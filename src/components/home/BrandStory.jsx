@@ -39,7 +39,7 @@ export const BrandStory = () => {
           <span className="text-[10px] tracking-[0.35em] text-neutral-400 font-serif uppercase block mb-2">
             PHILOSOPHY — JOIN LIFE
           </span>
-          <h2 className="section-heading-lg mb-5 md:mb-6">
+          <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6">
             REFINED WITH CONSCIENCE
           </h2>
           <p className="text-xs md:text-sm text-neutral-600 tracking-wider font-light leading-relaxed">

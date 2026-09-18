@@ -34,7 +34,7 @@ export const Newsletter = () => {
           <span className="text-[10px] tracking-[0.35em] uppercase text-neutral-400 font-serif block mb-2">
             EXCLUSIVE ACCESS
           </span>
-          <h2 className="section-heading-lg mb-5 md:mb-6">
+          <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6">
             BE THE FIRST TO KNOW
           </h2>
           <p className="text-xs md:text-sm text-neutral-500 tracking-wider font-light leading-relaxed mb-8 max-w-lg mx-auto">

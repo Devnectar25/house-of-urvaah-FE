@@ -50,7 +50,7 @@ export const AboutUs = () => {
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-2 block">
                 ABOUT US
               </span>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-normal tracking-[0.15em] uppercase text-[#111111] mb-5">
+              <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark mb-5">
                 OUR STORY
               </h2>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light mb-4">
@@ -76,7 +76,7 @@ export const AboutUs = () => {
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-2 block">
                 PURPOSE & VISION
               </span>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-normal tracking-[0.15em] uppercase text-[#111111] mb-5">
+              <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark mb-5">
                 OUR MISSION
               </h2>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light mb-4">
@@ -134,7 +134,7 @@ export const AboutUs = () => {
             <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
               CORE PILLARS
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-normal tracking-[0.18em] uppercase text-[#111111]">
+            <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
               DISTINCTIVE STANDARDS
             </h2>
           </div>

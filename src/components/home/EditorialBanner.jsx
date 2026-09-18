@@ -37,7 +37,7 @@ export const EditorialBanner = () => {
             <span className="text-[11px] md:text-xs tracking-[0.25em] uppercase text-neutral-500 font-serif mb-2">
               EDITORIAL VISION
             </span>
-            <h2 className="section-heading-lg text-brand-dark mb-5 md:mb-6">
+            <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6">
               THE ART OF<br />
               REFINED<br />
               TAILORING
