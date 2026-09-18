@@ -156,7 +156,7 @@ export const CategoryGrid = () => {
     <section id="recommended-for-you" className="py-12 md:py-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white">
       {/* Section Heading */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7">
-        <h2 className="section-heading text-brand-dark">
+        <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
           RECOMMENDED FOR YOU
         </h2>
       </div>

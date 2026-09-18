@@ -52,7 +52,7 @@ export const StealDeals = () => {
           </span>
 
           {/* Main Heading in Le Jour Serif */}
-          <h2 className="section-heading text-neutral-900">
+          <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
             STEAL DEALS
           </h2>
         </motion.div>
