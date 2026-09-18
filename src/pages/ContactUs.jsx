@@ -79,7 +79,7 @@ export const ContactUs = () => {
             <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-800 font-semibold mb-2 block">
               DIRECT ENQUIRY
             </span>
-            <h2 className="text-2xl sm:text-3xl font-serif font-normal tracking-[0.15em] uppercase text-[#111111] mb-8">
+            <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark mb-8">
               SEND A MESSAGE
             </h2>
 

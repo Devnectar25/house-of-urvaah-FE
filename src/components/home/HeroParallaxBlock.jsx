@@ -3,11 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Hero } from './Hero';
 import { DualCampaignBanner } from './DualCampaignBanner';
 import { Logo } from '../common/Logo';
+import { useCart } from '../../context/CartContext';
 
 export const HeroParallaxBlock = () => {
   const containerRef = useRef(null);
   const [isPinned, setIsPinned] = useState(true);
   const [opacity, setOpacity] = useState(1);
+  const { isMobileMenuOpen } = useCart();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,10 +59,30 @@ export const HeroParallaxBlock = () => {
             animate={{ opacity }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-3 left-2 sm:left-4 md:left-6 lg:left-8 md:bottom-8 lg:bottom-12 z-20 pointer-events-none text-left flex justify-start items-end transition-opacity duration-300 ease-out max-w-[88vw]"
+            className={`fixed bottom-3 md:bottom-8 lg:bottom-12 pointer-events-none flex items-end transition-all duration-500 ease-in-out max-w-[88vw] overflow-visible ${
+              isMobileMenuOpen
+                ? 'right-3 sm:right-6 md:right-10 lg:right-12 left-auto justify-end z-[60]'
+                : 'left-2 sm:left-4 md:left-6 lg:left-8 right-auto justify-start z-20'
+            }`}
             style={{ opacity }}
           >
-            <Logo className="h-10 sm:h-20 md:h-36 lg:h-[250px] w-auto max-w-full -translate-x-[8px] sm:-translate-x-[20px] md:-translate-x-[34px] drop-shadow-md" />
+            <div
+              className={`inline-flex items-center justify-center select-none h-10 sm:h-20 md:h-36 lg:h-[250px] w-auto max-w-full transition-all duration-500 ease-in-out ${
+                isMobileMenuOpen
+                  ? 'translate-x-0'
+                  : '-translate-x-[8px] sm:-translate-x-[20px] md:-translate-x-[34px]'
+              }`}
+            >
+              <img
+                src="/assets/logo.png"
+                alt="House of Urvaah"
+                className={`h-full w-auto object-contain transition-all duration-500 ease-in-out ${
+                  isMobileMenuOpen
+                    ? 'mix-blend-normal brightness-0 drop-shadow-sm'
+                    : 'mix-blend-multiply drop-shadow-md hover:opacity-85'
+                }`}
+              />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

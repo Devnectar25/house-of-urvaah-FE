@@ -25,7 +25,7 @@ export const ProductCarousel = ({ onQuickView }) => {
             <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
               WEEKLY DROP #34
             </span>
-            <h2 className="section-heading text-brand-dark">
+            <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
               NEW IN
             </h2>
           </div>
