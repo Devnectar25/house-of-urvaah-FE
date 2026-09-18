@@ -1,0 +1,96 @@
+@font-face {
+  font-family: 'Le Jour Serif';
+  src: url('/assets/fonts/LeJourSerif.woff2') format('woff2'),
+       url('/assets/fonts/LeJourSerif.woff') format('woff'),
+       url('/assets/fonts/LeJourSerif.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Parfumerie Script';
+  src: url('/assets/fonts/ParfumerieScript.woff2') format('woff2'),
+       url('/assets/fonts/ParfumerieScript.woff') format('woff'),
+       url('/assets/fonts/ParfumerieScript.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    scroll-behavior: smooth;
+    font-family: 'Le Jour Serif', serif;
+    color: #111111;
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Custom Scrollbar for ZARA editorial minimalist look */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f5f5f0;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #111111;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #444444;
+  }
+
+  /* Hide Edge & Browser native password reveal icons */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .text-shadow-subtle {
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+}
+
+@layer components {
+  /* Shared Major Section Heading Typography Scale */
+  .section-heading {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-script tracking-[0.08em] font-normal leading-[1.2];
+  }
+
+  .section-heading-lg {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-script tracking-[0.08em] font-normal leading-[1.2];
+  }
+}
+
+/* Image zoom hover effect helper */
+.editorial-img-zoom {
+  transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.editorial-card:hover .editorial-img-zoom {
+  transform: scale(1.04);
+}
