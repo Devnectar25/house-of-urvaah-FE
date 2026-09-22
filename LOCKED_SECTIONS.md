@@ -6,7 +6,8 @@ This file tracks sections, components, or pages marked as "PERFECT" by the user.
 - Header (Mobile + Desktop) — locked on [16-09-2026]
 - Navbar (Mobile + Desktop) — locked on [16-09-2026]
 - Side Navbar (Mobile + Desktop) — locked on [16-09-2026]
-- Best Sellers Section, including all 4 product cards (Oversized Tailored Blazer, Dark Blue Wide Leg Tailored Set, Peach Bloom Corset Set, Minimalist Ribbed Silk Top) — locked on [16-09-2026]
+- Best Sellers Section, including all 4 product cards — locked on [16-09-2026]
+- "TRENDING ON THE GRAM" title (Trending: Parfumerie Script Text; ON THE GRAM: Le Jour Serif) — locked on [23-09-2026]
 
 ---
 

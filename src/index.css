@@ -1,8 +1,20 @@
 @font-face {
   font-family: 'Le Jour Serif';
-  src: url('/assets/fonts/LeJourSerif.woff2') format('woff2'),
+  src: url('/fonts/LeJourSerif.woff2') format('woff2'),
+       url('/fonts/LeJourSerif.otf') format('opentype'),
+       url('/assets/fonts/LeJourSerif.woff2') format('woff2'),
        url('/assets/fonts/LeJourSerif.woff') format('woff'),
-       url('/assets/fonts/LeJourSerif.ttf') format('truetype');
+       url('/assets/fonts/LeJourSerif.ttf') format('truetype'),
+       url('/assets/fonts/LeJourSerif.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Parfumerie Script Text';
+  src: url('/fonts/ParfumerieScriptText.otf') format('opentype'),
+       url('/assets/fonts/ParfumerieScriptText.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -10,12 +22,30 @@
 
 @font-face {
   font-family: 'Parfumerie Script';
-  src: url('/assets/fonts/ParfumerieScript.woff2') format('woff2'),
-       url('/assets/fonts/ParfumerieScript.woff') format('woff'),
-       url('/assets/fonts/ParfumerieScript.ttf') format('truetype');
+  src: url('/fonts/ParfumerieScriptText.otf') format('opentype'),
+       url('/assets/fonts/ParfumerieScript.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
+}
+
+.font-parfumerie {
+  font-family: "Parfumerie Script Text", cursive;
+  color: rgb(0, 0, 0);
+  text-shadow: none;
+  font-size: 1.95em;
+  font-weight: normal;
+  line-height: 1;
+  vertical-align: baseline;
+}
+
+.font-le-jour {
+  font-family: 'Le Jour Serif', 'Bodoni Moda', 'Didot', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 400;
+  display: inline-block;
+  color: #000000;
 }
 
 @tailwind base;
@@ -25,7 +55,7 @@
 @layer base {
   html, body {
     scroll-behavior: smooth;
-    font-family: 'Le Jour Serif', serif;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: #111111;
     background-color: #ffffff;
     -webkit-font-smoothing: antialiased;
