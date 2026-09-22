@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 export const DualCampaignBanner = () => {
+  const navigate = useNavigate();
+
   // Auto-carousel state for the first section (Left Column Top)
   const blueImages = [
     '/assets/Images/Blue_Halter.jpg',
@@ -55,13 +58,14 @@ export const DualCampaignBanner = () => {
           ========================================================
         */}
         <div className="flex flex-col gap-0 w-full">
-          {/* 1. Top Left Image: Auto Carousel of Blue images */}
+          {/* 1. Top Left Image: Auto Carousel of Blue images -> Navigates to Blue Co-ord set (bs-102) */}
           <motion.div
             initial={{ opacity: 0, y: 60 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100"
+            onClick={() => navigate('/product/bs-102')}
+            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {blueImages.map((src, i) => (
               <img
@@ -76,13 +80,14 @@ export const DualCampaignBanner = () => {
             ))}
           </motion.div>
 
-          {/* 2. Bottom Left Image: Auto Carousel of Peach images */}
+          {/* 2. Bottom Left Image: Auto Carousel of Peach images -> Navigates to Silk Top (bs-104) */}
           <motion.div
             initial={{ opacity: 0, y: 60 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100"
+            onClick={() => navigate('/product/bs-104')}
+            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {peachImages.map((src, i) => (
               <img
@@ -100,17 +105,18 @@ export const DualCampaignBanner = () => {
 
         {/* 
           ========================================================
-          RIGHT COLUMN: Vertical Stack of Brown images + Corset04
+          RIGHT COLUMN: Vertical Stack of Brown images + Corset images
           ========================================================
         */}
         <div className="flex flex-col gap-0 w-full">
-          {/* 3. Top Right Image: Auto Carousel of Brown images */}
+          {/* 3. Top Right Image: Auto Carousel of Brown images -> Navigates to Blazer (bs-101) */}
           <motion.div
             initial={{ opacity: 0, y: 60 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100"
+            onClick={() => navigate('/product/bs-101')}
+            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {brownImages.map((src, i) => (
               <img
@@ -125,13 +131,14 @@ export const DualCampaignBanner = () => {
             ))}
           </motion.div>
 
-          {/* 4. Bottom Right Image: Auto Carousel of Corset images */}
+          {/* 4. Bottom Right Image: Auto Carousel of Corset images -> Navigates to Corset Set (bs-103) */}
           <motion.div
             initial={{ opacity: 0, y: 60 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100"
+            onClick={() => navigate('/product/bs-103')}
+            className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {corsetImages.map((src, i) => (
               <img
