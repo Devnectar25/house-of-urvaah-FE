@@ -728,8 +728,9 @@ export const TrendingOnGram = () => {
         <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
           AS SEEN ON INSTAGRAM
         </span>
-        <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
-          <span style={{ color: '#FFDA03', textShadow: '2px 3px 6px rgba(17, 17, 17, 0.25)' }}>TRENDING</span> ON THE GRAM
+        <h2 className="text-2xl sm:text-3xl md:text-4xl text-black flex items-baseline">
+          <span className="font-parfumerie capitalize inline-block mr-2">Trending</span>
+          <span className="font-le-jour">ON THE GRAM</span>
         </h2>
       </div>
 
