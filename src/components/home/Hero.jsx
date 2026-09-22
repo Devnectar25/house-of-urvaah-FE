@@ -2,7 +2,7 @@ import React from 'react';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 export const Hero = () => {
-  const supabaseVideoSrc = getSupabaseMediaUrl('/assets/video/Hero-section-video-two.mp4');
+  const supabaseVideoSrc = getSupabaseMediaUrl('HOU_desktop');
   const localVideoSrc = '/assets/video/Hero-section-video-two.mp4';
 
   return (
