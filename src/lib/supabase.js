@@ -12,14 +12,19 @@ export const getSupabaseMediaUrl = (path) => {
   }
   let cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
+  // Handle HOU_desktop aliases
+  if (cleanPath.includes("HOU_desktop")) {
+    return `${CDN_BASE_URL}/videos/HOU_desktop%20video.mp4.mp4`;
+  }
+
   // Remove "assets/" prefix if present
   if (cleanPath.startsWith("assets/")) {
     cleanPath = cleanPath.replace(/^assets\//, "");
   }
 
-  // Normalize "video/" to "Videos/" to match Supabase bucket folder
+  // Normalize "video/" to "videos/" to match Supabase bucket folder
   if (cleanPath.startsWith("video/")) {
-    cleanPath = cleanPath.replace(/^video\//, "Videos/");
+    cleanPath = cleanPath.replace(/^video\//, "videos/");
   }
 
   return `${CDN_BASE_URL}/${cleanPath}`;
