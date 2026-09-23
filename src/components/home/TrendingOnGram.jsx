@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
 const GRAM_VIDEOS = [
@@ -287,21 +287,16 @@ const InstagramIcon = () => (
   </svg>
 );
 
-const VideoCard = ({ item, isMuted, onToggleMute, onOpenLook }) => {
+const VideoCard = ({ item, onOpenLook }) => {
   const videoRef = useRef(null);
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.muted = isMuted;
+      videoRef.current.muted = true;
+      videoRef.current.defaultMuted = true;
       videoRef.current.play().catch(() => {});
     }
-  }, [isMuted]);
-
-  const toggleSound = (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onToggleMute();
-  };
+  }, []);
 
   return (
     <div
@@ -310,30 +305,38 @@ const VideoCard = ({ item, isMuted, onToggleMute, onOpenLook }) => {
     >
       {/* Autoplaying Loop Video */}
       <video
-        ref={videoRef}
+        ref={(el) => {
+          videoRef.current = el;
+          if (el) {
+            el.muted = true;
+            el.defaultMuted = true;
+          }
+        }}
         src={item.src}
         autoPlay
         muted
+        defaultMuted
         loop
         playsInline
+        onPlay={(e) => {
+          if (e.currentTarget) {
+            e.currentTarget.muted = true;
+          }
+        }}
+        onLoadedMetadata={(e) => {
+          if (e.currentTarget) {
+            e.currentTarget.muted = true;
+          }
+        }}
         className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
       />
 
-      {/* Top Bar Overlay: Brand Tag + Sound Toggle */}
-      <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
+      {/* Top Bar Overlay: Brand Tag */}
+      <div className="absolute top-3 left-3 z-10 pointer-events-none">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans">
           <InstagramIcon />
           <span>{item.handle}</span>
         </div>
-
-        <button
-          type="button"
-          onClick={toggleSound}
-          className="pointer-events-auto p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 hover:bg-black/70 hover:text-white transition-all cursor-pointer"
-          aria-label={isMuted ? 'Unmute video' : 'Mute video'}
-        >
-          {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-        </button>
       </div>
 
       {/* Bottom Editorial Content Scrim Overlay */}
@@ -357,7 +360,6 @@ const VideoCard = ({ item, isMuted, onToggleMute, onOpenLook }) => {
 // Shop The Look Modal (Matching the uploaded reference layout)
 const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onNext }) => {
   const modalVideoRef = useRef(null);
-  const [modalMuted, setModalMuted] = useState(false);
   const [selectedImage, setSelectedImage] = useState(look.product.image);
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
@@ -369,7 +371,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     setSelectedImgIndex(0);
     setIsExpanded(true);
     if (modalVideoRef.current) {
-      modalVideoRef.current.muted = modalMuted;
+      modalVideoRef.current.muted = true;
+      modalVideoRef.current.defaultMuted = true;
       modalVideoRef.current.currentTime = 0;
       modalVideoRef.current.play().catch(() => {});
     }
@@ -384,14 +387,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onPrev, onNext]);
-
-  const toggleModalSound = () => {
-    if (modalVideoRef.current) {
-      const nextMuted = !modalVideoRef.current.muted;
-      modalVideoRef.current.muted = nextMuted;
-      setModalMuted(nextMuted);
-    }
-  };
 
   const handleThumbnailClick = (img, index) => {
     setSelectedImage(img);
@@ -486,25 +481,32 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
         {/* Left Side: Vertical Fashion Video */}
         <div className="relative w-full md:w-[48%] h-[320px] sm:h-[400px] md:h-full bg-neutral-950 flex-shrink-0 overflow-hidden">
           <video
-            ref={modalVideoRef}
+            ref={(el) => {
+              modalVideoRef.current = el;
+              if (el) {
+                el.muted = true;
+                el.defaultMuted = true;
+              }
+            }}
             key={look.src}
             src={look.src}
             autoPlay
-            muted={modalMuted}
+            muted
+            defaultMuted
             loop
             playsInline
+            onPlay={(e) => {
+              if (e.currentTarget) {
+                e.currentTarget.muted = true;
+              }
+            }}
+            onLoadedMetadata={(e) => {
+              if (e.currentTarget) {
+                e.currentTarget.muted = true;
+              }
+            }}
             className="w-full h-full object-cover"
           />
-
-          {/* Sound Toggle Button on Top Right of Video */}
-          <button
-            type="button"
-            onClick={toggleModalSound}
-            className="absolute top-3.5 right-3.5 z-30 p-2 rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-black/85 transition-all cursor-pointer shadow-md"
-            aria-label={modalMuted ? 'Unmute' : 'Mute'}
-          >
-            {modalMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
 
           {/* Reel Tag Badge */}
           <div className="absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans">
@@ -698,14 +700,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
 
 export const TrendingOnGram = () => {
   const [activeModalIndex, setActiveModalIndex] = useState(null);
-  const [unmutedVideoId, setUnmutedVideoId] = useState(null);
-
-  const handleToggleMute = (id) => {
-    setUnmutedVideoId((prevId) => (prevId === id ? null : id));
-  };
 
   const handleOpenModal = (index) => {
-    setUnmutedVideoId(null);
     setActiveModalIndex(index);
   };
 
@@ -752,8 +748,6 @@ export const TrendingOnGram = () => {
           >
             <VideoCard
               item={item}
-              isMuted={unmutedVideoId !== item.id}
-              onToggleMute={() => handleToggleMute(item.id)}
               onOpenLook={() => handleOpenModal(idx)}
             />
           </motion.div>
