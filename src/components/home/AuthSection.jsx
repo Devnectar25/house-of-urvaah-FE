@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles, User, Lock, Mail, Eye, EyeOff, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -7,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const AuthSection = () => {
+  const navigate = useNavigate();
   const { user, loginUser, logoutUser } = useCart();
 
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -84,7 +86,14 @@ export const AuthSection = () => {
       });
 
       if (error) {
-        setLoginServerError('Invalid email or password.');
+        console.error('[Supabase Auth Login Error]', error);
+        if (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed')) {
+          setLoginServerError('Please verify your email address before logging in.');
+        } else if (error.code === 'invalid_credentials' || error.message?.toLowerCase().includes('invalid login credentials')) {
+          setLoginServerError('Invalid email or password. Please check your credentials or register a new account.');
+        } else {
+          setLoginServerError(error.message || 'Invalid email or password.');
+        }
         setIsLoginSubmitting(false);
         return;
       }
@@ -101,6 +110,7 @@ export const AuthSection = () => {
         });
         setSubmittedStatus('');
         setIsLoginSubmitting(false);
+        navigate('/account');
       }, 1000);
     } catch (err) {
       setLoginServerError('An unexpected error occurred.');
@@ -151,6 +161,7 @@ export const AuthSection = () => {
         });
         setSubmittedStatus('');
         setIsSignupSubmitting(false);
+        navigate('/account');
       }, 1200);
 
     } catch (err) {
