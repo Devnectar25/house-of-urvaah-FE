@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
 
 const CartContext = createContext();
 
@@ -23,17 +24,54 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(null); // null or { name, email }
+  const [user, setUser] = useState(null); // formatted user object
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
+
+  const formatUserData = (sbUser) => {
+    if (!sbUser) return null;
+    return {
+      id: sbUser.id,
+      name: sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Atelier Member',
+      email: sbUser.email,
+      user_metadata: sbUser.user_metadata
+    };
+  };
+
+  useEffect(() => {
+    // Get initial Supabase session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(formatUserData(session?.user));
+      setAuthLoading(false);
+    });
+
+    // Listen for Auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(formatUserData(session?.user));
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const loginUser = (userData) => {
     setUser(userData);
     setIsAuthModalOpen(false);
   };
 
-  const logoutUser = () => {
+  const logoutUser = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error signing out of Supabase:', err);
+    }
     setUser(null);
+    setSession(null);
+    setIsAuthModalOpen(false);
   };
 
   const openAuthModal = (mode = 'login') => {
@@ -126,6 +164,8 @@ export const CartProvider = ({ children }) => {
         openAuthModal,
         user,
         setUser,
+        session,
+        authLoading,
         loginUser,
         logoutUser,
         quickViewProduct,

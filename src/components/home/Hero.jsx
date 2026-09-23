@@ -24,10 +24,6 @@ export const Hero = () => {
         <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/25 via-black/5 to-transparent pointer-events-none" />
       </div>
 
-      {/* Midpoint Full-Width Hairline Structural Rule */}
-      <div className="absolute top-1/2 inset-x-0 z-10 -translate-y-1/2 pointer-events-none">
-        <div className="w-full h-[1px] bg-black/20 md:bg-black/15" />
-      </div>
     </section>
   );
 };
