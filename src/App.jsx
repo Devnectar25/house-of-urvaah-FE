@@ -15,6 +15,11 @@ import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
 import { Account } from './pages/Account';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { ShippingPolicy } from './pages/ShippingPolicy';
+import { ReturnRefundPolicy } from './pages/ReturnRefundPolicy';
+import { CookiePolicy } from './pages/CookiePolicy';
+import { TermsAndConditions } from './pages/TermsAndConditions';
 
 // Simple placeholder page component for future route stubs
 const PlaceholderPage = ({ title }) => (
@@ -62,6 +67,17 @@ export function App() {
             <Route path="/about-us" element={<AboutUs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/contact-us" element={<ContactUs />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/cookie-setting" element={<CookiePolicy />} />
+            <Route path="/cookie-settings" element={<CookiePolicy />} />
+            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+            <Route path="/terms-of-purchase" element={<TermsAndConditions />} />
+            <Route path="/terms" element={<TermsAndConditions />} />
+            <Route path="/return-refund-policy" element={<ReturnRefundPolicy />} />
+            <Route path="/returns" element={<ReturnRefundPolicy />} />
+            <Route path="/returns-exchanges" element={<ReturnRefundPolicy />} />
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/new-in" element={<Home />} />
             <Route path="/clothing" element={<Home />} />

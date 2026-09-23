@@ -41,7 +41,7 @@ export const Footer = () => {
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.help ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
               <li><Link to="/contact" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Contact Us</Link></li>
               <li><a href="#track" className="hover:text-black transition-colors block py-1">Track Order</a></li>
-              <li><a href="#returns" className="hover:text-black transition-colors block py-1">Returns & Exchanges</a></li>
+              <li><Link to="/return-refund-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Return &amp; Refund</Link></li>
               <li><a href="#shipping" className="hover:text-black transition-colors block py-1">Shipping Information</a></li>
               <li><a href="#size-guide" className="hover:text-black transition-colors block py-1">Size Guide</a></li>
               <li><a href="#faqs" className="hover:text-black transition-colors block py-1">FAQs</a></li>
@@ -78,9 +78,10 @@ export const Footer = () => {
               <ChevronDown className={`w-4 h-4 text-neutral-500 sm:hidden transition-transform duration-200 ${openSections.policies ? 'rotate-180' : ''}`} />
             </button>
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.policies ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
-              <li><a href="#privacy" className="hover:text-black transition-colors block py-1">Privacy Policy</a></li>
-              <li><a href="#terms" className="hover:text-black transition-colors block py-1">Terms of Purchase</a></li>
-              <li><a href="#cookies" className="hover:text-black transition-colors block py-1">Cookie Settings</a></li>
+              <li><Link to="/privacy-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Privacy Policy</Link></li>
+              <li><Link to="/shipping-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Shipping &amp; Delivery</Link></li>
+              <li><Link to="/terms-and-conditions" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Terms and Conditions</Link></li>
+              <li><Link to="/cookie-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Cookie Policy</Link></li>
               <li><a href="#accessibility" className="hover:text-black transition-colors block py-1">Accessibility</a></li>
             </ul>
           </div>
