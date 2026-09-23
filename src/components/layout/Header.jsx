@@ -120,6 +120,7 @@ export const Header = () => {
             <Link
               to="/contact"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+              data-allow-guest="true"
               className="hidden sm:flex text-xs sm:text-sm md:text-base font-bold tracking-[0.15em] uppercase text-brand-dark hover:opacity-60 transition-opacity items-center min-h-[44px] px-1 leading-none ml-0.5"
             >
               HELP
@@ -154,7 +155,7 @@ export const Header = () => {
 
           {/* Column 2 (Center): house of URVAAH Logo Image */}
           <div className="flex items-center justify-center">
-            <Link to="/" aria-label="House of Urvaah Home" className="inline-flex items-center justify-center">
+            <Link to="/" aria-label="House of Urvaah Home" data-allow-guest="true" className="inline-flex items-center justify-center">
               <Logo className="h-8 sm:h-12 md:h-16 lg:h-20" />
             </Link>
           </div>

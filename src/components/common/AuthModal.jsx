@@ -254,7 +254,7 @@ export const AuthModal = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-serif selection:bg-brand-dark selection:text-white select-none">
+      <div data-auth-modal="true" data-allow-guest="true" className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-serif selection:bg-brand-dark selection:text-white select-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
