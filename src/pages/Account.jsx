@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import apiClient from '../lib/apiClient';
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export const Account = () => {
   const [addresses, setAddresses] = useState([]);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddressIndex, setEditingAddressIndex] = useState(null);
+  const [editingAddressId, setEditingAddressId] = useState(null);
   const [addressForm, setAddressForm] = useState({
     name: '',
     phone: '',
@@ -31,14 +33,60 @@ export const Account = () => {
   });
   const [addressSaving, setAddressSaving] = useState(false);
 
-  // Sync state when user updates
+  // Orders state
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  // Fetch real profile details and addresses on mount / user change
+  const loadProfileAndAddresses = async () => {
+    if (!user) return;
+    try {
+      const res = await apiClient('/api/users/profile');
+      if (res.success) {
+        if (res.addresses) {
+          const mapped = res.addresses.map(a => ({
+            id: a.id,
+            name: user.name || 'Recipient',
+            phone: user.phone || '',
+            street: a.full_address || a.street || '',
+            city: a.city || '',
+            state: a.state || '',
+            pincode: a.postal_code || a.pincode || '',
+            type: a.address_label || a.type || 'Home',
+            isDefault: !!a.is_default
+          }));
+          setAddresses(mapped);
+        }
+      }
+    } catch (e) {
+      if (user.addresses) setAddresses(user.addresses);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       setFullNameInput(user.name || '');
       setPhoneInput(user.phone || '');
-      setAddresses(user.addresses || []);
+      loadProfileAndAddresses();
     }
   }, [user]);
+
+  // Fetch orders when tab switches to VIEW ORDERS
+  useEffect(() => {
+    if (activeTab === 'VIEW ORDERS' && user) {
+      setOrdersLoading(true);
+      apiClient('/api/orders/my-orders')
+        .then(res => {
+          if (res.success && res.data) {
+            setOrders(res.data);
+          }
+        })
+        .catch(err => {
+          console.warn('Could not fetch orders:', err.message);
+        })
+        .finally(() => setOrdersLoading(false));
+    }
+  }, [activeTab, user]);
 
   // Protect route
   useEffect(() => {
@@ -73,7 +121,7 @@ export const Account = () => {
     setProfileMessage('');
 
     const res = await updateUserProfile({
-      full_name: fullNameInput.trim(),
+      fullName: fullNameInput.trim(),
       phone: phoneInput.trim()
     });
 
@@ -89,6 +137,7 @@ export const Account = () => {
 
   const openAddAddressModal = () => {
     setEditingAddressIndex(null);
+    setEditingAddressId(null);
     setAddressForm({
       name: user?.name || '',
       phone: user?.phone || '',
@@ -104,7 +153,9 @@ export const Account = () => {
 
   const openEditAddressModal = (idx) => {
     setEditingAddressIndex(idx);
-    setAddressForm({ ...addresses[idx] });
+    const item = addresses[idx];
+    setEditingAddressId(item.id || null);
+    setAddressForm({ ...item });
     setIsAddressModalOpen(true);
   };
 
@@ -112,29 +163,64 @@ export const Account = () => {
     e.preventDefault();
     setAddressSaving(true);
 
-    let updatedList = [...addresses];
+    try {
+      const payload = {
+        user_id: user.id || user.username,
+        address_label: addressForm.type,
+        full_address: addressForm.street,
+        city: addressForm.city,
+        state: addressForm.state,
+        postal_code: addressForm.pincode,
+        is_default: addressForm.isDefault
+      };
 
-    // If new address is set to default, reset existing defaults
-    if (addressForm.isDefault) {
-      updatedList = updatedList.map((addr) => ({ ...addr, isDefault: false }));
-    }
+      if (editingAddressId) {
+        await apiClient(`/api/addresses/${editingAddressId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await apiClient('/api/addresses', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
 
-    if (editingAddressIndex !== null) {
-      updatedList[editingAddressIndex] = addressForm;
-    } else {
-      updatedList.push(addressForm);
-    }
-
-    const res = await updateUserProfile({ addresses: updatedList });
-    setAddressSaving(false);
-
-    if (res.success) {
-      setAddresses(updatedList);
+      await loadProfileAndAddresses();
       setIsAddressModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save address via backend API, falling back:', err);
+      // Fallback update profile
+      let updatedList = [...addresses];
+      if (addressForm.isDefault) {
+        updatedList = updatedList.map((addr) => ({ ...addr, isDefault: false }));
+      }
+      if (editingAddressIndex !== null) {
+        updatedList[editingAddressIndex] = addressForm;
+      } else {
+        updatedList.push(addressForm);
+      }
+      const res = await updateUserProfile({ addresses: updatedList });
+      if (res.success) {
+        setAddresses(updatedList);
+        setIsAddressModalOpen(false);
+      }
+    } finally {
+      setAddressSaving(false);
     }
   };
 
   const handleDeleteAddress = async (idx) => {
+    const item = addresses[idx];
+    if (item?.id) {
+      try {
+        await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
+        await loadProfileAndAddresses();
+        return;
+      } catch (err) {
+        console.error('Failed to delete address via backend API:', err);
+      }
+    }
     const updatedList = addresses.filter((_, i) => i !== idx);
     const res = await updateUserProfile({ addresses: updatedList });
     if (res.success) {
@@ -143,6 +229,25 @@ export const Account = () => {
   };
 
   const handleSetDefaultAddress = async (idx) => {
+    const item = addresses[idx];
+    if (item?.id) {
+      try {
+        await apiClient(`/api/addresses/${item.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            user_id: user.id || user.username,
+            address_label: item.type,
+            full_address: item.street,
+            city: item.city,
+            state: item.state,
+            postal_code: item.pincode,
+            is_default: true
+          })
+        });
+        await loadProfileAndAddresses();
+        return;
+      } catch (err) {}
+    }
     const updatedList = addresses.map((addr, i) => ({
       ...addr,
       isDefault: i === idx

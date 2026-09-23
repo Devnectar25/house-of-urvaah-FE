@@ -15,6 +15,7 @@ import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
 import { Account } from './pages/Account';
+import { AuthCallback } from './components/auth/AuthCallback';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { ShippingPolicy } from './pages/ShippingPolicy';
 import { ReturnRefundPolicy } from './pages/ReturnRefundPolicy';
@@ -93,6 +94,7 @@ export function App() {
             <Route path="/wishlist" element={<PlaceholderPage title="WISHLIST" />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account-details" element={<Account />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/login" element={<Home />} />
             <Route path="*" element={<Home />} />
           </Routes>
