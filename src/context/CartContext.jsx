@@ -32,12 +32,33 @@ export const CartProvider = ({ children }) => {
 
   const formatUserData = (sbUser) => {
     if (!sbUser) return null;
+    const fullName = sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Atelier Member';
+    const firstName = fullName.trim().split(' ')[0] || fullName;
     return {
       id: sbUser.id,
-      name: sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Atelier Member',
+      name: fullName,
+      firstName: firstName,
       email: sbUser.email,
+      phone: sbUser.user_metadata?.phone || '',
+      addresses: sbUser.user_metadata?.addresses || [],
       user_metadata: sbUser.user_metadata
     };
+  };
+
+  const updateUserProfile = async (updates) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: updates
+      });
+      if (error) throw error;
+      if (data?.user) {
+        setUser(formatUserData(data.user));
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to update user profile:', err);
+      return { success: false, error: err.message };
+    }
   };
 
   useEffect(() => {
@@ -168,6 +189,7 @@ export const CartProvider = ({ children }) => {
         authLoading,
         loginUser,
         logoutUser,
+        updateUserProfile,
         quickViewProduct,
         setQuickViewProduct,
         pdpProduct,

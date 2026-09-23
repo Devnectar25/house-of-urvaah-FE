@@ -14,6 +14,7 @@ import { Home } from './pages/Home';
 import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
+import { Account } from './pages/Account';
 
 // Simple placeholder page component for future route stubs
 const PlaceholderPage = ({ title }) => (
@@ -74,7 +75,8 @@ export function App() {
             <Route path="/sale" element={<Home />} />
             <Route path="/cart" element={<PlaceholderPage title="SHOPPING BAG" />} />
             <Route path="/wishlist" element={<PlaceholderPage title="WISHLIST" />} />
-            <Route path="/account" element={<Home />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/account-details" element={<Account />} />
             <Route path="/login" element={<Home />} />
             <Route path="*" element={<Home />} />
           </Routes>
