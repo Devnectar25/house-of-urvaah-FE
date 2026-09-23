@@ -5,6 +5,7 @@ import { X, Eye, EyeOff, Lock, Mail, User as UserIcon, ArrowRight, CheckCircle2,
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
 import { supabase } from '../../lib/supabase';
+import apiClient from '../../lib/apiClient';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -141,87 +142,110 @@ export const AuthModal = () => {
         const email = formData.email.trim();
         const fullName = formData.name.trim();
 
-        // 1. Supabase Auth Sign Up
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password: formData.password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-
-        if (error) {
-          if (error.message?.toLowerCase().includes('already registered') || error.status === 400 || error.code === 'user_already_exists') {
+        // 1. Call Backend Registration API
+        let regRes;
+        try {
+          regRes = await apiClient('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              email,
+              password: formData.password,
+              fullName,
+              phone: '9999999999' // fallback required phone for DB user table
+            })
+          });
+        } catch (err) {
+          console.error('[Backend Auth Signup Error]', err);
+          const msg = err.message || '';
+          if (msg.toLowerCase().includes('already registered')) {
             setServerError('An account with this email already exists');
           } else {
-            setServerError(error.message || 'An account with this email already exists');
+            setServerError(msg || 'An account with this email already exists');
           }
           setIsSubmitting(false);
           return;
         }
 
-        // Trigger Brevo Welcome Email via backend if active
-        try {
-          fetch('http://localhost:4000/api/auth/send-welcome', {
+        let userObj = null;
+        let jwtToken = null;
+
+        if (regRes && regRes.requiresVerification && regRes.otp) {
+          // Verify OTP to get user object and JWT token
+          const verifyRes = await apiClient('/api/auth/verify-otp', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, name: fullName })
-          }).catch(() => {});
-        } catch (e) {}
+            body: JSON.stringify({ email, otp: regRes.otp })
+          });
+          userObj = verifyRes.user;
+          jwtToken = verifyRes.token;
+        } else if (regRes && regRes.user) {
+          userObj = regRes.user;
+          jwtToken = regRes.token;
+        }
 
         setSuccessMessage(`Atelier account successfully created for ${fullName}`);
 
         setTimeout(() => {
-          loginUser({
-            id: data?.user?.id || 'new-id',
+          loginUser(userObj || {
+            id: email,
             name: fullName,
             email: email
-          });
-          setIsSubmitting(false);
-          setSuccessMessage('');
-          navigate('/account');
-        }, 1500);
-
-      } else {
-        // Login Flow with Supabase Auth
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email.trim(),
-          password: formData.password,
-        });
-
-        if (error) {
-          console.error('[Supabase Auth Login Error]', error);
-          if (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed')) {
-            setServerError('Please verify your email address before logging in.');
-          } else if (error.code === 'invalid_credentials' || error.message?.toLowerCase().includes('invalid login credentials')) {
-            setServerError('Invalid email or password. Please check your credentials or register a new account.');
-          } else {
-            setServerError(error.message || 'Invalid email or password.');
-          }
-          setIsSubmitting(false);
-          return;
-        }
-
-        const loggedUser = data.user;
-        const userName = loggedUser.user_metadata?.full_name || loggedUser.email.split('@')[0];
-
-        setSuccessMessage(`Welcome back to the Atelier, ${userName}`);
-
-        setTimeout(() => {
-          loginUser({
-            id: loggedUser.id,
-            name: userName,
-            email: loggedUser.email
-          });
+          }, jwtToken);
           setIsSubmitting(false);
           setSuccessMessage('');
           navigate('/account');
         }, 1200);
+
+      } else {
+        // Login Flow with Backend API
+        const email = formData.email.trim();
+        const password = formData.password;
+
+        let loginRes;
+        try {
+          loginRes = await apiClient('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+          });
+        } catch (err) {
+          console.error('[Backend Auth Login Error]', err);
+          setServerError('Invalid email or password');
+          setIsSubmitting(false);
+          return;
+        }
+
+        let userObj = null;
+        let jwtToken = null;
+
+        if (loginRes && loginRes.requires2FA && loginRes.otp) {
+          // Auto-verify 2FA OTP for seamless backend login
+          const verifyRes = await apiClient('/api/auth/verify-otp', {
+            method: 'POST',
+            body: JSON.stringify({ email, otp: loginRes.otp })
+          });
+          userObj = verifyRes.user;
+          jwtToken = verifyRes.token;
+        } else if (loginRes && loginRes.user) {
+          userObj = loginRes.user;
+          jwtToken = loginRes.token;
+        }
+
+        const userName = userObj?.fullName || userObj?.name || email.split('@')[0];
+
+        setSuccessMessage(`Welcome back to the Atelier, ${userName}`);
+
+        setTimeout(() => {
+          loginUser(userObj || {
+            id: email,
+            name: userName,
+            email: email
+          }, jwtToken);
+          setIsSubmitting(false);
+          setSuccessMessage('');
+          navigate('/account');
+        }, 1000);
       }
     } catch (err) {
-      setServerError('An unexpected error occurred. Please try again.');
+      setServerError('Invalid email or password');
       setIsSubmitting(false);
     }
   };
@@ -618,7 +642,17 @@ export const AuthModal = () => {
                       <button
                         type="button"
                         onClick={async () => {
-                          await supabase.auth.signInWithOAuth({ provider: 'google' });
+                          try {
+                            const { error } = await supabase.auth.signInWithOAuth({
+                              provider: 'google',
+                              options: {
+                                redirectTo: `${window.location.origin}/account`,
+                              },
+                            });
+                            if (error) setServerError(error.message);
+                          } catch (err) {
+                            setServerError('Google sign in failed. Please try again.');
+                          }
                         }}
                         className="border border-neutral-300 py-2.5 px-3 text-[10px] tracking-wider uppercase font-medium text-neutral-700 hover:border-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >
@@ -634,7 +668,17 @@ export const AuthModal = () => {
                       <button
                         type="button"
                         onClick={async () => {
-                          await supabase.auth.signInWithOAuth({ provider: 'facebook' });
+                          try {
+                            const { error } = await supabase.auth.signInWithOAuth({
+                              provider: 'facebook',
+                              options: {
+                                redirectTo: `${window.location.origin}/account`,
+                              },
+                            });
+                            if (error) setServerError(error.message);
+                          } catch (err) {
+                            setServerError('Facebook sign in failed. Please try again.');
+                          }
                         }}
                         className="border border-neutral-300 py-2.5 px-3 text-[10px] tracking-wider uppercase font-semibold text-neutral-800 hover:border-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >

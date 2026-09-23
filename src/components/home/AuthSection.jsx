@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles, User, Lock, Mail, Eye, EyeOff, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { supabase } from '../../lib/supabase';
+import apiClient from '../../lib/apiClient';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,40 +81,51 @@ export const AuthSection = () => {
 
     setIsLoginSubmitting(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail.trim(),
-        password: loginPassword,
-      });
+      const email = loginEmail.trim();
+      const password = loginPassword;
 
-      if (error) {
-        console.error('[Supabase Auth Login Error]', error);
-        if (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed')) {
-          setLoginServerError('Please verify your email address before logging in.');
-        } else if (error.code === 'invalid_credentials' || error.message?.toLowerCase().includes('invalid login credentials')) {
-          setLoginServerError('Invalid email or password. Please check your credentials or register a new account.');
-        } else {
-          setLoginServerError(error.message || 'Invalid email or password.');
-        }
+      let loginRes;
+      try {
+        loginRes = await apiClient('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+      } catch (err) {
+        console.error('[Backend Auth Login Error]', err);
+        setLoginServerError('Invalid email or password');
         setIsLoginSubmitting(false);
         return;
       }
 
+      let userObj = null;
+      let jwtToken = null;
+
+      if (loginRes && loginRes.requires2FA && loginRes.otp) {
+        const verifyRes = await apiClient('/api/auth/verify-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email, otp: loginRes.otp })
+        });
+        userObj = verifyRes.user;
+        jwtToken = verifyRes.token;
+      } else if (loginRes && loginRes.user) {
+        userObj = loginRes.user;
+        jwtToken = loginRes.token;
+      }
+
       setSubmittedStatus('login');
-      const loggedUser = data.user;
-      const userName = loggedUser.user_metadata?.full_name || loggedUser.email.split('@')[0];
 
       setTimeout(() => {
-        loginUser({
-          id: loggedUser.id,
-          name: userName,
-          email: loggedUser.email
-        });
+        loginUser(userObj || {
+          id: email,
+          name: email.split('@')[0],
+          email: email
+        }, jwtToken);
         setSubmittedStatus('');
         setIsLoginSubmitting(false);
         navigate('/account');
       }, 1000);
     } catch (err) {
-      setLoginServerError('An unexpected error occurred.');
+      setLoginServerError('Invalid email or password');
       setIsLoginSubmitting(false);
     }
   };
@@ -128,44 +140,59 @@ export const AuthSection = () => {
       const email = signupEmail.trim();
       const fullName = signupName.trim();
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: signupPassword,
-        options: {
-          data: { full_name: fullName }
+      let regRes;
+      try {
+        regRes = await apiClient('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            password: signupPassword,
+            fullName,
+            phone: '9999999999'
+          })
+        });
+      } catch (err) {
+        console.error('[Backend Auth Signup Error]', err);
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('already registered')) {
+          setSignupServerError('An account with this email already exists');
+        } else {
+          setSignupServerError(msg || 'An account with this email already exists');
         }
-      });
-
-      if (error) {
-        setSignupServerError('An account with this email already exists');
         setIsSignupSubmitting(false);
         return;
       }
 
-      // Trigger Brevo Welcome Email
-      try {
-        fetch('http://localhost:4000/api/auth/send-welcome', {
+      let userObj = null;
+      let jwtToken = null;
+
+      if (regRes && regRes.requiresVerification && regRes.otp) {
+        const verifyRes = await apiClient('/api/auth/verify-otp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name: fullName })
-        }).catch(() => {});
-      } catch (e) {}
+          body: JSON.stringify({ email, otp: regRes.otp })
+        });
+        userObj = verifyRes.user;
+        jwtToken = verifyRes.token;
+      } else if (regRes && regRes.user) {
+        userObj = regRes.user;
+        jwtToken = regRes.token;
+      }
 
       setSubmittedStatus('signup');
 
       setTimeout(() => {
-        loginUser({
-          id: data?.user?.id || 'new-user',
+        loginUser(userObj || {
+          id: email,
           name: fullName,
           email: email
-        });
+        }, jwtToken);
         setSubmittedStatus('');
         setIsSignupSubmitting(false);
         navigate('/account');
       }, 1200);
 
     } catch (err) {
-      setSignupServerError('An unexpected error occurred.');
+      setSignupServerError('Invalid email or password');
       setIsSignupSubmitting(false);
     }
   };
