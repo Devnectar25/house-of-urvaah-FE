@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Mail,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 
 export const CookiePolicy = () => {
@@ -38,7 +39,7 @@ export const CookiePolicy = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 sm:space-y-14 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
         >
           {/* INTRODUCTORY PARAGRAPHS */}
           <div className="space-y-5 pb-6 border-b border-neutral-200">
@@ -52,7 +53,7 @@ export const CookiePolicy = () => {
 
           {/* SECTION 1 */}
           <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-3.5 mb-2">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Cookie className="w-5 h-5 text-neutral-900" />
               </div>
@@ -86,8 +87,8 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 2 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Target className="w-5 h-5 text-neutral-900" />
               </div>
@@ -121,8 +122,8 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 3 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Layers className="w-5 h-5 text-neutral-900" />
               </div>
@@ -132,41 +133,41 @@ export const CookiePolicy = () => {
             </div>
 
             {/* RESPONSIVE STYLED HTML TABLE */}
-            <div className="overflow-x-auto my-6 border border-neutral-200 rounded-xl">
-              <table className="w-full text-left text-xs sm:text-sm font-serif border-collapse">
+            <div className="overflow-x-auto my-6 border border-neutral-200/90 rounded-2xl shadow-xs bg-white">
+              <table className="w-full text-left text-xs sm:text-sm font-serif border-collapse min-w-[640px]">
                 <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-900">
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
+                  <tr className="bg-neutral-50/90 border-b border-neutral-200 text-neutral-900">
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
                       Category
                     </th>
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/2">
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/2">
                       What They Do
                     </th>
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
                       Can You Turn Them Off?
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-200 text-neutral-700">
+                <tbody className="divide-y divide-neutral-200/80 text-neutral-700">
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Strictly Necessary Cookies</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">Essential for the website to work. They handle core features like remembering items in your bag, secure checkout, account login, and network security.</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top text-neutral-500 italic">No — these cannot be switched off, as the website wouldn&apos;t work properly without them.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Strictly Necessary Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Essential for the website to work. They handle core features like remembering items in your bag, secure checkout, account login, and network security.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-500 italic">No — these cannot be switched off, as the website wouldn&apos;t work properly without them.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Performance &amp; Analytics Cookies</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">Help us understand how visitors interact with the Platform (e.g. which pages are visited most, how long people stay, if any errors occur). All data is aggregated and anonymous.</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Performance &amp; Analytics Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Help us understand how visitors interact with the Platform (e.g. which pages are visited most, how long people stay, if any errors occur). All data is aggregated and anonymous.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Functionality Cookies</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">Remember the choices you make to provide a more tailored experience — such as your saved delivery pin code, size filters, currency, or preferred view.</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Functionality Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Remember the choices you make to provide a more tailored experience — such as your saved delivery pin code, size filters, currency, or preferred view.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Targeting &amp; Marketing Cookies</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">Used to show you products and offers you might like on our Platform and on third-party sites. They also help limit how many times you see an ad and measure the effectiveness of our campaigns.</td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings or ad network opt-outs.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Targeting &amp; Marketing Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Used to show you products and offers you might like on our Platform and on third-party sites. They also help limit how many times you see an ad and measure the effectiveness of our campaigns.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings or ad network opt-outs.</td>
                   </tr>
                 </tbody>
               </table>
@@ -174,8 +175,8 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 4 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Settings className="w-5 h-5 text-neutral-900" />
               </div>
@@ -188,7 +189,7 @@ export const CookiePolicy = () => {
             </p>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
-                <strong className="font-semibold text-neutral-900">Through your browser:</strong> Most browsers allow you to view, manage, delete, and block cookies through their settings. You can set your browser to reject all cookies, or to alert you whenever a cookie is being placed. Please note that if you disable or block cookies, some parts of the Platform (such as saving items to your bag or staying logged in) may not function as intended.
+                <strong className="font-semibold text-neutral-900">Through your browser:</strong> Most browsers allow you to view, manage, delete, and block cookies through their settings. You can set your browser to reject all cookies, or to alert you whenever a cookie is being placed.
               </li>
               <li>
                 <strong className="font-semibold text-neutral-900">Opting out of Google Analytics:</strong> You can prevent Google Analytics from collecting data across websites by installing the Google Analytics Opt-Out Browser Add-on.
@@ -200,11 +201,17 @@ export const CookiePolicy = () => {
                 <strong className="font-semibold text-neutral-900">Mobile device settings:</strong> On iOS and Android devices, you can manage tracking and ad personalization through your device&apos;s privacy settings (e.g. &quot;Ask App Not to Track&quot; on iOS or &quot;Opt out of Ads Personalization&quot; on Android).
               </li>
             </ul>
+            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
+              <AlertCircle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
+                Please note that if you disable or block cookies, some parts of the Platform (such as saving items to your bag or staying logged in) may not function as intended.
+              </p>
+            </div>
           </div>
 
           {/* SECTION 5 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Share2 className="w-5 h-5 text-neutral-900" />
               </div>
@@ -226,42 +233,39 @@ export const CookiePolicy = () => {
             </p>
           </div>
 
-          {/* 2-COLUMN PLAIN GRID FOR SECTIONS 6 & 8 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-neutral-100">
-            {/* SECTION 6 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                  <RefreshCw className="w-4 h-4 text-neutral-900" />
-                </div>
-                <h3 className="text-base font-serif font-bold text-neutral-900 uppercase tracking-wide">
-                  6. Updates to This Cookie Policy
-                </h3>
+          {/* SECTION 6 */}
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <RefreshCw className="w-5 h-5 text-neutral-900" />
               </div>
-              <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                We may update this Cookie Policy periodically to reflect changes in our use of cookies or applicable regulations. When changes are made, we will update the &quot;Effective Date&quot; at the top of this page. We encourage you to review this page periodically to stay informed about how we use cookies.
-              </p>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                6. Updates to This Cookie Policy
+              </h2>
             </div>
+            <p>
+              We may update this Cookie Policy periodically to reflect changes in our use of cookies or applicable regulations. When changes are made, we will update the &quot;Effective Date&quot; at the top of this page. We encourage you to review this page periodically to stay informed about how we use cookies.
+            </p>
+          </div>
 
-            {/* SECTION 8 */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-neutral-900" />
-                </div>
-                <h3 className="text-base font-serif font-bold text-neutral-900 uppercase tracking-wide">
-                  8. Legal &amp; Compliance Disclaimer
-                </h3>
+          {/* SECTION 8 */}
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <ShieldCheck className="w-5 h-5 text-neutral-900" />
               </div>
-              <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                This Cookie Policy is provided as a starting draft based on standard e-commerce practices and is not a substitute for legal advice. Before publishing, have it reviewed by a qualified legal professional to ensure it accurately reflects House of Urvaah&apos;s actual cookie usage, tracking technologies, and compliance obligations under applicable data protection regulations.
-              </p>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                8. Legal &amp; Compliance Disclaimer
+              </h2>
             </div>
+            <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+              This Cookie Policy is provided as a starting draft based on standard e-commerce practices and is not a substitute for legal advice. Before publishing, have it reviewed by a qualified legal professional to ensure it accurately reflects House of Urvaah&apos;s actual cookie usage, tracking technologies, and compliance obligations under applicable data protection regulations.
+            </p>
           </div>
 
           {/* SECTION 7 - CONTACT US WITH 2-COLUMN STRUCTURED CARD */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Mail className="w-5 h-5 text-neutral-900" />
               </div>
@@ -272,14 +276,24 @@ export const CookiePolicy = () => {
             <p>
               If you have any questions about our use of cookies or this Cookie Policy, please reach out to us:
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Direct Inquiries</p>
-                <p className="font-semibold text-neutral-900">Email: [Insert Email Address]</p>
+            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 sm:p-7 divide-y divide-neutral-200 my-4 shadow-sm">
+              <div className="flex items-start sm:items-center gap-3.5 pb-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Mail className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Direct Inquiries</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Email: [Insert Email Address]</p>
+                </div>
               </div>
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Customer Support</p>
-                <p className="font-semibold text-neutral-900">Support: [support@houseofurvaah.com]</p>
+              <div className="flex items-start sm:items-center gap-3.5 pt-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Mail className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Customer Support</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Support: [support@houseofurvaah.com]</p>
+                </div>
               </div>
             </div>
           </div>

@@ -15,6 +15,8 @@ import {
   ShieldAlert,
   Mail,
   AlertCircle,
+  Phone,
+  Clock,
 } from 'lucide-react';
 
 export const ReturnRefundPolicy = () => {
@@ -44,11 +46,11 @@ export const ReturnRefundPolicy = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 sm:space-y-14 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
         >
           {/* SECTION 1 */}
           <div className="space-y-4">
-            <div className="flex items-center gap-3.5 mb-2">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <FileText className="w-5 h-5 text-neutral-900" />
               </div>
@@ -65,8 +67,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 2 */}
-          <div className="space-y-6 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-6 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <XCircle className="w-5 h-5 text-neutral-900" />
               </div>
@@ -111,7 +113,7 @@ export const ReturnRefundPolicy = () => {
               <p>
                 Cancellation requests are accepted only until your order moves to the &quot;Packed&quot; or &quot;Shipped&quot; stage. You can check your order&apos;s current status anytime under &quot;Track Order.&quot;
               </p>
-              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-start gap-3.5">
+              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
                 <AlertCircle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
                 <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
                   Cut-off window for cancellation: [Insert Cancellation Time Limit]
@@ -121,8 +123,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 3 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Edit3 className="w-5 h-5 text-neutral-900" />
               </div>
@@ -136,8 +138,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 4 */}
-          <div className="space-y-6 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-6 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Package className="w-5 h-5 text-neutral-900" />
               </div>
@@ -154,7 +156,7 @@ export const ReturnRefundPolicy = () => {
               <p>
                 We want you to be completely happy with your purchase. If you&apos;re not satisfied with an item, you may request a return within:
               </p>
-              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-start gap-3.5">
+              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
                 <AlertCircle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
                 <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
                   [Insert Return Period, e.g. 7 / 10 / 14 days] from the date of delivery.
@@ -176,41 +178,41 @@ export const ReturnRefundPolicy = () => {
               <h3 className="text-base sm:text-lg font-serif font-semibold tracking-wide text-neutral-900">
                 4.2 How to Request a Return
               </h3>
-              <ol className="space-y-3 pt-1">
-                <li className="flex items-start gap-3 sm:gap-3.5">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-900 text-xs font-bold shrink-0 mt-0.5 border border-neutral-200">
+              <ol className="space-y-3.5 pt-2">
+                <li className="flex items-start gap-3 sm:gap-4">
+                  <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-100 text-neutral-900 text-xs sm:text-sm font-semibold shrink-0 border border-neutral-200">
                     1
                   </span>
-                  <p className="text-neutral-800 pt-0.5">
+                  <p className="text-neutral-800 pt-0.5 sm:pt-1">
                     Go to &quot;My Orders&quot; and select the item you&apos;d like to return.
                   </p>
                 </li>
-                <li className="flex items-start gap-3 sm:gap-3.5">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-900 text-xs font-bold shrink-0 mt-0.5 border border-neutral-200">
+                <li className="flex items-start gap-3 sm:gap-4">
+                  <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-100 text-neutral-900 text-xs sm:text-sm font-semibold shrink-0 border border-neutral-200">
                     2
                   </span>
-                  <p className="text-neutral-800 pt-0.5">
+                  <p className="text-neutral-800 pt-0.5 sm:pt-1">
                     Choose your reason for return.
                   </p>
                 </li>
-                <li className="flex items-start gap-3 sm:gap-3.5">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-900 text-xs font-bold shrink-0 mt-0.5 border border-neutral-200">
+                <li className="flex items-start gap-3 sm:gap-4">
+                  <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-100 text-neutral-900 text-xs sm:text-sm font-semibold shrink-0 border border-neutral-200">
                     3
                   </span>
-                  <p className="text-neutral-800 pt-0.5">
+                  <p className="text-neutral-800 pt-0.5 sm:pt-1">
                     Once approved, our delivery partner will arrange a pickup from your address, or you may be asked to self-ship the item, depending on your location.
                   </p>
                 </li>
-                <li className="flex items-start gap-3 sm:gap-3.5">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-100 text-neutral-900 text-xs font-bold shrink-0 mt-0.5 border border-neutral-200">
+                <li className="flex items-start gap-3 sm:gap-4">
+                  <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-100 text-neutral-900 text-xs sm:text-sm font-semibold shrink-0 border border-neutral-200">
                     4
                   </span>
-                  <p className="text-neutral-800 pt-0.5">
+                  <p className="text-neutral-800 pt-0.5 sm:pt-1">
                     Your item will be inspected upon receipt before the return is finalized.
                   </p>
                 </li>
               </ol>
-              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-start gap-3.5">
+              <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
                 <AlertCircle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
                 <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
                   Please note: returns requested outside the eligibility window mentioned above may not be accepted.
@@ -230,8 +232,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 5 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <RefreshCw className="w-5 h-5 text-neutral-900" />
               </div>
@@ -251,8 +253,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 6 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <AlertTriangle className="w-5 h-5 text-neutral-900" />
               </div>
@@ -270,7 +272,7 @@ export const ReturnRefundPolicy = () => {
             <p>
               Once verified, we will offer you a free replacement or a full refund, including any shipping charges paid, at no extra cost to you.
             </p>
-            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-start gap-3.5">
+            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
               <AlertTriangle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
               <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
                 If your package arrives with visibly damaged or tampered outer packaging, we recommend inspecting it in front of the delivery person and refusing delivery if the contents appear affected.
@@ -279,8 +281,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 7 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Ban className="w-5 h-5 text-neutral-900" />
               </div>
@@ -302,8 +304,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 8 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Tag className="w-5 h-5 text-neutral-900" />
               </div>
@@ -319,8 +321,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 9 */}
-          <div className="space-y-6 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-6 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Banknote className="w-5 h-5 text-neutral-900" />
               </div>
@@ -371,8 +373,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 10 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Truck className="w-5 h-5 text-neutral-900" />
               </div>
@@ -392,8 +394,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 11 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <AlertOctagon className="w-5 h-5 text-neutral-900" />
               </div>
@@ -411,8 +413,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 12 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <ShieldAlert className="w-5 h-5 text-neutral-900" />
               </div>
@@ -426,8 +428,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 13 - NEED HELP CONTACT CARD */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <Mail className="w-5 h-5 text-neutral-900" />
               </div>
@@ -438,18 +440,33 @@ export const ReturnRefundPolicy = () => {
             <p>
               We&apos;re here to make this as easy as possible. If you have any questions about a return, exchange, or refund, reach out to us:
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Email</p>
-                <p className="font-semibold text-neutral-900">[Insert Email Address]</p>
+            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 sm:p-7 divide-y divide-neutral-200 my-4 shadow-sm">
+              <div className="flex items-start sm:items-center gap-3.5 pb-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Mail className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Email</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">[Insert Email Address]</p>
+                </div>
               </div>
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Phone</p>
-                <p className="font-semibold text-neutral-900">[Insert Phone Number]</p>
+              <div className="flex items-start sm:items-center gap-3.5 py-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Phone className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Phone</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">[Insert Phone Number]</p>
+                </div>
               </div>
-              <div className="sm:col-span-2">
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>
-                <p className="font-semibold text-neutral-900">[Insert Support Hours]</p>
+              <div className="flex items-start sm:items-center gap-3.5 pt-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Clock className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Support Hours</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">[Insert Support Hours]</p>
+                </div>
               </div>
             </div>
             <p className="text-xs sm:text-sm text-neutral-600">
@@ -458,8 +475,8 @@ export const ReturnRefundPolicy = () => {
           </div>
 
           {/* SECTION 14 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
                 <FileText className="w-5 h-5 text-neutral-900" />
               </div>
