@@ -21,8 +21,10 @@ export const Footer = () => {
         {/* 5-Column Grid Layout: Logo Block (Left) + 4 Link Columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 sm:gap-8 lg:gap-12 xl:gap-16 mb-12 sm:mb-16">
           {/* Column 1: LOGO & BRAND TAGLINE */}
-          <div className="flex flex-col items-start pr-0 lg:pr-6 pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200">
-            <Logo className="h-12 sm:h-18 md:h-20 lg:h-24" />
+          <div className="flex flex-col items-start pr-0 lg:pr-6 pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200" data-allow-guest="true">
+            <Link to="/" data-allow-guest="true">
+              <Logo className="h-12 sm:h-18 md:h-20 lg:h-24" />
+            </Link>
             <p className="text-[10px] sm:text-[11px] md:text-xs tracking-[0.25em] text-neutral-400 uppercase mt-3 sm:mt-5 font-serif leading-relaxed">
               PARIS — NEW YORK — MUMBAI — TOKYO
             </p>
@@ -39,9 +41,9 @@ export const Footer = () => {
               <ChevronDown className={`w-4 h-4 text-neutral-500 sm:hidden transition-transform duration-200 ${openSections.help ? 'rotate-180' : ''}`} />
             </button>
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.help ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
-              <li><Link to="/contact" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Contact Us</Link></li>
+              <li><Link to="/contact" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Contact Us</Link></li>
               <li><a href="#track" className="hover:text-black transition-colors block py-1">Track Order</a></li>
-              <li><Link to="/return-refund-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Return &amp; Refund</Link></li>
+              <li><Link to="/return-refund-policy" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Return &amp; Refund</Link></li>
               <li><a href="#shipping" className="hover:text-black transition-colors block py-1">Shipping Information</a></li>
               <li><a href="#size-guide" className="hover:text-black transition-colors block py-1">Size Guide</a></li>
               <li><a href="#faqs" className="hover:text-black transition-colors block py-1">FAQs</a></li>
@@ -59,7 +61,7 @@ export const Footer = () => {
               <ChevronDown className={`w-4 h-4 text-neutral-500 sm:hidden transition-transform duration-200 ${openSections.company ? 'rotate-180' : ''}`} />
             </button>
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.company ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
-              <li><Link to="/about" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">About Us</Link></li>
+              <li><Link to="/about" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">About Us</Link></li>
               <li><a href="#sustainability" className="hover:text-black transition-colors block py-1">Join Life / Sustainability</a></li>
               <li><a href="#careers" className="hover:text-black transition-colors block py-1">Careers</a></li>
               <li><a href="#stores" className="hover:text-black transition-colors block py-1">Store Locator</a></li>
@@ -78,10 +80,10 @@ export const Footer = () => {
               <ChevronDown className={`w-4 h-4 text-neutral-500 sm:hidden transition-transform duration-200 ${openSections.policies ? 'rotate-180' : ''}`} />
             </button>
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.policies ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
-              <li><Link to="/privacy-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Privacy Policy</Link></li>
-              <li><Link to="/shipping-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Shipping &amp; Delivery</Link></li>
-              <li><Link to="/terms-and-conditions" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Terms and Conditions</Link></li>
-              <li><Link to="/cookie-policy" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Cookie Policy</Link></li>
+              <li><Link to="/privacy-policy" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Privacy Policy</Link></li>
+              <li><Link to="/shipping-policy" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Shipping &amp; Delivery</Link></li>
+              <li><Link to="/terms-and-conditions" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Terms and Conditions</Link></li>
+              <li><Link to="/cookie-policy" data-allow-guest="true" onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })} className="hover:text-black transition-colors block py-1">Cookie Policy</Link></li>
               <li><a href="#accessibility" className="hover:text-black transition-colors block py-1">Accessibility</a></li>
             </ul>
           </div>
