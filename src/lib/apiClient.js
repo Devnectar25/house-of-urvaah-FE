@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 
 export const getAuthToken = () => {
   return localStorage.getItem('urvaah_token') || null;
@@ -36,7 +36,8 @@ export const clearAuthSession = () => {
 
 export async function apiClient(endpoint, options = {}) {
   const token = getAuthToken();
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${cleanEndpoint}`;
 
   const headers = {
     'Content-Type': 'application/json',
