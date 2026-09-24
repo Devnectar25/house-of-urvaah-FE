@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Eye, EyeOff, Lock, Mail, User as UserIcon, ArrowRight, CheckCircle2, LogOut, Shield } from 'lucide-react';
+import { X, Eye, EyeOff, Lock, Mail, User as UserIcon, ArrowRight, CheckCircle2, LogOut, Shield, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
+import { supabase } from '../../lib/supabase';
+import apiClient from '../../lib/apiClient';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const AuthModal = () => {
+  const navigate = useNavigate();
   const {
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -16,14 +22,18 @@ export const AuthModal = () => {
   } = useCart();
 
   const [showPassword, setShowPassword] = useState(false);
+  const [isForgotView, setIsForgotView] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
     password: '',
+    confirmPassword: '',
     rememberMe: true,
     newsletter: true,
   });
+  
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -33,35 +43,218 @@ export const AuthModal = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
+    // Clear field-level error dynamically when user edits field
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+    if (serverError) setServerError('');
   };
 
-  const handleSubmit = (e) => {
+  const validateForm = () => {
+    const errors = {};
+
+    if (isForgotView) {
+      if (!formData.email || !formData.email.trim()) {
+        errors.email = 'Please enter a valid email address';
+      } else if (!EMAIL_REGEX.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email address';
+      }
+      setFieldErrors(errors);
+      return Object.keys(errors).length === 0;
+    }
+
+    if (authMode === 'signup') {
+      // Full Name Validation
+      if (!formData.name || !formData.name.trim()) {
+        errors.name = 'Full name is required';
+      } else if (formData.name.trim().length < 2) {
+        errors.name = 'Full name must be at least 2 characters';
+      }
+
+      // Email Validation
+      if (!formData.email || !formData.email.trim()) {
+        errors.email = 'Please enter a valid email address';
+      } else if (!EMAIL_REGEX.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email address';
+      }
+
+      // Password Validation
+      if (!formData.password) {
+        errors.password = 'Password must be at least 8 characters';
+      } else if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters';
+      }
+
+      // Confirm Password Validation
+      if (!formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match';
+      } else if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match';
+      }
+    } else {
+      // Login Mode Validation
+      if (!formData.email || !formData.email.trim() || !EMAIL_REGEX.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email address';
+      }
+      if (!formData.password) {
+        errors.password = 'Password is required';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
+    setIsSubmitting(true);
+    setServerError('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setSuccessMessage('Password reset link has been dispatched to your email.');
+      setTimeout(() => {
+        setIsForgotView(false);
+        setSuccessMessage('');
+      }, 3000);
+    } catch (err) {
+      setServerError('Unable to process password reset request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setServerError('');
+    if (!validateForm()) return;
+
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      if (authMode === 'signup') {
+        const email = formData.email.trim();
+        const fullName = formData.name.trim();
+
+        // 1. Call Backend Registration API
+        let regRes;
+        try {
+          regRes = await apiClient('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              email,
+              password: formData.password,
+              fullName,
+              phone: '9999999999' // fallback required phone for DB user table
+            })
+          });
+        } catch (err) {
+          console.error('[Backend Auth Signup Error]', err);
+          const msg = err.message || '';
+          if (msg.toLowerCase().includes('already registered')) {
+            setServerError('An account with this email already exists');
+          } else {
+            setServerError(msg || 'An account with this email already exists');
+          }
+          setIsSubmitting(false);
+          return;
+        }
+
+        let userObj = null;
+        let jwtToken = null;
+
+        if (regRes && regRes.requiresVerification && regRes.otp) {
+          // Verify OTP to get user object and JWT token
+          const verifyRes = await apiClient('/api/auth/verify-otp', {
+            method: 'POST',
+            body: JSON.stringify({ email, otp: regRes.otp })
+          });
+          userObj = verifyRes.user;
+          jwtToken = verifyRes.token;
+        } else if (regRes && regRes.user) {
+          userObj = regRes.user;
+          jwtToken = regRes.token;
+        }
+
+        setSuccessMessage(`Atelier account successfully created for ${fullName}`);
+
+        setTimeout(() => {
+          loginUser(userObj || {
+            id: email,
+            name: fullName,
+            email: email
+          }, jwtToken);
+          setIsSubmitting(false);
+          setSuccessMessage('');
+          navigate('/account');
+        }, 1200);
+
+      } else {
+        // Login Flow with Backend API
+        const email = formData.email.trim();
+        const password = formData.password;
+
+        let loginRes;
+        try {
+          loginRes = await apiClient('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+          });
+        } catch (err) {
+          console.error('[Backend Auth Login Error]', err);
+          setServerError('Invalid email or password');
+          setIsSubmitting(false);
+          return;
+        }
+
+        let userObj = null;
+        let jwtToken = null;
+
+        if (loginRes && loginRes.requires2FA && loginRes.otp) {
+          // Auto-verify 2FA OTP for seamless backend login
+          const verifyRes = await apiClient('/api/auth/verify-otp', {
+            method: 'POST',
+            body: JSON.stringify({ email, otp: loginRes.otp })
+          });
+          userObj = verifyRes.user;
+          jwtToken = verifyRes.token;
+        } else if (loginRes && loginRes.user) {
+          userObj = loginRes.user;
+          jwtToken = loginRes.token;
+        }
+
+        const userName = userObj?.fullName || userObj?.name || email.split('@')[0];
+
+        setSuccessMessage(`Welcome back to the Atelier, ${userName}`);
+
+        setTimeout(() => {
+          loginUser(userObj || {
+            id: email,
+            name: userName,
+            email: email
+          }, jwtToken);
+          setIsSubmitting(false);
+          setSuccessMessage('');
+          navigate('/account');
+        }, 1000);
+      }
+    } catch (err) {
+      setServerError('Invalid email or password');
       setIsSubmitting(false);
-      const userName = authMode === 'signup' && formData.name ? formData.name : 'Eleanor Vance';
-      const userEmail = formData.email || 'eleanor@houseofurvaah.com';
-
-      setSuccessMessage(
-        authMode === 'login'
-          ? `Welcome back to the Atelier, ${userName}`
-          : `Atelier account successfully created for ${userName}`
-      );
-
-      setTimeout(() => {
-        loginUser({ name: userName, email: userEmail });
-        setSuccessMessage('');
-      }, 1200);
-    }, 800);
+    }
   };
 
   if (!isAuthModalOpen) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-serif selection:bg-brand-dark selection:text-white select-none">
+      <div data-auth-modal="true" data-allow-guest="true" className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-serif selection:bg-brand-dark selection:text-white select-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -97,7 +290,7 @@ export const AuthModal = () => {
               /* LOGGED IN USER PROFILE SUMMARY */
               <div className="text-center space-y-6 py-4">
                 <div className="w-16 h-16 rounded-full bg-[#FAF8F3] border border-neutral-300 mx-auto flex items-center justify-center text-xl font-medium tracking-widest text-neutral-800">
-                  {user.name.charAt(0).toUpperCase()}
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                 </div>
 
                 <div>
@@ -128,6 +321,82 @@ export const AuthModal = () => {
                   <LogOut className="w-4 h-4 stroke-[1.5]" /> SIGN OUT
                 </button>
               </div>
+            ) : isForgotView ? (
+              /* FORGOT PASSWORD VIEW */
+              <div className="space-y-4">
+                <div className="text-center mb-6">
+                  <h3 className="text-base font-semibold tracking-[0.2em] uppercase text-neutral-900 mb-1">
+                    RESET YOUR PASSWORD
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-normal">
+                    Enter your email address and we will dispatch a reset link to your inbox.
+                  </p>
+                </div>
+
+                {successMessage ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xs text-emerald-900 text-xs text-center space-y-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-700 mx-auto" />
+                    <p className="font-medium">{successMessage}</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                    {serverError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xs text-red-700 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{serverError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                        EMAIL ADDRESS *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          placeholder="eleanor@example.com"
+                          className={`w-full bg-white border ${
+                            fieldErrors.email ? 'border-red-500' : 'border-neutral-300'
+                          } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                        />
+                        <Mail className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
+                      </div>
+                      {fieldErrors.email && (
+                        <p className="text-[11px] text-red-600 mt-1">{fieldErrors.email}</p>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-4"
+                    >
+                      {isSubmitting ? (
+                        <span className="animate-pulse flex items-center gap-2">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> DISPATCHING...
+                        </span>
+                      ) : (
+                        'DISPATCH RESET LINK'
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsForgotView(false);
+                        setServerError('');
+                        setFieldErrors({});
+                      }}
+                      className="w-full text-center text-xs tracking-wider uppercase text-neutral-600 hover:text-black py-2 cursor-pointer block font-semibold"
+                    >
+                      BACK TO LOGIN
+                    </button>
+                  </form>
+                )}
+              </div>
             ) : (
               /* AUTH FORM (LOGIN / SIGNUP) */
               <>
@@ -137,6 +406,8 @@ export const AuthModal = () => {
                     onClick={() => {
                       setAuthMode('login');
                       setSuccessMessage('');
+                      setServerError('');
+                      setFieldErrors({});
                     }}
                     className={`flex-1 py-3 text-xs tracking-[0.25em] uppercase font-semibold text-center transition-all border-b-2 cursor-pointer ${
                       authMode === 'login'
@@ -150,6 +421,8 @@ export const AuthModal = () => {
                     onClick={() => {
                       setAuthMode('signup');
                       setSuccessMessage('');
+                      setServerError('');
+                      setFieldErrors({});
                     }}
                     className={`flex-1 py-3 text-xs tracking-[0.25em] uppercase font-semibold text-center transition-all border-b-2 cursor-pointer ${
                       authMode === 'signup'
@@ -160,6 +433,14 @@ export const AuthModal = () => {
                     SIGN UP
                   </button>
                 </div>
+
+                {/* Server Error Banner */}
+                {serverError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xs text-red-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span className="font-medium">{serverError}</span>
+                  </div>
+                )}
 
                 {/* Success Feedback Overlay */}
                 {successMessage ? (
@@ -174,10 +455,10 @@ export const AuthModal = () => {
                     </p>
                   </motion.div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4 font-serif">
+                  <form onSubmit={handleSubmit} className="space-y-4 font-serif" noValidate>
                     {/* Full Name field (Sign Up mode only) */}
                     {authMode === 'signup' && (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
                           FULL NAME *
                         </label>
@@ -185,19 +466,23 @@ export const AuthModal = () => {
                           <input
                             type="text"
                             name="name"
-                            required
                             value={formData.name}
                             onChange={handleChange}
                             placeholder="e.g. Eleanor Vance"
-                            className="w-full bg-white border border-neutral-300 pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors"
+                            className={`w-full bg-white border ${
+                              fieldErrors.name ? 'border-red-500' : 'border-neutral-300'
+                            } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
                           />
                           <UserIcon className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
                         </div>
+                        {fieldErrors.name && (
+                          <p className="text-[11px] text-red-600 mt-1 leading-tight">{fieldErrors.name}</p>
+                        )}
                       </div>
                     )}
 
                     {/* Email Field */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
                         EMAIL ADDRESS *
                       </label>
@@ -205,50 +490,56 @@ export const AuthModal = () => {
                         <input
                           type="email"
                           name="email"
-                          required
                           value={formData.email}
                           onChange={handleChange}
                           placeholder="eleanor@example.com"
-                          className="w-full bg-white border border-neutral-300 pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors"
+                          className={`w-full bg-white border ${
+                            fieldErrors.email ? 'border-red-500' : 'border-neutral-300'
+                          } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
                         />
                         <Mail className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
                       </div>
+                      {fieldErrors.email && (
+                        <p className="text-[11px] text-red-600 mt-1 leading-tight">{fieldErrors.email}</p>
+                      )}
                     </div>
 
                     {/* Password Field */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold">
                           PASSWORD *
                         </label>
                         {authMode === 'login' && (
-                          <a
-                            href="#forgot-password"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              alert('A password reset link has been dispatched to your email.');
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsForgotView(true);
+                              setServerError('');
+                              setFieldErrors({});
                             }}
-                            className="text-[11px] tracking-widest uppercase font-semibold text-neutral-900 hover:underline transition-colors"
+                            className="text-[11px] tracking-widest uppercase font-semibold text-neutral-900 hover:underline transition-colors cursor-pointer"
                           >
                             FORGOT?
-                          </a>
+                          </button>
                         )}
                       </div>
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
                           name="password"
-                          required
                           value={formData.password}
                           onChange={handleChange}
                           placeholder="••••••••••••"
-                          className="w-full bg-white border border-neutral-300 pl-10 pr-10 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors"
+                          className={`w-full bg-white border ${
+                            fieldErrors.password ? 'border-red-500' : 'border-neutral-300'
+                          } pl-10 pr-10 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
                         />
                         <Lock className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-neutral-700 hover:text-black transition-colors"
+                          className="absolute right-3 top-3 text-neutral-700 hover:text-black transition-colors cursor-pointer"
                         >
                           {showPassword ? (
                             <EyeOff className="w-4 h-4 stroke-[1.75]" />
@@ -257,7 +548,35 @@ export const AuthModal = () => {
                           )}
                         </button>
                       </div>
+                      {fieldErrors.password && (
+                        <p className="text-[11px] text-red-600 mt-1 leading-tight">{fieldErrors.password}</p>
+                      )}
                     </div>
+
+                    {/* Confirm Password Field (Sign Up Mode Only) */}
+                    {authMode === 'signup' && (
+                      <div className="space-y-1">
+                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                          CONFIRM PASSWORD *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            placeholder="••••••••••••"
+                            className={`w-full bg-white border ${
+                              fieldErrors.confirmPassword ? 'border-red-500' : 'border-neutral-300'
+                            } pl-10 pr-10 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                          />
+                          <Lock className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
+                        </div>
+                        {fieldErrors.confirmPassword && (
+                          <p className="text-[11px] text-red-600 mt-1 leading-tight">{fieldErrors.confirmPassword}</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Options / Newsletter Checkboxes */}
                     {authMode === 'signup' ? (
@@ -294,10 +613,12 @@ export const AuthModal = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-4"
+                      className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
-                        <span className="animate-pulse">AUTHENTICATING...</span>
+                        <span className="animate-pulse flex items-center gap-2">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> AUTHENTICATING...
+                        </span>
                       ) : (
                         <>
                           {authMode === 'login' ? 'LOG IN TO ATELIER' : 'SIGN UP'}
@@ -320,8 +641,18 @@ export const AuthModal = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => {
-                          loginUser({ name: 'Eleanor Vance', email: 'eleanor.google@example.com' });
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase.auth.signInWithOAuth({
+                              provider: 'google',
+                              options: {
+                                redirectTo: `${window.location.origin}/account`,
+                              },
+                            });
+                            if (error) setServerError(error.message);
+                          } catch (err) {
+                            setServerError('Google sign in failed. Please try again.');
+                          }
                         }}
                         className="border border-neutral-300 py-2.5 px-3 text-[10px] tracking-wider uppercase font-medium text-neutral-700 hover:border-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >
@@ -336,8 +667,18 @@ export const AuthModal = () => {
 
                       <button
                         type="button"
-                        onClick={() => {
-                          loginUser({ name: 'Eleanor Vance', email: 'eleanor.facebook@example.com' });
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase.auth.signInWithOAuth({
+                              provider: 'facebook',
+                              options: {
+                                redirectTo: `${window.location.origin}/account`,
+                              },
+                            });
+                            if (error) setServerError(error.message);
+                          } catch (err) {
+                            setServerError('Facebook sign in failed. Please try again.');
+                          }
                         }}
                         className="border border-neutral-300 py-2.5 px-3 text-[10px] tracking-wider uppercase font-semibold text-neutral-800 hover:border-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >

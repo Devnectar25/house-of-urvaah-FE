@@ -14,11 +14,15 @@ import { Home } from './pages/Home';
 import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
+import { Account } from './pages/Account';
+import { AuthCallback } from './components/auth/AuthCallback';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { ShippingPolicy } from './pages/ShippingPolicy';
 import { ReturnRefundPolicy } from './pages/ReturnRefundPolicy';
 import { CookiePolicy } from './pages/CookiePolicy';
 import { TermsAndConditions } from './pages/TermsAndConditions';
+
+import { useCart } from './context/CartContext';
 
 // Simple placeholder page component for future route stubs
 const PlaceholderPage = ({ title }) => (
@@ -41,7 +45,76 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
-export function App() {
+const GlobalLoginWall = ({ children }) => {
+  const { user, session, openAuthModal } = useCart();
+
+  React.useEffect(() => {
+    // If user is logged in, do not attach global click listener
+    const hasToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+    if (user || session || hasToken) return;
+
+    const ALLOWED_POLICY_PATHS = [
+      '/about',
+      '/about-us',
+      '/contact',
+      '/contact-us',
+      '/privacy-policy',
+      '/shipping-policy',
+      '/cookie-policy',
+      '/cookie-setting',
+      '/cookie-settings',
+      '/terms-and-conditions',
+      '/terms-of-purchase',
+      '/terms',
+      '/return-refund-policy',
+      '/returns',
+      '/returns-exchanges'
+    ];
+
+    const handleGlobalClick = (e) => {
+      const activeToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+      if (user || session || activeToken) return;
+
+      // 1. Allow all clicks inside AuthModal or marked with data-allow-guest="true"
+      if (
+        e.target.closest('[data-auth-modal="true"]') ||
+        e.target.closest('[data-allow-guest="true"]')
+      ) {
+        return;
+      }
+
+      // 2. Allow direct navigation to legal & policy pages
+      const closestLink = e.target.closest('a');
+      if (closestLink) {
+        const href = closestLink.getAttribute('href') || '';
+        if (ALLOWED_POLICY_PATHS.some((path) => href.endsWith(path))) {
+          return;
+        }
+      }
+
+      // 3. Intercept any other click on interactive elements (links, buttons, inputs, cards)
+      const isInteractive = e.target.closest(
+        'a, button, input, select, textarea, [role="button"], [onclick], [data-interactive="true"], .cursor-pointer'
+      );
+
+      if (isInteractive) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openAuthModal('login');
+      }
+    };
+
+    window.addEventListener('click', handleGlobalClick, true);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick, true);
+    };
+  }, [user, session, openAuthModal]);
+
+  return children;
+};
+
+export function AppContent() {
   React.useEffect(() => {
     // Explicitly override browser scroll restoration to prevent restoring scroll position on refresh
     if ('scrollRestoration' in window.history) {
@@ -53,7 +126,7 @@ export function App() {
   }, []);
 
   return (
-    <CartProvider>
+    <GlobalLoginWall>
       <div className="min-h-screen flex flex-col bg-white text-brand-dark antialiased font-serif selection:bg-brand-dark selection:text-white relative w-full max-w-full overflow-x-hidden">
         {/* 4.2 Header / Nav */}
         <Header />
@@ -90,7 +163,9 @@ export function App() {
             <Route path="/sale" element={<Home />} />
             <Route path="/cart" element={<PlaceholderPage title="SHOPPING BAG" />} />
             <Route path="/wishlist" element={<PlaceholderPage title="WISHLIST" />} />
-            <Route path="/account" element={<Home />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/account-details" element={<Account />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/login" element={<Home />} />
             <Route path="*" element={<Home />} />
           </Routes>
@@ -108,6 +183,14 @@ export function App() {
         <ProductDetailModal />
         <AuthModal />
       </div>
+    </GlobalLoginWall>
+  );
+}
+
+export function App() {
+  return (
+    <CartProvider>
+      <AppContent />
     </CartProvider>
   );
 }

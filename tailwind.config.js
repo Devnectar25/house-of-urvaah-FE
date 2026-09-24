@@ -18,10 +18,10 @@ export default {
         }
       },
       fontFamily: {
-        serif: ['Le Jour Serif', 'serif'],
-        script: ['Parfumerie Script', 'Pinyon Script', 'Alex Brush', 'Great Vibes', 'cursive'],
-        sans: ['Le Jour Serif', 'serif'],
-        mono: ['Le Jour Serif', 'serif'],
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        script: ['"Parfumerie Script Text"', '"Parfumerie Script"', 'Pinyon Script', 'Alex Brush', 'cursive'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       letterSpacing: {
         'super-wide': '0.25em',

@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
+import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, clearAuthSession } from '../lib/apiClient';
 
 const CartContext = createContext();
 
@@ -23,17 +25,154 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(null); // null or { name, email }
+  const [user, setUser] = useState(null); // formatted user object
+  const [token, setTokenState] = useState(null);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
 
-  const loginUser = (userData) => {
-    setUser(userData);
-    setIsAuthModalOpen(false);
+  const formatUserData = (userData) => {
+    if (!userData) return null;
+    const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Atelier Member';
+    const firstName = fullName.trim().split(' ')[0] || fullName;
+    return {
+      id: userData.id || userData.userid || userData.username || 'user',
+      name: fullName,
+      firstName: firstName,
+      email: userData.email || userData.emailid || '',
+      phone: userData.phone || userData.contactno || '',
+      addresses: userData.addresses || [],
+      memberSince: userData.memberSince || userData.member_since || null,
+      avatar: userData.avatar || userData.avatar_url || ''
+    };
   };
 
-  const logoutUser = () => {
+  const fetchUserProfile = async () => {
+    try {
+      const res = await apiClient('/api/users/profile');
+      if (res.success && res.user) {
+        const formatted = formatUserData({
+          ...res.user,
+          addresses: res.addresses || []
+        });
+        setUser(formatted);
+        setStoredUser(formatted);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch profile with stored JWT:', err.message);
+    }
+  };
+
+  const updateUserProfile = async (updates) => {
+    try {
+      const res = await apiClient('/api/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+      if (res.success && res.user) {
+        const formatted = formatUserData({
+          ...res.user,
+          addresses: user?.addresses || []
+        });
+        setUser(formatted);
+        setStoredUser(formatted);
+        return { success: true };
+      }
+      return { success: false, error: res.message || 'Update failed' };
+    } catch (err) {
+      console.error('Failed to update user profile via backend API:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  useEffect(() => {
+    // 1. Initial check for JWT token & user in localStorage
+    const savedToken = getAuthToken();
+    const savedUser = getStoredUser();
+
+    if (savedToken) {
+      setTokenState(savedToken);
+      if (savedUser) {
+        setUser(savedUser);
+      }
+      // Refresh profile details in background
+      fetchUserProfile().finally(() => setAuthLoading(false));
+    } else {
+      // Fallback: check Supabase session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          const formatted = formatUserData(session.user);
+          setUser(formatted);
+        }
+        setAuthLoading(false);
+      });
+    }
+
+    // Listen for Supabase Auth changes as fallback
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user && !getAuthToken()) {
+        const formatted = formatUserData(session.user);
+        setUser(formatted);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const [pendingAction, setPendingAction] = useState(null);
+
+  const requireAuth = (actionCallback) => {
+    if (user || getAuthToken()) {
+      if (typeof actionCallback === 'function') {
+        actionCallback();
+      }
+    } else {
+      if (typeof actionCallback === 'function') {
+        setPendingAction(() => actionCallback);
+      }
+      openAuthModal('login');
+    }
+  };
+
+  const loginUser = (userData, jwtToken = null) => {
+    const formatted = formatUserData(userData);
+    setUser(formatted);
+    setStoredUser(formatted);
+
+    if (jwtToken) {
+      setTokenState(jwtToken);
+      setAuthToken(jwtToken);
+    }
+
+    setIsAuthModalOpen(false);
+
+    if (pendingAction) {
+      const actionToRun = pendingAction;
+      setPendingAction(null);
+      setTimeout(() => {
+        try {
+          actionToRun();
+        } catch (e) {
+          console.error('Error executing post-login action:', e);
+        }
+      }, 200);
+    }
+  };
+
+  const logoutUser = async () => {
+    clearAuthSession();
+    setTokenState(null);
     setUser(null);
+    setSession(null);
+    setPendingAction(null);
+    setIsAuthModalOpen(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {}
   };
 
   const openAuthModal = (mode = 'login') => {
@@ -126,8 +265,11 @@ export const CartProvider = ({ children }) => {
         openAuthModal,
         user,
         setUser,
+        session,
+        authLoading,
         loginUser,
         logoutUser,
+        updateUserProfile,
         quickViewProduct,
         setQuickViewProduct,
         pdpProduct,
