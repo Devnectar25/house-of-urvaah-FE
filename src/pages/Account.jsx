@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -293,6 +294,12 @@ export const Account = () => {
 
   return (
     <div className="min-h-screen bg-white text-brand-dark pt-24 sm:pt-28 pb-20 font-serif selection:bg-brand-dark selection:text-white">
+      <SEOHead
+        title="My Account | House of Urvaah"
+        description="Manage your House of Urvaah account, track order status, update shipping details, and view saved items."
+        keywords="House of Urvaah account, user profile, orders, addresses"
+        noindex={true}
+      />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12">
         {/* Welcome Banner */}
         <div className="mb-8 md:mb-12 border-b border-neutral-200 pb-6 text-left">
