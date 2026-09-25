@@ -56,8 +56,9 @@ export const ProductDetail = () => {
 
   const fallbackProduct = (productId) => {
     const found =
-      BEST_SELLERS_PRODUCTS.find((p) => p.id === productId) ||
-      MOCK_PRODUCTS.find((p) => p.id === productId) ||
+      BEST_SELLERS_PRODUCTS.find((p) => p.id === productId || (p.id === 'bs-105' && productId === '109')) ||
+      MOCK_PRODUCTS.find((p) => p.id === productId || (p.id === 'bs-105' && productId === '109')) ||
+      BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-105') ||
       BEST_SELLERS_PRODUCTS[0];
     setProduct(found);
   };
@@ -136,10 +137,11 @@ export const ProductDetail = () => {
   // Variant reference code generator
   const getReferenceCode = (prod) => {
     if (prod.referenceCode) return prod.referenceCode;
-    if (prod.id === 'bs-102') return 'NAVY BLUE | 1255/717/401';
-    if (prod.id === 'bs-101') return 'TAUPE BROWN | 8421/305/702';
-    if (prod.id === 'bs-103') return 'BLUSH PEACH | 5109/248/119';
-    if (prod.id === 'bs-104') return 'ROSE DUST | 3901/412/084';
+    if (prod.id === 'bs-102' || prod.id === '102') return 'NAVY BLUE | 1255/717/401';
+    if (prod.id === 'bs-101' || prod.id === '101') return 'TAUPE BROWN | 8421/305/702';
+    if (prod.id === 'bs-103' || prod.id === '103') return 'BLUSH PEACH | 5109/248/119';
+    if (prod.id === 'bs-104' || prod.id === '104') return 'ROSE DUST | 3901/412/084';
+    if (prod.id === 'bs-105' || prod.id === '109') return 'EMBROIDERED RED | 7204/182/905';
     return `${(prod.category || 'CLASSIC').toUpperCase()} | ${prod.id.toUpperCase()}/2026`;
   };
 

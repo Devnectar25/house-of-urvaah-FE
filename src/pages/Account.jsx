@@ -301,14 +301,41 @@ export const Account = () => {
         noindex={true}
       />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12">
-        {/* Welcome Banner */}
-        <div className="mb-8 md:mb-12 border-b border-neutral-200 pb-6 text-left">
-          <span className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-neutral-400 block mb-2 font-serif">
-            MY ATELIER ACCOUNT
-          </span>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl text-black font-serif tracking-[0.12em] uppercase font-normal">
-            WELCOME {firstName}
-          </h1>
+        {/* Profile Header Card with Cream/Off-White Palette (#FAF8F3) matching modal */}
+        <div className="mb-8 p-6 sm:p-8 bg-[#FAF8F3] border border-neutral-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
+          <div className="flex items-center gap-5">
+            {/* Avatar / Initial Circle */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border border-neutral-300 flex items-center justify-center text-xl sm:text-2xl font-serif font-semibold tracking-widest text-brand-dark shadow-xs">
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.25em] font-serif uppercase px-2.5 py-0.5 bg-black text-white font-semibold">
+                  PRIVILÈGE VIP MEMBER
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-serif tracking-[0.12em] uppercase text-black font-semibold">
+                {user?.name || 'ATELIER MEMBER'}
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-600 font-sans font-light">
+                {user?.email || 'member@houseofurvaah.com'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto border-t md:border-t-0 border-neutral-200/80 pt-4 md:pt-0">
+            <button
+              onClick={async () => {
+                await logoutUser();
+                navigate('/');
+              }}
+              className="w-full md:w-auto bg-brand-dark text-white hover:bg-neutral-800 text-xs font-sans font-bold tracking-[0.2em] uppercase px-6 py-3 transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 stroke-[1.5]" />
+              SIGN OUT
+            </button>
+          </div>
         </div>
 
         {/* 1. Horizontal Top Navigation Tabs Bar */}
