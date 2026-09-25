@@ -1,38 +1,45 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import {
+  Cookie,
+  Target,
+  Layers,
+  Settings,
+  Share2,
+  RefreshCw,
+  Mail,
+  ShieldCheck,
+  AlertCircle,
+} from 'lucide-react';
 
 export const CookiePolicy = () => {
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
-
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1200px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
+      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="text-center flex flex-col items-center"
         >
-          <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
+          <span className="px-3.5 py-1 bg-neutral-100 text-neutral-800 text-[10px] sm:text-xs font-serif font-semibold rounded-full uppercase tracking-[0.25em] mb-3 inline-block">
             DATA &amp; PRIVACY
           </span>
-          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold tracking-wider uppercase text-[#111111] mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-6">
             COOKIE POLICY
           </h1>
           <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
         </motion.div>
       </section>
 
-      {/* 2. POLICY DOCUMENT CONTENT */}
-      <section className="w-full max-w-[960px] mx-auto px-6 sm:px-10 lg:px-12">
+      {/* 2. POLICY DOCUMENT CONTENT WRAPPED IN CENTERED CARD */}
+      <section className="w-full max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-12">
         <motion.article
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-10 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 sm:space-y-14 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
         >
           {/* INTRODUCTORY PARAGRAPHS */}
           <div className="space-y-5 pb-6 border-b border-neutral-200">
@@ -46,9 +53,14 @@ export const CookiePolicy = () => {
 
           {/* SECTION 1 */}
           <div className="space-y-4 pt-2">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              1. What Are Cookies?
-            </h2>
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Cookie className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                1. What Are Cookies?
+              </h2>
+            </div>
             <p>
               Cookies are small text files placed on your device (computer, phone or tablet) when you visit a website or use an app. They help the Platform remember who you are, keep track of items in your bag, save your preferences, and generally make your visit smoother the next time you come back.
             </p>
@@ -75,10 +87,15 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 2 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              2. Why House of Urvaah Uses Cookies
-            </h2>
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Target className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                2. Why House of Urvaah Uses Cookies
+              </h2>
+            </div>
             <p>
               We use cookies to:
             </p>
@@ -105,71 +122,52 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 3 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              3. Types of Cookies We Use
-            </h2>
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Layers className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                3. Types of Cookies We Use
+              </h2>
+            </div>
 
             {/* RESPONSIVE STYLED HTML TABLE */}
-            <div className="overflow-x-auto my-6 border border-neutral-200 rounded-sm">
-              <table className="w-full text-left text-xs sm:text-sm font-serif border-collapse">
+            <div className="overflow-x-auto my-6 border border-neutral-200/90 rounded-2xl shadow-xs bg-white">
+              <table className="w-full text-left text-xs sm:text-sm font-serif border-collapse min-w-[640px]">
                 <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-900">
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
+                  <tr className="bg-neutral-50/90 border-b border-neutral-200 text-neutral-900">
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
                       Category
                     </th>
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/2">
-                      What It Does
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/2">
+                      What They Do
                     </th>
-                    <th className="py-3.5 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
-                      Your Choice
+                    <th className="py-4 px-4 sm:px-6 font-semibold tracking-wider uppercase text-[11px] sm:text-xs w-1/4">
+                      Can You Turn Them Off?
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-200 text-neutral-700">
+                <tbody className="divide-y divide-neutral-200/80 text-neutral-700">
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">
-                      Strictly Necessary
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Essential for core functions like account login, security, keeping items in your shopping bag, and completing checkout. The Platform cannot function properly without these.
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Always active — cannot be switched off.
-                    </td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Strictly Necessary Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Essential for the website to work. They handle core features like remembering items in your bag, secure checkout, account login, and network security.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-500 italic">No — these cannot be switched off, as the website wouldn&apos;t work properly without them.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">
-                      Functional / Preference
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Remembers your choices, such as saved sizes, delivery address, language, or region, to personalize your experience.
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Optional — set with your consent.
-                    </td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Performance &amp; Analytics Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Help us understand how visitors interact with the Platform (e.g. which pages are visited most, how long people stay, if any errors occur). All data is aggregated and anonymous.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">
-                      Analytics / Performance
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Helps us understand how visitors use the Platform — which pages are popular, how people navigate, and where they may run into issues — so we can improve the site. This data is generally viewed in aggregate.
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Optional — set with your consent.
-                    </td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Functionality Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Remember the choices you make to provide a more tailored experience — such as your saved delivery pin code, size filters, currency, or preferred view.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings.</td>
                   </tr>
                   <tr className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">
-                      Advertising / Marketing
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Used to show you relevant ads on our Platform and elsewhere, and to measure how well our marketing campaigns perform.
-                    </td>
-                    <td className="py-3.5 px-4 sm:px-6 align-top">
-                      Optional — set with your consent.
-                    </td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 font-semibold text-neutral-900 align-top">Targeting &amp; Marketing Cookies</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top">Used to show you products and offers you might like on our Platform and on third-party sites. They also help limit how many times you see an ad and measure the effectiveness of our campaigns.</td>
+                    <td className="py-4 sm:py-5 px-4 sm:px-6 align-top text-neutral-700 font-medium">Yes — optional via your browser settings or ad network opt-outs.</td>
                   </tr>
                 </tbody>
               </table>
@@ -177,113 +175,133 @@ export const CookiePolicy = () => {
           </div>
 
           {/* SECTION 4 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              4. How Cookies Improve Your Shopping Experience
-            </h2>
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Settings className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                4. Managing Your Cookie Preferences
+              </h2>
+            </div>
             <p>
-              Cookies play a quiet but important role behind the scenes — they&apos;re what let you add an item to your bag and have it still be there when you come back later, keep you logged into your account across visits, remember your size preferences for faster future shopping, and help us fix broken pages or confusing layouts by showing us (in aggregate, anonymized form) how people actually use the site.
+              You have full control over non-essential cookies. Here is how you can manage them:
             </p>
+            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
+              <li>
+                <strong className="font-semibold text-neutral-900">Through your browser:</strong> Most browsers allow you to view, manage, delete, and block cookies through their settings. You can set your browser to reject all cookies, or to alert you whenever a cookie is being placed.
+              </li>
+              <li>
+                <strong className="font-semibold text-neutral-900">Opting out of Google Analytics:</strong> You can prevent Google Analytics from collecting data across websites by installing the Google Analytics Opt-Out Browser Add-on.
+              </li>
+              <li>
+                <strong className="font-semibold text-neutral-900">Opting out of interest-based ads:</strong> You can opt out of personalized ads from participating ad networks via the Digital Advertising Alliance (aboutads.info/choices) or Network Advertising Initiative (optout.networkadvertising.org).
+              </li>
+              <li>
+                <strong className="font-semibold text-neutral-900">Mobile device settings:</strong> On iOS and Android devices, you can manage tracking and ad personalization through your device&apos;s privacy settings (e.g. &quot;Ask App Not to Track&quot; on iOS or &quot;Opt out of Ads Personalization&quot; on Android).
+              </li>
+            </ul>
+            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 border-l-4 border-l-neutral-900 rounded-r-xl rounded-l-sm flex items-start gap-3.5 my-3">
+              <AlertCircle className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
+                Please note that if you disable or block cookies, some parts of the Platform (such as saving items to your bag or staying logged in) may not function as intended.
+              </p>
+            </div>
           </div>
 
           {/* SECTION 5 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              5. Third-Party Cookies &amp; Services
-            </h2>
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Share2 className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                5. Third-Party Cookies
+              </h2>
+            </div>
             <p>
-              We may work with trusted third-party service providers who help us operate the Platform, understand our traffic, process payments, and run marketing campaigns. These providers may set their own cookies when you visit our site — for example: [Insert Third-Party Service, e.g. Google Analytics, Meta Pixel, payment gateway providers, or other tools actually used by House of Urvaah].
+              Some cookies on our Platform are set by third-party services we work with. These may include:
             </p>
+            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
+              <li>Analytics providers (such as Google Analytics) to help us understand site traffic and usage patterns;</li>
+              <li>Payment gateways to ensure secure and seamless transactions;</li>
+              <li>Social media platforms (such as Instagram or Pinterest) when you use share features or view integrated content; and</li>
+              <li>Advertising partners to deliver relevant House of Urvaah ads across other sites and platforms.</li>
+            </ul>
             <p>
-              We do not control the cookies set by these third parties, and this policy does not cover their individual privacy or cookie practices. We recommend reviewing their respective privacy and cookie policies directly for more detail on how they handle your data.
-            </p>
-            <p>
-              If we use any third-party advertising or retargeting service to show you House of Urvaah products on other websites or platforms after you&apos;ve visited our site, this will also rely on cookies from that service provider.
+              These third parties have their own privacy and cookie policies, and we encourage you to review them directly.
             </p>
           </div>
 
           {/* SECTION 6 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              6. Cookie Duration
-            </h2>
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <RefreshCw className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                6. Updates to This Cookie Policy
+              </h2>
+            </div>
             <p>
-              Cookies used on our Platform may last for different lengths of time depending on their purpose:
-            </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                <strong className="font-semibold text-neutral-900">Session cookies:</strong> deleted automatically when you close your browser.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Persistent cookies:</strong> retained for [Insert Cookie Duration], after which they expire automatically unless renewed by continued use of the site.
-              </li>
-            </ul>
-          </div>
-
-          {/* SECTION 7 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              7. Managing Your Cookie Preferences
-            </h2>
-            <p>
-              You&apos;re always in control of your cookie preferences. Here&apos;s how:
-            </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                <strong className="font-semibold text-neutral-900">Cookie consent banner:</strong> Where shown on the Platform, you can accept or decline optional (non-essential) cookies at any time through our cookie banner or preferences tool.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Browser settings:</strong> Most browsers let you view, block, or delete cookies through their settings menu. Check your browser&apos;s help section for step-by-step instructions, as this varies by browser (Chrome, Safari, Firefox, Edge, etc.).
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Device settings:</strong> On mobile devices, you can manage app-tracking and advertising permissions through your phone or tablet&apos;s privacy settings.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Account preferences:</strong> You can update your marketing communication preferences anytime from your House of Urvaah account settings, as described in our Privacy Policy.
-              </li>
-            </ul>
-            <p>
-              Please note that strictly necessary cookies cannot be disabled, since the Platform relies on them to function. Blocking or deleting other cookies may affect your experience — for example, you may be logged out unexpectedly, lose items from your shopping bag, or see less relevant product recommendations.
+              We may update this Cookie Policy periodically to reflect changes in our use of cookies or applicable regulations. When changes are made, we will update the &quot;Effective Date&quot; at the top of this page. We encourage you to review this page periodically to stay informed about how we use cookies.
             </p>
           </div>
 
           {/* SECTION 8 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              8. Consent
-            </h2>
-            <p>
-              When you first visit the Platform, you may be shown a cookie consent banner allowing you to accept or customize which optional cookies you&apos;re comfortable with. You can change your preferences at any time by [Insert Details — e.g. &quot;revisiting the cookie settings link in our footer&quot; or the actual mechanism used on the site].
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <ShieldCheck className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                8. Legal &amp; Compliance Disclaimer
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+              This Cookie Policy is provided as a starting draft based on standard e-commerce practices and is not a substitute for legal advice. Before publishing, have it reviewed by a qualified legal professional to ensure it accurately reflects House of Urvaah&apos;s actual cookie usage, tracking technologies, and compliance obligations under applicable data protection regulations.
             </p>
           </div>
 
-          {/* SECTION 9 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              9. Changes to This Cookie Policy
-            </h2>
+          {/* SECTION 7 - CONTACT US WITH 2-COLUMN STRUCTURED CARD */}
+          <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Mail className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                7. Contact Us
+              </h2>
+            </div>
             <p>
-              We may update this Cookie Policy from time to time to reflect changes in the cookies and technologies we use, or to comply with new legal requirements. Any updates will be posted on this page with a revised effective date, and where required, we&apos;ll notify you before significant changes take effect.
+              If you have any questions about our use of cookies or this Cookie Policy, please reach out to us:
             </p>
+            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-5 sm:p-7 divide-y divide-neutral-200 my-4 shadow-sm">
+              <div className="flex items-start sm:items-center gap-3.5 pb-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Mail className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Direct Inquiries</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Email: [Insert Email Address]</p>
+                </div>
+              </div>
+              <div className="flex items-start sm:items-center gap-3.5 pt-4">
+                <div className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 border border-neutral-200">
+                  <Mail className="w-4 h-4 text-neutral-900" />
+                </div>
+                <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
+                  <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Customer Support</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Support: [support@houseofurvaah.com]</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* SECTION 10 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              10. Questions About This Policy
-            </h2>
-            <p>
-              If you have any questions about how we use cookies, feel free to reach out:
-            </p>
-            <p>
-              <strong className="font-semibold text-neutral-900">Email:</strong> [Insert Email Address]
-            </p>
-          </div>
-
-          {/* LEGAL REVIEW DISCLAIMER */}
-          <div className="pt-6 border-t border-neutral-200">
-            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 text-xs sm:text-sm text-neutral-600 rounded-sm italic leading-relaxed">
-              This Cookie Policy is provided as a starting draft and should be reviewed by a qualified legal professional before publishing, to ensure it accurately reflects the specific cookies, third-party tools, and tracking technologies actually used on the House of Urvaah website, and complies with applicable data protection law (including the Digital Personal Data Protection Act, 2023 and the Information Technology Act, 2000, if operating in India).
+          {/* CLOSING LEGAL NOTICE NESTED BOTTOM BANNER */}
+          <div className="border-t border-neutral-200 pt-8 mt-12 bg-neutral-50 -mx-6 -mb-6 sm:-mx-10 sm:-mb-10 md:-mx-14 md:-mb-14 p-6 sm:p-10 rounded-b-2xl text-center space-y-3">
+            <div className="max-w-3xl mx-auto text-xs sm:text-sm text-neutral-600 italic leading-relaxed">
+              For more details on how House of Urvaah protects your personal information, please refer to our Privacy Policy and Terms &amp; Conditions.
             </div>
           </div>
         </motion.article>
@@ -291,3 +309,5 @@ export const CookiePolicy = () => {
     </div>
   );
 };
+
+export default CookiePolicy;

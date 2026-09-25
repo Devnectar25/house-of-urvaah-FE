@@ -1,38 +1,60 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import {
+  Building2,
+  RefreshCw,
+  UserCheck,
+  Key,
+  ShieldAlert,
+  ShoppingBag,
+  Tag,
+  CheckCircle,
+  CreditCard,
+  Truck,
+  RotateCcw,
+  Copyright,
+  MessageSquare,
+  ExternalLink,
+  Server,
+  AlertCircle,
+  Scale,
+  Shield,
+  Lock,
+  Ban,
+  FileText,
+  Mail,
+  Layers,
+  PhoneCall,
+} from 'lucide-react';
 
 export const TermsAndConditions = () => {
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
-
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1200px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
+      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="text-center flex flex-col items-center"
         >
-          <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
+          <span className="px-3.5 py-1 bg-neutral-100 text-neutral-800 text-[10px] sm:text-xs font-serif font-semibold rounded-full uppercase tracking-[0.25em] mb-3 inline-block">
             LEGAL &amp; COMPLIANCE
           </span>
-          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold tracking-wider uppercase text-[#111111] mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-6">
             TERMS AND CONDITIONS
           </h1>
           <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
         </motion.div>
       </section>
 
-      {/* 2. POLICY DOCUMENT CONTENT */}
-      <section className="w-full max-w-[960px] mx-auto px-6 sm:px-10 lg:px-12">
+      {/* 2. POLICY DOCUMENT CONTENT WRAPPED IN CENTERED CARD */}
+      <section className="w-full max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-12">
         <motion.article
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-10 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
         >
           {/* PREAMBLE / INTRODUCTORY PARAGRAPHS */}
           <div className="space-y-5 pb-6 border-b border-neutral-200">
@@ -49,9 +71,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 1 */}
           <div className="space-y-4 pt-2">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              1. About House of Urvaah
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Building2 className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                1. About House of Urvaah
+              </h2>
+            </div>
             <p>
               References to &quot;House of Urvaah&quot;, &quot;the Company&quot;, &quot;we&quot;, &quot;us&quot; or &quot;our&quot; mean [Insert Legal Name], the owner and operator of the Platform, with its registered office at [Insert Business Address]. References to &quot;you&quot;, &quot;your&quot;, &quot;User&quot; or &quot;Customer&quot; mean any person who accesses, browses or uses the Platform, including anyone who places an order.
             </p>
@@ -60,7 +87,7 @@ export const TermsAndConditions = () => {
             </p>
 
             {/* SUB-SECTION 1.1 */}
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2 pl-0 sm:pl-4 mt-4">
               <h3 className="text-base sm:text-lg font-serif font-semibold text-neutral-900 tracking-wide">
                 1.1 Listings Are an Invitation to Offer
               </h3>
@@ -72,9 +99,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 2 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              2. Changes to These Terms
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <RefreshCw className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                2. Changes to These Terms
+              </h2>
+            </div>
             <p>
               We may update these Terms from time to time to reflect changes in our business, products, or legal requirements. The most current version will always be available on this page, and continuing to use the Platform after changes are posted means you accept the updated Terms. Where practical, we&apos;ll notify you of significant changes via email or an in-app/on-site notice before they take effect.
             </p>
@@ -82,9 +114,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 3 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              3. Who Can Use the Platform
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <UserCheck className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                3. Who Can Use the Platform
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 You must be at least 18 years old to place an order on the Platform. If you are under 18, you may browse the Platform only with the involvement and consent of a parent or legal guardian, who agrees to be bound by these Terms on your behalf.
@@ -97,9 +134,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 4 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              4. Account Registration &amp; Your Responsibilities
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Key className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                4. Account Registration &amp; Your Responsibilities
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 To place an order, you may need to create an account. You agree to provide accurate, current, and complete information, and to keep your details updated.
@@ -118,34 +160,25 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 5 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              5. Acceptable Use of the Platform
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <ShieldAlert className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                5. Acceptable Use of the Platform
+              </h2>
+            </div>
             <p>
               You agree to use the Platform only for lawful purposes. You must not:
             </p>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                Post or share content that is unlawful, abusive, defamatory, obscene, or infringes anyone else&apos;s rights (including copyright, trademark, or privacy rights);
-              </li>
-              <li>
-                Impersonate any person, brand, or entity, including House of Urvaah;
-              </li>
-              <li>
-                Upload viruses, malware, or any code designed to disrupt or damage the Platform;
-              </li>
-              <li>
-                Attempt to probe, scan, or breach the security of the Platform or its systems;
-              </li>
-              <li>
-                Use bots, scrapers, or other automated tools to access, copy, or extract data (including product listings, prices, or images) from the Platform;
-              </li>
-              <li>
-                Interfere with or disrupt the Platform&apos;s functioning or other users&apos; ability to use it;
-              </li>
-              <li>
-                Use the Platform to run unauthorized surveys, contests, chain letters, or promotional schemes.
-              </li>
+              <li>Post or share content that is unlawful, abusive, defamatory, obscene, or infringes anyone else&apos;s rights (including copyright, trademark, or privacy rights);</li>
+              <li>Impersonate any person, brand, or entity, including House of Urvaah;</li>
+              <li>Upload viruses, malware, or any code designed to disrupt or damage the Platform;</li>
+              <li>Attempt to probe, scan, or breach the security of the Platform or its systems;</li>
+              <li>Use bots, scrapers, or other automated tools to access, copy, or extract data (including product listings, prices, or images) from the Platform;</li>
+              <li>Interfere with or disrupt the Platform&apos;s functioning or other users&apos; ability to use it;</li>
+              <li>Use the Platform to run unauthorized surveys, contests, chain letters, or promotional schemes.</li>
             </ul>
             <p>
               We reserve the right to suspend or terminate access for anyone who violates this section.
@@ -154,9 +187,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 6 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              6. Products, Descriptions, Images &amp; Availability
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <ShoppingBag className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                6. Products, Descriptions, Images &amp; Availability
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 We make every effort to accurately display our products, including descriptions, materials, sizing information, and photographs. However, due to factors like screen settings and lighting, actual colors may vary slightly from what&apos;s shown on your device.
@@ -175,9 +213,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 7 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              7. Pricing, Offers, Discounts &amp; Taxes
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Tag className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                7. Pricing, Offers, Discounts &amp; Taxes
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 All prices displayed on the Platform are in [Insert Currency, e.g. Indian Rupees (INR)] and are inclusive of applicable taxes, unless stated otherwise.
@@ -199,9 +242,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 8 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              8. Orders &amp; Order Acceptance
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <CheckCircle className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                8. Orders &amp; Order Acceptance
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 Placing an order on the Platform is an offer by you to purchase the selected products. We will send an order confirmation, but this does not automatically guarantee acceptance — a binding sale is formed only once your order is confirmed and dispatched.
@@ -223,9 +271,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 9 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              9. Payments
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <CreditCard className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                9. Payments
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 We accept payments through the methods displayed at checkout, which may include credit/debit cards, UPI, net banking, digital wallets, and Cash on Delivery (where available).
@@ -244,9 +297,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 10 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              10. Shipping &amp; Delivery
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Truck className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                10. Shipping &amp; Delivery
+              </h2>
+            </div>
             <p>
               Order processing, dispatch, and delivery are governed by our Shipping &amp; Delivery Policy, which forms part of these Terms. By placing an order, you agree to its terms, including estimated delivery timelines, serviceable areas, and delivery procedures.
             </p>
@@ -257,9 +315,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 11 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              11. Cancellations, Returns, Exchanges &amp; Refunds
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <RotateCcw className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                11. Cancellations, Returns, Exchanges &amp; Refunds
+              </h2>
+            </div>
             <p>
               Order cancellations, product returns, exchanges, and refunds are governed by our Cancellation, Return, Exchange &amp; Refund Policy, which forms part of these Terms. Please review that policy for eligibility windows, product condition requirements, and refund timelines before placing your order.
             </p>
@@ -267,9 +330,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 12 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              12. Intellectual Property
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Copyright className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                12. Intellectual Property
+              </h2>
+            </div>
             <p>
               All content on the Platform — including our logo, brand name, product photography, graphics, website design, layout, and written content — is owned by or licensed to House of Urvaah and is protected under applicable intellectual property laws.
             </p>
@@ -283,25 +351,22 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 13 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              13. Reviews, Ratings &amp; User Content
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <MessageSquare className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                13. Reviews, Ratings &amp; User Content
+              </h2>
+            </div>
             <p>
               If the Platform allows you to submit product reviews, ratings, photos, or comments (&quot;User Content&quot;), you agree that your submission will not:
             </p>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                Contain false, misleading, defamatory, obscene, or offensive content;
-              </li>
-              <li>
-                Infringe someone else&apos;s copyright or other rights (only submit content you own or have permission to share);
-              </li>
-              <li>
-                Include advertisements, spam, or solicitations;
-              </li>
-              <li>
-                Impersonate another person or brand.
-              </li>
+              <li>Contain false, misleading, defamatory, obscene, or offensive content;</li>
+              <li>Infringe someone else&apos;s copyright or other rights (only submit content you own or have permission to share);</li>
+              <li>Include advertisements, spam, or solicitations;</li>
+              <li>Impersonate another person or brand.</li>
             </ul>
             <p>
               By submitting User Content, you grant House of Urvaah a non-exclusive, royalty-free, worldwide right to use, display, reproduce, and share that content in connection with the Platform and our marketing (for example, featuring a customer photo in our social media or website). We reserve the right to remove any User Content at our discretion, without prior notice.
@@ -310,9 +375,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 14 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              14. Third-Party Links
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <ExternalLink className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                14. Third-Party Links
+              </h2>
+            </div>
             <p>
               The Platform may contain links to third-party websites, social media pages, or services. We don&apos;t control these third parties and are not responsible for their content, practices, or policies. Visiting a linked site is at your own discretion and risk.
             </p>
@@ -320,9 +390,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 15 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              15. Website Availability &amp; Technical Issues
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Server className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                15. Website Availability &amp; Technical Issues
+              </h2>
+            </div>
             <p>
               We aim to keep the Platform running smoothly, but we don&apos;t guarantee that it will always be available, uninterrupted, or error-free. The Platform may occasionally be unavailable for maintenance, updates, or due to circumstances beyond our control. We are not liable for any inconvenience or loss resulting from such downtime.
             </p>
@@ -330,9 +405,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 16 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              16. Disclaimer of Warranties
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <AlertCircle className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                16. Disclaimer of Warranties
+              </h2>
+            </div>
             <p>
               The Platform and its content are provided on an &quot;as is&quot; and &quot;as available&quot; basis. To the extent permitted by law, we do not make any warranties — express or implied — regarding the accuracy, reliability, or fitness of the Platform, its content, or the products sold through it, beyond what is expressly stated in these Terms and applicable consumer protection law.
             </p>
@@ -343,9 +423,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 17 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              17. Limitation of Liability
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Scale className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                17. Limitation of Liability
+              </h2>
+            </div>
             <p>
               To the maximum extent permitted by applicable law, House of Urvaah&apos;s total liability for any claim arising from your use of the Platform or a specific order is limited to the amount you actually paid for that order.
             </p>
@@ -356,9 +441,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 18 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              18. Indemnification
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Shield className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                18. Indemnification
+              </h2>
+            </div>
             <p>
               You agree to hold House of Urvaah, its employees, and representatives harmless from any claims, losses, or expenses (including reasonable legal fees) arising from your misuse of the Platform, your breach of these Terms, or any content you submit that infringes someone else&apos;s rights.
             </p>
@@ -366,9 +456,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 19 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              19. Privacy &amp; Cookies
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Lock className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                19. Privacy &amp; Cookies
+              </h2>
+            </div>
             <p>
               Your use of the Platform is also governed by our Privacy Policy and Cookie Policy, which explain how we collect, use, and protect your personal information, and how we use cookies to improve your browsing experience. Please review both policies to understand our practices.
             </p>
@@ -376,9 +471,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 20 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              20. Termination
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Ban className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                20. Termination
+              </h2>
+            </div>
             <p>
               We may suspend or terminate your access to the Platform at any time, with or without notice, if you breach these Terms, engage in fraudulent or abusive behavior, or if required to do so by law. We are not liable to you for any such suspension or termination.
             </p>
@@ -386,9 +486,14 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 21 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              21. Governing Law &amp; Dispute Resolution
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <FileText className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                21. Governing Law &amp; Dispute Resolution
+              </h2>
+            </div>
             <p>
               These Terms are governed by the laws of [Insert Governing Jurisdiction]. Any disputes arising from these Terms or your use of the Platform will be subject to the exclusive jurisdiction of the courts of [Insert Governing Jurisdiction].
             </p>
@@ -399,22 +504,43 @@ export const TermsAndConditions = () => {
 
           {/* SECTION 22 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              22. Contact Us
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Mail className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                22. Contact Us
+              </h2>
+            </div>
             <p>
               If you have questions about these Terms, or need help with an order, please reach out:
             </p>
-            <p>
-              Email: [Insert Email Address] Address: [Insert Business Address] Support Hours: [Insert Support Hours]
-            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
+              <div>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Email</p>
+                <p className="font-semibold text-neutral-900">[Insert Email Address]</p>
+              </div>
+              <div>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>
+                <p className="font-semibold text-neutral-900">[Insert Support Hours]</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Address</p>
+                <p className="font-semibold text-neutral-900">[Insert Business Address]</p>
+              </div>
+            </div>
           </div>
 
           {/* SECTION 23 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              23. Miscellaneous
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <Layers className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                23. Miscellaneous
+              </h2>
+            </div>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>
                 <strong className="font-semibold text-neutral-900">Entire agreement:</strong> These Terms, along with our referenced Policies, make up the entire agreement between you and House of Urvaah regarding your use of the Platform.
@@ -431,16 +557,39 @@ export const TermsAndConditions = () => {
             </ul>
           </div>
 
-          {/* SECTION 24 (Rendered strictly as a heading with no body text beneath per instructions) */}
+          {/* SECTION 24 */}
           <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-              24. Contact Details
-            </h2>
+            <div className="flex items-center gap-3.5 mb-2">
+              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
+                <PhoneCall className="w-5 h-5 text-neutral-900" />
+              </div>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+                24. Contact Details
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
+              <div>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Company</p>
+                <p className="font-semibold text-neutral-900">House of Urvaah / [Insert Legal Name]</p>
+              </div>
+              <div>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Email</p>
+                <p className="font-semibold text-neutral-900">[Insert Email Address]</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Registered Address</p>
+                <p className="font-semibold text-neutral-900">[Insert Business Address]</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>
+                <p className="font-semibold text-neutral-900">[Insert Support Hours]</p>
+              </div>
+            </div>
           </div>
 
-          {/* LEGAL REVIEW DISCLAIMER */}
-          <div className="pt-6 border-t border-neutral-200">
-            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 text-xs sm:text-sm text-neutral-600 rounded-sm italic leading-relaxed">
+          {/* CLOSING LEGAL NOTICE NESTED BOTTOM BANNER */}
+          <div className="border-t border-neutral-200 pt-8 mt-12 bg-neutral-50 -mx-6 -mb-6 sm:-mx-10 sm:-mb-10 md:-mx-14 md:-mb-14 p-6 sm:p-10 rounded-b-2xl text-center space-y-3">
+            <div className="max-w-3xl mx-auto text-xs sm:text-sm text-neutral-600 italic leading-relaxed">
               This Terms &amp; Conditions document is provided as a starting draft based on the structure of a reference policy and is not a substitute for legal advice. Before publishing this on a live site, please have it reviewed by a qualified legal professional to ensure it accurately reflects House of Urvaah&apos;s actual business details, entity structure, and compliance obligations under applicable consumer protection and e-commerce law.
             </div>
           </div>
@@ -449,3 +598,5 @@ export const TermsAndConditions = () => {
     </div>
   );
 };
+
+export default TermsAndConditions;
