@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Scissors, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const AboutUs = () => {
   // Ensure page scrolls to top on navigation mount
@@ -11,6 +12,12 @@ export const AboutUs = () => {
 
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden select-none">
+      <SEOHead
+        title="About Us | House of Urvaah — Contemporary Women's Fashion"
+        description="Learn about House of Urvaah: our passion for refined editorial fashion, timeless craftsmanship, and our mission to empower women with elevated wardrobes."
+        keywords="About House of Urvaah, luxury fashion brand, contemporary tailoring, sustainable fashion atelier, brand story"
+        ogImage="/assets/Images/Corset01.png"
+      />
       {/* 1. EDITORIAL HERO SECTION */}
       <section className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

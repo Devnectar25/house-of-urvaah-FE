@@ -27,7 +27,7 @@ export const BrandStory = () => {
   ];
 
   return (
-    <section className="py-20 bg-brand-sand/60 border-t border-b border-neutral-200/80 font-serif text-brand-dark">
+    <section className="py-20 bg-white border-t border-b border-neutral-200/80 font-serif text-brand-dark">
       <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -58,7 +58,7 @@ export const BrandStory = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className="bg-white p-8 border border-neutral-200/60 shadow-sm flex flex-col justify-between"
+                className="bg-[#F5F5F5] p-8 border border-neutral-200/80 shadow-xs flex flex-col justify-between"
               >
                 <div>
                   <div className="w-10 h-10 rounded-full bg-brand-sand flex items-center justify-center text-brand-dark mb-6">

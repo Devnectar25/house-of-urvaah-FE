@@ -1,5 +1,6 @@
 import React from 'react';
 // House of Urvaah - Home Page
+import { SEOHead } from '../components/common/SEOHead';
 import { HeroParallaxBlock } from '../components/home/HeroParallaxBlock';
 import { CategoryGrid } from '../components/home/CategoryGrid';
 import { EditorialBanner } from '../components/home/EditorialBanner';
@@ -17,6 +18,12 @@ export const Home = () => {
 
   return (
     <main className="w-full min-h-screen bg-white">
+      <SEOHead 
+        title="House of Urvaah | Official Online Store & Luxury Atelier"
+        description="Explore House of Urvaah: high-fashion runway tailoring, luxury silk dresses, minimalist co-ord sets, and timeless women's designer apparel."
+        keywords="House of Urvaah, luxury clothing, architectural tailoring, silk dresses, co-ord sets, women fashion atelier"
+        ogImage="/assets/Images/Brown01.png"
+      />
       {/* Hero Video + Dual Campaign Banner Parallax Block with Pinned Logo Overlay */}
       <HeroParallaxBlock />
 

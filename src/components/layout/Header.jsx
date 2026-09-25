@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Menu, Search, User, Heart, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
@@ -7,10 +7,13 @@ import { Logo } from '../common/Logo';
 export const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHomePage =
     (location.pathname === '/' || location.pathname === '') &&
     (!location.hash || location.hash === '#' || location.hash === '#/' || location.hash === '');
   const {
+    user,
+    session,
     cartCount,
     wishlistCount,
     setIsCartOpen,
@@ -18,6 +21,16 @@ export const Header = () => {
     setIsMobileMenuOpen,
     openAuthModal,
   } = useCart();
+
+  const handleAccountClick = () => {
+    const activeToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+    if (user || session || activeToken) {
+      navigate('/account');
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+      openAuthModal('login');
+    }
+  };
 
   useEffect(() => {
     if (!isHomePage) {
@@ -82,10 +95,10 @@ export const Header = () => {
             </button>
 
             <button
-              onClick={() => openAuthModal('login')}
+              onClick={handleAccountClick}
               className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
-              aria-label="Log In / Sign Up"
-              title="Log In / Sign Up"
+              aria-label="Account"
+              title="Account"
             >
               <User className="w-5 h-5 md:w-6 md:h-6 stroke-[2.25]" />
             </button>
@@ -172,7 +185,7 @@ export const Header = () => {
             </button>
 
             <button
-              onClick={() => openAuthModal('login')}
+              onClick={handleAccountClick}
               className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Account"
               title="Account"
