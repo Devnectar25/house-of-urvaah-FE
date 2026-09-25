@@ -13,7 +13,25 @@ export const BestSellers = ({ onQuickView }) => {
     productApi.getFeaturedProducts()
       .then((data) => {
         if (isMounted && data && data.length > 0) {
-          setProducts(data);
+          const seenNames = new Set();
+          const uniqueProducts = [];
+          for (const item of data) {
+            const normName = item.name.trim().toLowerCase();
+            if (!seenNames.has(normName)) {
+              seenNames.add(normName);
+              uniqueProducts.push(item);
+            }
+          }
+          if (uniqueProducts.length < 5) {
+            for (const item of BEST_SELLERS_PRODUCTS) {
+              const normName = item.name.trim().toLowerCase();
+              if (!seenNames.has(normName)) {
+                seenNames.add(normName);
+                uniqueProducts.push(item);
+              }
+            }
+          }
+          setProducts(uniqueProducts.slice(0, 5));
         }
       })
       .catch((err) => {
@@ -39,8 +57,8 @@ export const BestSellers = ({ onQuickView }) => {
           </h2>
         </div>
 
-        {/* 4-Column Product Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+        {/* 5-Column Product Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8">
           {products.map((product, idx) => (
             <motion.div
               key={product.id}

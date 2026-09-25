@@ -18,10 +18,16 @@ import {
   Phone,
   Clock,
 } from 'lucide-react';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const ReturnRefundPolicy = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+      <SEOHead
+        title="Return & Refund Policy | House of Urvaah"
+        description="Understand House of Urvaah return, exchange, and refund policies for online purchases. Enjoy hassle-free returns on eligible luxury garments."
+        keywords="House of Urvaah returns, refund policy, exchange policy, garment returns"
+      />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

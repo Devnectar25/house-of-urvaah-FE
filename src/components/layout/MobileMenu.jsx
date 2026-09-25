@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Search, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -71,7 +71,10 @@ const MENU_SECTIONS = [
 ];
 
 export const MobileMenu = () => {
+  const navigate = useNavigate();
   const {
+    user,
+    session,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
     cartCount,
@@ -150,7 +153,13 @@ export const MobileMenu = () => {
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
-                    openAuthModal('login');
+                    const activeToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+                    if (user || session || activeToken) {
+                      navigate('/account');
+                      window.scrollTo({ top: 0, behavior: 'instant' });
+                    } else {
+                      openAuthModal('login');
+                    }
                   }}
                   className="p-2 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
                   aria-label="Account"

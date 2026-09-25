@@ -10,10 +10,16 @@ import {
   Mail,
   FileText,
 } from 'lucide-react';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const PrivacyPolicy = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+      <SEOHead
+        title="Privacy Policy | House of Urvaah"
+        description="Read the official House of Urvaah Privacy Policy to learn how we collect, handle, and safeguard your personal information and shopping security."
+        keywords="House of Urvaah privacy policy, data security, customer privacy, legal terms"
+      />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

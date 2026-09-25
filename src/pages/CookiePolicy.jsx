@@ -11,10 +11,16 @@ import {
   ShieldCheck,
   AlertCircle,
 } from 'lucide-react';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const CookiePolicy = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+      <SEOHead
+        title="Cookie Policy | House of Urvaah"
+        description="Learn how House of Urvaah uses cookies and similar tracking technologies to personalize your shopping experience and optimize store performance."
+        keywords="House of Urvaah cookie policy, browser cookies, analytics, tracking settings"
+      />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

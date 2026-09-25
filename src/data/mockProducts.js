@@ -307,6 +307,28 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     colors: ['#F5F5F0', '#111111'],
     sizes: ['S', 'M', 'L'],
     description: 'Fine silk rib knit fitted top in dusty rose blush with delicate crew neckline.'
+  },
+  {
+    id: 'bs-105',
+    name: 'EMBROIDERED SILK KURTI SET',
+    price: 8990,
+    originalPrice: 11990,
+    category: 'ETHNIC WEAR',
+    subcategory: 'Kurti Ensembles',
+    tag: 'NEW IN',
+    isNew: true,
+    isBestSeller: true,
+    image: '/assets/Images/Kurti_2.png',
+    hoverImage: '/assets/Images/Kurti_4.png',
+    gallery: [
+      '/assets/Images/Kurti_2.png',
+      '/assets/Images/Kurti_4.png',
+      '/assets/Images/Kurti_3.png',
+      '/assets/Images/Kurti_1.png'
+    ],
+    colors: ['#8B0000', '#111111', '#F5F5F0'],
+    sizes: ['XS', 'S', 'M', 'L', 'XL'],
+    description: 'Architectural embroidered silk kurti ensemble featuring intricate hand-finished detailing and flowing silhouette.'
   }
 ];
 
