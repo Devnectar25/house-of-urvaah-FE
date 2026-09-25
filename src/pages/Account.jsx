@@ -135,6 +135,10 @@ export const Account = () => {
       setShowSignOutModal(true);
       return;
     }
+    if (tab === 'VIEW WISHLIST') {
+      navigate('/wishlist');
+      return;
+    }
     setActiveTab(tab);
   };
 
