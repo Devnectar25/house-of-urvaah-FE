@@ -13,6 +13,9 @@ import { Newsletter } from '../components/home/Newsletter';
 import { AuthSection } from '../components/home/AuthSection';
 import { useCart } from '../context/CartContext';
 
+// Flag to control visibility of the "PRICE DROP ERA" (StealDeals) section on the homepage
+const SHOW_PRICE_DROP_ERA = false;
+
 export const Home = () => {
   const { setPdpProduct } = useCart();
 
@@ -32,8 +35,8 @@ export const Home = () => {
         <BestSellers onQuickView={(p) => setPdpProduct(p)} />
       </section>
 
-      {/* STEAL DEALS Section */}
-      <StealDeals />
+      {/* STEAL DEALS / PRICE DROP ERA Section */}
+      {SHOW_PRICE_DROP_ERA && <StealDeals />}
 
       {/* TRENDING ON THE GRAM Section */}
       <section id="trending" className="scroll-mt-20">
