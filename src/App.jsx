@@ -120,17 +120,14 @@ const GlobalLoginWall = ({ children }) => {
   return children;
 };
 
-export function AppContent() {
-  React.useEffect(() => {
-    // Explicitly override browser scroll restoration to prevent restoring scroll position on refresh
-    if ('scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual';
-    }
+import { AdminLogin } from './pages/admin/AdminLogin';
+import { AdminLayout } from './components/admin/AdminLayout';
+import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
+import { AdminProducts } from './pages/admin/AdminProducts';
 
-    // Force page scroll to top on initial mount / page refresh
-    window.scrollTo(0, 0);
-  }, []);
-
+export function StorefrontLayout() {
   return (
     <GlobalLoginWall>
       <div className="min-h-screen flex flex-col bg-white text-brand-dark antialiased font-serif selection:bg-brand-dark selection:text-white relative w-full max-w-full overflow-x-hidden">
@@ -190,6 +187,53 @@ export function AppContent() {
         <AuthModal />
       </div>
     </GlobalLoginWall>
+  );
+}
+
+export function AppContent() {
+  React.useEffect(() => {
+    // Explicitly override browser scroll restoration to prevent restoring scroll position on refresh
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    // Force page scroll to top on initial mount / page refresh
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <Routes>
+      {/* Admin Portal Authentication Route */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+
+      {/* Admin Portal Guarded Layout & Routes */}
+      <Route
+        path="/admin"
+        element={
+          <AdminRouteGuard>
+            <AdminLayout />
+          </AdminRouteGuard>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="products" element={<AdminProducts />} />
+        <Route path="products/new" element={<AdminPlaceholderPage />} />
+        <Route path="products/:id/edit" element={<AdminPlaceholderPage />} />
+        <Route path="categories" element={<AdminPlaceholderPage />} />
+        <Route path="orders" element={<AdminPlaceholderPage />} />
+        <Route path="coupons" element={<AdminPlaceholderPage />} />
+        <Route path="customers" element={<AdminPlaceholderPage />} />
+        <Route path="refunds" element={<AdminPlaceholderPage />} />
+        <Route path="reviews" element={<AdminPlaceholderPage />} />
+        <Route path="analytics" element={<AdminPlaceholderPage />} />
+        <Route path="settings" element={<AdminPlaceholderPage />} />
+        <Route path="*" element={<AdminDashboard />} />
+      </Route>
+
+      {/* Customer Storefront Routes */}
+      <Route path="/*" element={<StorefrontLayout />} />
+    </Routes>
   );
 }
 
