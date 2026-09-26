@@ -56,9 +56,17 @@ export async function apiClient(endpoint, options = {}) {
   try {
     const response = await fetch(url, config);
 
-    // Handle 401 Unauthorized globally if token expired
-    if (response.status === 401 && token) {
-      console.warn('[apiClient] Session expired or 401 returned. Clearing session.');
+    // Handle 401 Unauthorized / 403 Forbidden globally if token expired or invalid
+    if ((response.status === 401 || response.status === 403) && token) {
+      console.warn(`[apiClient] Session invalid (${response.status}). Clearing session and invalidating.`);
+      clearAuthSession();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('urvaah:auth:unauthorized', {
+            detail: { status: response.status }
+          })
+        );
+      }
     }
 
     const data = await response.json().catch(() => ({}));
