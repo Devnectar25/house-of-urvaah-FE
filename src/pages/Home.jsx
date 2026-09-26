@@ -32,7 +32,7 @@ export const Home = () => {
 
       {/* BEST SELLERS Section */}
       <section id="best-sellers" className="scroll-mt-20">
-        <BestSellers onQuickView={(p) => setPdpProduct(p)} />
+        <BestSellers />
       </section>
 
       {/* STEAL DEALS / PRICE DROP ERA Section */}

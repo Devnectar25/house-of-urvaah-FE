@@ -21,13 +21,9 @@ export const ProductCard = ({ product, onQuickView }) => {
   }, [product?.carouselImages]);
 
   const handleCardClick = () => {
-    if (isModalOpen) return;
     if (product?.id) {
-      if (setPdpProduct) {
-        setPdpProduct(product);
-      } else {
-        navigate(`/product/${product.id}`);
-      }
+      navigate(`/product/${product.id}`);
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   };
 
@@ -121,10 +117,9 @@ export const ProductCard = ({ product, onQuickView }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (onQuickView) {
-                onQuickView(product);
-              } else if (setPdpProduct) {
-                setPdpProduct(product);
+              if (product?.id) {
+                navigate(`/product/${product.id}`);
+                window.scrollTo({ top: 0, behavior: 'instant' });
               }
             }}
             title="Quick View"
