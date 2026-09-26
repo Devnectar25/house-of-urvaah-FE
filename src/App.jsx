@@ -16,6 +16,7 @@ import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
 import { Account } from './pages/Account';
 import { Wishlist } from './pages/Wishlist';
+import { Checkout } from './pages/Checkout';
 import { AuthCallback } from './components/auth/AuthCallback';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { ShippingPolicy } from './pages/ShippingPolicy';
@@ -166,6 +167,7 @@ export function StorefrontLayout() {
             <Route path="/accessories" element={<Home />} />
             <Route path="/sale" element={<Home />} />
             <Route path="/cart" element={<PlaceholderPage title="SHOPPING BAG" />} />
+            <Route path="/checkout" element={<Checkout />} />
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account-details" element={<Account />} />
