@@ -15,6 +15,7 @@ import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
 import { Account } from './pages/Account';
+import { Wishlist } from './pages/Wishlist';
 import { AuthCallback } from './components/auth/AuthCallback';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { ShippingPolicy } from './pages/ShippingPolicy';
@@ -23,12 +24,18 @@ import { CookiePolicy } from './pages/CookiePolicy';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 
 import { useCart } from './context/CartContext';
+import { SEOHead } from './components/common/SEOHead';
 
 // Simple placeholder page component for future route stubs
 const PlaceholderPage = ({ title }) => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center font-serif">
+    <SEOHead
+      title={`${title} | House of Urvaah`}
+      description={`House of Urvaah ${title} page.`}
+      noindex={true}
+    />
     <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif mb-2">
-      HOUSE OF URAAH
+      HOUSE OF URVAAH
     </span>
     <h1 className="text-2xl font-serif tracking-[0.2em] uppercase mb-4 text-brand-dark">
       {title}
@@ -159,7 +166,7 @@ export function StorefrontLayout() {
             <Route path="/accessories" element={<Home />} />
             <Route path="/sale" element={<Home />} />
             <Route path="/cart" element={<PlaceholderPage title="SHOPPING BAG" />} />
-            <Route path="/wishlist" element={<PlaceholderPage title="WISHLIST" />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account-details" element={<Account />} />
             <Route path="/auth/callback" element={<AuthCallback />} />

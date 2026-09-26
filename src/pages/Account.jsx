@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -16,11 +17,34 @@ export const Account = () => {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
 
+  // Sign out confirmation modal state
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
   // Address modal & state
   const [addresses, setAddresses] = useState([]);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddressIndex, setEditingAddressIndex] = useState(null);
   const [editingAddressId, setEditingAddressId] = useState(null);
+
+  // Keyboard Escape listener for Sign Out modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showSignOutModal) {
+        setShowSignOutModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSignOutModal]);
+
+  const handleConfirmSignOut = async () => {
+    setIsSigningOut(true);
+    await logoutUser();
+    setShowSignOutModal(false);
+    setIsSigningOut(false);
+    navigate('/');
+  };
   const [addressForm, setAddressForm] = useState({
     name: '',
     phone: '',
@@ -106,10 +130,13 @@ export const Account = () => {
     'SIGN OUT'
   ];
 
-  const handleTabClick = async (tab) => {
+  const handleTabClick = (tab) => {
     if (tab === 'SIGN OUT') {
-      await logoutUser();
-      navigate('/');
+      setShowSignOutModal(true);
+      return;
+    }
+    if (tab === 'VIEW WISHLIST') {
+      navigate('/wishlist');
       return;
     }
     setActiveTab(tab);
@@ -293,20 +320,50 @@ export const Account = () => {
 
   return (
     <div className="min-h-screen bg-white text-brand-dark pt-24 sm:pt-28 pb-20 font-serif selection:bg-brand-dark selection:text-white">
+      <SEOHead
+        title="My Account | House of Urvaah"
+        description="Manage your House of Urvaah account, track order status, update shipping details, and view saved items."
+        keywords="House of Urvaah account, user profile, orders, addresses"
+        noindex={true}
+      />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12">
-        {/* Welcome Banner */}
-        <div className="mb-8 md:mb-12 border-b border-neutral-200 pb-6 text-left">
-          <span className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-neutral-400 block mb-2 font-serif">
-            MY ATELIER ACCOUNT
-          </span>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl text-black font-serif tracking-[0.12em] uppercase font-normal">
-            WELCOME {firstName}
-          </h1>
+        {/* Profile Header Card with Cream/Off-White Palette (#FAF8F3) matching modal */}
+        <div className="mb-8 p-6 sm:p-8 bg-[#FAF8F3] border border-neutral-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
+          <div className="flex items-center gap-5">
+            {/* Avatar / Initial Circle */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border border-neutral-300 flex items-center justify-center text-xl sm:text-2xl font-serif font-semibold tracking-widest text-brand-dark shadow-xs">
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] tracking-[0.25em] font-serif uppercase px-2.5 py-0.5 bg-black text-white font-semibold">
+                  PRIVILÈGE VIP MEMBER
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-serif tracking-[0.12em] uppercase text-black font-semibold">
+                {user?.name || 'ATELIER MEMBER'}
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-600 font-sans font-light">
+                {user?.email || 'member@houseofurvaah.com'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto border-t md:border-t-0 border-neutral-200/80 pt-4 md:pt-0">
+            <button
+              onClick={() => setShowSignOutModal(true)}
+              className="w-full md:w-auto bg-brand-dark text-white hover:bg-neutral-800 text-xs font-sans font-bold tracking-[0.2em] uppercase px-6 py-3 transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 stroke-[1.5]" />
+              SIGN OUT
+            </button>
+          </div>
         </div>
 
         {/* 1. Horizontal Top Navigation Tabs Bar */}
         <div className="mb-10 border-b border-neutral-200 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-6 sm:gap-10 min-w-max pb-0.5">
+          <div className="flex items-center justify-between min-w-max md:min-w-full w-full gap-4 sm:gap-6 md:gap-8 pb-0.5">
             {tabs.map((tab) => {
               const isActive = activeTab === tab;
               return (
@@ -314,7 +371,7 @@ export const Account = () => {
                   key={tab}
                   type="button"
                   onClick={() => handleTabClick(tab)}
-                  className={`relative py-3 text-xs sm:text-sm tracking-[0.2em] font-sans uppercase transition-colors cursor-pointer ${
+                  className={`relative py-3 text-xs sm:text-sm tracking-[0.2em] font-sans uppercase transition-colors cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'text-black font-semibold'
                       : 'text-neutral-500 hover:text-black font-medium'
@@ -808,6 +865,69 @@ export const Account = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. SIGN OUT CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {showSignOutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-brand-dark font-sans">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSignOutModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative z-10 w-full max-w-md bg-[#FAF8F3] p-6 sm:p-8 shadow-2xl border border-neutral-200 text-center"
+            >
+              <button
+                type="button"
+                onClick={() => setShowSignOutModal(false)}
+                className="absolute top-4 right-4 p-1 text-neutral-400 hover:text-black cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-12 h-12 rounded-full bg-white border border-neutral-200 flex items-center justify-center mx-auto mb-4 text-brand-dark shadow-xs">
+                <LogOut className="w-5 h-5 stroke-[1.5]" />
+              </div>
+
+              <h3 className="font-serif text-lg sm:text-xl tracking-[0.12em] uppercase text-black font-semibold mb-2">
+                SIGN OUT OF YOUR ACCOUNT?
+              </h3>
+
+              <p className="text-xs text-neutral-600 font-sans leading-relaxed tracking-wider mb-8 max-w-xs mx-auto">
+                You'll need to log in again to access your orders, wishlist, and saved addresses.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleConfirmSignOut}
+                  disabled={isSigningOut}
+                  className="w-full sm:flex-1 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase py-3.5 transition-colors cursor-pointer text-center shadow-xs flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4 stroke-[1.5]" />
+                  {isSigningOut ? 'SIGNING OUT...' : 'SIGN OUT'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutModal(false)}
+                  disabled={isSigningOut}
+                  className="w-full sm:flex-1 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase py-3.5 transition-colors cursor-pointer text-center"
+                >
+                  CANCEL
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

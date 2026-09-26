@@ -19,10 +19,16 @@ import {
   FileText,
   HelpCircle,
 } from 'lucide-react';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const ShippingPolicy = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+      <SEOHead
+        title="Shipping Policy | House of Urvaah"
+        description="Review House of Urvaah shipping and delivery details, including domestic express shipping, delivery timelines, and order tracking information."
+        keywords="House of Urvaah shipping policy, express delivery, courier tracking, delivery charges"
+      />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

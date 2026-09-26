@@ -19,7 +19,7 @@ export const CartProvider = ({ children }) => {
       quantity: 1
     }
   ]);
-  const [wishlist, setWishlist] = useState(['prod-102']);
+  const [wishlist, setWishlist] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -123,6 +123,41 @@ export const CartProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Fetch & persist wishlist for logged-in user
+  useEffect(() => {
+    if (!user) {
+      setWishlist([]);
+      return;
+    }
+
+    const userId = user.id || user.username || 'user';
+    const cachedKey = `urvaah_wishlist_${userId}`;
+
+    // 1. Instant load from localStorage cache if available
+    const cached = localStorage.getItem(cachedKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setWishlist(parsed.map(String));
+        }
+      } catch (e) {}
+    }
+
+    // 2. Fetch ground truth wishlist from backend API
+    apiClient(`/api/wishlist/${userId}`)
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const ids = res.data.map((item) => String(item.productId || item.product_id));
+          setWishlist(ids);
+          localStorage.setItem(cachedKey, JSON.stringify(ids));
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch backend wishlist, using cached:', err.message);
+      });
+  }, [user?.id]);
+
   const [pendingAction, setPendingAction] = useState(null);
 
   const requireAuth = (actionCallback) => {
@@ -168,6 +203,7 @@ export const CartProvider = ({ children }) => {
     setTokenState(null);
     setUser(null);
     setSession(null);
+    setWishlist([]);
     setPendingAction(null);
     setIsAuthModalOpen(false);
     try {
@@ -221,15 +257,88 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const toggleWishlist = (productId) => {
-    setWishlist((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    );
+  const isInWishlist = (productId) => {
+    if (!productId) return false;
+    const strId = String(productId).trim();
+    const numId = strId.replace(/\D/g, '');
+    return wishlist.some((id) => {
+      const itemStr = String(id).trim();
+      const itemNum = itemStr.replace(/\D/g, '');
+      if (itemStr === strId) return true;
+      if (numId && itemNum && numId === itemNum) return true;
+      return false;
+    });
   };
 
-  const isInWishlist = (productId) => wishlist.includes(productId);
+  const toggleWishlist = async (productId) => {
+    if (!user && !getAuthToken()) {
+      openAuthModal('login');
+      return false;
+    }
+
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const stringId = String(productId).trim();
+    const numId = stringId.replace(/\D/g, '');
+    const cachedKey = `urvaah_wishlist_${userId}`;
+
+    const isCurrentlyIn = isInWishlist(stringId);
+    let updated;
+    if (isCurrentlyIn) {
+      updated = wishlist.filter((id) => {
+        const itemStr = String(id).trim();
+        const itemNum = itemStr.replace(/\D/g, '');
+        if (itemStr === stringId) return false;
+        if (numId && itemNum && numId === itemNum) return false;
+        return true;
+      });
+    } else {
+      updated = [...wishlist, stringId];
+    }
+
+    setWishlist(updated);
+    localStorage.setItem(cachedKey, JSON.stringify(updated));
+
+    try {
+      await apiClient('/api/wishlist/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ userId, productId: stringId })
+      });
+    } catch (err) {
+      console.warn('Wishlist toggle API sync warning:', err.message);
+    }
+
+    return !isCurrentlyIn;
+  };
+
+  const removeFromWishlist = async (productId) => {
+    if (!user && !getAuthToken()) {
+      openAuthModal('login');
+      return;
+    }
+
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const stringId = String(productId).trim();
+    const numId = stringId.replace(/\D/g, '');
+    const cachedKey = `urvaah_wishlist_${userId}`;
+    const updated = wishlist.filter((id) => {
+      const itemStr = String(id).trim();
+      const itemNum = itemStr.replace(/\D/g, '');
+      if (itemStr === stringId) return false;
+      if (numId && itemNum && numId === itemNum) return false;
+      return true;
+    });
+
+    setWishlist(updated);
+    localStorage.setItem(cachedKey, JSON.stringify(updated));
+
+    try {
+      await apiClient(`/api/wishlist/${userId}/${stringId}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn('Wishlist remove API sync warning:', err.message);
+    }
+  };
 
   const wishlistCount = useMemo(() => wishlist.length, [wishlist]);
 
@@ -278,6 +387,7 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         updateQuantity,
         toggleWishlist,
+        removeFromWishlist,
         isInWishlist,
         cartCount,
         cartSubtotal,

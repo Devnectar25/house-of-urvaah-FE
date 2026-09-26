@@ -2,13 +2,14 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Hero } from './Hero';
 import { DualCampaignBanner } from './DualCampaignBanner';
-import { Logo } from '../common/Logo';
 import { useCart } from '../../context/CartContext';
 
 export const HeroParallaxBlock = () => {
   const containerRef = useRef(null);
+  const heroRef = useRef(null);
   const [isPinned, setIsPinned] = useState(true);
   const [opacity, setOpacity] = useState(1);
+  const [isPastHero, setIsPastHero] = useState(false);
   const { isMobileMenuOpen } = useCart();
 
   useEffect(() => {
@@ -16,6 +17,15 @@ export const HeroParallaxBlock = () => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
+
+      // Check if user has scrolled past the hero section into the second section
+      if (heroRef.current) {
+        const heroRect = heroRef.current.getBoundingClientRect();
+        // Hero is considered passed when its bottom is <= 40% of viewport height
+        // (i.e. user has scrolled into DualCampaignBanner, the second section)
+        const scrolledPastHero = heroRect.bottom <= windowHeight * 0.4;
+        setIsPastHero(scrolledPastHero);
+      }
 
       // fadeStartThreshold: starts fading when bottom of DualCampaignBanner is 1.4x windowHeight from top
       const fadeStartThreshold = windowHeight * 1.4;
@@ -43,28 +53,37 @@ export const HeroParallaxBlock = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const activeOpacity = isPastHero ? opacity : 0;
+
   return (
     <div ref={containerRef} className="relative w-full bg-white">
       {/* 1. Hero Video Background */}
-      <Hero />
+      <div ref={heroRef} className="w-full">
+        <Hero />
+      </div>
 
       {/* 2. Side-by-Side Dual Image Campaign Banner (Blue02.png & Brown02.png) */}
       <DualCampaignBanner />
 
       {/* 3. Pinned Oversized Logo Overlay across Hero + Dual Campaign Banner */}
       <AnimatePresence>
-        {isPinned && opacity > 0 && (
+        {isPinned && (
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity }}
+            animate={{ opacity: activeOpacity }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`fixed bottom-3 md:bottom-8 lg:bottom-12 pointer-events-none flex items-end transition-all duration-500 ease-in-out max-w-[88vw] overflow-visible ${
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className={`fixed bottom-3 md:bottom-8 lg:bottom-12 pointer-events-none flex items-end max-w-[88vw] overflow-visible ${
+              isPastHero && activeOpacity > 0 ? 'visible' : 'invisible'
+            } ${
               isMobileMenuOpen
                 ? 'right-3 sm:right-6 md:right-10 lg:right-12 left-auto justify-end z-[60]'
                 : 'left-2 sm:left-4 md:left-6 lg:left-8 right-auto justify-start z-20'
             }`}
-            style={{ opacity }}
+            style={{ 
+              opacity: activeOpacity,
+              transition: 'opacity 0.4s ease, visibility 0.4s ease'
+            }}
           >
             <div
               className={`inline-flex items-center justify-center select-none h-10 sm:h-20 md:h-36 lg:h-[250px] w-auto max-w-full transition-all duration-500 ease-in-out ${
@@ -89,3 +108,4 @@ export const HeroParallaxBlock = () => {
     </div>
   );
 };
+

@@ -26,10 +26,16 @@ import {
   Layers,
   PhoneCall,
 } from 'lucide-react';
+import { SEOHead } from '../components/common/SEOHead';
 
 export const TermsAndConditions = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+      <SEOHead
+        title="Terms & Conditions | House of Urvaah"
+        description="Review the official Terms and Conditions governing your use of the House of Urvaah website, online purchases, and official atelier services."
+        keywords="House of Urvaah terms and conditions, terms of service, legal notice, user agreement"
+      />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
         <motion.div

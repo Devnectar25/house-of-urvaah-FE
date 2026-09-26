@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Eye, EyeOff, Lock, Mail, User as UserIcon, ArrowRight, CheckCircle2, LogOut, Shield, AlertCircle, RefreshCw } from 'lucide-react';
@@ -20,6 +20,14 @@ export const AuthModal = () => {
     loginUser,
     logoutUser,
   } = useCart();
+
+  useEffect(() => {
+    if (isAuthModalOpen && user) {
+      setIsAuthModalOpen(false);
+      navigate('/account');
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [isAuthModalOpen, user, navigate, setIsAuthModalOpen]);
 
   const [showPassword, setShowPassword] = useState(false);
   const [isForgotView, setIsForgotView] = useState(false);
