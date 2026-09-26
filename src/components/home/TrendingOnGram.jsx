@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -415,8 +416,13 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     }, 1500);
   };
 
+  const navigate = useNavigate();
+
   const handleMoreInfo = () => {
-    setPdpProduct(look.product);
+    if (look.product?.id) {
+      navigate(`/product/${look.product.id}`);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
     onClose();
   };
 
