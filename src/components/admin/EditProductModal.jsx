@@ -1,8 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-=======
-import React, { useState, useEffect } from 'react';
-
 import {
   X,
   Plus,
@@ -13,10 +10,7 @@ import {
   Image as ImageIcon,
   CheckCircle2
 } from 'lucide-react';
-
 import { apiClient, clearAuthSession } from '../../lib/apiClient';
-
-import { apiClient } from '../../lib/apiClient';
 
 
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
@@ -57,8 +51,6 @@ const DEFAULT_CATEGORIES = [
 ];
 
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-
-  const [categories, setCategories] = useState([]);
 
   const [errors, setErrors] = useState({});
   const [fetchingDetail, setFetchingDetail] = useState(false);
@@ -391,16 +383,6 @@ const DEFAULT_CATEGORIES = [
       } else if (!isDiscountValid) {
         discountRef.current?.focus();
       }
-
-
-    // Validate required fields
-    const isNameValid = validateField('name', formData.name);
-    const isCategoryValid = validateField('category_id', formData.category_id);
-    const isPriceValid = validateField('price', formData.price);
-
-    if (!isNameValid || !isCategoryValid || !isPriceValid) {
-      setSubmitError('Please fix the highlighted required fields before saving.');
-
       return;
     }
 
@@ -440,7 +422,6 @@ const DEFAULT_CATEGORIES = [
         body: JSON.stringify(payload)
       });
 
-
       const updatedProduct = res?.data || res;
       onProductUpdated(updatedProduct || { ...product, ...payload });
       onClose();
@@ -457,19 +438,8 @@ const DEFAULT_CATEGORIES = [
       if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
         setSubmitError(err.message || err.data?.message || 'Invalid product data provided. Please check all fields.');
       } else {
-        setSubmitError('Something went wrong. Please try again.');
+        setSubmitError(err.message || 'Failed to save product updates. Please try again.');
       }
-
-      if (res?.success || res?.data) {
-        onProductUpdated(res.data || { ...product, ...payload });
-        onClose();
-      } else {
-        throw new Error(res?.message || 'Failed to update product details');
-      }
-    } catch (err) {
-      console.error('Failed to update product:', err);
-      setSubmitError(err.message || 'Failed to save product updates. Please try again.');
-
     } finally {
       setUpdating(false);
     }
@@ -477,12 +447,7 @@ const DEFAULT_CATEGORIES = [
 
   // Delete Handler with Confirmation
   const handleDeleteConfirm = async () => {
-
     if (deleting || updating) return;
-
-    setDeleting(true);
-    setSubmitError(null);
-
 
     setDeleting(true);
     setSubmitError(null);
@@ -491,7 +456,6 @@ const DEFAULT_CATEGORIES = [
       const res = await apiClient(`/api/products/${product.id}`, {
         method: 'DELETE'
       });
-
 
       onProductDeleted(product.id);
       onClose();
@@ -508,20 +472,9 @@ const DEFAULT_CATEGORIES = [
       if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
         setSubmitError(err.message || err.data?.message || 'This product cannot be deleted due to existing orders or constraints.');
       } else {
-        setSubmitError('Something went wrong. Please try again.');
+        setSubmitError(err.message || 'Could not delete product. Server error.');
       }
-
-      if (res?.success || res) {
-        onProductDeleted(product.id);
-        onClose();
-      } else {
-        throw new Error(res?.message || 'Delete operation failed');
-      }
-    } catch (err) {
-      console.error('Failed to delete product:', err);
-      setSubmitError(err.message || 'Could not delete product. Server error.');
       setShowDeleteConfirm(false);
-
     } finally {
       setDeleting(false);
     }
@@ -568,7 +521,6 @@ const DEFAULT_CATEGORIES = [
 
               {/* Delete Confirmation Warning Box */}
               {showDeleteConfirm && (
-
                 <div className="p-4 bg-rose-50/90 border border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in shadow-xs">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
@@ -602,32 +554,6 @@ const DEFAULT_CATEGORIES = [
                       ) : (
                         <span>Yes, Delete Product</span>
                       )}
-
-                <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-rose-600" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider">Confirm Product Deletion</h4>
-                  </div>
-                  <p className="text-xs text-rose-700 leading-relaxed">
-                    Are you sure you want to delete <span className="font-semibold text-rose-900">"{formData.name}"</span>? This will permanently remove it from your store catalog.
-                  </p>
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleDeleteConfirm}
-                      disabled={deleting}
-                      className="px-4 py-2 bg-rose-700 text-white text-xs font-semibold rounded-lg hover:bg-rose-800 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                    >
-                      {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      Confirm Permanent Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 text-xs font-semibold rounded-lg hover:bg-neutral-100 transition-colors"
-                    >
-                      Cancel
-
                     </button>
                   </div>
                 </div>
@@ -750,24 +676,17 @@ const DEFAULT_CATEGORIES = [
                     Discount %
                   </label>
                   <input
-
                     ref={discountRef}
-
                     type="number"
                     min="0"
                     max="100"
                     value={formData.discountPercent}
                     onChange={handleDiscountChange}
-
                     className={`w-full px-3 py-2 bg-white border rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 ${
                       errors.discountPercent ? 'border-rose-400 focus:ring-rose-400 bg-rose-50' : 'border-neutral-200 focus:ring-brand-dark'
                     }`}
                   />
                   {errors.discountPercent && <p className="text-[10px] text-rose-600">{errors.discountPercent}</p>}
-
-                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
-                  />
-
                 </div>
 
                 <div className="space-y-1">
@@ -1094,18 +1013,13 @@ const DEFAULT_CATEGORIES = [
             disabled={updating || deleting || showDeleteConfirm}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
           >
-
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete Product</span>
-
-            Delete Product
-
           </button>
           <button
             type="submit"
             form="edit-product-form"
             disabled={updating || deleting || fetchingDetail}
-
             className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 min-w-[130px]"
           >
             {updating ? (
@@ -1116,12 +1030,6 @@ const DEFAULT_CATEGORIES = [
             ) : (
               <span>Update Details</span>
             )}
-
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
-          >
-            {updating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Update Details
-
           </button>
         </div>
 
