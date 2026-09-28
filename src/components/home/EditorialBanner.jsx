@@ -204,7 +204,7 @@ export const EditorialBanner = () => {
                         muted
                         playsInline
                         loop
-                        preload="auto"
+                        preload="metadata"
                         onLoadedData={() =>
                           setVideoLoaded((prev) => ({ ...prev, [item.id]: true }))
                         }
