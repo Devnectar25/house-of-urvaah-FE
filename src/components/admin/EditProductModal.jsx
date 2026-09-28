@@ -5,14 +5,23 @@ import {
   Trash2,
   Upload,
   Loader2,
-  AlertCircle,
-  Image as ImageIcon,
-  CheckCircle2
+  AlertCircle
 } from 'lucide-react';
 import { apiClient, clearAuthSession } from '../../lib/apiClient';
 
+const DEFAULT_CATEGORIES = [
+  { id: 1, category_id: 1, name: 'CORSET TOPS' },
+  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
+
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
-  if (!isOpen || !product) return null;
+  // Refs for focusing first invalid field on submit validation
+  const nameRef = useRef(null);
+  const categoryRef = useRef(null);
+  const priceRef = useRef(null);
+  const discountRef = useRef(null);
 
   // Form State initialized from product prop
   const [formData, setFormData] = useState({
@@ -34,13 +43,6 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     images: []
   });
 
-  const DEFAULT_CATEGORIES = [
-    { id: 1, category_id: 1, name: 'CORSET TOPS' },
-    { id: 2, category_id: 2, name: 'CO-ORD SETS' },
-    { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
-    { id: 4, category_id: 4, name: 'PARTY WEAR' }
-  ];
-
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [errors, setErrors] = useState({});
   const [fetchingDetail, setFetchingDetail] = useState(false);
@@ -58,29 +60,29 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
-  // Refs for focusing first invalid field on submit validation
-  const nameRef = useRef(null);
-  const categoryRef = useRef(null);
-  const priceRef = useRef(null);
-  const discountRef = useRef(null);
-
   // Fetch available categories
   useEffect(() => {
+    let isMounted = true;
     const fetchCats = async () => {
       try {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
-        setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+        if (isMounted) {
+          setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+        }
       } catch (err) {
         console.error('Failed to load categories in modal:', err);
       }
     };
     fetchCats();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Populate or fetch detailed product data when product ID changes
+  // Populate or fetch detailed product data when product ID changes or modal opens
   useEffect(() => {
-    if (!product?.id) return;
+    if (!isOpen || !product?.id) return;
 
     const loadFullProduct = async () => {
       setFetchingDetail(true);
@@ -88,54 +90,65 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       setShowDeleteConfirm(false);
       try {
         const res = await apiClient(`/api/products/${product.id}`);
-        const data = res?.data || res || {};
-        
-        let specsArr = [];
+        const data = res?.data || res || product;
+
+        // Map backend product data to modal state
+        const origPrice = data.originalPrice ?? data.price ?? 0;
+        const currPrice = data.price ?? 0;
+        const calcDiscount = origPrice > 0 && origPrice > currPrice
+          ? Math.round(((origPrice - currPrice) / origPrice) * 100)
+          : (data.discount || 0);
+
+        // Map specifications array or object
+        let specPairs = [];
         if (Array.isArray(data.specifications)) {
-          specsArr = data.specifications;
+          specPairs = data.specifications;
         } else if (data.specifications && typeof data.specifications === 'object') {
-          specsArr = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
+          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
+        } else if (data.fabric || data.fitType) {
+          if (data.fabric) specPairs.push({ label: 'Fabric', value: data.fabric });
+          if (data.fitType) specPairs.push({ label: 'Fit Type', value: data.fitType });
         }
 
         setFormData({
-          name: data.title || data.productname || product.name || '',
-          category_id: data.category_id || product.category_id || '',
-          subCategory: data.subcategory_name || data.subCategory || product.subCategory || '',
-          shortDescription: data.shortdescription || data.shortDescription || product.shortDescription || '',
-          description: data.description || product.description || '',
-          originalPrice: Number(data.originalprice || data.originalPrice || product.originalPrice || product.price || 0),
-          discountPercent: Number(data.discount || data.discountPercent || product.discountPercent || 0),
-          price: Number(data.price || product.price || 0),
-          stockQuantity: Number(data.stock_quantity ?? data.quantity ?? product.stockQuantity ?? 0),
-          active: Boolean(data.is_active ?? data.active ?? product.active ?? true),
-          promoted: Boolean(data.promoted ?? product.promoted ?? false),
-          sizes: Array.isArray(data.sizes) ? data.sizes : (product.sizes || ['XS', 'S', 'M', 'L']),
-          colors: Array.isArray(data.colors) ? data.colors : (product.colors || ['Default']),
-          specifications: specsArr,
-          careInstructions: data.care_instructions || data.careInstructions || product.careInstructions || '',
+          name: data.name || data.title || '',
+          category_id: data.categoryId || data.category_id || '',
+          subCategory: data.subCategory || data.subcategory_name || '',
+          shortDescription: data.shortDescription || data.shortdescription || '',
+          description: data.description || '',
+          originalPrice: origPrice,
+          discountPercent: calcDiscount,
+          price: currPrice,
+          stockQuantity: data.stockQuantity ?? data.quantity ?? 0,
+          active: data.active !== false && data.is_active !== false,
+          promoted: Boolean(data.promoted || data.is_featured),
+          sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['XS', 'S', 'M', 'L'],
+          colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
+          specifications: specPairs,
+          careInstructions: data.careInstructions || data.care_instructions || '',
           images: Array.isArray(data.images) && data.images.length > 0
-            ? data.images 
-            : (data.image ? [data.image] : (product.images || []))
+            ? data.images
+            : (data.image ? [data.image] : [])
         });
       } catch (err) {
-        console.error('Error loading full product details:', err);
+        console.warn('Falling back to list row product data:', err);
         setFormData({
           name: product.name || '',
-          category_id: product.category_id || '',
+          category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.description || '',
-          originalPrice: Number(product.originalPrice || product.price || 0),
-          discountPercent: Number(product.discountPercent || 0),
-          price: Number(product.price || 0),
-          stockQuantity: Number(product.stockQuantity || 0),
-          active: product.active ?? true,
-          promoted: product.promoted ?? false,
-          sizes: product.sizes || ['XS', 'S', 'M', 'L'],
-          colors: product.colors || ['Default'],
+          originalPrice: product.originalPrice || product.price || 0,
+          discountPercent: product.discount || 0,
+          price: product.price || 0,
+          stockQuantity: product.stockQuantity ?? 0,
+          active: product.active !== false,
+          promoted: Boolean(product.promoted),
+          sizes: Array.isArray(product.sizes) ? product.sizes : ['XS', 'S', 'M', 'L'],
+          colors: Array.isArray(product.colors) ? product.colors : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
-          images: product.images || []
+          images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : [])
         });
       } finally {
         setFetchingDetail(false);
@@ -143,15 +156,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     };
 
     loadFullProduct();
-  }, [product]);
+  }, [isOpen, product]);
 
-  // Real-time Field Validation
+  // Validation handler
   const validateField = (field, value) => {
-    let err = null;
+    let err = '';
     if (field === 'name') {
-      if (!value || !value.trim()) err = 'Product name is required';
+      if (!value || !value.trim()) err = 'Product Name is required';
     } else if (field === 'category_id') {
-      if (!value) err = 'Please select a category';
+      if (!value) err = 'Category selection is required';
     } else if (field === 'price') {
       if (value === '' || value === null || isNaN(value) || Number(value) < 0) {
         err = 'Valid current price is required';
@@ -170,48 +183,47 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     validateField(field, formData[field]);
   };
 
-  // Automatic recalculation for Pricing
+  // Price & Discount auto-calculation logic
   const handleOriginalPriceChange = (e) => {
     const orig = parseFloat(e.target.value) || 0;
     const disc = formData.discountPercent || 0;
-    const calcPrice = disc > 0 ? orig * (1 - disc / 100) : orig;
+    const calcPrice = disc > 0 ? Math.round(orig * (1 - disc / 100)) : orig;
     setFormData(prev => ({
       ...prev,
       originalPrice: orig,
-      price: Number(calcPrice.toFixed(2))
+      price: calcPrice >= 0 ? calcPrice : 0
     }));
     validateField('price', calcPrice);
   };
 
   const handleDiscountChange = (e) => {
-    const disc = parseFloat(e.target.value) || 0;
-    const orig = formData.originalPrice || formData.price || 0;
-    const calcPrice = orig > 0 ? orig * (1 - disc / 100) : formData.price;
+    const disc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+    const orig = formData.originalPrice || 0;
+    const calcPrice = orig > 0 ? Math.round(orig * (1 - disc / 100)) : formData.price;
     setFormData(prev => ({
       ...prev,
       discountPercent: disc,
-      price: Number(calcPrice.toFixed(2))
+      price: calcPrice >= 0 ? calcPrice : 0
     }));
     validateField('discountPercent', disc);
     validateField('price', calcPrice);
   };
 
   const handlePriceChange = (e) => {
-    const p = parseFloat(e.target.value) || 0;
-    setFormData(prev => ({ ...prev, price: p }));
-    validateField('price', p);
+    const val = parseFloat(e.target.value) || 0;
+    setFormData(prev => ({ ...prev, price: val }));
+    validateField('price', val);
   };
 
-  // Sizes tag handler
+  // Size pill handlers
   const handleAddSize = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const newSize = sizeInput.trim().toUpperCase();
-      if (newSize && !formData.sizes.includes(newSize)) {
-        setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
-      }
-      setSizeInput('');
+    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !sizeInput.trim()) return;
+    e.preventDefault();
+    const newSize = sizeInput.trim().toUpperCase();
+    if (!formData.sizes.includes(newSize)) {
+      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
     }
+    setSizeInput('');
   };
 
   const handleRemoveSize = (sizeToRemove) => {
@@ -221,16 +233,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     }));
   };
 
-  // Colors tag handler
+  // Color pill handlers
   const handleAddColor = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const newColor = colorInput.trim();
-      if (newColor && !formData.colors.includes(newColor)) {
-        setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
-      }
-      setColorInput('');
+    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !colorInput.trim()) return;
+    e.preventDefault();
+    const newColor = colorInput.trim();
+    if (!formData.colors.includes(newColor)) {
+      setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
     }
+    setColorInput('');
   };
 
   const handleRemoveColor = (colorToRemove) => {
@@ -240,7 +251,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     }));
   };
 
-  // Specifications Key-Value handler
+  // Specification Key-Value Pair Handlers
   const handleAddSpecification = () => {
     setFormData(prev => ({
       ...prev,
@@ -259,11 +270,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const handleRemoveSpecification = (index) => {
     setFormData(prev => ({
       ...prev,
-      specifications: prev.specifications.filter((_, idx) => idx !== index)
+      specifications: prev.specifications.filter((_, i) => i !== index)
     }));
   };
 
-  // File / Image Handler
+  // Image Upload / Removal Handlers
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -277,49 +288,56 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     setSubmitError(null);
 
     try {
-      const data = new FormData();
-      data.append('file', file);
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      uploadData.append('folder', 'products');
 
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+      const token = localStorage.getItem('urvaah_token');
+
       const res = await fetch(`${API_BASE}/api/upload/upload-image`, {
         method: 'POST',
-        body: data
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: uploadData
       });
-      const resData = await res.json();
 
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.message || 'Image upload failed');
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Image upload failed');
       }
 
-      const uploadedUrl = resData.data?.url || resData.url;
+      const uploadedUrl = data.url || data.data?.url || data.filePath;
       if (uploadedUrl) {
         setFormData(prev => ({
           ...prev,
           images: [...prev.images, uploadedUrl]
         }));
+      } else {
+        throw new Error('No image URL returned by server');
       }
     } catch (err) {
-      console.error('Image upload error:', err);
-      // Local fallback blob URL
-      const localUrl = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, localUrl]
-      }));
+      console.error('Upload failed:', err);
+      setSubmitError(err.message || 'Image upload failed. Please try again.');
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 
   const handleAddImageUrl = () => {
-    if (!imageUrlInput.trim()) return;
+    const trimmed = imageUrlInput.trim();
+    if (!trimmed) return;
+    if (trimmed.startsWith('blob:')) {
+      setSubmitError('Direct blob URLs are not permitted. Please provide a valid external image URL.');
+      return;
+    }
     if (formData.images.length >= 5) {
       setSubmitError('Maximum 5 images allowed per product.');
       return;
     }
     setFormData(prev => ({
       ...prev,
-      images: [...prev.images, imageUrlInput.trim()]
+      images: [...prev.images, trimmed]
     }));
     setImageUrlInput('');
     setShowUrlInput(false);
@@ -335,7 +353,6 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   // Submit / Update Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (updating || deleting) return;
 
     setSubmitError(null);
@@ -357,6 +374,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       } else if (!isDiscountValid) {
         discountRef.current?.focus();
       }
+      return;
+    }
+
+    const hasBlobImage = formData.images.some(img => typeof img === 'string' && img.startsWith('blob:'));
+    if (hasBlobImage) {
+      setSubmitError('Temporary image previews cannot be saved. Please re-upload or remove them before saving.');
       return;
     }
 
@@ -393,9 +416,16 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         body: JSON.stringify(payload)
       });
 
-      const updatedProduct = res?.data || res;
-      onProductUpdated(updatedProduct || { ...product, ...payload });
-      onClose();
+      if (res?.success || res?.data) {
+        const updatedProduct = res?.data || res;
+        onProductUpdated(updatedProduct || { ...product, ...payload });
+        onClose();
+      } else if (res && !res.error && !res.message) {
+        onProductUpdated(res || { ...product, ...payload });
+        onClose();
+      } else {
+        throw new Error(res?.message || 'Failed to update product details');
+      }
     } catch (err) {
       console.error('Failed to update product:', err);
       if (err.status === 401 || err.status === 403) {
@@ -428,8 +458,13 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         method: 'DELETE'
       });
 
-      onProductDeleted(product.id);
-      onClose();
+      if (res?.success || (res && !res.error && res.status !== 'error')) {
+        setShowDeleteConfirm(false);
+        onProductDeleted(product.id);
+        onClose();
+      } else {
+        throw new Error(res?.message || 'Delete operation failed');
+      }
     } catch (err) {
       console.error('Failed to delete product:', err);
       if (err.status === 401 || err.status === 403) {
@@ -451,10 +486,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     }
   };
 
+  if (!isOpen || !product) return null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
       <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200">
-        
+
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/80 sticky top-0 z-20">
           <div>
@@ -481,11 +518,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             </div>
           ) : (
             <form id="edit-product-form" onSubmit={handleSubmit} className="space-y-6">
-              
+
               {/* Submit / General Error Banner */}
               {submitError && (
                 <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-800 text-xs">
-                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <span className="flex-1 font-medium">{submitError}</span>
                 </div>
               )}
@@ -649,6 +686,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     max="100"
                     value={formData.discountPercent}
                     onChange={handleDiscountChange}
+                    onBlur={() => handleBlur('discountPercent')}
                     className={`w-full px-3 py-2 bg-white border rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 ${
                       errors.discountPercent ? 'border-rose-400 focus:ring-rose-400 bg-rose-50' : 'border-neutral-200 focus:ring-brand-dark'
                     }`}
@@ -968,7 +1006,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             type="button"
             onClick={onClose}
             disabled={updating || deleting}
-            className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
@@ -976,7 +1014,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             disabled={updating || deleting || showDeleteConfirm}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete Product</span>
@@ -985,7 +1023,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             type="submit"
             form="edit-product-form"
             disabled={updating || deleting || fetchingDetail}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 min-w-[130px]"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 min-w-[130px] cursor-pointer"
           >
             {updating ? (
               <>
