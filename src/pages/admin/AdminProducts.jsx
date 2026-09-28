@@ -19,9 +19,18 @@ import { apiClient } from '../../lib/apiClient';
 import { EditProductModal } from '../../components/admin/EditProductModal';
 import { AddProductModal } from '../../components/admin/AddProductModal';
 
+
+const DEFAULT_CATEGORIES = [
+  { id: 1, category_id: 1, name: 'CORSET TOPS' },
+  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
+
 export const AdminProducts = () => {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+
   const [totalProducts, setTotalProducts] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -64,7 +73,7 @@ export const AdminProducts = () => {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
         if (isMounted) {
-          setCategories(list);
+          setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
         }
       } catch (err) {
         console.error('Failed to load categories:', err);
@@ -478,6 +487,7 @@ const ProductTableRow = ({
   const [imgError, setImgError] = useState(false);
 
   return (
+
     <tr className="hover:bg-neutral-50/80 transition-colors group">
       {/* Thumbnail */}
       <td className="py-3.5 px-4 cursor-pointer" onClick={() => onOpenEditModal(product)}>
@@ -505,6 +515,7 @@ const ProductTableRow = ({
           <span>{product.name}</span>
           <Edit3 className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
+
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[11px] text-neutral-400 font-mono">
             ID: #{product.id}
@@ -570,6 +581,7 @@ const ProductTableRow = ({
 
       {/* Active Toggle Switch */}
       <td className="py-3.5 px-4 text-center">
+
         <button
           type="button"
           onClick={(e) => {

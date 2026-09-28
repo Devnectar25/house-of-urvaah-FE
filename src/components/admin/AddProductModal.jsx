@@ -34,7 +34,16 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     images: []
   });
 
-  const [categories, setCategories] = useState([]);
+
+const DEFAULT_CATEGORIES = [
+  { id: 1, category_id: 1, name: 'CORSET TOPS' },
+  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
+
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+
   const [errors, setErrors] = useState({});
   const [creating, setCreating] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -52,7 +61,11 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
       try {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
+
+        setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+
         setCategories(list);
+
       } catch (err) {
         console.error('Failed to load categories in Add modal:', err);
       }
