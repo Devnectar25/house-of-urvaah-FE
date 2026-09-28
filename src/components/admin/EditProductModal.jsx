@@ -412,14 +412,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
       <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200">
         
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/80 sticky top-0 z-20">
           <div>
-            <h2 className="text-lg font-bold font-serif text-brand-dark">Edit Product</h2>
-            <p className="text-xs text-neutral-500 font-sans">
+            <h2 className="text-lg font-bold font-admin text-brand-dark">Edit Product</h2>
+            <p className="text-xs text-neutral-500 font-admin">
               ID: #{product.id} {formData.name ? `• ${formData.name}` : ''}
             </p>
           </div>

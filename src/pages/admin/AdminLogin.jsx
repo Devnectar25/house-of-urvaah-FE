@@ -186,7 +186,7 @@ export const AdminLogin = () => {
   return (
     <div
       data-allow-guest="true"
-      className="min-h-screen w-full bg-brand-sand flex items-center justify-center p-4 sm:p-6 md:p-8 font-serif"
+      className="min-h-screen w-full bg-brand-sand flex items-center justify-center p-4 sm:p-6 md:p-8 font-admin"
     >
       {/* Centered Admin Card */}
       <div className="w-full max-w-md bg-white rounded-2xl border border-neutral-200/90 shadow-editorial p-8 sm:p-10 text-center">
@@ -196,12 +196,12 @@ export const AdminLogin = () => {
         </div>
 
         {/* 2. Bold Title */}
-        <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase mb-2">
+        <h1 className="text-xl sm:text-2xl font-admin font-bold tracking-[0.1em] text-brand-dark uppercase mb-2">
           House of Urvaah Admin
         </h1>
 
         {/* 3. Muted Subtitle */}
-        <p className="text-xs sm:text-sm text-brand-gray font-serif tracking-wider mb-8">
+        <p className="text-xs sm:text-sm text-brand-gray font-admin tracking-wider mb-8">
           Sign in to access the admin dashboard
         </p>
 
@@ -212,7 +212,7 @@ export const AdminLogin = () => {
             className="mb-6 p-3.5 bg-amber-50/90 border border-amber-200 text-amber-900 text-xs rounded-lg text-left flex items-start gap-2.5 animate-fadeIn"
           >
             <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
-            <span className="leading-relaxed font-sans">{sessionNotice}</span>
+            <span className="leading-relaxed font-admin">{sessionNotice}</span>
           </div>
         )}
 
@@ -223,12 +223,12 @@ export const AdminLogin = () => {
             className="mb-6 p-3.5 bg-red-50/90 border border-red-200 text-red-700 text-xs rounded-lg text-left flex items-start gap-2.5"
           >
             <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
-            <span className="leading-relaxed font-sans">{serverError}</span>
+            <span className="leading-relaxed font-admin">{serverError}</span>
           </div>
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-5 text-left font-serif" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-5 text-left font-admin" noValidate>
           {/* Username Field */}
           <div>
             <label
@@ -263,7 +263,7 @@ export const AdminLogin = () => {
             {errors.username && (
               <div
                 id="username-error"
-                className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-sans leading-tight"
+                className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-admin leading-tight"
               >
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 <span>{errors.username}</span>
@@ -317,7 +317,7 @@ export const AdminLogin = () => {
             {errors.password && (
               <div
                 id="password-error"
-                className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-sans leading-tight"
+                className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600 font-admin leading-tight"
               >
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 <span>{errors.password}</span>

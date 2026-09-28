@@ -131,6 +131,7 @@ import { AdminProducts } from './pages/admin/AdminProducts';
 
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminOrders } from './pages/admin/AdminOrders';
+import { AdminCoupons } from './pages/admin/AdminCoupons';
 
 
 
@@ -235,7 +236,7 @@ export function AppContent() {
         <Route path="categories" element={<AdminPlaceholderPage />} />
         <Route path="orders" element={<AdminPlaceholderPage />} />
 
-        <Route path="coupons" element={<AdminPlaceholderPage />} />
+        <Route path="coupons" element={<AdminCoupons />} />
         <Route path="customers" element={<AdminPlaceholderPage />} />
         <Route path="refunds" element={<AdminPlaceholderPage />} />
         <Route path="reviews" element={<AdminPlaceholderPage />} />

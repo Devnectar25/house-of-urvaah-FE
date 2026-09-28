@@ -265,7 +265,7 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 my-8 transition-all"
         onClick={(e) => e.stopPropagation()}
@@ -273,10 +273,10 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
         {/* Modal Header */}
         <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
           <div>
-            <h2 className="text-lg font-serif font-bold text-brand-dark tracking-tight">
+            <h2 className="text-lg font-admin font-bold text-brand-dark tracking-tight">
               {isEdit ? 'Edit Category' : 'Add Category'}
             </h2>
-            <p className="text-xs text-neutral-500 font-sans mt-0.5">
+            <p className="text-xs text-neutral-500 font-admin mt-0.5">
               {isEdit ? 'Update details for this product category.' : 'Create a new product category for your store catalog.'}
             </p>
           </div>

@@ -265,7 +265,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin"
       onClick={handleCloseModal}
     >
       <div
@@ -275,10 +275,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         {/* Modal Header */}
         <div className="px-6 py-4.5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50 flex-shrink-0">
           <div>
-            <h2 className="text-base sm:text-lg font-serif font-bold text-brand-dark tracking-tight">
+            <h2 className="text-base sm:text-lg font-admin font-bold text-brand-dark tracking-tight">
               Order Details - {order?.order_number || order?.id?.slice(0, 8) || orderId}
             </h2>
-            <p className="text-xs text-neutral-500 font-sans mt-0.5">
+            <p className="text-xs text-neutral-500 font-admin mt-0.5">
               View customer details, shipping address, line items, and manage status.
             </p>
           </div>
@@ -333,7 +333,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-neutral-500">Order Number:</span>
-                      <span className="font-serif font-bold text-brand-dark">{order.order_number || order.id}</span>
+                      <span className="font-admin font-bold text-brand-dark">{order.order_number || order.id}</span>
                     </div>
 
                     <div className="flex justify-between">
@@ -540,7 +540,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-serif font-bold text-brand-dark truncate">
+                                <span className="font-admin font-bold text-brand-dark truncate">
                                   {item.name || item.title || `Product #${item.product_id}`}
                                 </span>
                                 {item.status && (
@@ -556,7 +556,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </div>
 
                           {/* Item Line Total */}
-                          <div className="font-serif font-bold text-brand-dark text-right flex-shrink-0">
+                          <div className="font-admin font-bold text-brand-dark text-right flex-shrink-0">
                             ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
                         </div>
@@ -589,7 +589,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </div>
                 )}
 
-                <div className="pt-2.5 border-t border-neutral-200 flex justify-between items-center text-sm font-serif font-bold">
+                <div className="pt-2.5 border-t border-neutral-200 flex justify-between items-center text-sm font-admin font-bold">
                   <span className="text-brand-dark tracking-wide">TOTAL AMOUNT</span>
                   <span className="text-brand-accent text-base sm:text-lg">
                     ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
