@@ -889,10 +889,40 @@ export const AdminCoupons = () => {
             ))}
           </div>
         ) : (
-          <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-2xs p-6 space-y-3 font-sans">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-neutral-100 rounded-lg animate-pulse" />
-            ))}
+          <div className="bg-white border border-neutral-200/80 rounded-xl shadow-sm overflow-hidden font-admin">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[850px]">
+                <thead>
+                  <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80 font-admin">
+                    <th className="py-3.5 px-4">Code</th>
+                    <th className="py-3.5 px-4">Type</th>
+                    <th className="py-3.5 px-4">Scope</th>
+                    <th className="py-3.5 px-4">Value</th>
+                    <th className="py-3.5 px-4">Expiry</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-center">Assign</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200/60">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="py-3.5 px-4">
+                        <div className="h-4 bg-neutral-200 rounded w-24" />
+                        <div className="h-3 bg-neutral-100 rounded w-32 mt-1" />
+                      </td>
+                      <td className="py-3.5 px-4"><div className="h-4 bg-neutral-200 rounded w-16" /></td>
+                      <td className="py-3.5 px-4"><div className="h-5 bg-neutral-200 rounded-full w-20" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 bg-neutral-200 rounded w-14" /></td>
+                      <td className="py-3.5 px-4"><div className="h-4 bg-neutral-200 rounded w-20" /></td>
+                      <td className="py-3.5 px-4"><div className="h-5 bg-neutral-200 rounded-full w-20" /></td>
+                      <td className="py-3.5 px-4 text-center"><div className="h-6 w-12 bg-neutral-200 rounded-lg mx-auto" /></td>
+                      <td className="py-3.5 px-4 text-right"><div className="h-6 w-14 bg-neutral-200 rounded-lg ml-auto" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       ) : filteredCoupons.length === 0 ? (
@@ -976,20 +1006,24 @@ export const AdminCoupons = () => {
                     </span>
 
                     {/* Active Toggle Switch */}
-                    <label
-                      className="relative inline-flex items-center cursor-pointer shrink-0"
-                      title={st.disabledReason || (cpn.active ? 'Deactivate coupon' : 'Activate coupon')}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(cpn.active)}
-                        disabled={!st.canToggle || togglingId === cpn.id}
-                        onChange={(e) => handleToggleStatus(e, cpn)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-8 h-4.5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
-                    </label>
+                    {togglingId === cpn.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-500 shrink-0" />
+                    ) : (
+                      <label
+                        className="relative inline-flex items-center cursor-pointer shrink-0"
+                        title={st.disabledReason || (cpn.active ? 'Deactivate coupon' : 'Activate coupon')}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(cpn.active)}
+                          disabled={!st.canToggle}
+                          onChange={(e) => handleToggleStatus(e, cpn)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-dark peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                      </label>
+                    )}
                   </div>
                 </div>
 
@@ -1018,16 +1052,16 @@ export const AdminCoupons = () => {
                   </div>
 
                   {/* Quick Card Action Buttons */}
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {cpn.is_restricted && (
                       <button
                         type="button"
                         onClick={(e) => handleOpenAssignModal(e, cpn)}
                         aria-label={`Assign customers to ${cpn.code}`}
-                        className="px-2.5 py-1 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg text-brand-dark bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1"
                         title="Assign customers to private coupon"
                       >
-                        <UserCheck className="w-3.5 h-3.5" />
+                        <UserCheck className="w-3.5 h-3.5 text-neutral-600" />
                         <span>Assign</span>
                       </button>
                     )}
@@ -1036,20 +1070,20 @@ export const AdminCoupons = () => {
                       type="button"
                       onClick={() => handleOpenEditModal(cpn)}
                       aria-label={`Edit coupon ${cpn.code}`}
-                      className="p-1.5 rounded-lg text-neutral-600 hover:text-brand-dark bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                      className="p-1 rounded-lg text-neutral-400 hover:text-brand-dark transition-colors cursor-pointer"
                       title="Edit coupon"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setDeleteTargetCoupon(cpn)}
                       aria-label={`Delete coupon ${cpn.code}`}
-                      className="p-1.5 rounded-lg text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+                      className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
                       title="Delete coupon"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1058,23 +1092,35 @@ export const AdminCoupons = () => {
           })}
         </div>
       ) : (
-        /* ── LIST VIEW TABLE ───────────────────────────────────────────────── */
-        <div className="bg-white border border-neutral-200/90 rounded-2xl overflow-hidden shadow-2xs font-admin">
+        /* ── LIST VIEW TABLE (RESHAPED TO EXACT 8 COLUMNS) ─────────────────── */
+        <div className="bg-white border border-neutral-200/80 rounded-xl shadow-sm overflow-hidden font-admin">
+          {/* Table Header Count Bar */}
+          <div className="px-6 py-3.5 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
+            <h2 className="text-xs font-semibold tracking-wider text-brand-dark uppercase">
+              Coupons List <span className="ml-1 px-2 py-0.5 bg-neutral-200/60 rounded-full text-neutral-700 text-[11px]">{filteredCoupons.length}</span>
+            </h2>
+            {isFilterActive && (
+              <span className="text-[11px] text-neutral-500 font-sans">
+                Filtered view
+              </span>
+            )}
+          </div>
+
           <div className="overflow-x-auto relative">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[850px]">
               <thead>
-                <tr className="bg-neutral-50/80 text-[11px] font-bold tracking-wider text-neutral-600 uppercase border-b border-neutral-200/80 font-admin">
+                <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80 font-admin">
                   
                   {/* Column 1: Code (Sortable, Sticky Left) */}
                   <th
                     scope="col"
                     aria-sort={sortField === 'code' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className="py-3.5 px-4 sticky left-0 bg-neutral-50 z-20 shadow-2xs min-w-[150px]"
+                    className="py-3.5 px-4 sticky left-0 bg-neutral-50/95 z-20 shadow-2xs min-w-[170px]"
                   >
                     <button
                       type="button"
                       onClick={() => handleSort('code')}
-                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-bold"
+                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-semibold"
                     >
                       <span>Code</span>
                       {sortField === 'code' ? (
@@ -1086,7 +1132,7 @@ export const AdminCoupons = () => {
                   </th>
 
                   {/* Column 2: Type */}
-                  <th scope="col" className="py-3.5 px-4 min-w-[100px]">Type</th>
+                  <th scope="col" className="py-3.5 px-4 min-w-[110px]">Type</th>
 
                   {/* Column 3: Scope */}
                   <th scope="col" className="py-3.5 px-4 min-w-[140px]">Scope</th>
@@ -1100,7 +1146,7 @@ export const AdminCoupons = () => {
                     <button
                       type="button"
                       onClick={() => handleSort('value')}
-                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-bold"
+                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-semibold"
                     >
                       <span>Value</span>
                       {sortField === 'value' ? (
@@ -1111,39 +1157,16 @@ export const AdminCoupons = () => {
                     </button>
                   </th>
 
-                  {/* Column 5: Visibility */}
-                  <th scope="col" className="py-3.5 px-4 min-w-[100px]">Visibility</th>
-
-                  {/* Column 6: Usage (Sortable) */}
-                  <th
-                    scope="col"
-                    aria-sort={sortField === 'usage' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className="py-3.5 px-4 min-w-[120px]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSort('usage')}
-                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-bold"
-                    >
-                      <span>Usage</span>
-                      {sortField === 'usage' ? (
-                        sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-brand-dark" /> : <ArrowDown className="w-3.5 h-3.5 text-brand-dark" />
-                      ) : (
-                        <ArrowUpDown className="w-3 h-3 text-neutral-400" />
-                      )}
-                    </button>
-                  </th>
-
-                  {/* Column 7: Expiry (Sortable) */}
+                  {/* Column 5: Expiry (Sortable) */}
                   <th
                     scope="col"
                     aria-sort={sortField === 'expiry' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className="py-3.5 px-4 min-w-[150px]"
+                    className="py-3.5 px-4 min-w-[140px]"
                   >
                     <button
                       type="button"
                       onClick={() => handleSort('expiry')}
-                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-bold"
+                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-semibold"
                     >
                       <span>Expiry</span>
                       {sortField === 'expiry' ? (
@@ -1154,7 +1177,7 @@ export const AdminCoupons = () => {
                     </button>
                   </th>
 
-                  {/* Column 8: Status (Sortable) */}
+                  {/* Column 6: Status (Sortable) */}
                   <th
                     scope="col"
                     aria-sort={sortField === 'status' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
@@ -1163,7 +1186,7 @@ export const AdminCoupons = () => {
                     <button
                       type="button"
                       onClick={() => handleSort('status')}
-                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-bold"
+                      className="flex items-center gap-1.5 hover:text-brand-dark cursor-pointer text-left font-semibold"
                     >
                       <span>Status</span>
                       {sortField === 'status' ? (
@@ -1174,111 +1197,102 @@ export const AdminCoupons = () => {
                     </button>
                   </th>
 
-                  {/* Column 9: Assign */}
+                  {/* Column 7: Assign */}
                   <th scope="col" className="py-3.5 px-4 min-w-[120px] text-center">Assign</th>
 
-                  {/* Column 10: Actions */}
+                  {/* Column 8: Actions */}
                   <th scope="col" className="py-3.5 px-4 min-w-[100px] text-right">Actions</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-neutral-100 text-xs">
+              <tbody className="divide-y divide-neutral-200/60 text-xs text-brand-dark">
                 {paginatedCoupons.map((cpn) => {
                   const st = getCouponStatusDetails(cpn);
+                  const isPrivate = Boolean(cpn.is_restricted || cpn.is_private);
+                  const visText = isPrivate ? 'Private' : 'Public';
+
+                  const timesUsed = parseInt(cpn.times_used || cpn.used_count || 0, 10);
+                  const usageLimit = cpn.usage_limit ? parseInt(cpn.usage_limit, 10) : null;
+                  const usageText = usageLimit ? `Used ${timesUsed} / ${usageLimit}` : `Used ${timesUsed}`;
+                  const codeSubtext = `${visText} · ${usageText}`;
 
                   return (
                     <tr
                       key={cpn.id}
-                      className="hover:bg-neutral-50/80 transition-colors group"
+                      onClick={() => handleOpenEditModal(cpn)}
+                      className="hover:bg-neutral-50/80 transition-colors group cursor-pointer"
                     >
-                      {/* Column 1: Code (Sticky Left) */}
+                      {/* Column 1: Code (Bold Uppercase + Visibility & Usage Subtext + Description Tooltip) */}
                       <td className="py-3.5 px-4 sticky left-0 bg-white group-hover:bg-neutral-50/90 z-10 shadow-2xs">
-                        <div className="font-mono font-bold text-brand-dark text-xs tracking-wide">
-                          {cpn.code}
-                        </div>
-                        {cpn.description && (
-                          <div
-                            title={cpn.description}
-                            className="text-[11px] text-neutral-400 font-sans truncate max-w-[180px] mt-0.5"
-                          >
-                            {cpn.description}
+                        <div title={cpn.description || undefined} className="min-w-0 cursor-help">
+                          <div className="font-mono font-bold text-brand-dark text-xs tracking-wide uppercase">
+                            {cpn.code}
                           </div>
-                        )}
+                          <div className="text-[11px] text-neutral-500 font-sans mt-0.5 whitespace-nowrap">
+                            {codeSubtext}
+                          </div>
+                        </div>
                       </td>
 
-                      {/* Column 2: Type */}
+                      {/* Column 2: Type ("Percentage" or "Fixed") */}
                       <td className="py-3.5 px-4 text-neutral-700 font-medium font-sans">
                         {renderTypeDisplay(cpn)}
                       </td>
 
-                      {/* Column 3: Scope */}
+                      {/* Column 3: Scope ("All Products", "Category (N)", or "Product (N)") */}
                       <td className="py-3.5 px-4">
                         {renderScopeCell(cpn)}
                       </td>
 
-                      {/* Column 4: Value */}
+                      {/* Column 4: Value (Bold Value + Max Cap / Min Order Subtext) */}
                       <td className="py-3.5 px-4">
                         {renderValueCell(cpn)}
                       </td>
 
-                      {/* Column 5: Visibility */}
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border font-sans ${
-                            cpn.is_restricted
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}
-                        >
-                          {cpn.is_restricted ? 'Private' : 'Public'}
-                        </span>
-                      </td>
-
-                      {/* Column 6: Usage */}
-                      <td className="py-3.5 px-4">
-                        {renderUsageCell(cpn)}
-                      </td>
-
-                      {/* Column 7: Expiry */}
+                      {/* Column 5: Expiry (Formatted Date + IST Tooltip) */}
                       <td className="py-3.5 px-4">
                         {renderExpiryCell(cpn)}
                       </td>
 
-                      {/* Column 8: Status (Toggle + Label) */}
+                      {/* Column 6: Status (Toggle + Label Pill) */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5 font-sans">
-                          <label
-                            className="relative inline-flex items-center cursor-pointer shrink-0"
-                            title={st.disabledReason || (cpn.active ? 'Deactivate coupon' : 'Activate coupon')}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={Boolean(cpn.active)}
-                              disabled={!st.canToggle || togglingId === cpn.id}
-                              onChange={(e) => handleToggleStatus(e, cpn)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-8 h-4.5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
-                          </label>
+                          {togglingId === cpn.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-neutral-500 shrink-0" />
+                          ) : (
+                            <label
+                              className="relative inline-flex items-center cursor-pointer shrink-0"
+                              title={st.disabledReason || (cpn.active ? 'Deactivate coupon' : 'Activate coupon')}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={Boolean(cpn.active)}
+                                disabled={!st.canToggle}
+                                onChange={(e) => handleToggleStatus(e, cpn)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-dark peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+                            </label>
+                          )}
 
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border tracking-wide uppercase shrink-0 ${st.badgeBg}`}>
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border tracking-wide uppercase shrink-0 ${st.badgeBg}`}>
                             {st.label}
                           </span>
                         </div>
                       </td>
 
-                      {/* Column 9: Assign */}
+                      {/* Column 7: Assign (Private: Icon Button with Count | Public: "All customers") */}
                       <td className="py-3.5 px-4 text-center font-sans">
-                        {cpn.is_restricted ? (
+                        {isPrivate ? (
                           <button
                             type="button"
                             onClick={(e) => handleOpenAssignModal(e, cpn)}
                             aria-label={`Assign customers to coupon ${cpn.code}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer text-xs font-semibold"
                             title="Assign customers to private coupon"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-brand-dark bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 transition-colors cursor-pointer text-xs font-semibold"
                           >
-                            <UserCheck className="w-3.5 h-3.5" />
+                            <Users className="w-3.5 h-3.5 text-neutral-600" />
                             <span>{cpn.assigned_count || 0}</span>
                           </button>
                         ) : (
@@ -1286,27 +1300,27 @@ export const AdminCoupons = () => {
                         )}
                       </td>
 
-                      {/* Column 10: Actions */}
+                      {/* Column 8: Actions (Edit Pencil & Delete Trash Icon Buttons) */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center gap-1.5 font-sans">
+                        <div className="inline-flex items-center gap-2 font-sans justify-end" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(cpn)}
                             aria-label={`Edit coupon ${cpn.code}`}
-                            className="p-1.5 rounded-lg text-neutral-600 hover:text-brand-dark bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                             title="Edit coupon"
+                            className="p-1 rounded-lg text-neutral-400 hover:text-brand-dark transition-colors cursor-pointer"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setDeleteTargetCoupon(cpn)}
                             aria-label={`Delete coupon ${cpn.code}`}
-                            className="p-1.5 rounded-lg text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
                             title="Delete coupon"
+                            className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

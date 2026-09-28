@@ -257,7 +257,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
         </div>
 
         {/* ── Modal Body ────────────────────────────────────────────────────── */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 p-6 space-y-5 no-scrollbar">
           
           {/* Status Banners */}
           {error && (
@@ -356,7 +356,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
                   Currently Assigned Customers ({assignedUsers.length})
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pt-0.5">
+              <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto overflow-x-hidden no-scrollbar pt-0.5">
                 {assignedUsers.map((u) => {
                   const uid = u.username || u.user_id;
                   return (
@@ -400,11 +400,11 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
 
           {/* ── CUSTOMER TABLE ──────────────────────────────────────────────── */}
           <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-            <div className="max-h-72 overflow-y-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="max-h-72 overflow-y-auto overflow-x-hidden no-scrollbar">
+              <table className="w-full text-left border-collapse table-fixed">
                 <thead className="bg-neutral-50/90 sticky top-0 z-10 border-b border-neutral-200 text-xs font-bold text-neutral-600 uppercase tracking-wider font-admin">
                   <tr>
-                    <th className="py-3 px-4 w-12 text-center">
+                    <th className="py-3 px-2.5 w-10 text-center">
                       <input
                         type="checkbox"
                         checked={allFilteredSelected}
@@ -416,24 +416,24 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
                         className="rounded border-neutral-300 text-brand-dark focus:ring-brand-dark cursor-pointer disabled:opacity-40"
                       />
                     </th>
-                    <th className="py-3 px-4">User</th>
-                    <th className="py-3 px-4">Contact</th>
+                    <th className="py-3 px-3 w-[28%]">User</th>
+                    <th className="py-3 px-3 w-[30%]">Contact</th>
 
                     {/* Conditional Header Columns */}
                     {targetingMode !== 'all' && (
-                      <th className="py-3 px-4 text-center">Orders</th>
+                      <th className="py-3 px-2.5 text-center w-[12%]">Orders</th>
                     )}
                     {targetingMode !== 'all' && (
-                      <th className="py-3 px-4 text-right">Revenue</th>
+                      <th className="py-3 px-2.5 text-right w-[16%]">Revenue</th>
                     )}
                     {targetingMode === 'all' && (
-                      <th className="py-3 px-4">Joined Date</th>
+                      <th className="py-3 px-3 w-[28%]">Joined Date</th>
                     )}
                     {targetingMode === 'active' && (
-                      <th className="py-3 px-4">Last Active</th>
+                      <th className="py-3 px-3 w-[28%]">Last Active</th>
                     )}
 
-                    <th className="py-3 px-4 text-right">Status</th>
+                    <th className="py-3 px-3 text-right w-[14%]">Status</th>
                   </tr>
                 </thead>
 
@@ -476,7 +476,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
                           }`}
                         >
                           {/* Checkbox */}
-                          <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <td className="py-2.5 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               disabled={isAssigned}
@@ -487,56 +487,56 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
                           </td>
 
                           {/* User Info */}
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-brand-dark">{name}</div>
-                            <div className="text-[11px] text-neutral-500 font-mono">{uIdStr}</div>
+                          <td className="py-2.5 px-3 min-w-0">
+                            <div className="font-semibold text-brand-dark truncate" title={name}>{name}</div>
+                            <div className="text-[11px] text-neutral-500 font-mono truncate">{uIdStr}</div>
                           </td>
 
                           {/* Contact */}
-                          <td className="py-3 px-4 text-neutral-600">
-                            <div>{email}</div>
+                          <td className="py-2.5 px-3 text-neutral-600 min-w-0">
+                            <div className="truncate" title={email}>{email}</div>
                             {phone !== 'No phone' && (
-                              <div className="text-[11px] text-neutral-400">{phone}</div>
+                              <div className="text-[11px] text-neutral-400 truncate">{phone}</div>
                             )}
                           </td>
 
                           {/* Orders Column (Top/Active mode) */}
                           {targetingMode !== 'all' && (
-                            <td className="py-3 px-4 text-center font-semibold text-brand-dark">
+                            <td className="py-2.5 px-2.5 text-center font-semibold text-brand-dark whitespace-nowrap">
                               {u.total_orders ?? u.orders ?? u.order_count ?? 0}
                             </td>
                           )}
 
                           {/* Revenue Column (Top/Active mode) */}
                           {targetingMode !== 'all' && (
-                            <td className="py-3 px-4 text-right font-semibold text-brand-dark font-mono">
+                            <td className="py-2.5 px-2.5 text-right font-semibold text-brand-dark font-mono whitespace-nowrap">
                               {formatCurrency(u.total_revenue ?? u.revenue ?? 0)}
                             </td>
                           )}
 
                           {/* Joined Date (All mode) */}
                           {targetingMode === 'all' && (
-                            <td className="py-3 px-4 text-neutral-500">
+                            <td className="py-2.5 px-3 text-neutral-500 whitespace-nowrap">
                               {formatDateStr(u.created_at || u.createdate)}
                             </td>
                           )}
 
                           {/* Last Active Date (Active mode) */}
                           {targetingMode === 'active' && (
-                            <td className="py-3 px-4 text-neutral-500">
+                            <td className="py-2.5 px-3 text-neutral-500 whitespace-nowrap">
                               {formatDateStr(u.last_active || u.created_at)}
                             </td>
                           )}
 
                           {/* Status Badge */}
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             {isAssigned ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                 <Check className="w-3 h-3" />
                                 Assigned
                               </span>
                             ) : isSelected ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-dark bg-brand-sand px-2.5 py-0.5 rounded-full border border-neutral-300">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-dark bg-brand-sand px-2 py-0.5 rounded-full border border-neutral-300">
                                 Selected
                               </span>
                             ) : (
@@ -565,7 +565,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
               type="button"
               onClick={onClose}
               disabled={assigning}
-              className="px-4.5 py-2.5 border border-neutral-300 text-neutral-700 rounded-xl text-xs font-semibold hover:bg-neutral-100 transition-colors cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 min-w-[110px] inline-flex items-center justify-center text-center border border-neutral-300 text-neutral-700 rounded-xl text-xs font-semibold hover:bg-neutral-100 hover:text-brand-dark transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
@@ -574,7 +574,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
               type="button"
               onClick={handleAssignSelected}
               disabled={assigning || selectedUserIds.length === 0}
-              className="px-5 py-2.5 bg-brand-dark text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-2.5 min-w-[140px] inline-flex items-center justify-center text-center bg-brand-dark text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed gap-2"
             >
               {assigning ? (
                 <>
