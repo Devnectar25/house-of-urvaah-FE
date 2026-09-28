@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -12,16 +11,9 @@ import {
 } from 'lucide-react';
 import { apiClient, clearAuthSession } from '../../lib/apiClient';
 
-
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
   if (!isOpen || !product) return null;
 
-
-  // Refs for focusing first invalid field on submit validation
-  const nameRef = useRef(null);
-  const categoryRef = useRef(null);
-  const priceRef = useRef(null);
-  const discountRef = useRef(null);
   // Form State initialized from product prop
   const [formData, setFormData] = useState({
     name: '',
@@ -42,16 +34,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     images: []
   });
 
-
-const DEFAULT_CATEGORIES = [
-  { id: 1, category_id: 1, name: 'CORSET TOPS' },
-  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
-  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
-  { id: 4, category_id: 4, name: 'PARTY WEAR' }
-];
+  const DEFAULT_CATEGORIES = [
+    { id: 1, category_id: 1, name: 'CORSET TOPS' },
+    { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+    { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+    { id: 4, category_id: 4, name: 'PARTY WEAR' }
+  ];
 
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-
   const [errors, setErrors] = useState({});
   const [fetchingDetail, setFetchingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -68,17 +58,19 @@ const DEFAULT_CATEGORIES = [
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
+  // Refs for focusing first invalid field on submit validation
+  const nameRef = useRef(null);
+  const categoryRef = useRef(null);
+  const priceRef = useRef(null);
+  const discountRef = useRef(null);
+
   // Fetch available categories
   useEffect(() => {
     const fetchCats = async () => {
       try {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
-
         setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
-
-        setCategories(list);
-
       } catch (err) {
         console.error('Failed to load categories in modal:', err);
       }
@@ -96,65 +88,54 @@ const DEFAULT_CATEGORIES = [
       setShowDeleteConfirm(false);
       try {
         const res = await apiClient(`/api/products/${product.id}`);
-        const data = res?.data || res || product;
+        const data = res?.data || res || {};
         
-        // Map backend product data to modal state
-        const origPrice = data.originalPrice ?? data.price ?? 0;
-        const currPrice = data.price ?? 0;
-        const calcDiscount = origPrice > 0 && origPrice > currPrice 
-          ? Math.round(((origPrice - currPrice) / origPrice) * 100) 
-          : (data.discount || 0);
-
-        // Map specifications array or object
-        let specPairs = [];
+        let specsArr = [];
         if (Array.isArray(data.specifications)) {
-          specPairs = data.specifications;
+          specsArr = data.specifications;
         } else if (data.specifications && typeof data.specifications === 'object') {
-          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
-        } else if (data.fabric || data.fitType) {
-          if (data.fabric) specPairs.push({ label: 'Fabric', value: data.fabric });
-          if (data.fitType) specPairs.push({ label: 'Fit Type', value: data.fitType });
+          specsArr = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
         }
 
         setFormData({
-          name: data.name || data.title || '',
-          category_id: data.categoryId || data.category_id || '',
-          subCategory: data.subCategory || data.subcategory_name || '',
-          shortDescription: data.shortDescription || data.shortdescription || '',
-          description: data.description || '',
-          originalPrice: origPrice,
-          discountPercent: calcDiscount,
-          price: currPrice,
-          stockQuantity: data.stockQuantity ?? data.quantity ?? 0,
-          active: data.active !== false && data.is_active !== false,
-          promoted: Boolean(data.promoted || data.is_featured),
-          sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['XS', 'S', 'M', 'L'],
-          colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
-          specifications: specPairs,
-          careInstructions: data.careInstructions || data.care_instructions || '',
-          images: Array.isArray(data.images) && data.images.length > 0 
+          name: data.title || data.productname || product.name || '',
+          category_id: data.category_id || product.category_id || '',
+          subCategory: data.subcategory_name || data.subCategory || product.subCategory || '',
+          shortDescription: data.shortdescription || data.shortDescription || product.shortDescription || '',
+          description: data.description || product.description || '',
+          originalPrice: Number(data.originalprice || data.originalPrice || product.originalPrice || product.price || 0),
+          discountPercent: Number(data.discount || data.discountPercent || product.discountPercent || 0),
+          price: Number(data.price || product.price || 0),
+          stockQuantity: Number(data.stock_quantity ?? data.quantity ?? product.stockQuantity ?? 0),
+          active: Boolean(data.is_active ?? data.active ?? product.active ?? true),
+          promoted: Boolean(data.promoted ?? product.promoted ?? false),
+          sizes: Array.isArray(data.sizes) ? data.sizes : (product.sizes || ['XS', 'S', 'M', 'L']),
+          colors: Array.isArray(data.colors) ? data.colors : (product.colors || ['Default']),
+          specifications: specsArr,
+          careInstructions: data.care_instructions || data.careInstructions || product.careInstructions || '',
+          images: Array.isArray(data.images) && data.images.length > 0
             ? data.images 
-            : (data.image ? [data.image] : [])
+            : (data.image ? [data.image] : (product.images || []))
         });
       } catch (err) {
-        console.warn('Falling back to list row product data:', err);
+        console.error('Error loading full product details:', err);
         setFormData({
           name: product.name || '',
-          category_id: product.categoryId || product.category_id || '',
+          category_id: product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.description || '',
-          originalPrice: product.originalPrice || product.price || 0,
-          discountPercent: product.discount || 0,
-          price: product.price || 0,
-          stockQuantity: product.stockQuantity ?? 0,
-          active: product.active !== false,
-          promoted: Boolean(product.promoted),
-          sizes: Array.isArray(product.sizes) ? product.sizes : ['XS', 'S', 'M', 'L'],
-          colors: Array.isArray(product.colors) ? product.colors : ['Default'],
+          originalPrice: Number(product.originalPrice || product.price || 0),
+          discountPercent: Number(product.discountPercent || 0),
+          price: Number(product.price || 0),
+          stockQuantity: Number(product.stockQuantity || 0),
+          active: product.active ?? true,
+          promoted: product.promoted ?? false,
+          sizes: product.sizes || ['XS', 'S', 'M', 'L'],
+          colors: product.colors || ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
-          images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : [])
+          images: product.images || []
         });
       } finally {
         setFetchingDetail(false);
@@ -164,24 +145,22 @@ const DEFAULT_CATEGORIES = [
     loadFullProduct();
   }, [product]);
 
-  // Validation handler
+  // Real-time Field Validation
   const validateField = (field, value) => {
-    let err = '';
+    let err = null;
     if (field === 'name') {
-      if (!value || !value.trim()) err = 'Product Name is required';
+      if (!value || !value.trim()) err = 'Product name is required';
     } else if (field === 'category_id') {
-      if (!value) err = 'Category selection is required';
+      if (!value) err = 'Please select a category';
     } else if (field === 'price') {
       if (value === '' || value === null || isNaN(value) || Number(value) < 0) {
         err = 'Valid current price is required';
       }
-
     } else if (field === 'discountPercent') {
       const num = Number(value);
       if (isNaN(num) || num < 0 || num > 100) {
         err = 'Discount % must be between 0 and 100';
       }
-
     }
     setErrors(prev => ({ ...prev, [field]: err }));
     return !err;
@@ -191,49 +170,48 @@ const DEFAULT_CATEGORIES = [
     validateField(field, formData[field]);
   };
 
-  // Price & Discount auto-calculation logic
+  // Automatic recalculation for Pricing
   const handleOriginalPriceChange = (e) => {
     const orig = parseFloat(e.target.value) || 0;
     const disc = formData.discountPercent || 0;
-    const calcPrice = disc > 0 ? Math.round(orig * (1 - disc / 100)) : orig;
+    const calcPrice = disc > 0 ? orig * (1 - disc / 100) : orig;
     setFormData(prev => ({
       ...prev,
       originalPrice: orig,
-      price: calcPrice >= 0 ? calcPrice : 0
+      price: Number(calcPrice.toFixed(2))
     }));
     validateField('price', calcPrice);
   };
 
   const handleDiscountChange = (e) => {
-    const disc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-    const orig = formData.originalPrice || 0;
-    const calcPrice = orig > 0 ? Math.round(orig * (1 - disc / 100)) : formData.price;
+    const disc = parseFloat(e.target.value) || 0;
+    const orig = formData.originalPrice || formData.price || 0;
+    const calcPrice = orig > 0 ? orig * (1 - disc / 100) : formData.price;
     setFormData(prev => ({
       ...prev,
       discountPercent: disc,
-      price: calcPrice >= 0 ? calcPrice : 0
+      price: Number(calcPrice.toFixed(2))
     }));
-
     validateField('discountPercent', disc);
-
     validateField('price', calcPrice);
   };
 
   const handlePriceChange = (e) => {
-    const val = parseFloat(e.target.value) || 0;
-    setFormData(prev => ({ ...prev, price: val }));
-    validateField('price', val);
+    const p = parseFloat(e.target.value) || 0;
+    setFormData(prev => ({ ...prev, price: p }));
+    validateField('price', p);
   };
 
-  // Size pill handlers
+  // Sizes tag handler
   const handleAddSize = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !sizeInput.trim()) return;
-    e.preventDefault();
-    const newSize = sizeInput.trim().toUpperCase();
-    if (!formData.sizes.includes(newSize)) {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const newSize = sizeInput.trim().toUpperCase();
+      if (newSize && !formData.sizes.includes(newSize)) {
+        setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
+      }
+      setSizeInput('');
     }
-    setSizeInput('');
   };
 
   const handleRemoveSize = (sizeToRemove) => {
@@ -243,15 +221,16 @@ const DEFAULT_CATEGORIES = [
     }));
   };
 
-  // Color pill handlers
+  // Colors tag handler
   const handleAddColor = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !colorInput.trim()) return;
-    e.preventDefault();
-    const newColor = colorInput.trim();
-    if (!formData.colors.includes(newColor)) {
-      setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const newColor = colorInput.trim();
+      if (newColor && !formData.colors.includes(newColor)) {
+        setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
+      }
+      setColorInput('');
     }
-    setColorInput('');
   };
 
   const handleRemoveColor = (colorToRemove) => {
@@ -261,7 +240,7 @@ const DEFAULT_CATEGORIES = [
     }));
   };
 
-  // Specification Key-Value Pair Handlers
+  // Specifications Key-Value handler
   const handleAddSpecification = () => {
     setFormData(prev => ({
       ...prev,
@@ -280,11 +259,11 @@ const DEFAULT_CATEGORIES = [
   const handleRemoveSpecification = (index) => {
     setFormData(prev => ({
       ...prev,
-      specifications: prev.specifications.filter((_, i) => i !== index)
+      specifications: prev.specifications.filter((_, idx) => idx !== index)
     }));
   };
 
-  // Image Upload / Removal Handlers
+  // File / Image Handler
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -298,25 +277,21 @@ const DEFAULT_CATEGORIES = [
     setSubmitError(null);
 
     try {
-      const uploadData = new FormData();
-      uploadData.append('file', file);
-      uploadData.append('folder', 'products');
+      const data = new FormData();
+      data.append('file', file);
 
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
-
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const res = await fetch(`${API_BASE}/api/upload/upload-image`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
+        body: data
       });
+      const resData = await res.json();
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Image upload failed');
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.message || 'Image upload failed');
       }
 
-      const uploadedUrl = data.url || data.data?.url || data.filePath;
+      const uploadedUrl = resData.data?.url || resData.url;
       if (uploadedUrl) {
         setFormData(prev => ({
           ...prev,
@@ -324,16 +299,15 @@ const DEFAULT_CATEGORIES = [
         }));
       }
     } catch (err) {
-      console.error('Upload failed:', err);
-      // Fallback preview using Object URL for seamless demo editing
-      const objectUrl = URL.createObjectURL(file);
+      console.error('Image upload error:', err);
+      // Local fallback blob URL
+      const localUrl = URL.createObjectURL(file);
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, objectUrl]
+        images: [...prev.images, localUrl]
       }));
     } finally {
       setUploadingImage(false);
-      e.target.value = '';
     }
   };
 
@@ -387,10 +361,7 @@ const DEFAULT_CATEGORIES = [
     }
 
     setUpdating(true);
-
-
     setSubmitError(null);
-
 
     try {
       const payload = {
@@ -565,9 +536,7 @@ const DEFAULT_CATEGORIES = [
                   Product Name <span className="text-rose-500">*</span>
                 </label>
                 <input
-
                   ref={nameRef}
-
                   type="text"
                   value={formData.name}
                   onChange={(e) => {
@@ -590,9 +559,7 @@ const DEFAULT_CATEGORIES = [
                     Category <span className="text-rose-500">*</span>
                   </label>
                   <select
-
                     ref={categoryRef}
-
                     value={formData.category_id}
                     onChange={(e) => {
                       setFormData(prev => ({ ...prev, category_id: e.target.value }));
@@ -694,9 +661,7 @@ const DEFAULT_CATEGORIES = [
                     Price (Current ₹) <span className="text-rose-500">*</span>
                   </label>
                   <input
-
                     ref={priceRef}
-
                     type="number"
                     min="0"
                     step="0.01"
