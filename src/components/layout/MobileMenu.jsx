@@ -8,12 +8,10 @@ import { getSupabaseMediaUrl } from '../../lib/supabase';
 const TABS = ['WOMAN'];
 
 const FEATURED_PREVIEWS = [
-  { label: 'THE NEW', image: getSupabaseMediaUrl('/assets/Images/Brown01.png'), href: '#recommended' },
-  { label: 'DRESSES', image: getSupabaseMediaUrl('/assets/Images/Corset01.png'), href: '#whats-hot' },
-  { label: 'TAILORED', image: getSupabaseMediaUrl('/assets/Images/Brown02.png'), href: '#best-sellers' },
-  { label: 'CO-ORDS', image: getSupabaseMediaUrl('/assets/Images/Blue02.png'), href: '#steal-deals' },
-  { label: 'OUTERWEAR', image: getSupabaseMediaUrl('/assets/Images/Brown04.png'), href: '#editorial' },
-  { label: 'KNITWEAR', image: getSupabaseMediaUrl('/assets/Images/Peach03.png'), href: '#trending' }
+  { label: 'CORSET TOPS', image: getSupabaseMediaUrl('/assets/Images/Corset01.png'), href: '#corset-tops' },
+  { label: 'CO-ORD SETS', image: getSupabaseMediaUrl('/assets/Images/Blue02.png'), href: '#co-ord-sets' },
+  { label: 'SUMMER DRESSES', image: getSupabaseMediaUrl('/assets/Images/Corset04.png'), href: '#summer-dresses' },
+  { label: 'PARTY WEAR', image: getSupabaseMediaUrl('/assets/Images/Brown02.png'), href: '#party-wear' }
 ];
 
 const MENU_SECTIONS = [

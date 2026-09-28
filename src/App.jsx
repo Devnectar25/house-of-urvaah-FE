@@ -15,6 +15,7 @@ import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
 import { ProductDetail } from './pages/ProductDetail';
 import { Account } from './pages/Account';
+import { Wishlist } from './pages/Wishlist';
 import { AuthCallback } from './components/auth/AuthCallback';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { ShippingPolicy } from './pages/ShippingPolicy';
@@ -127,6 +128,11 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 import { AdminProducts } from './pages/admin/AdminProducts';
 
+import { AdminCategories } from './pages/admin/AdminCategories';
+import { AdminOrders } from './pages/admin/AdminOrders';
+
+
+
 export function StorefrontLayout() {
   return (
     <GlobalLoginWall>
@@ -165,7 +171,7 @@ export function StorefrontLayout() {
             <Route path="/accessories" element={<Home />} />
             <Route path="/sale" element={<Home />} />
             <Route path="/cart" element={<PlaceholderPage title="SHOPPING BAG" />} />
-            <Route path="/wishlist" element={<PlaceholderPage title="WISHLIST" />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account-details" element={<Account />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
@@ -220,8 +226,13 @@ export function AppContent() {
         <Route path="products" element={<AdminProducts />} />
         <Route path="products/new" element={<AdminPlaceholderPage />} />
         <Route path="products/:id/edit" element={<AdminPlaceholderPage />} />
+
+        <Route path="categories" element={<AdminCategories />} />
+        <Route path="orders" element={<AdminOrders />} />
+
         <Route path="categories" element={<AdminPlaceholderPage />} />
         <Route path="orders" element={<AdminPlaceholderPage />} />
+
         <Route path="coupons" element={<AdminPlaceholderPage />} />
         <Route path="customers" element={<AdminPlaceholderPage />} />
         <Route path="refunds" element={<AdminPlaceholderPage />} />
