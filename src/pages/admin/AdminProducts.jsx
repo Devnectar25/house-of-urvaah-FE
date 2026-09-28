@@ -203,7 +203,7 @@ export const AdminProducts = () => {
       {/* Toast Notification Banner */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-serif border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
             toast.type === 'success'
               ? 'bg-brand-dark text-white border-neutral-800'
               : 'bg-brand-dark text-rose-100 border-rose-950'
@@ -214,7 +214,7 @@ export const AdminProducts = () => {
           ) : (
             <XCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
           )}
-          <span className="font-serif tracking-wide">{toast.message}</span>
+          <span className="font-admin tracking-wide">{toast.message}</span>
         </div>
       )}
 
@@ -237,7 +237,7 @@ export const AdminProducts = () => {
       {/* Page Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-dark tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
             Product Management
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">

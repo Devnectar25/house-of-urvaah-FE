@@ -92,7 +92,7 @@ export const AdminPlaceholderPage = ({ title: overrideTitle, subtitle: overrideS
             <span>/</span>
             <span className="text-neutral-700 font-medium">{config.module}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-dark tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
             {config.title}
           </h1>
         </div>
@@ -113,7 +113,7 @@ export const AdminPlaceholderPage = ({ title: overrideTitle, subtitle: overrideS
           {config.module}
         </span>
 
-        <h2 className="text-xl sm:text-2xl font-serif font-bold text-brand-dark uppercase tracking-wider mb-3 max-w-lg">
+        <h2 className="text-xl sm:text-2xl font-admin font-bold text-brand-dark uppercase tracking-wider mb-3 max-w-lg">
           {config.title} Interface
         </h2>
 

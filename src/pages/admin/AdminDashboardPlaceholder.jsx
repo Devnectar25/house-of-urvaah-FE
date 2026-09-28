@@ -19,7 +19,7 @@ export const AdminDashboardPlaceholder = () => {
   };
 
   return (
-    <div className="min-h-screen bg-brand-sand flex flex-col font-serif">
+    <div className="min-h-screen bg-brand-sand flex flex-col font-admin">
       {/* Admin Minimal Header */}
       <header className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-4">
@@ -57,9 +57,9 @@ export const AdminDashboardPlaceholder = () => {
             Authentication successful. Welcome to the House of Urvaah management portal.
           </p>
           <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left text-xs space-y-1.5 font-sans mb-6">
-            <p><strong className="font-semibold text-neutral-900 font-serif">Logged in as:</strong> {user?.username || 'Admin'}</p>
-            <p><strong className="font-semibold text-neutral-900 font-serif">Assigned Role:</strong> {user?.role || 'Administrator'}</p>
-            <p><strong className="font-semibold text-neutral-900 font-serif">Status:</strong> Authenticated & Authorized</p>
+            <p><strong className="font-semibold text-neutral-900 font-admin">Logged in as:</strong> {user?.username || 'Admin'}</p>
+            <p><strong className="font-semibold text-neutral-900 font-admin">Assigned Role:</strong> {user?.role || 'Administrator'}</p>
+            <p><strong className="font-semibold text-neutral-900 font-admin">Status:</strong> Authenticated & Authorized</p>
           </div>
           <p className="text-[11px] text-neutral-400 uppercase tracking-widest">
             Full admin dashboard features will be linked in the next phase.

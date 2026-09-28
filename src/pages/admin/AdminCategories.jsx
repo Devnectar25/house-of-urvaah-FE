@@ -183,7 +183,7 @@ export const AdminCategories = () => {
       {/* Toast Banner */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-serif border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
             toast.type === 'success'
               ? 'bg-brand-dark text-white border-neutral-800'
               : 'bg-brand-dark text-rose-100 border-rose-950'
@@ -194,7 +194,7 @@ export const AdminCategories = () => {
           ) : (
             <XCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
           )}
-          <span className="font-serif tracking-wide">{toast.message}</span>
+          <span className="font-admin tracking-wide">{toast.message}</span>
         </div>
       )}
 
@@ -208,14 +208,14 @@ export const AdminCategories = () => {
 
       {/* Delete Category Confirmation Dialog */}
       {deleteTargetCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-neutral-200 p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="text-base font-serif font-bold text-brand-dark">
+              <h3 className="text-base font-admin font-bold text-brand-dark">
                 Delete Category
               </h3>
               <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
@@ -265,7 +265,7 @@ export const AdminCategories = () => {
       {/* Page Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-dark tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
             Category Management
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
@@ -452,7 +452,7 @@ export const AdminCategories = () => {
                       </td>
 
                       {/* Category Name */}
-                      <td className="py-3 px-4 font-serif font-bold text-xs text-brand-dark tracking-wide">
+                      <td className="py-3 px-4 font-admin font-bold text-xs text-brand-dark tracking-wide">
                         {cat.name}
                       </td>
 

@@ -18,7 +18,8 @@ export default {
         }
       },
       fontFamily: {
-        serif: ['Roboto', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Arial', 'sans-serif'],
+        admin: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
         script: ['"Parfumerie Script Text"', '"Parfumerie Script"', 'Pinyon Script', 'Alex Brush', 'cursive'],
         sans: ['Roboto', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Arial', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
