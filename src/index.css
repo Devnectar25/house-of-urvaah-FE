@@ -64,6 +64,16 @@
     max-width: 100%;
   }
 
+  /* Admin Scope Form Control Typography Inherit */
+  .font-admin,
+  .font-admin input,
+  .font-admin textarea,
+  .font-admin select,
+  .font-admin button,
+  .font-admin option {
+    font-family: Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
   /* Custom Scrollbar for ZARA editorial minimalist look */
   ::-webkit-scrollbar {
     width: 5px;

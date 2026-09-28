@@ -298,7 +298,7 @@ export const AdminOrders = () => {
 
   // Reset all filters in a single action
   const handleClearFilters = () => {
-    if (ordersLoading) return;
+    if (ordersLoading || !isFilterActive) return;
     setSelectedStatus('all');
     setSelectedPaymentStatus('all');
     setSelectedPaymentType('all');
@@ -471,7 +471,7 @@ export const AdminOrders = () => {
     <div className="space-y-6 pb-12">
       {/* Page Header Row */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-dark tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
           Order Management
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
@@ -510,7 +510,7 @@ export const AdminOrders = () => {
                     {statsLoading ? (
                       <div className="h-5 w-8 bg-neutral-200 rounded animate-pulse" />
                     ) : (
-                      <span className={`text-xs font-serif font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
+                      <span className={`text-xs font-admin font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
                         {card.count}
                       </span>
                     )}
@@ -523,7 +523,7 @@ export const AdminOrders = () => {
                     {statsLoading ? (
                       <div className="h-6 w-14 bg-neutral-200 rounded mt-1 animate-pulse" />
                     ) : (
-                      <p className="text-lg font-serif font-bold text-brand-dark mt-0.5">
+                      <p className="text-lg font-admin font-bold text-brand-dark mt-0.5">
                         {card.count}
                       </p>
                     )}
@@ -556,11 +556,12 @@ export const AdminOrders = () => {
           <button
             type="button"
             onClick={handleClearFilters}
-            disabled={!isFilterActive || ordersLoading}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all cursor-pointer bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-neutral-200 shadow-2xs"
-            title={isFilterActive ? 'Reset all search and status filters to default' : 'No active filters to clear'}
+            disabled={ordersLoading}
+            aria-label="Clear filters"
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark focus-visible:ring-offset-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+            title={isFilterActive ? 'Reset all search and status filters to default' : 'Clear filters'}
           >
-            <X className="w-3.5 h-3.5 text-neutral-500" />
+            <X className={`w-3.5 h-3.5 transition-colors duration-200 ${isFilterActive ? 'text-rose-600' : 'text-neutral-500'}`} />
             <span>Clear Filters</span>
           </button>
         </div>
@@ -833,7 +834,7 @@ export const AdminOrders = () => {
                       className="hover:bg-neutral-50/80 transition-colors group cursor-pointer"
                     >
                       {/* Order ID */}
-                      <td className="py-3 px-4 font-serif font-bold text-xs text-brand-dark tracking-wide">
+                      <td className="py-3 px-4 font-admin font-bold text-xs text-brand-dark tracking-wide">
                         {ord.order_number || ord.id?.slice(0, 8)}
                       </td>
 
@@ -860,7 +861,7 @@ export const AdminOrders = () => {
                       </td>
 
                       {/* Total Amount */}
-                      <td className="py-3 px-4 font-serif font-bold text-xs text-brand-dark">
+                      <td className="py-3 px-4 font-admin font-bold text-xs text-brand-dark">
                         {formattedTotal}
                       </td>
 

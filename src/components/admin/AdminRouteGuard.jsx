@@ -162,10 +162,10 @@ export const AdminRouteGuard = ({ allowedRoles = null, children = null }) => {
   // Initializing/Checking loading state (if needed for async transitions)
   if (authState.status === 'loading') {
     return (
-      <div className="min-h-screen bg-brand-sand flex flex-col items-center justify-center p-6 font-serif">
+      <div className="min-h-screen bg-brand-sand flex flex-col items-center justify-center p-6 font-admin">
         <div className="flex flex-col items-center space-y-3">
           <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
-          <p className="text-xs uppercase tracking-[0.25em] text-neutral-600 font-sans">
+          <p className="text-xs uppercase tracking-[0.25em] text-neutral-600 font-admin">
             Verifying Authorization...
           </p>
         </div>

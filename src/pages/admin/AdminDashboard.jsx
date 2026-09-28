@@ -255,7 +255,7 @@ export const AdminDashboard = () => {
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-amber-900 shadow-2xs">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="font-sans">
-            <h4 className="font-semibold text-xs uppercase tracking-wider font-serif">
+            <h4 className="font-semibold text-xs uppercase tracking-wider font-admin">
               Access Restricted
             </h4>
             <p className="text-xs text-amber-800 mt-0.5">
@@ -268,7 +268,7 @@ export const AdminDashboard = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200/80 pb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-brand-dark tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
             Dashboard
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
@@ -306,7 +306,7 @@ export const AdminDashboard = () => {
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="font-serif font-bold text-base text-red-900 uppercase tracking-wide mb-1">
+            <h3 className="font-admin font-bold text-base text-red-900 uppercase tracking-wide mb-1">
               Couldn't load dashboard data
             </h3>
             <p className="text-xs text-red-700 font-sans mb-5 max-w-xs mx-auto">
@@ -366,7 +366,7 @@ export const AdminDashboard = () => {
 
                   {/* Stat Number (defensively formatted, never undefined or NaN) */}
                   <div className="my-0.5">
-                    <span className="text-xl sm:text-2xl font-serif font-bold text-brand-dark tracking-tight">
+                    <span className="text-xl sm:text-2xl font-admin font-bold text-brand-dark tracking-tight">
                       {formatStatNumber(card.value)}
                     </span>
                   </div>
@@ -393,7 +393,7 @@ export const AdminDashboard = () => {
       {/* ========================================================================= */}
       <section aria-label="Administrative Quick Actions" className="pt-2">
         <div className="mb-3 sm:mb-4">
-          <h2 className="text-lg sm:text-xl font-serif font-bold text-brand-dark uppercase tracking-wider">
+          <h2 className="text-lg sm:text-xl font-admin font-bold text-brand-dark uppercase tracking-wider">
             Quick Actions
           </h2>
         </div>
@@ -412,7 +412,7 @@ export const AdminDashboard = () => {
                 </div>
                 <div className="flex-1 min-w-0 font-sans">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs sm:text-[13px] font-bold text-brand-dark font-serif uppercase tracking-wider group-hover:text-brand-dark transition-colors truncate">
+                    <h3 className="text-xs sm:text-[13px] font-bold text-brand-dark font-admin uppercase tracking-wider group-hover:text-brand-dark transition-colors truncate">
                       {action.title}
                     </h3>
                     <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-brand-dark group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
