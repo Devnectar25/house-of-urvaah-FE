@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 
 export const CartDrawer = () => {
+  const navigate = useNavigate();
   const {
     cart,
     isCartOpen,
@@ -179,7 +181,8 @@ export const CartDrawer = () => {
                   variant="primary"
                   className="group flex items-center justify-center gap-2 py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-colors cursor-pointer"
                   onClick={() => {
-                    alert('Proceeding to Checkout!');
+                    setIsCartOpen(false);
+                    navigate('/checkout');
                   }}
                 >
                   PROCEED TO CHECKOUT

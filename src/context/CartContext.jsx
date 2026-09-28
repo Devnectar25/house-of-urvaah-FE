@@ -5,20 +5,7 @@ import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, cl
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([
-    // Initial sample item for instant demo satisfaction
-    {
-      product: {
-        id: 'prod-101',
-        name: 'DOUBLE-BREASTED OVERSIZED BLAZER',
-        price: 8990,
-        image: 'https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?auto=format&fit=crop&q=80&w=1000',
-        colors: ['#111111']
-      },
-      selectedSize: 'M',
-      quantity: 1
-    }
-  ]);
+  const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -158,6 +145,56 @@ export const CartProvider = ({ children }) => {
       });
   }, [user?.id]);
 
+  // Fetch & persist cart for logged-in user
+  useEffect(() => {
+    if (!user) {
+      setCart([]);
+      return;
+    }
+
+    const userId = user.id || user.username || 'user';
+    const cachedKey = `urvaah_cart_${userId}`;
+
+    // 1. Instant load from localStorage cache if available
+    const cached = localStorage.getItem(cachedKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Fetch ground truth cart from backend API
+    apiClient(`/api/cart/${userId}`)
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const mappedBackendCart = res.data.map((item) => ({
+            product: {
+              id: String(item.productId || item.product_id || item.id),
+              name: item.name || item.productname || item.title || 'Product',
+              price: Number(item.price || 0),
+              originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
+              image: item.image || item.image_url || '/assets/Images/Brown01.png',
+              brand: item.brand || 'House of Urvaah',
+              category: item.category || 'CLOTHING',
+              inStock: item.inStock ?? true,
+              stockQuantity: item.stockQuantity ?? 10
+            },
+            selectedSize: item.selectedSize || 'M',
+            quantity: Number(item.quantity || 1)
+          }));
+
+          setCart(mappedBackendCart);
+          localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch backend cart, using cached:', err.message);
+      });
+  }, [user?.id]);
+
   const [pendingAction, setPendingAction] = useState(null);
 
   const requireAuth = (actionCallback) => {
@@ -204,6 +241,7 @@ export const CartProvider = ({ children }) => {
     setUser(null);
     setSession(null);
     setWishlist([]);
+    setCart([]);
     setPendingAction(null);
     setIsAuthModalOpen(false);
     try {
@@ -216,45 +254,139 @@ export const CartProvider = ({ children }) => {
     setIsAuthModalOpen(true);
   };
 
-  const addToCart = (product, selectedSize = 'M') => {
+  const addToCart = async (product, selectedSize = 'M') => {
+    if (!product) return;
+
+    if (!user && !getAuthToken()) {
+      setPendingAction(() => () => addToCart(product, selectedSize));
+      openAuthModal('login');
+      return;
+    }
+
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const cachedKey = `urvaah_cart_${userId}`;
+
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedSize === selectedSize
+        (item) => String(item.product.id) === String(product.id) && item.selectedSize === selectedSize
       );
 
+      let updated;
       if (existingIndex > -1) {
-        const updated = [...prevCart];
-        updated[existingIndex].quantity += 1;
-        return updated;
+        updated = [...prevCart];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + 1
+        };
+      } else {
+        updated = [
+          ...prevCart,
+          {
+            product: {
+              id: String(product.id),
+              name: product.name || product.title || 'Garment',
+              price: Number(product.price || 0),
+              originalPrice: Number(product.originalPrice || product.price || 0),
+              image: product.image || (product.gallery && product.gallery[0]) || '/assets/Images/Brown01.png',
+              colors: product.colors || ['#111111'],
+              brand: product.brand || 'House of Urvaah',
+              category: product.category || 'CLOTHING'
+            },
+            selectedSize,
+            quantity: 1
+          }
+        ];
       }
 
-      return [...prevCart, { product, selectedSize, quantity: 1 }];
+      localStorage.setItem(cachedKey, JSON.stringify(updated));
+      return updated;
     });
 
-    // Auto open side cart drawer on add
     setIsCartOpen(true);
+
+    const numericId = parseInt(String(product.id).replace(/\D/g, ''), 10);
+    if (numericId && !isNaN(numericId)) {
+      try {
+        await apiClient('/api/cart/add', {
+          method: 'POST',
+          body: JSON.stringify({ userId, productId: numericId, quantity: 1 })
+        });
+      } catch (err) {
+        console.warn('Cart add API sync warning:', err.message);
+      }
+    }
   };
 
-  const removeFromCart = (productId, selectedSize) => {
-    setCart((prevCart) =>
-      prevCart.filter(
-        (item) => !(item.product.id === productId && item.selectedSize === selectedSize)
-      )
-    );
-  };
+  const removeFromCart = async (productId, selectedSize) => {
+    if (!user && !getAuthToken()) {
+      openAuthModal('login');
+      return;
+    }
 
-  const updateQuantity = (productId, selectedSize, delta) => {
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const cachedKey = `urvaah_cart_${userId}`;
+
     setCart((prevCart) => {
-      return prevCart
+      const updated = prevCart.filter(
+        (item) => !(String(item.product.id) === String(productId) && item.selectedSize === selectedSize)
+      );
+      localStorage.setItem(cachedKey, JSON.stringify(updated));
+      return updated;
+    });
+
+    const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
+    if (numericId && !isNaN(numericId)) {
+      try {
+        await apiClient(`/api/cart/item/${numericId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.warn('Cart remove API sync warning:', err.message);
+      }
+    }
+  };
+
+  const updateQuantity = async (productId, selectedSize, delta) => {
+    if (!user && !getAuthToken()) {
+      openAuthModal('login');
+      return;
+    }
+
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const cachedKey = `urvaah_cart_${userId}`;
+    let newQty = 0;
+
+    setCart((prevCart) => {
+      const updated = prevCart
         .map((item) => {
-          if (item.product.id === productId && item.selectedSize === selectedSize) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          if (String(item.product.id) === String(productId) && item.selectedSize === selectedSize) {
+            const calculated = item.quantity + delta;
+            newQty = calculated;
+            return calculated > 0 ? { ...item, quantity: calculated } : null;
           }
           return item;
         })
         .filter(Boolean);
+
+      localStorage.setItem(cachedKey, JSON.stringify(updated));
+      return updated;
     });
+
+    const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
+    if (numericId && !isNaN(numericId)) {
+      try {
+        if (newQty <= 0) {
+          await apiClient(`/api/cart/item/${numericId}`, { method: 'DELETE' });
+        } else {
+          await apiClient('/api/cart/update', {
+            method: 'PATCH',
+            body: JSON.stringify({ userId, productId: numericId, quantity: newQty })
+          });
+        }
+      } catch (err) {
+        console.warn('Cart update quantity API sync warning:', err.message);
+      }
+    }
   };
 
   const isInWishlist = (productId) => {

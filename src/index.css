@@ -40,8 +40,8 @@
 }
 
 .font-le-jour {
-  font-family: 'Le Jour Serif', 'Bodoni Moda', 'Didot', serif;
-  text-transform: uppercase;
+  font-family: 'Italiana', 'Le Jour Serif', 'Bodoni Moda', 'Didot', serif;
+  text-transform: none;
   letter-spacing: 0.08em;
   font-weight: 400;
   display: inline-block;

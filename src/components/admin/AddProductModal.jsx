@@ -44,8 +44,6 @@ const DEFAULT_CATEGORIES = [
 
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
 
-  const [categories, setCategories] = useState([]);
-
   const [errors, setErrors] = useState({});
   const [creating, setCreating] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);

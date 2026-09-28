@@ -207,7 +207,7 @@ export const Wishlist = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.35 }}
                 >
-                  <ProductCard product={product} onQuickView={(p) => setPdpProduct(p)} />
+                  <ProductCard product={product} />
                 </motion.div>
               ))}
             </AnimatePresence>

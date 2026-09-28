@@ -73,7 +73,7 @@ export const Header = () => {
             : 'opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0'
         }`}
       >
-        <div className="max-w-[1800px] mx-auto flex justify-between items-start">
+        <div className="max-w-[1800px] mx-auto flex justify-between items-center">
           {/* Top-Left: Hamburger Icon Only */}
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -83,61 +83,66 @@ export const Header = () => {
             <Menu className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.25]" />
           </button>
 
-          {/* Right Side: Search, Account/Log In, Wishlist, Bag Icons + Help */}
-          <div className="flex items-center gap-0 sm:gap-1 md:gap-1.5 text-brand-dark">
+          {/* Right Side: Search, Wishlist, Bag, Account Icons */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 text-brand-dark">
+            {/* Search Icon Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              aria-label="Search"
+              title="Search products"
+            >
+              <Search className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+            </button>
+
+            {/* Mobile Search Icon */}
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="flex sm:hidden p-2 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Search"
               title="Search"
             >
-              <Search className="w-5 h-5 md:w-6 md:h-6 stroke-[2.25]" />
+              <Search className="w-5 h-5 stroke-[2.25]" />
             </button>
 
-            <button
-              onClick={handleAccountClick}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
-              aria-label="Account"
-              title="Account"
-            >
-              <User className="w-5 h-5 md:w-6 md:h-6 stroke-[2.25]" />
-            </button>
-
+            {/* Wishlist Icon + Overlapping Badge */}
             <Link
               to="/wishlist"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark gap-1 cursor-pointer"
+              className="hidden sm:flex relative p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Wishlist"
               title="Wishlist"
             >
-              <Heart className="w-5 h-5 md:w-6 md:h-6 stroke-[2.25]" />
+              <Heart className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
               {wishlistCount > 0 && (
-                <span className="text-xs font-bold tracking-wider font-mono">
-                  [{wishlistCount}]
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                  {wishlistCount}
                 </span>
               )}
             </Link>
 
+            {/* Shopping Bag Icon + Overlapping Badge */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="p-1 sm:p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark gap-1 cursor-pointer"
+              className="relative p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Shopping Bag"
               title="Shopping Bag"
             >
-              <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 stroke-[2.25]" />
-              <span className="text-xs font-bold tracking-wider font-mono">
-                [{cartCount}]
+              <ShoppingBag className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                {cartCount}
               </span>
             </button>
 
-            <Link
-              to="/contact"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              data-allow-guest="true"
-              className="hidden sm:flex text-xs sm:text-sm md:text-base font-bold tracking-[0.15em] uppercase text-brand-dark hover:opacity-60 transition-opacity items-center min-h-[44px] px-1 leading-none ml-0.5"
+            {/* Account Icon */}
+            <button
+              onClick={handleAccountClick}
+              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              aria-label="Account"
+              title="Account"
             >
-              HELP
-            </Link>
+              <User className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+            </button>
           </div>
         </div>
       </div>
@@ -173,51 +178,55 @@ export const Header = () => {
             </Link>
           </div>
 
-          {/* Column 3 (Right): Search, Account, Wishlist, Bag Icons */}
-          <div className="flex items-center justify-end gap-0 sm:gap-1 md:gap-1.5 text-brand-dark">
+          {/* Column 3 (Right): Search, Wishlist, Bag, Account Icons */}
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 text-brand-dark">
+            {/* Search Icon (First in right group) */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Search"
-              title="Search"
+              title="Search products"
             >
-              <Search className="w-5 h-5 md:w-6 md:h-6 stroke-[2]" />
+              <Search className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
             </button>
 
-            <button
-              onClick={handleAccountClick}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
-              aria-label="Account"
-              title="Account"
-            >
-              <User className="w-5 h-5 md:w-6 md:h-6 stroke-[2]" />
-            </button>
-
+            {/* Wishlist Icon + Overlapping Badge */}
             <Link
               to="/wishlist"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="hidden sm:flex p-1 sm:p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark gap-1 cursor-pointer"
+              className="hidden sm:flex relative p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Wishlist"
               title="Wishlist"
             >
-              <Heart className="w-5 h-5 md:w-6 md:h-6 stroke-[2]" />
+              <Heart className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
               {wishlistCount > 0 && (
-                <span className="text-xs font-semibold tracking-wider font-mono">
-                  [{wishlistCount}]
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                  {wishlistCount}
                 </span>
               )}
             </Link>
 
+            {/* Shopping Bag Icon + Overlapping Badge */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="p-1 sm:p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark gap-1 cursor-pointer"
+              className="relative p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Shopping Bag"
               title="Shopping Bag"
             >
-              <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 stroke-[2]" />
-              <span className="text-xs font-semibold tracking-wider font-mono">
-                [{cartCount}]
+              <ShoppingBag className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                {cartCount}
               </span>
+            </button>
+
+            {/* Account Icon */}
+            <button
+              onClick={handleAccountClick}
+              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              aria-label="Account"
+              title="Account"
+            >
+              <User className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
             </button>
           </div>
         </div>
