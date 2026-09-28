@@ -1,18 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Plus,
   Trash2,
   Upload,
   Loader2,
-  AlertCircle,
-  Image as ImageIcon,
-  CheckCircle2
+  AlertCircle
 } from 'lucide-react';
-import { apiClient } from '../../lib/apiClient';
+import { apiClient, clearAuthSession } from '../../lib/apiClient';
+
+const DEFAULT_CATEGORIES = [
+  { id: 1, category_id: 1, name: 'CORSET TOPS' },
+  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
 
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
-  if (!isOpen || !product) return null;
+  // Refs for focusing first invalid field on submit validation
+  const nameRef = useRef(null);
+  const categoryRef = useRef(null);
+  const priceRef = useRef(null);
+  const discountRef = useRef(null);
 
   // Form State initialized from product prop
   const [formData, setFormData] = useState({
@@ -34,7 +43,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     images: []
   });
 
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [errors, setErrors] = useState({});
   const [fetchingDetail, setFetchingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -53,21 +62,27 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Fetch available categories
   useEffect(() => {
+    let isMounted = true;
     const fetchCats = async () => {
       try {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
-        setCategories(list);
+        if (isMounted) {
+          setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+        }
       } catch (err) {
         console.error('Failed to load categories in modal:', err);
       }
     };
     fetchCats();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Populate or fetch detailed product data when product ID changes
+  // Populate or fetch detailed product data when product ID changes or modal opens
   useEffect(() => {
-    if (!product?.id) return;
+    if (!isOpen || !product?.id) return;
 
     const loadFullProduct = async () => {
       setFetchingDetail(true);
@@ -76,12 +91,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       try {
         const res = await apiClient(`/api/products/${product.id}`);
         const data = res?.data || res || product;
-        
+
         // Map backend product data to modal state
         const origPrice = data.originalPrice ?? data.price ?? 0;
         const currPrice = data.price ?? 0;
-        const calcDiscount = origPrice > 0 && origPrice > currPrice 
-          ? Math.round(((origPrice - currPrice) / origPrice) * 100) 
+        const calcDiscount = origPrice > 0 && origPrice > currPrice
+          ? Math.round(((origPrice - currPrice) / origPrice) * 100)
           : (data.discount || 0);
 
         // Map specifications array or object
@@ -111,8 +126,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
           specifications: specPairs,
           careInstructions: data.careInstructions || data.care_instructions || '',
-          images: Array.isArray(data.images) && data.images.length > 0 
-            ? data.images 
+          images: Array.isArray(data.images) && data.images.length > 0
+            ? data.images
             : (data.image ? [data.image] : [])
         });
       } catch (err) {
@@ -141,7 +156,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     };
 
     loadFullProduct();
-  }, [product]);
+  }, [isOpen, product]);
 
   // Validation handler
   const validateField = (field, value) => {
@@ -153,6 +168,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     } else if (field === 'price') {
       if (value === '' || value === null || isNaN(value) || Number(value) < 0) {
         err = 'Valid current price is required';
+      }
+    } else if (field === 'discountPercent') {
+      const num = Number(value);
+      if (isNaN(num) || num < 0 || num > 100) {
+        err = 'Discount % must be between 0 and 100';
       }
     }
     setErrors(prev => ({ ...prev, [field]: err }));
@@ -185,6 +205,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       discountPercent: disc,
       price: calcPrice >= 0 ? calcPrice : 0
     }));
+    validateField('discountPercent', disc);
     validateField('price', calcPrice);
   };
 
@@ -291,15 +312,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           ...prev,
           images: [...prev.images, uploadedUrl]
         }));
+      } else {
+        throw new Error('No image URL returned by server');
       }
     } catch (err) {
       console.error('Upload failed:', err);
-      // Fallback preview using Object URL for seamless demo editing
-      const objectUrl = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, objectUrl]
-      }));
+      setSubmitError(err.message || 'Image upload failed. Please try again.');
     } finally {
       setUploadingImage(false);
       e.target.value = '';
@@ -307,14 +325,19 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   };
 
   const handleAddImageUrl = () => {
-    if (!imageUrlInput.trim()) return;
+    const trimmed = imageUrlInput.trim();
+    if (!trimmed) return;
+    if (trimmed.startsWith('blob:')) {
+      setSubmitError('Direct blob URLs are not permitted. Please provide a valid external image URL.');
+      return;
+    }
     if (formData.images.length >= 5) {
       setSubmitError('Maximum 5 images allowed per product.');
       return;
     }
     setFormData(prev => ({
       ...prev,
-      images: [...prev.images, imageUrlInput.trim()]
+      images: [...prev.images, trimmed]
     }));
     setImageUrlInput('');
     setShowUrlInput(false);
@@ -330,14 +353,33 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   // Submit / Update Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (updating || deleting) return;
 
-    // Validate required fields
+    setSubmitError(null);
+
+    // Full field validation
     const isNameValid = validateField('name', formData.name);
     const isCategoryValid = validateField('category_id', formData.category_id);
     const isPriceValid = validateField('price', formData.price);
+    const isDiscountValid = validateField('discountPercent', formData.discountPercent);
 
-    if (!isNameValid || !isCategoryValid || !isPriceValid) {
+    if (!isNameValid || !isCategoryValid || !isPriceValid || !isDiscountValid) {
       setSubmitError('Please fix the highlighted required fields before saving.');
+      if (!isNameValid) {
+        nameRef.current?.focus();
+      } else if (!isCategoryValid) {
+        categoryRef.current?.focus();
+      } else if (!isPriceValid) {
+        priceRef.current?.focus();
+      } else if (!isDiscountValid) {
+        discountRef.current?.focus();
+      }
+      return;
+    }
+
+    const hasBlobImage = formData.images.some(img => typeof img === 'string' && img.startsWith('blob:'));
+    if (hasBlobImage) {
+      setSubmitError('Temporary image previews cannot be saved. Please re-upload or remove them before saving.');
       return;
     }
 
@@ -375,14 +417,30 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       });
 
       if (res?.success || res?.data) {
-        onProductUpdated(res.data || { ...product, ...payload });
+        const updatedProduct = res?.data || res;
+        onProductUpdated(updatedProduct || { ...product, ...payload });
+        onClose();
+      } else if (res && !res.error && !res.message) {
+        onProductUpdated(res || { ...product, ...payload });
         onClose();
       } else {
         throw new Error(res?.message || 'Failed to update product details');
       }
     } catch (err) {
       console.error('Failed to update product:', err);
-      setSubmitError(err.message || 'Failed to save product updates. Please try again.');
+      if (err.status === 401 || err.status === 403) {
+        clearAuthSession();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
+        }
+        return;
+      }
+
+      if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
+        setSubmitError(err.message || err.data?.message || 'Invalid product data provided. Please check all fields.');
+      } else {
+        setSubmitError(err.message || 'Failed to save product updates. Please try again.');
+      }
     } finally {
       setUpdating(false);
     }
@@ -390,13 +448,18 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Delete Handler with Confirmation
   const handleDeleteConfirm = async () => {
+    if (deleting || updating) return;
+
     setDeleting(true);
     setSubmitError(null);
+
     try {
       const res = await apiClient(`/api/products/${product.id}`, {
         method: 'DELETE'
       });
-      if (res?.success || res) {
+
+      if (res?.success || (res && !res.error && res.status !== 'error')) {
+        setShowDeleteConfirm(false);
         onProductDeleted(product.id);
         onClose();
       } else {
@@ -404,17 +467,31 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       }
     } catch (err) {
       console.error('Failed to delete product:', err);
-      setSubmitError(err.message || 'Could not delete product. Server error.');
+      if (err.status === 401 || err.status === 403) {
+        clearAuthSession();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
+        }
+        return;
+      }
+
+      if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
+        setSubmitError(err.message || err.data?.message || 'This product cannot be deleted due to existing orders or constraints.');
+      } else {
+        setSubmitError(err.message || 'Could not delete product. Server error.');
+      }
       setShowDeleteConfirm(false);
     } finally {
       setDeleting(false);
     }
   };
 
+  if (!isOpen || !product) return null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
       <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200">
-        
+
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/80 sticky top-0 z-20">
           <div>
@@ -441,41 +518,50 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             </div>
           ) : (
             <form id="edit-product-form" onSubmit={handleSubmit} className="space-y-6">
-              
+
               {/* Submit / General Error Banner */}
               {submitError && (
                 <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-800 text-xs">
-                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <span className="flex-1 font-medium">{submitError}</span>
                 </div>
               )}
 
               {/* Delete Confirmation Warning Box */}
               {showDeleteConfirm && (
-                <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in">
+                <div className="p-4 bg-rose-50/90 border border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in shadow-xs">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-rose-600" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider">Confirm Product Deletion</h4>
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <h4 className="text-xs font-bold font-serif uppercase tracking-wider text-rose-900">
+                      Confirm Product Deletion
+                    </h4>
                   </div>
-                  <p className="text-xs text-rose-700 leading-relaxed">
-                    Are you sure you want to delete <span className="font-semibold text-rose-900">"{formData.name}"</span>? This will permanently remove it from your store catalog.
+                  <p className="text-xs text-rose-800 leading-relaxed font-sans">
+                    Are you sure you want to permanently delete <strong className="font-semibold text-rose-950">"{formData.name || product.name}"</strong> (ID: #{product.id})? This action cannot be undone.
                   </p>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center gap-2.5 pt-1 border-t border-rose-200/80">
                     <button
                       type="button"
-                      onClick={handleDeleteConfirm}
                       disabled={deleting}
-                      className="px-4 py-2 bg-rose-700 text-white text-xs font-semibold rounded-lg hover:bg-rose-800 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                     >
-                      {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      Confirm Permanent Delete
+                      Cancel
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 text-xs font-semibold rounded-lg hover:bg-neutral-100 transition-colors"
+                      disabled={deleting}
+                      onClick={handleDeleteConfirm}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
                     >
-                      Cancel
+                      {deleting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Deleting...</span>
+                        </>
+                      ) : (
+                        <span>Yes, Delete Product</span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -487,6 +573,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   Product Name <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  ref={nameRef}
                   type="text"
                   value={formData.name}
                   onChange={(e) => {
@@ -509,6 +596,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Category <span className="text-rose-500">*</span>
                   </label>
                   <select
+                    ref={categoryRef}
                     value={formData.category_id}
                     onChange={(e) => {
                       setFormData(prev => ({ ...prev, category_id: e.target.value }));
@@ -592,13 +680,18 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Discount %
                   </label>
                   <input
+                    ref={discountRef}
                     type="number"
                     min="0"
                     max="100"
                     value={formData.discountPercent}
                     onChange={handleDiscountChange}
-                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
+                    onBlur={() => handleBlur('discountPercent')}
+                    className={`w-full px-3 py-2 bg-white border rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 ${
+                      errors.discountPercent ? 'border-rose-400 focus:ring-rose-400 bg-rose-50' : 'border-neutral-200 focus:ring-brand-dark'
+                    }`}
                   />
+                  {errors.discountPercent && <p className="text-[10px] text-rose-600">{errors.discountPercent}</p>}
                 </div>
 
                 <div className="space-y-1">
@@ -606,6 +699,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Price (Current ₹) <span className="text-rose-500">*</span>
                   </label>
                   <input
+                    ref={priceRef}
                     type="number"
                     min="0"
                     step="0.01"
@@ -912,7 +1006,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             type="button"
             onClick={onClose}
             disabled={updating || deleting}
-            className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
@@ -920,18 +1014,25 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
             disabled={updating || deleting || showDeleteConfirm}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
           >
-            Delete Product
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Product</span>
           </button>
           <button
             type="submit"
             form="edit-product-form"
             disabled={updating || deleting || fetchingDetail}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 min-w-[130px] cursor-pointer"
           >
-            {updating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Update Details
+            {updating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <span>Update Details</span>
+            )}
           </button>
         </div>
 

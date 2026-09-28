@@ -30,7 +30,7 @@
 }
 
 .font-parfumerie {
-  font-family: "Parfumerie Script Text", cursive;
+  font-family: "Parfumerie Script Text", cursive !important;
   color: rgb(0, 0, 0);
   text-shadow: none;
   font-size: 1.95em;
@@ -40,7 +40,7 @@
 }
 
 .font-le-jour {
-  font-family: 'Italiana', 'Le Jour Serif', 'Bodoni Moda', 'Didot', serif;
+  font-family: 'Italiana', 'Le Jour Serif', 'Bodoni Moda', 'Didot', serif !important;
   text-transform: none;
   letter-spacing: 0.08em;
   font-weight: 400;
@@ -55,7 +55,7 @@
 @layer base {
   html, body {
     scroll-behavior: smooth;
-    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     color: #111111;
     background-color: #ffffff;
     -webkit-font-smoothing: antialiased;
