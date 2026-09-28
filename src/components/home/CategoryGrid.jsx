@@ -100,7 +100,7 @@ export const CategoryGrid = () => {
           })));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { isMounted = false; };
   }, []);
 
@@ -154,15 +154,16 @@ export const CategoryGrid = () => {
 
   return (
     <section id="recommended-for-you" className="py-12 md:py-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white">
-      {/* Section Heading */}
-      <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7">
-        <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
-          RECOMMENDED FOR YOU
+      {/* Section Heading matching Trending on the gram typography */}
+      <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl text-black flex items-baseline flex-wrap">
+          <span className="font-parfumerie capitalize inline-block mr-3.5 sm:mr-5">Recommended</span>
+          <span className="font-le-jour lowercase">for you</span>
         </h2>
       </div>
 
       {/* Relative Carousel Wrapper with Floating Arrow Navigation */}
-      <div 
+      <div
         className="relative group"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -216,9 +217,8 @@ export const CategoryGrid = () => {
                   aria-label="Wishlist"
                 >
                   <Heart
-                    className={`w-4 h-4 ${
-                      isInWishlist(product.id) ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'
-                    }`}
+                    className={`w-4 h-4 ${isInWishlist(product.id) ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'
+                      }`}
                   />
                 </button>
 
