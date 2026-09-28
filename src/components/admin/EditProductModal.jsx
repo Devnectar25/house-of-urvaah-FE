@@ -1,4 +1,8 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+=======
 import React, { useState, useEffect } from 'react';
+
 import {
   X,
   Plus,
@@ -9,11 +13,21 @@ import {
   Image as ImageIcon,
   CheckCircle2
 } from 'lucide-react';
+
+import { apiClient, clearAuthSession } from '../../lib/apiClient';
+
 import { apiClient } from '../../lib/apiClient';
+
 
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
   if (!isOpen || !product) return null;
 
+
+  // Refs for focusing first invalid field on submit validation
+  const nameRef = useRef(null);
+  const categoryRef = useRef(null);
+  const priceRef = useRef(null);
+  const discountRef = useRef(null);
   // Form State initialized from product prop
   const [formData, setFormData] = useState({
     name: '',
@@ -34,7 +48,18 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     images: []
   });
 
+
+const DEFAULT_CATEGORIES = [
+  { id: 1, category_id: 1, name: 'CORSET TOPS' },
+  { id: 2, category_id: 2, name: 'CO-ORD SETS' },
+  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
+
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+
   const [categories, setCategories] = useState([]);
+
   const [errors, setErrors] = useState({});
   const [fetchingDetail, setFetchingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -57,7 +82,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       try {
         const res = await apiClient('/api/categories');
         const list = Array.isArray(res) ? res : (res?.data || []);
+
+        setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+
         setCategories(list);
+
       } catch (err) {
         console.error('Failed to load categories in modal:', err);
       }
@@ -154,6 +183,13 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       if (value === '' || value === null || isNaN(value) || Number(value) < 0) {
         err = 'Valid current price is required';
       }
+
+    } else if (field === 'discountPercent') {
+      const num = Number(value);
+      if (isNaN(num) || num < 0 || num > 100) {
+        err = 'Discount % must be between 0 and 100';
+      }
+
     }
     setErrors(prev => ({ ...prev, [field]: err }));
     return !err;
@@ -185,6 +221,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       discountPercent: disc,
       price: calcPrice >= 0 ? calcPrice : 0
     }));
+
+    validateField('discountPercent', disc);
+
     validateField('price', calcPrice);
   };
 
@@ -331,6 +370,29 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (updating || deleting) return;
+
+    setSubmitError(null);
+
+    // Full field validation
+    const isNameValid = validateField('name', formData.name);
+    const isCategoryValid = validateField('category_id', formData.category_id);
+    const isPriceValid = validateField('price', formData.price);
+    const isDiscountValid = validateField('discountPercent', formData.discountPercent);
+
+    if (!isNameValid || !isCategoryValid || !isPriceValid || !isDiscountValid) {
+      setSubmitError('Please fix the highlighted required fields before saving.');
+      if (!isNameValid) {
+        nameRef.current?.focus();
+      } else if (!isCategoryValid) {
+        categoryRef.current?.focus();
+      } else if (!isPriceValid) {
+        priceRef.current?.focus();
+      } else if (!isDiscountValid) {
+        discountRef.current?.focus();
+      }
+
+
     // Validate required fields
     const isNameValid = validateField('name', formData.name);
     const isCategoryValid = validateField('category_id', formData.category_id);
@@ -338,11 +400,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
     if (!isNameValid || !isCategoryValid || !isPriceValid) {
       setSubmitError('Please fix the highlighted required fields before saving.');
+
       return;
     }
 
     setUpdating(true);
+
+
     setSubmitError(null);
+
 
     try {
       const payload = {
@@ -374,6 +440,26 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         body: JSON.stringify(payload)
       });
 
+
+      const updatedProduct = res?.data || res;
+      onProductUpdated(updatedProduct || { ...product, ...payload });
+      onClose();
+    } catch (err) {
+      console.error('Failed to update product:', err);
+      if (err.status === 401 || err.status === 403) {
+        clearAuthSession();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
+        }
+        return;
+      }
+
+      if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
+        setSubmitError(err.message || err.data?.message || 'Invalid product data provided. Please check all fields.');
+      } else {
+        setSubmitError('Something went wrong. Please try again.');
+      }
+
       if (res?.success || res?.data) {
         onProductUpdated(res.data || { ...product, ...payload });
         onClose();
@@ -383,6 +469,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     } catch (err) {
       console.error('Failed to update product:', err);
       setSubmitError(err.message || 'Failed to save product updates. Please try again.');
+
     } finally {
       setUpdating(false);
     }
@@ -390,12 +477,40 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Delete Handler with Confirmation
   const handleDeleteConfirm = async () => {
+
+    if (deleting || updating) return;
+
     setDeleting(true);
     setSubmitError(null);
+
+
+    setDeleting(true);
+    setSubmitError(null);
+
     try {
       const res = await apiClient(`/api/products/${product.id}`, {
         method: 'DELETE'
       });
+
+
+      onProductDeleted(product.id);
+      onClose();
+    } catch (err) {
+      console.error('Failed to delete product:', err);
+      if (err.status === 401 || err.status === 403) {
+        clearAuthSession();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
+        }
+        return;
+      }
+
+      if (err.status === 400 || (err.status >= 400 && err.status < 500)) {
+        setSubmitError(err.message || err.data?.message || 'This product cannot be deleted due to existing orders or constraints.');
+      } else {
+        setSubmitError('Something went wrong. Please try again.');
+      }
+
       if (res?.success || res) {
         onProductDeleted(product.id);
         onClose();
@@ -406,6 +521,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       console.error('Failed to delete product:', err);
       setSubmitError(err.message || 'Could not delete product. Server error.');
       setShowDeleteConfirm(false);
+
     } finally {
       setDeleting(false);
     }
@@ -452,6 +568,41 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
               {/* Delete Confirmation Warning Box */}
               {showDeleteConfirm && (
+
+                <div className="p-4 bg-rose-50/90 border border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <h4 className="text-xs font-bold font-serif uppercase tracking-wider text-rose-900">
+                      Confirm Product Deletion
+                    </h4>
+                  </div>
+                  <p className="text-xs text-rose-800 leading-relaxed font-sans">
+                    Are you sure you want to permanently delete <strong className="font-semibold text-rose-950">"{formData.name || product.name}"</strong> (ID: #{product.id})? This action cannot be undone.
+                  </p>
+                  <div className="flex items-center gap-2.5 pt-1 border-t border-rose-200/80">
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={handleDeleteConfirm}
+                      className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Deleting...</span>
+                        </>
+                      ) : (
+                        <span>Yes, Delete Product</span>
+                      )}
+
                 <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-3 text-rose-900 animate-in fade-in">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-rose-600" />
@@ -476,6 +627,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       className="px-4 py-2 bg-white text-neutral-700 border border-neutral-300 text-xs font-semibold rounded-lg hover:bg-neutral-100 transition-colors"
                     >
                       Cancel
+
                     </button>
                   </div>
                 </div>
@@ -487,6 +639,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   Product Name <span className="text-rose-500">*</span>
                 </label>
                 <input
+
+                  ref={nameRef}
+
                   type="text"
                   value={formData.name}
                   onChange={(e) => {
@@ -509,6 +664,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Category <span className="text-rose-500">*</span>
                   </label>
                   <select
+
+                    ref={categoryRef}
+
                     value={formData.category_id}
                     onChange={(e) => {
                       setFormData(prev => ({ ...prev, category_id: e.target.value }));
@@ -592,13 +750,24 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Discount %
                   </label>
                   <input
+
+                    ref={discountRef}
+
                     type="number"
                     min="0"
                     max="100"
                     value={formData.discountPercent}
                     onChange={handleDiscountChange}
+
+                    className={`w-full px-3 py-2 bg-white border rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 ${
+                      errors.discountPercent ? 'border-rose-400 focus:ring-rose-400 bg-rose-50' : 'border-neutral-200 focus:ring-brand-dark'
+                    }`}
+                  />
+                  {errors.discountPercent && <p className="text-[10px] text-rose-600">{errors.discountPercent}</p>}
+
                     className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                   />
+
                 </div>
 
                 <div className="space-y-1">
@@ -606,6 +775,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     Price (Current ₹) <span className="text-rose-500">*</span>
                   </label>
                   <input
+
+                    ref={priceRef}
+
                     type="number"
                     min="0"
                     step="0.01"
@@ -922,16 +1094,34 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             disabled={updating || deleting || showDeleteConfirm}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
           >
+
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Product</span>
+
             Delete Product
+
           </button>
           <button
             type="submit"
             form="edit-product-form"
             disabled={updating || deleting || fetchingDetail}
+
+            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 min-w-[130px]"
+          >
+            {updating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <span>Update Details</span>
+            )}
+
             className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-brand-dark text-white hover:bg-black rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
           >
             {updating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Update Details
+
           </button>
         </div>
 

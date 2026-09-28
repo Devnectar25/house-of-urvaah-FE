@@ -247,7 +247,7 @@ const GRAM_VIDEOS = [
       name: 'DOUBLE-BREASTED OVERSIZED BLAZER',
       price: 8990,
       formattedPrice: '₹ 8,990',
-      category: 'OUTERWEAR',
+      category: 'PARTY WEAR',
       subcategory: 'Blazers & Tailoring',
       tag: 'ICONIC',
       image: '/assets/Images/Brown02.png',
