@@ -127,6 +127,8 @@ import { AdminRouteGuard } from './components/admin/AdminRouteGuard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminPlaceholderPage } from './pages/admin/AdminPlaceholderPage';
 import { AdminProducts } from './pages/admin/AdminProducts';
+import { AdminCategories } from './pages/admin/AdminCategories';
+import { AdminOrders } from './pages/admin/AdminOrders';
 
 export function StorefrontLayout() {
   return (
@@ -221,8 +223,8 @@ export function AppContent() {
         <Route path="products" element={<AdminProducts />} />
         <Route path="products/new" element={<AdminPlaceholderPage />} />
         <Route path="products/:id/edit" element={<AdminPlaceholderPage />} />
-        <Route path="categories" element={<AdminPlaceholderPage />} />
-        <Route path="orders" element={<AdminPlaceholderPage />} />
+        <Route path="categories" element={<AdminCategories />} />
+        <Route path="orders" element={<AdminOrders />} />
         <Route path="coupons" element={<AdminPlaceholderPage />} />
         <Route path="customers" element={<AdminPlaceholderPage />} />
         <Route path="refunds" element={<AdminPlaceholderPage />} />
