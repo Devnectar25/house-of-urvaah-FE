@@ -320,9 +320,7 @@ export const AuthModal = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className={`relative z-10 w-full bg-white border border-neutral-200 shadow-2xl overflow-hidden my-auto transition-all duration-300 ${
-            step === 'details' ? 'max-w-3xl' : 'max-w-md'
-          }`}
+          className="relative z-10 w-full max-w-md bg-white border border-neutral-200 shadow-2xl overflow-hidden my-auto transition-all duration-300"
         >
           {/* Header Bar */}
           <div className="p-5 md:p-6 border-b border-neutral-100 flex items-center justify-between bg-[#FAF8F3]">
@@ -536,131 +534,112 @@ export const AuthModal = () => {
 
                 {/* --- STEP 3: FIRST-TIME USER DETAILS --- */}
                 {step === 'details' && (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch font-serif">
-                    {/* Left Column: Promo Banner */}
-                    <div className="md:col-span-5 relative bg-[#111111] text-white p-6 rounded-xs overflow-hidden flex flex-col justify-between min-h-[260px] md:min-h-full">
-                      <div className="absolute inset-0 opacity-40 bg-cover bg-center mix-blend-overlay pointer-events-none" style={{ backgroundImage: `url('/assets/Images/Brown01.png')` }} />
-                      <div className="relative z-10">
-                        <span className="inline-block bg-white/20 text-white text-[9px] tracking-[0.25em] uppercase px-2.5 py-1 mb-4 font-semibold border border-white/30 backdrop-blur-xs">
-                          WELCOME OFFER
-                        </span>
-                        <h4 className="text-xl sm:text-2xl font-serif tracking-[0.1em] uppercase font-light text-white leading-tight mb-2">
-                          FLAT 10% OFF
-                        </h4>
-                        <p className="text-xs text-neutral-300 font-light leading-relaxed">
-                          On your first purchase at House of Urvaah Atelier.
-                        </p>
-                      </div>
-
-                      <div className="relative z-10 mt-6 pt-4 border-t border-white/20">
-                        <span className="text-[10px] tracking-widest text-neutral-400 uppercase block mb-1">PROMO CODE</span>
-                        <div className="bg-white/10 border border-white/30 px-3 py-2 text-center text-xs font-mono font-bold tracking-[0.25em] text-white">
-                          WELCOME10
-                        </div>
-                      </div>
+                  <div className="space-y-5 font-serif">
+                    <div className="text-center mb-6">
+                      <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-400 block mb-1">
+                        ACCOUNT DETAILS
+                      </span>
+                      <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-neutral-900 font-medium">
+                        HEY, WE NEED A FEW DETAILS
+                      </h3>
+                      <p className="text-xs text-neutral-500 font-light mt-1.5 leading-relaxed">
+                        Complete your profile to customize your Atelier experience.
+                      </p>
                     </div>
 
-                    {/* Right Column: User Details Form */}
-                    <div className="md:col-span-7 space-y-4">
-                      <div>
-                        <h3 className="text-lg font-serif tracking-[0.1em] uppercase text-neutral-900 font-medium">
-                          HEY, WE NEED A FEW DETAILS
-                        </h3>
-                        <p className="text-xs text-neutral-500 font-light mt-1">
-                          Complete your profile to customize your Atelier experience.
-                        </p>
+                    <form onSubmit={handleCompleteSignup} className="space-y-4" noValidate>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                          FIRST NAME *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={firstName}
+                            onChange={(e) => {
+                              setFirstName(e.target.value);
+                              if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
+                            }}
+                            placeholder="Eleanor"
+                            className={`w-full bg-white border ${
+                              fieldErrors.firstName ? 'border-red-500' : 'border-neutral-300'
+                            } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                            autoFocus
+                          />
+                          <UserIcon className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
+                        </div>
+                        {fieldErrors.firstName && (
+                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.firstName}</p>
+                        )}
                       </div>
 
-                      <form onSubmit={handleCompleteSignup} className="space-y-3.5" noValidate>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[11px] tracking-[0.15em] uppercase text-neutral-900 font-semibold block">
-                              FIRST NAME *
-                            </label>
-                            <input
-                              type="text"
-                              value={firstName}
-                              onChange={(e) => {
-                                setFirstName(e.target.value);
-                                if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
-                              }}
-                              placeholder="Eleanor"
-                              className={`w-full bg-white border ${
-                                fieldErrors.firstName ? 'border-red-500' : 'border-neutral-300'
-                              } px-3 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black`}
-                              autoFocus
-                            />
-                            {fieldErrors.firstName && (
-                              <p className="text-[10px] text-red-600 mt-0.5">{fieldErrors.firstName}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[11px] tracking-[0.15em] uppercase text-neutral-900 font-semibold block">
-                              LAST NAME *
-                            </label>
-                            <input
-                              type="text"
-                              value={lastName}
-                              onChange={(e) => {
-                                setLastName(e.target.value);
-                                if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
-                              }}
-                              placeholder="Vance"
-                              className={`w-full bg-white border ${
-                                fieldErrors.lastName ? 'border-red-500' : 'border-neutral-300'
-                              } px-3 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black`}
-                            />
-                            {fieldErrors.lastName && (
-                              <p className="text-[10px] text-red-600 mt-0.5">{fieldErrors.lastName}</p>
-                            )}
-                          </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                          LAST NAME *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={lastName}
+                            onChange={(e) => {
+                              setLastName(e.target.value);
+                              if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
+                            }}
+                            placeholder="Vance"
+                            className={`w-full bg-white border ${
+                              fieldErrors.lastName ? 'border-red-500' : 'border-neutral-300'
+                            } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                          />
+                          <UserIcon className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
                         </div>
+                        {fieldErrors.lastName && (
+                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.lastName}</p>
+                        )}
+                      </div>
 
-                        {/* Phone Number Field */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] tracking-[0.15em] uppercase text-neutral-900 font-semibold block">
-                            PHONE NUMBER *
-                          </label>
-                          <div className="relative">
-                            <div className="absolute left-3 top-2.5 text-xs text-neutral-500 font-medium flex items-center gap-1 border-r border-neutral-300 pr-2">
-                              <span>+91</span>
-                            </div>
-                            <input
-                              type="tel"
-                              value={phone}
-                              maxLength={10}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, '');
-                                setPhone(val);
-                                if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
-                              }}
-                              placeholder="9876543210"
-                              className={`w-full bg-white border ${
-                                fieldErrors.phone ? 'border-red-500' : 'border-neutral-300'
-                              } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black`}
-                            />
+                      {/* Phone Number Field */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                          PHONE NUMBER *
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-3 top-2.5 text-xs text-neutral-500 font-medium flex items-center gap-1 border-r border-neutral-300 pr-2">
+                            <span>+91</span>
                           </div>
-                          {fieldErrors.phone && (
-                            <p className="text-[10px] text-red-600 mt-0.5">{fieldErrors.phone}</p>
-                          )}
+                          <input
+                            type="tel"
+                            value={phone}
+                            maxLength={10}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              setPhone(val);
+                              if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
+                            }}
+                            placeholder="9876543210"
+                            className={`w-full bg-white border ${
+                              fieldErrors.phone ? 'border-red-500' : 'border-neutral-300'
+                            } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                          />
                         </div>
+                        {fieldErrors.phone && (
+                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.phone}</p>
+                        )}
+                      </div>
 
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-4 disabled:opacity-50"
-                        >
-                          {isSubmitting ? (
-                            <span className="animate-pulse flex items-center gap-2">
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> SUBMITTING...
-                            </span>
-                          ) : (
-                            'SUBMIT'
-                          )}
-                        </button>
-                      </form>
-                    </div>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-6 disabled:opacity-50"
+                      >
+                        {isSubmitting ? (
+                          <span className="animate-pulse flex items-center gap-2">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> SUBMITTING...
+                          </span>
+                        ) : (
+                          'SUBMIT'
+                        )}
+                      </button>
+                    </form>
                   </div>
                 )}
               </>
