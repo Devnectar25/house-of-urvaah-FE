@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
-import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 export const CartDrawer = () => {
   const navigate = useNavigate();
@@ -111,10 +110,8 @@ export const CartDrawer = () => {
                 cart.map((item, idx) => (
                   <div key={`${item.product.id}-${item.selectedSize}-${idx}`} className="py-4 first:pt-0 last:pb-0 flex gap-4">
                     <img
-                      src={getSupabaseOptimizedImage(item.product.image, 200, 80)}
+                      src={item.product.image}
                       alt={item.product.name}
-                      loading="lazy"
-                      decoding="async"
                       className="w-20 h-24 object-cover object-top bg-neutral-100 flex-shrink-0 border border-neutral-200/60"
                     />
 

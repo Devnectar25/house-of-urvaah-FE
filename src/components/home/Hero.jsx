@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { getSupabaseMediaUrl, getSupabaseOptimizedImage } from '../../lib/supabase';
+import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 export const Hero = () => {
   const supabaseVideoSrc = getSupabaseMediaUrl('HOU_desktop');
   const localVideoSrc = '/assets/video/Hero-section-video-two.mp4';
-  const posterImg = getSupabaseOptimizedImage('Images/Brown01.png', 1200, 80);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -25,8 +24,6 @@ export const Hero = () => {
           defaultMuted
           loop
           playsInline
-          preload="metadata"
-          poster={posterImg}
           className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
         >
           <source src={supabaseVideoSrc} type="video/mp4" />
@@ -36,6 +33,8 @@ export const Hero = () => {
         {/* Subtle Scrim Gradient at top for header icon legibility */}
         <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/25 via-black/5 to-transparent pointer-events-none" />
       </div>
+
     </section>
   );
 };
+

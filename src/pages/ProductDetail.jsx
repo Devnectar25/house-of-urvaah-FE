@@ -16,7 +16,6 @@ import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
 import { productApi } from '../services/productApi';
 import { SEOHead } from '../components/common/SEOHead';
-import { getSupabaseOptimizedImage } from '../lib/supabase';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -303,10 +302,8 @@ export const ProductDetail = () => {
                   className="w-full relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden shadow-xs p-2 flex items-center justify-center"
                 >
                   <img
-                    src={getSupabaseOptimizedImage(imgUrl, 1200, 80)}
+                    src={imgUrl}
                     alt={`${product.name} view ${idx + 1}`}
-                    loading="lazy"
-                    decoding="async"
                     className="w-full h-auto max-h-[85vh] object-contain object-center"
                     onError={(e) => {
                       e.currentTarget.parentElement.style.display = 'none';
@@ -336,10 +333,8 @@ export const ProductDetail = () => {
                     }`}
                   >
                     <img
-                      src={getSupabaseOptimizedImage(imgUrl, 200, 80)}
+                      src={imgUrl}
                       alt={product.name}
-                      loading="lazy"
-                      decoding="async"
                       onError={(e) => {
                         e.currentTarget.parentElement.style.display = 'none';
                       }}
@@ -356,20 +351,16 @@ export const ProductDetail = () => {
                 onMouseLeave={() => setIsMainHovered(false)}
               >
                 <img
-                  src={getSupabaseOptimizedImage(selectedImage || gallery[0], 1200, 80)}
+                  src={selectedImage || gallery[0]}
                   alt={product.name}
-                  loading="lazy"
-                  decoding="async"
                   className={`w-full h-full object-contain object-center transition-all duration-500 ease-out ${
                     selectedImage === gallery[0] && product?.hoverImage && isMainHovered ? 'opacity-0' : 'opacity-100'
                   }`}
                 />
                 {selectedImage === gallery[0] && product?.hoverImage && (
                   <img
-                    src={getSupabaseOptimizedImage(product.hoverImage, 1200, 80)}
+                    src={product.hoverImage}
                     alt={`${product.name} alternate view`}
-                    loading="lazy"
-                    decoding="async"
                     className={`absolute inset-0 w-full h-full object-contain object-center p-2 transition-all duration-500 ease-out ${
                       isMainHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
                     }`}
