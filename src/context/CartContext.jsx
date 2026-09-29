@@ -236,6 +236,9 @@ export const CartProvider = ({ children }) => {
   };
 
   const logoutUser = async () => {
+    try {
+      await apiClient('/api/auth/logout', { method: 'POST' });
+    } catch (e) {}
     clearAuthSession();
     setTokenState(null);
     setUser(null);
