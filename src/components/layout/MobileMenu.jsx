@@ -3,15 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Search, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseMediaUrl, getSupabaseOptimizedImage } from '../../lib/supabase';
+import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 const TABS = ['WOMAN'];
 
 const FEATURED_PREVIEWS = [
-  { label: 'CORSET TOPS', image: getSupabaseOptimizedImage('/assets/Images/Corset01.png', 300, 80), href: '#corset-tops' },
-  { label: 'CO-ORD SETS', image: getSupabaseOptimizedImage('/assets/Images/Blue02.png', 300, 80), href: '#co-ord-sets' },
-  { label: 'SUMMER DRESSES', image: getSupabaseOptimizedImage('/assets/Images/Corset04.png', 300, 80), href: '#summer-dresses' },
-  { label: 'PARTY WEAR', image: getSupabaseOptimizedImage('/assets/Images/Brown02.png', 300, 80), href: '#party-wear' }
+  { label: 'CORSET TOPS', image: getSupabaseMediaUrl('/assets/Images/Corset01.png'), href: '#corset-tops' },
+  { label: 'CO-ORD SETS', image: getSupabaseMediaUrl('/assets/Images/Blue02.png'), href: '#co-ord-sets' },
+  { label: 'SUMMER DRESSES', image: getSupabaseMediaUrl('/assets/Images/Corset04.png'), href: '#summer-dresses' },
+  { label: 'PARTY WEAR', image: getSupabaseMediaUrl('/assets/Images/Brown02.png'), href: '#party-wear' }
 ];
 
 const MENU_SECTIONS = [
@@ -261,8 +261,6 @@ export const MobileMenu = () => {
                         <img
                           src={cat.image}
                           alt={cat.label}
-                          loading="lazy"
-                          decoding="async"
                           className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                         />
                       </div>

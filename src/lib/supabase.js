@@ -40,31 +40,3 @@ export const getSupabaseMediaUrl = (path) => {
 
   return `${CDN_BASE_URL}/${cleanPath}`;
 };
-
-/**
- * Transforms raw Supabase storage image URLs into optimized Supabase Render/Transform CDN URLs.
- * Automatically resizes, compresses, and delivers WebP images from the Edge.
- * Non-Supabase external URLs are returned unchanged.
- */
-export const getSupabaseOptimizedImage = (path, width = 800, quality = 80) => {
-  if (!path) return "";
-  const rawUrl = getSupabaseMediaUrl(path);
-
-  // Pass through non-Supabase external URLs unchanged
-  if (!rawUrl || !rawUrl.includes('/storage/v1/object/public/')) {
-    return rawUrl;
-  }
-
-  // Do not transform videos or SVGs
-  if (rawUrl.match(/\.(mp4|webm|mov|m4v|svg)($|\?)/i)) {
-    return rawUrl;
-  }
-
-  const renderUrl = rawUrl.replace(
-    '/storage/v1/object/public/',
-    '/storage/v1/render/image/public/'
-  );
-
-  const delimiter = renderUrl.includes('?') ? '&' : '?';
-  return `${renderUrl}${delimiter}width=${width}&quality=${quality}`;
-};

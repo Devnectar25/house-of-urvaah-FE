@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 const RECOMMENDED_PRODUCTS = [
   {
@@ -202,7 +201,7 @@ export const CategoryGrid = () => {
                 className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100/90 cursor-pointer"
               >
                 <img
-                  src={getSupabaseOptimizedImage(product.image, 600, 80)}
+                  src={product.image}
                   alt={product.name}
                   className="w-full h-full object-cover object-top filter brightness-[0.98] transition-transform duration-500 group-hover/card:scale-105"
                   loading="lazy"

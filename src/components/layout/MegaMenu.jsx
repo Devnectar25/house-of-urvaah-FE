@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../../data/mockProducts';
-import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 export const MegaMenu = ({ categoryId, onClose }) => {
   const category = CATEGORIES.find((cat) => cat.id === categoryId);
@@ -100,10 +99,8 @@ export const MegaMenu = ({ categoryId, onClose }) => {
           {category.promo && (
             <div className="relative group overflow-hidden bg-neutral-100 aspect-[4/3] cursor-pointer">
               <img
-                src={getSupabaseOptimizedImage(category.promo.image, 600, 80)}
+                src={category.promo.image}
                 alt={category.promo.title}
-                loading="lazy"
-                decoding="async"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-black/30 p-6 flex flex-col justify-end text-white">

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 export const ProductCard = ({ product, onQuickView }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -17,7 +16,7 @@ export const ProductCard = ({ product, onQuickView }) => {
     if (!product?.carouselImages || product.carouselImages.length <= 1) return;
     const interval = setInterval(() => {
       setCarouselIndex((prev) => (prev + 1) % product.carouselImages.length);
-    }, 2500);
+    }, 2500); // crossfade every 2.5s matching banner sections
     return () => clearInterval(interval);
   }, [product?.carouselImages]);
 
@@ -52,35 +51,32 @@ export const ProductCard = ({ product, onQuickView }) => {
           product.carouselImages.map((src, i) => (
             <img
               key={src}
-              src={getSupabaseOptimizedImage(src, 400, 80)}
+              src={src}
               alt={`${product.name} ${i}`}
               className={`absolute inset-0 w-full h-full object-cover object-top filter brightness-[0.98] contrast-[1.02] transition-opacity duration-1000 ease-in-out ${
                 i === carouselIndex ? 'opacity-100' : 'opacity-0'
               } transform ${!isModalOpen ? 'group-hover:scale-105' : ''} transition-transform duration-700 ease-out`}
               loading="lazy"
-              decoding="async"
             />
           ))
         ) : (
           <div className="relative w-full h-full">
             <img
-              src={getSupabaseOptimizedImage(product.image, 400, 80)}
+              src={product.image}
               alt={product.name}
               className={`absolute inset-0 w-full h-full object-cover object-top transition-all duration-500 ease-out transform ${
                 !isModalOpen ? 'group-hover:scale-105' : ''
               } ${product.hoverImage && activeHover ? 'opacity-0' : 'opacity-100'}`}
               loading="lazy"
-              decoding="async"
             />
             {product.hoverImage && (
               <img
-                src={getSupabaseOptimizedImage(product.hoverImage, 400, 80)}
+                src={product.hoverImage}
                 alt={`${product.name} hover view`}
                 className={`absolute inset-0 w-full h-full object-cover object-top transition-all duration-500 ease-out transform ${
                   !isModalOpen ? 'group-hover:scale-105' : ''
                 } ${activeHover ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 loading="lazy"
-                decoding="async"
               />
             )}
           </div>
@@ -103,7 +99,7 @@ export const ProductCard = ({ product, onQuickView }) => {
           />
         </button>
 
-        {/* Quick Action Overlay Bar */}
+        {/* Quick Action Overlay Bar at bottom of card (always visible on mobile, hover reveal on desktop) */}
         <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-2 sm:p-3 transition-transform duration-300 ease-in-out flex items-center gap-1.5 sm:gap-2 ${
           !isModalOpen ? 'md:translate-y-full md:group-hover:translate-y-0 translate-y-0' : 'translate-y-full pointer-events-none'
         }`}>

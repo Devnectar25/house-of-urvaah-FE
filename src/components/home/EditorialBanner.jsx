@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../common/Button';
-import { supabase, BUCKET_NAME, getSupabaseMediaUrl, getSupabaseOptimizedImage } from '../../lib/supabase';
+import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
 
 const EDITORIAL_VIDEOS = [
   {
@@ -9,7 +9,6 @@ const EDITORIAL_VIDEOS = [
     name: 'Blush Pink Embroidered Floral Co-Ord Set',
     tag: 'PETAL THREADWORK',
     defaultPath: 'videos/Blush Pink Embroidered Floral Co-Ord Set_h264.mp4',
-    posterPath: 'Images/Peach01.png',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
       return lower.includes('blush') && lower.includes('pink') && lower.includes('h264');
@@ -20,7 +19,6 @@ const EDITORIAL_VIDEOS = [
     name: 'Mocha Brown Embroidered Co-Ord Set',
     tag: 'HERITAGE WEAVE',
     defaultPath: 'videos/Mocha Brown Embroidered Co-Ord Set_h264.mp4',
-    posterPath: 'Images/Brown01.png',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
       return lower.includes('mocha') && lower.includes('brown') && lower.includes('h264');
@@ -31,7 +29,6 @@ const EDITORIAL_VIDEOS = [
     name: 'Teal Embroidered Floral Co-Ord Set',
     tag: 'OCEAN BLOOM',
     defaultPath: 'videos/Teal Embroidered Floral Co-Ord Set_h264.mp4',
-    posterPath: 'Images/Blue01.png',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
       return lower.includes('teal') && lower.includes('h264');
@@ -67,6 +64,7 @@ export const EditorialBanner = () => {
   const [videoLoaded, setVideoLoaded] = useState({});
   const [videoErrors, setVideoErrors] = useState({});
 
+  // Dynamically resolve video URLs from the Supabase houseofurvaah-media bucket by matching names
   useEffect(() => {
     let isMounted = true;
 
@@ -99,6 +97,7 @@ export const EditorialBanner = () => {
     };
   }, []);
 
+  // Intersection Observer to autoplay when in view and pause when scrolled out
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -114,6 +113,7 @@ export const EditorialBanner = () => {
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                   playPromise.catch((err) => {
+                    // Autoplay restriction or unready state: handled gracefully without triggering error banner
                     console.debug('[EditorialVideo] Play promise caught:', err.name);
                   });
                 }
@@ -154,26 +154,31 @@ export const EditorialBanner = () => {
             transition={{ duration: 0.8 }}
             className="lg:col-span-7 relative w-full"
           >
+            {/* Unified Frame Container blending seamlessly into section background (bg-brand-sand) */}
             <div
               style={{ '--frame-color': 'var(--brand-sand, #F5F5F0)' }}
               className="relative w-full bg-brand-sand rounded-sm overflow-hidden p-1.5 sm:p-2 border border-brand-sand shadow-none"
             >
+              {/* 3 Videos side by side (horizontal scroll on small mobile, 3-col grid on sm+) */}
               <div className="flex sm:grid sm:grid-cols-3 gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible snap-x snap-mandatory scrollbar-none">
                 {videos.map((item, idx) => (
                   <div
                     key={item.id}
                     className="relative flex-shrink-0 w-[72vw] sm:w-auto snap-center aspect-[9/16] overflow-hidden bg-[#EBEBE6] group select-none"
                   >
+                    {/* Individual Video Tag */}
                     <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap">
                       {item.tag}
                     </div>
 
+                    {/* Warm sand neutral loading skeleton/background (4% darker than section bg) */}
                     {!videoLoaded[item.id] && !videoErrors[item.id] && (
                       <div className="absolute inset-0 bg-[#EBEBE6] animate-pulse flex items-center justify-center">
                         <div className="w-6 h-6 rounded-full border border-neutral-300 border-t-neutral-600 animate-spin" />
                       </div>
                     )}
 
+                    {/* Fallback placeholder if video fails to load */}
                     {videoErrors[item.id] ? (
                       <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-[#EBEBE6] text-neutral-600 text-center font-serif">
                         <div className="w-8 h-8 rounded-full border border-neutral-300 flex items-center justify-center mb-2">
@@ -200,7 +205,6 @@ export const EditorialBanner = () => {
                         playsInline
                         loop
                         preload="metadata"
-                        poster={getSupabaseOptimizedImage(item.posterPath, 400, 80)}
                         onLoadedData={() =>
                           setVideoLoaded((prev) => ({ ...prev, [item.id]: true }))
                         }
@@ -251,6 +255,7 @@ export const EditorialBanner = () => {
                       </video>
                     )}
 
+                    {/* Gradient Scrim for caption legibility */}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent pt-14 pb-3.5 px-2.5 sm:px-3 flex flex-col justify-end text-center pointer-events-none z-10">
                       <span className="font-serif text-[10px] sm:text-[11px] text-white/95 uppercase tracking-wider leading-snug line-clamp-2 drop-shadow-sm">
                         {item.name}
@@ -293,15 +298,22 @@ export const EditorialBanner = () => {
                   type="button"
                   className="w-full relative inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase border border-brand-dark text-brand-dark group overflow-hidden transition-colors duration-400 select-none cursor-pointer"
                 >
+                  {/* Revealed background fill underneath */}
                   <span className="absolute inset-0 bg-brand-dark pointer-events-none" />
+
+                  {/* Top-Left Triangular Curtain */}
                   <span
                     className="absolute inset-0 bg-[#F5F5F0] pointer-events-none transition-transform duration-400 ease-in-out group-hover:-translate-x-full group-hover:-translate-y-full"
                     style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}
                   />
+
+                  {/* Bottom-Right Triangular Curtain */}
                   <span
                     className="absolute inset-0 bg-[#F5F5F0] pointer-events-none transition-transform duration-400 ease-in-out group-hover:translate-x-full group-hover:translate-y-full"
                     style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
                   />
+
+                  {/* Button Text Label */}
                   <span className="relative z-10 text-brand-dark group-hover:text-white transition-colors duration-400 ease-in-out">
                     VIEW CAMPAIGN FILM
                   </span>

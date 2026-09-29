@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 const GRAM_VIDEOS = [
   {
@@ -315,8 +314,6 @@ const VideoCard = ({ item, onOpenLook }) => {
           }
         }}
         src={item.src}
-        poster={getSupabaseOptimizedImage(item.product.image, 400, 80)}
-        preload="metadata"
         autoPlay
         muted
         defaultMuted
@@ -499,8 +496,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
             }}
             key={look.src}
             src={look.src}
-            poster={getSupabaseOptimizedImage(look.product.image, 600, 80)}
-            preload="metadata"
             autoPlay
             muted
             defaultMuted
@@ -533,10 +528,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
             {/* Main Product Image Viewer with Carousel Controls */}
             <div className="relative w-full h-[230px] sm:h-[260px] md:h-[280px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
               <img
-                src={getSupabaseOptimizedImage(selectedImage, 800, 80)}
+                src={selectedImage}
                 alt={look.product.name}
-                loading="lazy"
-                decoding="async"
                 className="w-full h-full object-contain object-center transition-all duration-300 p-1"
               />
 
@@ -597,10 +590,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                         }`}
                     >
                       <img
-                        src={getSupabaseOptimizedImage(img, 200, 80)}
+                        src={img}
                         alt={look.product.name}
-                        loading="lazy"
-                        decoding="async"
                         onError={(e) => {
                           e.currentTarget.parentElement.style.display = 'none';
                         }}
