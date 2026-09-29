@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 const TRENDING_CATEGORIES = [
   {
@@ -50,8 +51,10 @@ export const WhatsHot = () => {
             className="group relative block aspect-[3/4] md:aspect-[4/5] overflow-hidden bg-neutral-100"
           >
             <img
-              src={category.image}
+              src={getSupabaseOptimizedImage(category.image, 600, 80)}
               alt={category.title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.03]"
             />
             {/* Category Text directly over clear image */}

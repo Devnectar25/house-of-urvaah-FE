@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, ShoppingBag, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
+import { getSupabaseOptimizedImage } from '../../lib/supabase';
 
 export const QuickViewModal = () => {
   const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist } = useCart();
@@ -62,8 +63,10 @@ export const QuickViewModal = () => {
           {/* Left: Product Images */}
           <div className="w-full md:w-1/2 bg-neutral-100 relative aspect-[3/4]">
             <img
-              src={quickViewProduct.image}
+              src={getSupabaseOptimizedImage(quickViewProduct.image, 800, 80)}
               alt={quickViewProduct.name}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover object-top"
             />
             {quickViewProduct.tag && (
