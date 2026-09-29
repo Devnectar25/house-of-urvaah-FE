@@ -200,7 +200,7 @@ export const AuthModal = () => {
           loginUser(res.user, res.token);
           setIsSubmitting(false);
           setSuccessMessage('');
-          navigate('/account');
+          setIsAuthModalOpen(false);
         }, 800);
       } else {
         setServerError('Verification failed. Please try again.');
@@ -284,7 +284,7 @@ export const AuthModal = () => {
           loginUser(res.user, res.token);
           setIsSubmitting(false);
           setSuccessMessage('');
-          navigate('/account');
+          setIsAuthModalOpen(false);
         }, 1000);
       } else {
         setServerError('Signup failed. Please try again.');
