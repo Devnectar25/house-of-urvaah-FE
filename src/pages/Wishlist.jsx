@@ -7,7 +7,7 @@ import { SEOHead } from '../components/common/SEOHead';
 import { ProductCard } from '../components/common/ProductCard';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
-import { getSupabaseMediaUrl } from '../lib/supabase';
+import { getSupabaseMediaUrl, getSupabaseOptimizedImage } from '../lib/supabase';
 
 // Combine all product catalogs for item lookup
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
