@@ -21,7 +21,6 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
   if (!isOpen) return null;
 
   const isEdit = Boolean(coupon && coupon.id);
-  const isUsed = Boolean(coupon && (coupon.times_used > 0 || coupon.used_count > 0));
 
   // ── Code Generation Helper ──────────────────────────────────────────────────
   const generateRandomCode = () => {
@@ -157,7 +156,6 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
 
   // ── Auto Code Mode Toggle ──────────────────────────────────────────────────
   const handleCodeModeChange = (mode) => {
-    if (isEdit) return;
     setCodeMode(mode);
     if (mode === 'auto') {
       const generated = generateRandomCode();
@@ -470,7 +468,7 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
     setSubmitting(true);
 
     let retryCount = 0;
-    const maxAutoRetries = (codeMode === 'auto' && !isEdit) ? 3 : 1;
+    const maxAutoRetries = codeMode === 'auto' ? 3 : 1;
 
     while (retryCount < maxAutoRetries) {
       try {
@@ -599,47 +597,35 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
             </div>
           )}
 
-          {/* Used Coupon Lock Notice */}
-          {isUsed && (
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-amber-900 text-xs font-sans">
-              <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-              <span>
-                Coupon Code, Discount Type, and Discount Value are locked because this coupon has already been redeemed by customers.
-              </span>
-            </div>
-          )}
-
           <form id="coupon-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
             
-            {/* ── Code Generation Mode Radio Switch (Create Mode Only) ────────── */}
-            {!isEdit && (
-              <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
-                <span className="text-xs font-semibold text-neutral-700">Code Generation Mode</span>
-                <div className="flex items-center gap-4 text-xs font-medium">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="codeMode"
-                      checked={codeMode === 'manual'}
-                      onChange={() => handleCodeModeChange('manual')}
-                      className="w-4 h-4 accent-brand-dark cursor-pointer"
-                    />
-                    <span>Manual Entry</span>
-                  </label>
+            {/* ── Code Generation Mode Radio Switch ────────── */}
+            <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
+              <span className="text-xs font-semibold text-neutral-700">Code Generation Mode</span>
+              <div className="flex items-center gap-4 text-xs font-medium">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="codeMode"
+                    checked={codeMode === 'manual'}
+                    onChange={() => handleCodeModeChange('manual')}
+                    className="w-4 h-4 accent-brand-dark cursor-pointer"
+                  />
+                  <span>Manual Entry</span>
+                </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="codeMode"
-                      checked={codeMode === 'auto'}
-                      onChange={() => handleCodeModeChange('auto')}
-                      className="w-4 h-4 accent-brand-dark cursor-pointer"
-                    />
-                    <span>Auto Generate</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="codeMode"
+                    checked={codeMode === 'auto'}
+                    onChange={() => handleCodeModeChange('auto')}
+                    className="w-4 h-4 accent-brand-dark cursor-pointer"
+                  />
+                  <span>Auto Generate</span>
+                </label>
               </div>
-            )}
+            </div>
 
             {/* ── ROW 1: Coupon Code & Discount Type ─────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -650,7 +636,7 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                   Coupon Code <span className="text-rose-600">*</span>
                 </label>
 
-                {codeMode === 'auto' && !isEdit ? (
+                {codeMode === 'auto' ? (
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -677,7 +663,6 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                     type="text"
                     name="code"
                     value={formData.code}
-                    disabled={isUsed}
                     onChange={handleChange}
                     onBlur={() => handleBlur('code')}
                     placeholder="e.g. FESTIVE20"
@@ -686,7 +671,7 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                       errors.code
                         ? 'border-rose-500 focus:ring-rose-500'
                         : 'border-neutral-200 focus:border-brand-dark focus:ring-brand-dark'
-                    } disabled:opacity-60 disabled:cursor-not-allowed`}
+                    }`}
                   />
                 )}
 
@@ -703,9 +688,8 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                 <select
                   name="discount_type"
                   value={formData.discount_type}
-                  disabled={isUsed}
                   onChange={handleChange}
-                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all disabled:opacity-60 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all cursor-pointer"
                 >
                   <option value="percentage">Percentage (%)</option>
                   <option value="fixed">Fixed Amount (₹)</option>
@@ -738,7 +722,6 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                       step="0.01"
                       min="0"
                       value={formData.discount_value}
-                      disabled={isUsed}
                       onChange={handleChange}
                       onBlur={() => handleBlur('discount_value')}
                       placeholder={formData.discount_type === 'percentage' ? '15' : '200'}
@@ -747,7 +730,7 @@ export const CouponModal = ({ isOpen, onClose, coupon, onCouponSaved }) => {
                         errors.discount_value
                           ? 'border-rose-500 focus:ring-rose-500'
                           : 'border-neutral-200 focus:border-brand-dark focus:ring-brand-dark'
-                      } disabled:opacity-60 disabled:cursor-not-allowed`}
+                      }`}
                     />
                   </div>
                 )}
