@@ -21,6 +21,8 @@ import {
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
+import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
+import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
 
 export const Checkout = () => {
   const navigate = useNavigate();
@@ -94,11 +96,11 @@ export const Checkout = () => {
         if (res.success && res.addresses && res.addresses.length > 0) {
           const mapped = res.addresses.map((a) => ({
             id: a.id,
-            name: user.name || a.name || 'Recipient',
-            phone: user.phone || a.phone || '',
+            name: a.recipient_name || a.name || user.name || 'Recipient',
+            phone: a.phone || a.contact_phone || user.phone || '',
             street: a.full_address || a.street || '',
             city: a.city || '',
-            state: a.state || '',
+            state: findMatchedState(a.state) || a.state || '',
             pincode: a.postal_code || a.pincode || '',
             type: a.address_label || a.type || 'Home',
             isDefault: !!a.is_default,
@@ -526,16 +528,21 @@ export const Checkout = () => {
                       <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
                         STATE *
                       </label>
-                      <input
-                        type="text"
+                      <select
                         required
                         value={newShippingForm.state}
                         onChange={(e) =>
                           setNewShippingForm({ ...newShippingForm, state: e.target.value })
                         }
-                        className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
-                        placeholder="State"
-                      />
+                        className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer"
+                      >
+                        <option value="" disabled>Select State</option>
+                        {INDIAN_STATES.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
@@ -616,18 +623,18 @@ export const Checkout = () => {
                           Pay securely using GPay, PhonePe, Paytm, Credit/Debit Cards, or Netbanking.
                         </p>
                         <div className="flex items-center gap-2 mt-2.5">
-                          <span className="px-1.5 py-0.5 border border-neutral-300 text-[9px] font-mono font-bold text-neutral-700 bg-neutral-50">
-                            UPI
-                          </span>
-                          <span className="px-1.5 py-0.5 border border-neutral-300 text-[9px] font-mono font-bold text-neutral-700 bg-neutral-50">
-                            VISA
-                          </span>
-                          <span className="px-1.5 py-0.5 border border-neutral-300 text-[9px] font-mono font-bold text-neutral-700 bg-neutral-50">
-                            MASTERCARD
-                          </span>
-                          <span className="px-1.5 py-0.5 border border-neutral-300 text-[9px] font-mono font-bold text-neutral-700 bg-neutral-50">
-                            RUPAY
-                          </span>
+                          <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
+                            <UpiLogo className="h-3.5 w-auto" />
+                          </div>
+                          <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
+                            <VisaLogo className="h-3 w-auto" />
+                          </div>
+                          <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
+                            <MastercardLogo className="h-3.5 w-auto" />
+                          </div>
+                          <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
+                            <RupayLogo className="h-3.5 w-auto" />
+                          </div>
                         </div>
                       </div>
                     </div>
