@@ -21,10 +21,12 @@ export const UpiLogo = ({ className = "h-4 w-auto" }) => (
 
 export const VisaLogo = ({ className = "h-4 w-auto" }) => (
   <svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} aria-label="Visa">
-    <path
-      d="M47.7 27.6h5.8l3.6-21.9h-5.8l-3.6 21.9zm17.4-21.3c-1.2-.4-3-.9-5.3-.9-5.8 0-9.9 3.1-10 7.5-.1 3.3 2.9 5.1 5.2 6.2 2.3 1.1 3.1 1.9 3.1 2.9 0 1.5-1.8 2.2-3.5 2.2-2.3 0-3.6-.3-5.5-1.2l-.8-.4-.9 5.4c1.5.7 4.2 1.3 7 1.3 6.6 0 10.9-3.2 11-8.3 0-2.8-1.7-4.9-5.3-6.6-2.2-1.1-3.6-1.9-3.5-3 0-1 .1-1.7 2.8-1.7 1.6 0 2.8.3 3.7.7l.4.2.8-5.3zm21.3.1h-4.5c-1.4 0-2.4.4-3 1.8l-8.5 20.3h6.1l1.2-3.4h7.5l.7 3.4h5.4L86.4 6.4zm-6.9 13.7l3.1-8.4 1.8 8.4h-4.9zM36.1 6.4L30.4 22c-.3 1.4-1.5 2-2.8 2H18.1l-.2.8 9.7 2.1c1.8.4 3.4 0 3.9-1.9L37 6.4h-6.1l5.2 0z"
-      fill="#1A1F71"
-    />
+    {/* Clean, high-fidelity Visa brand wordmark with gold V accent */}
+    <text x="14" y="29" fill="#1A1F71" fontStyle="italic" fontWeight="900" fontSize="28" fontFamily="'Trebuchet MS', 'Arial Black', sans-serif" letterSpacing="-1">
+      VISA
+    </text>
+    {/* Gold accent triangle on top-left tip of V */}
+    <polygon points="11,7 19,7 15,15" fill="#F7B600" />
   </svg>
 );
 
