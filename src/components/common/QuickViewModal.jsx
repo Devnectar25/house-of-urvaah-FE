@@ -53,10 +53,10 @@ export const QuickViewModal = () => {
           {/* Close Button */}
           <button
             onClick={() => setQuickViewProduct(null)}
-            className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 p-2.5 bg-white/95 shadow-md border border-neutral-200 rounded-full hover:bg-black hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
+            className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 p-2.5 bg-white/95 text-black shadow-md border border-neutral-200 rounded-full hover:bg-black hover:text-white transition-colors duration-250 min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
             aria-label="Close modal"
           >
-            <X className="w-5 h-5 text-black" />
+            <X className="w-5 h-5 transition-colors duration-250" />
           </button>
 
           {/* Left: Product Images */}

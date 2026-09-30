@@ -296,7 +296,8 @@ export const EditorialBanner = () => {
               <a href="#campaign" className="inline-block w-full sm:w-auto">
                 <button
                   type="button"
-                  className="w-full relative inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase border border-brand-dark text-brand-dark group overflow-hidden transition-colors duration-400 select-none cursor-pointer"
+                  data-no-hover="true"
+                  className="no-global-hover w-full relative inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase border border-brand-dark text-brand-dark group overflow-hidden transition-colors duration-400 select-none cursor-pointer"
                 >
                   {/* Revealed background fill underneath */}
                   <span className="absolute inset-0 bg-brand-dark pointer-events-none" />

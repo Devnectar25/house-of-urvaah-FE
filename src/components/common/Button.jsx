@@ -14,10 +14,10 @@ export const Button = ({
   const baseStyles = 'inline-flex items-center justify-center font-medium tracking-widest uppercase transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed select-none';
 
   const variants = {
-    primary: 'bg-brand-dark text-brand-light hover:bg-black border border-brand-dark',
-    secondary: 'bg-brand-sand text-brand-dark hover:bg-neutral-200 border border-brand-sand',
-    outline: 'bg-transparent text-brand-dark border border-brand-dark hover:bg-brand-dark hover:text-brand-light',
-    outlineWhite: 'bg-transparent text-brand-light border border-brand-light hover:bg-brand-light hover:text-brand-dark',
+    primary: 'bg-brand-dark text-white border border-brand-dark hover:bg-white hover:text-black hover:border-black transition-colors duration-300',
+    secondary: 'bg-brand-sand text-brand-dark border border-brand-sand hover:bg-black hover:text-white hover:border-black transition-colors duration-300',
+    outline: 'bg-transparent text-brand-dark border border-brand-dark hover:bg-black hover:text-white hover:border-black transition-colors duration-300',
+    outlineWhite: 'bg-transparent text-white border border-white hover:bg-white hover:text-black hover:border-white transition-colors duration-300',
     minimal: 'bg-transparent text-brand-dark hover:text-neutral-500 p-0 tracking-widest relative after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1px] after:bg-current',
   };
 

@@ -135,3 +135,78 @@
 .editorial-card:hover .editorial-img-zoom {
   transform: scale(1.04);
 }
+
+/* Global Color-Inversion Button Hover Effect across House of Urvaah */
+button svg {
+  transition: color 0.25s ease, stroke 0.25s ease, fill 0.25s ease;
+}
+
+button:not(.no-global-hover):not([data-no-hover="true"]) {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, transform 0.25s ease !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* SVG Icon Color Sync for hover inversion */
+  button[class*="hover:text-white"]:hover svg:not(.fill-red-600):not(.fill-red-700),
+  button[class*="hover:bg-black"]:hover svg:not(.fill-red-600):not(.fill-red-700) {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+  }
+
+  button[class*="hover:text-black"]:hover svg:not(.fill-red-600):not(.fill-red-700),
+  button[class*="hover:bg-white"]:hover svg:not(.fill-red-600):not(.fill-red-700) {
+    color: #000000 !important;
+    stroke: #000000 !important;
+  }
+
+  /* 1. Black / Dark background buttons: invert to white background + black text + 1px solid black border */
+  button.bg-black:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-brand-dark:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-neutral-950:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-neutral-900:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-neutral-800:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+    box-shadow: inset 0 0 0 1px #000000 !important;
+  }
+
+  /* Ensure SVG icons inside dark buttons switch to black on hover */
+  button.bg-black:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-brand-dark:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-neutral-950:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-neutral-900:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-neutral-800:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg {
+    color: #000000 !important;
+    stroke: #000000 !important;
+  }
+
+  /* 2. White / Outline / Sand / Light background buttons with borders: invert to black background + white text */
+  button.bg-white.border:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-transparent.border:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.bg-brand-sand:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.border-brand-dark:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.border-black:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.border-neutral-300:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover,
+  button.border-neutral-200:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+  }
+
+  /* Ensure SVG icons inside outline/light buttons switch to white on hover */
+  button.bg-white.border:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-transparent.border:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.bg-brand-sand:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.border-brand-dark:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.border-black:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg,
+  button.border-neutral-300:not(.bg-brand-dark):not(.bg-black):not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):hover svg {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+  }
+
+  button:not(.no-global-hover):not([data-no-hover="true"]):not(:disabled):active {
+    transform: scale(0.98);
+  }
+}
+

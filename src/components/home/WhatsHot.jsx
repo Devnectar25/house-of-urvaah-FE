@@ -4,24 +4,28 @@ import { motion } from 'framer-motion';
 const TRENDING_CATEGORIES = [
   {
     id: 'hot-1',
+    anchorId: 'corset-tops',
     title: 'CORSET TOPS',
     image: '/assets/Images/Corset04.png',
     link: '#corsets'
   },
   {
     id: 'hot-2',
+    anchorId: 'co-ord-sets',
     title: 'CO-ORD SETS',
     image: '/assets/Images/Brown02.png',
     link: '#coords'
   },
   {
     id: 'hot-3',
+    anchorId: 'summer-dresses',
     title: 'SUMMER DRESSES',
     image: '/assets/Images/Blue03.png',
     link: '#summer-dresses'
   },
   {
     id: 'hot-4',
+    anchorId: 'party-wear',
     title: 'PARTY WEAR',
     image: '/assets/Images/Peach03.png',
     link: '#party-wear'
@@ -42,6 +46,7 @@ export const WhatsHot = () => {
         {TRENDING_CATEGORIES.map((category, idx) => (
           <motion.a
             key={category.id}
+            id={category.anchorId}
             href={category.link}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
