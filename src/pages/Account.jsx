@@ -714,20 +714,115 @@ export const Account = () => {
 
         {/* OTHER TAB PANELS */}
         {activeTab === 'VIEW ORDERS' && (
-          <div className="max-w-4xl bg-neutral-50/70 p-8 md:p-12 border border-neutral-200 text-center font-sans">
-            <Package className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2">
-              MY ORDERS
-            </h3>
-            <p className="text-xs text-neutral-500 tracking-wider uppercase mb-6 max-w-md mx-auto">
-              You haven't placed any orders yet. Explore our latest luxury edit to make your first purchase.
-            </p>
-            <button
-              onClick={() => navigate('/')}
-              className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
-            >
-              EXPLORE COLLECTION
-            </button>
+          <div className="max-w-4xl space-y-6 font-sans">
+            <div className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-neutral-200">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-normal">
+                    MY ORDERS {orders.length > 0 && `(${orders.length})`}
+                  </h2>
+                  <p className="text-xs text-neutral-500 tracking-wider font-sans mt-0.5">
+                    Track and manage your atelier purchases
+                  </p>
+                </div>
+              </div>
+
+              {ordersLoading ? (
+                <div className="py-12 text-center">
+                  <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-xs text-neutral-400 uppercase tracking-widest">Loading your orders...</p>
+                </div>
+              ) : orders.length === 0 ? (
+                <div className="py-12 text-center border border-dashed border-neutral-300 bg-white p-6 font-sans">
+                  <Package className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                  <p className="text-xs sm:text-sm text-neutral-600 tracking-wider uppercase font-medium mb-1">
+                    You haven't placed any orders yet.
+                  </p>
+                  <p className="text-[11px] text-neutral-400 mb-6">
+                    Explore our latest luxury edit to make your first purchase.
+                  </p>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
+                  >
+                    EXPLORE COLLECTION
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((ord, idx) => {
+                    const orderNum = ord.order_number || ord.orderNumber || `HOU-ORD-${ord.id}`;
+                    const orderStatus = ord.status || 'Confirmed';
+                    const orderTotal = ord.total || ord.total_amount || 0;
+                    const orderDate = ord.created_at
+                      ? new Date(ord.created_at).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })
+                      : 'Recently';
+
+                    return (
+                      <div key={ord.id || idx} className="p-5 bg-white border border-neutral-200 shadow-2xs font-sans">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-neutral-100">
+                          <div>
+                            <span className="text-[10px] text-neutral-400 uppercase font-mono tracking-wider block">
+                              ORDER REFERENCE
+                            </span>
+                            <span className="text-sm font-bold font-mono text-black">{orderNum}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase font-mono ${
+                              orderStatus === 'Delivered'
+                                ? 'bg-emerald-900 text-white'
+                                : orderStatus === 'Cancelled'
+                                ? 'bg-red-900 text-white'
+                                : 'bg-neutral-900 text-white'
+                            }`}>
+                              {orderStatus}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs mb-3">
+                          <div>
+                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">DATE</span>
+                            <span className="font-medium text-neutral-800">{orderDate}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">PAYMENT</span>
+                            <span className="font-medium text-neutral-800 uppercase">{ord.payment_method || ord.paymentMethod || 'Online'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">TOTAL</span>
+                            <span className="font-bold text-neutral-900 font-serif">₹{Number(orderTotal).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">EST. DELIVERY</span>
+                            <span className="font-medium text-emerald-800">{ord.estimated_delivery || '2–4 Business Days'}</span>
+                          </div>
+                        </div>
+
+                        {ord.items && ord.items.length > 0 && (
+                          <div className="pt-3 border-t border-neutral-100 space-y-2">
+                            {ord.items.map((item, itemIdx) => (
+                              <div key={itemIdx} className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-neutral-900">{item.name || item.title || 'Atelier Item'}</span>
+                                  <span className="text-neutral-400">× {item.quantity || 1}</span>
+                                </div>
+                                <span className="font-mono text-neutral-700">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -349,6 +349,16 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  const clearCart = async () => {
+    const userId = user?.id || getStoredUser()?.id || 'user';
+    const cachedKey = `urvaah_cart_${userId}`;
+    setCart([]);
+    localStorage.removeItem(cachedKey);
+    try {
+      await apiClient(`/api/cart/${userId}`, { method: 'DELETE' });
+    } catch (e) {}
+  };
+
   const updateQuantity = async (productId, selectedSize, delta) => {
     if (!user && !getAuthToken()) {
       openAuthModal('login');
@@ -520,6 +530,7 @@ export const CartProvider = ({ children }) => {
         setPdpProduct,
         addToCart,
         removeFromCart,
+        clearCart,
         updateQuantity,
         toggleWishlist,
         removeFromWishlist,
