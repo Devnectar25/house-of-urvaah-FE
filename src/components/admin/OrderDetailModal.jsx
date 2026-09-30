@@ -306,14 +306,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
           ) : fetchError ? (
             /* Error State with Retry Button inside Modal */
-            <div className="p-8 text-center bg-rose-50/70 border border-rose-200 rounded-xl space-y-3">
-              <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-              <h3 className="text-sm font-semibold text-rose-900">Failed to Load Order Details</h3>
-              <p className="text-xs text-rose-700 max-w-sm mx-auto">{fetchError}</p>
+            <div className="p-8 text-center bg-neutral-50/70 border border-neutral-200 rounded-xl space-y-3">
+              <AlertCircle className="w-10 h-10 text-neutral-500 mx-auto" />
+              <h3 className="text-sm font-semibold text-brand-dark">Failed to Load Order Details</h3>
+              <p className="text-xs text-neutral-600 max-w-sm mx-auto">{fetchError}</p>
               <button
                 type="button"
                 onClick={fetchOrderDetail}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-dark text-white rounded-lg text-xs font-semibold hover:bg-black transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Retry Loading</span>
@@ -504,22 +504,22 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               </div>
 
               {/* Order Items Section */}
-              <div className="border border-neutral-200/80 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 bg-neutral-50/80 border-b border-neutral-200/80 text-xs font-semibold text-brand-dark uppercase tracking-wider">
-                  Order Items ({Array.isArray(order.items) ? order.items.length : 0})
+              <div className="border border-neutral-200/80 rounded-xl overflow-hidden bg-white">
+                <div className="px-4 py-3 bg-neutral-50/80 border-b border-neutral-200/80 text-xs font-semibold text-brand-dark uppercase tracking-wider flex items-center justify-between">
+                  <span>Order Items ({Array.isArray(order.items) ? order.items.length : 0})</span>
                 </div>
 
-                <div className="divide-y divide-neutral-200/60">
+                <div className="divide-y divide-neutral-200/60 max-h-64 overflow-y-auto">
                   {Array.isArray(order.items) && order.items.length > 0 ? (
                     order.items.map((item, idx) => {
-                      const rawImg = item.image || item.image_url || item.category_image;
+                      const rawImg = item.image || item.image_url || (Array.isArray(item.images) ? item.images[0] : item.images) || item.category_image;
                       const imgUrl = rawImg ? getSupabaseMediaUrl(rawImg) : '';
                       const unitPrice = parseFloat(item.price) || 0;
                       const qty = parseInt(item.quantity, 10) || 1;
                       const itemTotal = unitPrice * qty;
 
                       return (
-                        <div key={item.id || idx} className="p-4 flex items-center justify-between gap-4 text-xs">
+                        <div key={item.id || idx} className="p-4 flex items-center justify-between gap-4 text-xs hover:bg-neutral-50/50 transition-colors">
                           {/* Thumbnail + Title */}
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-12 h-12 rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden flex-shrink-0 flex items-center justify-center">
@@ -563,8 +563,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       );
                     })
                   ) : (
-                    <div className="p-6 text-center text-xs text-neutral-500 italic">
-                      No order items records found for this order.
+                    <div className="p-6 text-center text-xs text-neutral-500 italic space-y-1">
+                      <Package className="w-6 h-6 text-neutral-300 mx-auto mb-1" />
+                      <p className="font-semibold text-neutral-600 not-italic">No Order Items Available</p>
+                      <p className="text-[11px]">No order line items are recorded for this order.</p>
                     </div>
                   )}
                 </div>
@@ -591,7 +593,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                 <div className="pt-2.5 border-t border-neutral-200 flex justify-between items-center text-sm font-admin font-bold">
                   <span className="text-brand-dark tracking-wide">TOTAL AMOUNT</span>
-                  <span className="text-brand-accent text-base sm:text-lg">
+                  <span className="text-brand-dark text-base sm:text-lg">
                     ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
