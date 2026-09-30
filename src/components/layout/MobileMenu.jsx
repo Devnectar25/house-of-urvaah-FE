@@ -8,10 +8,10 @@ import { getSupabaseMediaUrl } from '../../lib/supabase';
 const TABS = ['WOMAN'];
 
 const FEATURED_PREVIEWS = [
-  { label: 'CORSET TOPS', image: getSupabaseMediaUrl('/assets/Images/Corset01.png'), href: '#corset-tops' },
-  { label: 'CO-ORD SETS', image: getSupabaseMediaUrl('/assets/Images/Blue02.png'), href: '#co-ord-sets' },
-  { label: 'SUMMER DRESSES', image: getSupabaseMediaUrl('/assets/Images/Corset04.png'), href: '#summer-dresses' },
-  { label: 'PARTY WEAR', image: getSupabaseMediaUrl('/assets/Images/Brown02.png'), href: '#party-wear' }
+  { label: 'CORSET TOPS', href: '#corset-tops' },
+  { label: 'CO-ORD SETS', href: '#co-ord-sets' },
+  { label: 'SUMMER DRESSES', href: '#summer-dresses' },
+  { label: 'PARTY WEAR', href: '#party-wear' }
 ];
 
 const MENU_SECTIONS = [
@@ -103,7 +103,17 @@ export const MobileMenu = () => {
       }
 
       const targetId = href.replace('#', '');
-      const element = document.getElementById(targetId);
+      let element = document.getElementById(targetId);
+
+      // Fallback for hidden or aliased sections (e.g. steal-deals -> whats-hot / recommended)
+      if (!element) {
+        if (targetId === 'steal-deals') {
+          element = document.getElementById('whats-hot') || document.getElementById('recommended');
+        } else if (targetId === 'corset-tops' || targetId === 'co-ord-sets' || targetId === 'summer-dresses' || targetId === 'party-wear') {
+          element = document.getElementById('whats-hot') || document.getElementById('recommended');
+        }
+      }
+
       if (element) {
         setTimeout(() => {
           element.scrollIntoView({ behavior: 'smooth' });
@@ -244,29 +254,23 @@ export const MobileMenu = () => {
 
             {/* SCROLLABLE MENU BODY */}
             <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-6">
-              {/* 3. FEATURED PREVIEWS ROW: Horizontally Scrollable Category Cards */}
+              {/* 3. FEATURED CATEGORIES: Text-Only 2-Column Grid */}
               <div>
                 <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block mb-3">
                   FEATURED CATEGORIES
                 </span>
-                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                <div className="grid grid-cols-2 gap-2.5">
                   {FEATURED_PREVIEWS.map((cat, idx) => (
                     <a
                       key={idx}
                       href={cat.href}
                       onClick={(e) => handleItemClick(e, cat)}
-                      className="flex-shrink-0 w-24 group flex flex-col items-center cursor-pointer"
+                      className="group flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/70 transition-all cursor-pointer"
                     >
-                      <div className="w-24 h-32 bg-neutral-100 overflow-hidden mb-1.5 border border-neutral-200/60 shadow-xs group-hover:border-black transition-colors">
-                        <img
-                          src={cat.image}
-                          alt={cat.label}
-                          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                      <span className="text-[10px] font-semibold tracking-widest text-center text-neutral-900 group-hover:text-black uppercase">
+                      <span className="text-xs sm:text-sm font-semibold tracking-[0.16em] text-neutral-900 group-hover:text-black uppercase">
                         {cat.label}
                       </span>
+                      <ArrowRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                     </a>
                   ))}
                 </div>
