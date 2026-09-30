@@ -5,6 +5,7 @@ import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock,
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
+import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -55,6 +56,7 @@ export const Account = () => {
     type: 'Home',
     isDefault: false
   });
+  const [addressErrors, setAddressErrors] = useState({});
   const [addressSaving, setAddressSaving] = useState(false);
 
   // Orders state
@@ -66,21 +68,19 @@ export const Account = () => {
     if (!user) return;
     try {
       const res = await apiClient('/api/users/profile');
-      if (res.success) {
-        if (res.addresses) {
-          const mapped = res.addresses.map(a => ({
-            id: a.id,
-            name: user.name || 'Recipient',
-            phone: user.phone || '',
-            street: a.full_address || a.street || '',
-            city: a.city || '',
-            state: a.state || '',
-            pincode: a.postal_code || a.pincode || '',
-            type: a.address_label || a.type || 'Home',
-            isDefault: !!a.is_default
-          }));
-          setAddresses(mapped);
-        }
+      if (res.success && res.addresses) {
+        const mapped = res.addresses.map(a => ({
+          id: a.id,
+          name: a.recipient_name || a.name || user.name || 'Recipient',
+          phone: a.phone || a.contact_phone || user.phone || '',
+          street: a.full_address || a.street || '',
+          city: a.city || '',
+          state: findMatchedState(a.state) || a.state || '',
+          pincode: a.postal_code || a.pincode || '',
+          type: a.address_label || a.type || 'Home',
+          isDefault: !!a.is_default
+        }));
+        setAddresses(mapped);
       }
     } catch (e) {
       if (user.addresses) setAddresses(user.addresses);
@@ -165,6 +165,7 @@ export const Account = () => {
   const openAddAddressModal = () => {
     setEditingAddressIndex(null);
     setEditingAddressId(null);
+    setAddressErrors({});
     setAddressForm({
       name: user?.name || '',
       phone: user?.phone || '',
@@ -182,23 +183,69 @@ export const Account = () => {
     setEditingAddressIndex(idx);
     const item = addresses[idx];
     setEditingAddressId(item.id || null);
-    setAddressForm({ ...item });
+    setAddressErrors({});
+    setAddressForm({
+      ...item,
+      state: findMatchedState(item.state) || item.state || ''
+    });
     setIsAddressModalOpen(true);
+  };
+
+  const validateAddressForm = () => {
+    const errors = {};
+    if (!addressForm.name || !addressForm.name.trim()) {
+      errors.name = 'Recipient name is required.';
+    }
+
+    const cleanPhone = (addressForm.phone || '').replace(/\D/g, '');
+    if (!cleanPhone) {
+      errors.phone = 'Phone number is required.';
+    } else if (cleanPhone.length !== 10) {
+      errors.phone = 'Phone number must be a valid 10-digit mobile number.';
+    }
+
+    if (!addressForm.street || !addressForm.street.trim()) {
+      errors.street = 'Street address / flat / building is required.';
+    }
+
+    if (!addressForm.city || !addressForm.city.trim()) {
+      errors.city = 'City is required.';
+    }
+
+    if (!addressForm.state || !addressForm.state.trim()) {
+      errors.state = 'Please select a state or union territory.';
+    }
+
+    const cleanPincode = (addressForm.pincode || '').replace(/\D/g, '');
+    if (!cleanPincode) {
+      errors.pincode = 'Pincode is required.';
+    } else if (cleanPincode.length !== 6) {
+      errors.pincode = 'Pincode must be exactly 6 digits.';
+    }
+
+    setAddressErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSaveAddress = async (e) => {
     e.preventDefault();
+    if (!validateAddressForm()) {
+      return;
+    }
     setAddressSaving(true);
 
     try {
       const payload = {
-        user_id: user.id || user.username,
+        user_id: user.id || user.username || user.email,
         address_label: addressForm.type,
-        full_address: addressForm.street,
-        city: addressForm.city,
-        state: addressForm.state,
-        postal_code: addressForm.pincode,
-        is_default: addressForm.isDefault
+        full_address: addressForm.street.trim(),
+        city: addressForm.city.trim(),
+        state: addressForm.state.trim(),
+        postal_code: addressForm.pincode.trim(),
+        is_default: addressForm.isDefault,
+        name: addressForm.name.trim(),
+        recipient_name: addressForm.name.trim(),
+        phone: addressForm.phone.trim()
       };
 
       if (editingAddressId) {
@@ -213,25 +260,58 @@ export const Account = () => {
         });
       }
 
-      await loadProfileAndAddresses();
-      setIsAddressModalOpen(false);
-    } catch (err) {
-      console.error('Failed to save address via backend API, falling back:', err);
-      // Fallback update profile
       let updatedList = [...addresses];
       if (addressForm.isDefault) {
         updatedList = updatedList.map((addr) => ({ ...addr, isDefault: false }));
       }
+      const newItem = {
+        id: editingAddressId || `local-${Date.now()}`,
+        name: addressForm.name.trim(),
+        phone: addressForm.phone.trim(),
+        street: addressForm.street.trim(),
+        city: addressForm.city.trim(),
+        state: addressForm.state.trim(),
+        pincode: addressForm.pincode.trim(),
+        type: addressForm.type,
+        isDefault: addressForm.isDefault
+      };
+
       if (editingAddressIndex !== null) {
-        updatedList[editingAddressIndex] = addressForm;
+        updatedList[editingAddressIndex] = newItem;
       } else {
-        updatedList.push(addressForm);
+        updatedList.push(newItem);
       }
-      const res = await updateUserProfile({ addresses: updatedList });
-      if (res.success) {
-        setAddresses(updatedList);
-        setIsAddressModalOpen(false);
+
+      setAddresses(updatedList);
+      await updateUserProfile({ addresses: updatedList });
+      await loadProfileAndAddresses();
+      setIsAddressModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save address via backend API, using local fallback:', err);
+      let updatedList = [...addresses];
+      if (addressForm.isDefault) {
+        updatedList = updatedList.map((addr) => ({ ...addr, isDefault: false }));
       }
+      const newItem = {
+        id: editingAddressId || `local-${Date.now()}`,
+        name: addressForm.name.trim(),
+        phone: addressForm.phone.trim(),
+        street: addressForm.street.trim(),
+        city: addressForm.city.trim(),
+        state: addressForm.state.trim(),
+        pincode: addressForm.pincode.trim(),
+        type: addressForm.type,
+        isDefault: addressForm.isDefault
+      };
+
+      if (editingAddressIndex !== null) {
+        updatedList[editingAddressIndex] = newItem;
+      } else {
+        updatedList.push(newItem);
+      }
+      setAddresses(updatedList);
+      await updateUserProfile({ addresses: updatedList });
+      setIsAddressModalOpen(false);
     } finally {
       setAddressSaving(false);
     }
@@ -239,7 +319,7 @@ export const Account = () => {
 
   const handleDeleteAddress = async (idx) => {
     const item = addresses[idx];
-    if (item?.id) {
+    if (item?.id && !String(item.id).startsWith('local-')) {
       try {
         await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
         await loadProfileAndAddresses();
@@ -257,12 +337,12 @@ export const Account = () => {
 
   const handleSetDefaultAddress = async (idx) => {
     const item = addresses[idx];
-    if (item?.id) {
+    if (item?.id && !String(item.id).startsWith('local-')) {
       try {
         await apiClient(`/api/addresses/${item.id}`, {
           method: 'PUT',
           body: JSON.stringify({
-            user_id: user.id || user.username,
+            user_id: user.id || user.username || user.email,
             address_label: item.type,
             full_address: item.street,
             city: item.city,
@@ -733,91 +813,140 @@ export const Account = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveAddress} className="space-y-4 font-sans text-xs">
+              <form onSubmit={handleSaveAddress} noValidate className="space-y-4 font-sans text-xs">
                 <div>
                   <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                    RECIPIENT NAME
+                    RECIPIENT NAME *
                   </label>
                   <input
                     type="text"
-                    required
                     value={addressForm.name}
-                    onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
+                    onChange={(e) => {
+                      setAddressForm({ ...addressForm, name: e.target.value });
+                      if (addressErrors.name) setAddressErrors((prev) => ({ ...prev, name: '' }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-white border ${
+                      addressErrors.name ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                    } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
                     placeholder="Full name"
                   />
+                  {addressErrors.name && (
+                    <p className="text-[11px] text-red-600 mt-1">{addressErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                    PHONE NUMBER
+                    PHONE NUMBER *
                   </label>
                   <input
                     type="tel"
-                    required
                     value={addressForm.phone}
-                    onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
-                    placeholder="+91 98765 43210"
+                    onChange={(e) => {
+                      setAddressForm({ ...addressForm, phone: e.target.value });
+                      if (addressErrors.phone) setAddressErrors((prev) => ({ ...prev, phone: '' }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-white border ${
+                      addressErrors.phone ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                    } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
+                    placeholder="+91 XXXXX XXXXX"
                   />
+                  {addressErrors.phone && (
+                    <p className="text-[11px] text-red-600 mt-1">{addressErrors.phone}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                    STREET ADDRESS / FLAT / BUILDING
+                    STREET ADDRESS / FLAT / BUILDING *
                   </label>
                   <textarea
-                    required
                     rows={2}
                     value={addressForm.street}
-                    onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm resize-none"
+                    onChange={(e) => {
+                      setAddressForm({ ...addressForm, street: e.target.value });
+                      if (addressErrors.street) setAddressErrors((prev) => ({ ...prev, street: '' }));
+                    }}
+                    className={`w-full px-3.5 py-2.5 bg-white border ${
+                      addressErrors.street ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                    } focus:ring-1 focus:ring-brand-dark outline-none text-sm resize-none`}
                     placeholder="House/Flat No., Street Name, Area"
                   />
+                  {addressErrors.street && (
+                    <p className="text-[11px] text-red-600 mt-1">{addressErrors.street}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      CITY
+                      CITY *
                     </label>
                     <input
                       type="text"
-                      required
                       value={addressForm.city}
-                      onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
+                      onChange={(e) => {
+                        setAddressForm({ ...addressForm, city: e.target.value });
+                        if (addressErrors.city) setAddressErrors((prev) => ({ ...prev, city: '' }));
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-white border ${
+                        addressErrors.city ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                      } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
                       placeholder="City"
                     />
+                    {addressErrors.city && (
+                      <p className="text-[11px] text-red-600 mt-1">{addressErrors.city}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      STATE
+                      STATE *
                     </label>
-                    <input
-                      type="text"
-                      required
+                    <select
                       value={addressForm.state}
-                      onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
-                      placeholder="State"
-                    />
+                      onChange={(e) => {
+                        setAddressForm({ ...addressForm, state: e.target.value });
+                        if (addressErrors.state) setAddressErrors((prev) => ({ ...prev, state: '' }));
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-white border ${
+                        addressErrors.state ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                      } focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer`}
+                    >
+                      <option value="" disabled>Select State</option>
+                      {INDIAN_STATES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                    {addressErrors.state && (
+                      <p className="text-[11px] text-red-600 mt-1">{addressErrors.state}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      PINCODE
+                      PINCODE *
                     </label>
                     <input
                       type="text"
-                      required
+                      maxLength={6}
                       value={addressForm.pincode}
-                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setAddressForm({ ...addressForm, pincode: val });
+                        if (addressErrors.pincode) setAddressErrors((prev) => ({ ...prev, pincode: '' }));
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-white border ${
+                        addressErrors.pincode ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
+                      } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
                       placeholder="6-digit Pincode"
                     />
+                    {addressErrors.pincode && (
+                      <p className="text-[11px] text-red-600 mt-1">{addressErrors.pincode}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
