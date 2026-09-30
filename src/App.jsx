@@ -132,6 +132,7 @@ import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminCoupons } from './pages/admin/AdminCoupons';
+import { AdminRefundDesk } from './pages/admin/AdminRefundDesk';
 
 
 
@@ -232,13 +233,10 @@ export function AppContent() {
 
         <Route path="categories" element={<AdminCategories />} />
         <Route path="orders" element={<AdminOrders />} />
-
-        <Route path="categories" element={<AdminPlaceholderPage />} />
-        <Route path="orders" element={<AdminPlaceholderPage />} />
-
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="customers" element={<AdminPlaceholderPage />} />
-        <Route path="refunds" element={<AdminPlaceholderPage />} />
+        <Route path="refunds" element={<AdminRefundDesk />} />
+        <Route path="refund-desk" element={<AdminRefundDesk />} />
         <Route path="reviews" element={<AdminPlaceholderPage />} />
         <Route path="analytics" element={<AdminPlaceholderPage />} />
         <Route path="settings" element={<AdminPlaceholderPage />} />

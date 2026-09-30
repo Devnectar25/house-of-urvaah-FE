@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket },
   { name: 'Customers', path: '/admin/customers', icon: Users },
-  { name: 'Refunds', path: '/admin/refunds', icon: RotateCcw },
+  { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw },
   { name: 'Reviews', path: '/admin/reviews', icon: Star },
   { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
   { name: 'Settings', path: '/admin/settings', icon: Settings },

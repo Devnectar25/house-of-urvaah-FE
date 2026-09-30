@@ -1,10 +1,6 @@
 @font-face {
   font-family: 'Le Jour Serif';
-  src: url('/fonts/LeJourSerif.woff2') format('woff2'),
-       url('/fonts/LeJourSerif.otf') format('opentype'),
-       url('/assets/fonts/LeJourSerif.woff2') format('woff2'),
-       url('/assets/fonts/LeJourSerif.woff') format('woff'),
-       url('/assets/fonts/LeJourSerif.ttf') format('truetype'),
+  src: url('/fonts/LeJourSerif.otf') format('opentype'),
        url('/assets/fonts/LeJourSerif.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
@@ -23,11 +19,12 @@
 @font-face {
   font-family: 'Parfumerie Script';
   src: url('/fonts/ParfumerieScriptText.otf') format('opentype'),
-       url('/assets/fonts/ParfumerieScript.woff2') format('woff2');
+       url('/assets/fonts/ParfumerieScriptText.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
+
 
 .font-parfumerie {
   font-family: "Parfumerie Script Text", cursive !important;

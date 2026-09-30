@@ -343,7 +343,7 @@ export const AdminOrders = () => {
       return 'bg-amber-50 text-amber-700 border-amber-200';
     }
     if (s.includes('cancel')) {
-      return 'bg-rose-50 text-rose-700 border-rose-200';
+      return 'bg-neutral-100 text-neutral-700 border-neutral-200';
     }
     if (s.includes('return')) {
       return 'bg-orange-50 text-orange-700 border-orange-200';
@@ -364,7 +364,7 @@ export const AdminOrders = () => {
       return 'bg-amber-50 text-amber-700 border-amber-200';
     }
     if (s === 'failed') {
-      return 'bg-rose-50 text-rose-700 border-rose-200';
+      return 'bg-stone-100 text-stone-700 border-stone-200';
     }
     if (s === 'refunded') {
       return 'bg-purple-50 text-purple-700 border-purple-200';
@@ -433,8 +433,8 @@ export const AdminOrders = () => {
       label: 'Cancelled',
       count: stats?.cancelled ?? stats?.canceled ?? 0,
       icon: XCircle,
-      colorClass: 'bg-rose-50 text-rose-600 border-rose-200',
-      badgeBg: 'bg-rose-100 text-rose-800',
+      colorClass: 'bg-stone-50 text-stone-700 border-stone-200',
+      badgeBg: 'bg-stone-100 text-stone-800',
       statusFilter: 'Cancelled'
     },
     {
@@ -489,7 +489,7 @@ export const AdminOrders = () => {
             </div>
             <button
               onClick={fetchStats}
-              className="px-3 py-1 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-colors cursor-pointer"
+              className="px-3 py-1 bg-brand-dark text-white rounded-lg font-semibold hover:bg-black transition-colors cursor-pointer"
             >
               Retry
             </button>
@@ -561,7 +561,7 @@ export const AdminOrders = () => {
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark focus-visible:ring-offset-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
             title={isFilterActive ? 'Reset all search and status filters to default' : 'Clear filters'}
           >
-            <X className={`w-3.5 h-3.5 transition-colors duration-200 ${isFilterActive ? 'text-rose-600' : 'text-neutral-500'}`} />
+            <X className={`w-3.5 h-3.5 transition-colors duration-200 ${isFilterActive ? 'text-brand-dark' : 'text-neutral-500'}`} />
             <span>Clear Filters</span>
           </button>
         </div>
@@ -729,13 +729,13 @@ export const AdminOrders = () => {
 
         {/* Orders Fetch Error State */}
         {ordersError && !ordersLoading && (
-          <div className="p-6 bg-rose-50/70 border-b border-rose-200 text-center">
-            <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
-            <h4 className="text-sm font-semibold text-rose-900 mb-1">Failed to Load Orders</h4>
-            <p className="text-xs text-rose-700 mb-4">{ordersError}</p>
+          <div className="p-6 bg-neutral-50/70 border-b border-neutral-200 text-center">
+            <AlertCircle className="w-8 h-8 text-neutral-500 mx-auto mb-2" />
+            <h4 className="text-sm font-semibold text-brand-dark mb-1">Failed to Load Orders</h4>
+            <p className="text-xs text-neutral-600 mb-4">{ordersError}</p>
             <button
               onClick={fetchOrders}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-dark text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Retry Request
