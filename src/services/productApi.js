@@ -31,6 +31,22 @@ export const productApi = {
   },
 
   /**
+   * Fetch recommendations (7-tier pipeline: wishlist, admin-recommended, recently viewed, cart, best sellers, etc.)
+   */
+  async getRecommendations(params = {}) {
+    const query = new URLSearchParams();
+    if (params.recentlyViewed) query.append('recentlyViewed', Array.isArray(params.recentlyViewed) ? params.recentlyViewed.join(',') : params.recentlyViewed);
+    if (params.cart) query.append('cart', Array.isArray(params.cart) ? params.cart.join(',') : params.cart);
+    if (params.userId) query.append('userId', params.userId);
+    if (params.limit) query.append('limit', params.limit);
+
+    const queryString = query.toString();
+    const endpoint = `/api/products/recommendations${queryString ? `?${queryString}` : ''}`;
+    const res = await apiFetch(endpoint);
+    return res?.data || res || [];
+  },
+
+  /**
    * Fetch single product by ID or style code
    */
   async getProductById(id) {

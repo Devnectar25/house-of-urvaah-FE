@@ -10,38 +10,49 @@ export const BestSellers = ({ onQuickView }) => {
 
   useEffect(() => {
     let isMounted = true;
-    productApi.getFeaturedProducts()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          const seenNames = new Set();
-          const uniqueProducts = [];
-          for (const item of data) {
-            const normName = item.name.trim().toLowerCase();
-            if (!seenNames.has(normName)) {
-              seenNames.add(normName);
-              uniqueProducts.push(item);
-            }
-          }
-          if (uniqueProducts.length < 5) {
-            for (const item of BEST_SELLERS_PRODUCTS) {
+    const fetchBestSellers = () => {
+      productApi.getFeaturedProducts()
+        .then((data) => {
+          if (isMounted && data && data.length > 0) {
+            const seenNames = new Set();
+            const uniqueProducts = [];
+            for (const item of data) {
               const normName = item.name.trim().toLowerCase();
               if (!seenNames.has(normName)) {
                 seenNames.add(normName);
                 uniqueProducts.push(item);
               }
             }
+            if (uniqueProducts.length < 5) {
+              for (const item of BEST_SELLERS_PRODUCTS) {
+                const normName = item.name.trim().toLowerCase();
+                if (!seenNames.has(normName)) {
+                  seenNames.add(normName);
+                  uniqueProducts.push(item);
+                }
+              }
+            }
+            setProducts(uniqueProducts.slice(0, 5));
           }
-          setProducts(uniqueProducts.slice(0, 5));
-        }
-      })
-      .catch((err) => {
-        console.warn('Using fallback best sellers:', err.message);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+        })
+        .catch((err) => {
+          console.warn('Using fallback best sellers:', err.message);
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
 
-    return () => { isMounted = false; };
+    fetchBestSellers();
+
+    window.addEventListener('urvaah_products_updated', fetchBestSellers);
+    window.addEventListener('storage', fetchBestSellers);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('urvaah_products_updated', fetchBestSellers);
+      window.removeEventListener('storage', fetchBestSellers);
+    };
   }, []);
 
   return (

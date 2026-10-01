@@ -576,6 +576,11 @@ const ProductTableRow = ({
             Promoted
           </span>
         ) : null}
+        {product.is_recommended ? (
+          <span className="inline-block mt-1 ml-1 text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200/80 rounded">
+            Recommended
+          </span>
+        ) : null}
       </td>
 
       {/* Stock Status */}

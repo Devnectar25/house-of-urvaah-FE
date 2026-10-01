@@ -54,7 +54,7 @@ export const ProductDetail = () => {
   const [isAdded, setIsAdded] = useState(false);
   const [pincode, setPincode] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('8th and 9th Sep');
-  const [openAccordion, setOpenAccordion] = useState(null);
+  const [openAccordion, setOpenAccordion] = useState('desc');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -84,7 +84,10 @@ export const ProductDetail = () => {
               image: data.image || prev?.image,
               hoverImage: data.hoverImage || prev?.hoverImage || data.image,
               gallery: data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image]),
-              sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL']
+              sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
+              nameOptions: data.nameOptions || data.name_options || prev?.nameOptions || [],
+              productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
+              careInstructions: data.careInstructions || data.care_instructions || prev?.careInstructions || ''
             }));
           } else if (isMounted && !local) {
             fallbackProduct(id);
@@ -370,6 +373,31 @@ export const ProductDetail = () => {
               <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-[0.15em] uppercase text-brand-dark leading-tight">
                 {product.name}
               </h1>
+              {product.shortDescription && (
+                <p className="text-xs text-neutral-500 font-sans mt-1.5 leading-relaxed">
+                  {product.shortDescription}
+                </p>
+              )}
+
+              {/* NAME OPTIONS (Rendered dynamically if available) */}
+              {Array.isArray(product.nameOptions || product.name_options) &&
+                (product.nameOptions || product.name_options).filter(Boolean).length > 0 && (
+                  <div className="mt-3.5 pt-3 border-t border-neutral-100/80">
+                    <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-neutral-800 block mb-1.5 font-serif">
+                      NAME OPTIONS
+                    </span>
+                    <ul className="space-y-1 font-sans text-xs text-neutral-600">
+                      {(product.nameOptions || product.name_options)
+                        .filter(Boolean)
+                        .map((optName, idx) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0" />
+                            <span>{optName}</span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
             </div>
 
             {/* Price Section */}
@@ -378,16 +406,40 @@ export const ProductDetail = () => {
                 <span className="text-2xl md:text-3xl font-bold tracking-wider text-brand-dark font-sans">
                   {formatPrice(product.price)}
                 </span>
-                {product.originalPrice && (
-                  <span className="text-sm text-neutral-400 line-through font-sans">
-                    {formatPrice(product.originalPrice)}
-                  </span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <>
+                    <span className="text-sm text-neutral-400 line-through font-sans">
+                      {formatPrice(product.originalPrice)}
+                    </span>
+                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
+                      {product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                    </span>
+                  </>
                 )}
               </div>
               <span className="text-xs text-neutral-400 font-normal tracking-wide mt-1 block font-sans">
                 Inclusive of All Taxes
               </span>
             </div>
+
+            {/* COLORS Selection */}
+            {product.colors && product.colors.length > 0 && (
+              <div>
+                <span className="text-xs font-bold tracking-widest uppercase text-brand-dark block mb-2">
+                  COLOR: <span className="font-normal text-neutral-600">{product.colors.join(', ')}</span>
+                </span>
+                <div className="flex flex-wrap gap-2 font-sans">
+                  {product.colors.map((col, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1.5 border border-neutral-300 text-xs font-medium bg-neutral-50 text-brand-dark rounded-xs"
+                    >
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* SIZE Selection */}
             <div>
@@ -426,10 +478,17 @@ export const ProductDetail = () => {
             <div className="flex items-center gap-2.5">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-black text-white py-3.5 sm:py-4 px-4 text-xs font-semibold tracking-[0.2em] uppercase hover:bg-neutral-800 transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer font-sans"
+                disabled={product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)}
+                className={`flex-1 py-3.5 sm:py-4 px-4 text-xs font-semibold tracking-[0.2em] uppercase transition-colors shadow-md flex items-center justify-center gap-2 font-sans ${
+                  product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
+                    ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                    : 'bg-black text-white hover:bg-neutral-800 cursor-pointer'
+                }`}
               >
                 <ShoppingBag className="w-4 h-4" />
-                {isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG'}
+                {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
+                  ? 'OUT OF STOCK'
+                  : (isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG')}
               </button>
 
               {/* Wishlist Heart Icon Button */}
@@ -496,27 +555,115 @@ export const ProductDetail = () => {
 
             {/* ACCORDION SECTIONS */}
             <div className="pt-3 border-t border-neutral-200 space-y-0.5">
-              {accordionItems.map((item, idx) => (
-                <div key={idx} className="border-b border-neutral-200 pb-2.5 pt-1.5">
+              {/* Product Description */}
+              {product.description && (
+                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
                   <button
-                    onClick={() => toggleAccordion(idx)}
+                    onClick={() => toggleAccordion('desc')}
                     className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
-                    <span>{item.title}</span>
-                    {openAccordion === idx ? (
-                      <Minus className="w-4 h-4 stroke-[2]" />
-                    ) : (
-                      <Plus className="w-4 h-4 stroke-[2]" />
-                    )}
+                    <span>PRODUCT DESCRIPTION</span>
+                    {openAccordion === 'desc' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
-
-                  {openAccordion === idx && (
-                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
-                      {item.content}
+                  {openAccordion === 'desc' && (
+                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
+                      {product.description}
                     </div>
                   )}
                 </div>
-              ))}
+              )}
+
+              {/* Product Details (Dynamic Bullet Points) */}
+              {Array.isArray(product.productDetails || product.product_details) &&
+                (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
+                  <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                    <button
+                      onClick={() => toggleAccordion('pdetails')}
+                      className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    >
+                      <span>PRODUCT DETAILS</span>
+                      {openAccordion === 'pdetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    </button>
+                    {openAccordion === 'pdetails' && (
+                      <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
+                        <ul className="space-y-1.5">
+                          {(product.productDetails || product.product_details)
+                            .filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim()))
+                            .map((detail, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
+                                <div>
+                                  {detail.label && detail.label.trim() && (
+                                    <strong className="font-semibold text-neutral-900">{detail.label.trim()}: </strong>
+                                  )}
+                                  <span>{detail.value}</span>
+                                </div>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {/* Specifications Accordion */}
+              {Array.isArray(product.specifications) && product.specifications.length > 0 && (
+                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                  <button
+                    onClick={() => toggleAccordion('specs')}
+                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  >
+                    <span>SPECIFICATIONS</span>
+                    {openAccordion === 'specs' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                  </button>
+                  {openAccordion === 'specs' && (
+                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
+                      {product.specifications.map((sp, idx) => (
+                        <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-1">
+                          <span className="font-semibold text-neutral-700">{sp.label}:</span>
+                          <span className="text-neutral-600">{sp.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Care Instructions Accordion */}
+              {(product.careInstructions || product.care_instructions) && (
+                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                  <button
+                    onClick={() => toggleAccordion('care')}
+                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  >
+                    <span>CARE INSTRUCTIONS</span>
+                    {openAccordion === 'care' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                  </button>
+                  {openAccordion === 'care' && (
+                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
+                      {product.careInstructions || product.care_instructions}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Additional Information Accordion */}
+              {product.additionalInfo && (
+                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                  <button
+                    onClick={() => toggleAccordion('info')}
+                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  >
+                    <span>ADDITIONAL INFORMATION</span>
+                    {openAccordion === 'info' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                  </button>
+                  {openAccordion === 'info' && (
+                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
+                      {product.additionalInfo}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

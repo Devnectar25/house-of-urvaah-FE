@@ -30,12 +30,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     subCategory: '',
     shortDescription: '',
     description: '',
+    nameOptions: [],
+    productDetails: [],
     originalPrice: 0,
     discountPercent: 0,
     price: 0,
     stockQuantity: 0,
     active: true,
     promoted: false,
+    is_recommended: false,
     sizes: ['XS', 'S', 'M', 'L'],
     colors: ['Default'],
     specifications: [],
@@ -110,18 +113,33 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           if (data.fitType) specPairs.push({ label: 'Fit Type', value: data.fitType });
         }
 
+        let nameOpts = data.nameOptions || data.name_options || product?.nameOptions || product?.name_options || [];
+        if (typeof nameOpts === 'string') {
+          try { nameOpts = JSON.parse(nameOpts); } catch (e) { nameOpts = []; }
+        }
+        if (!Array.isArray(nameOpts)) nameOpts = [];
+
+        let prodDetails = data.productDetails || data.product_details || product?.productDetails || product?.product_details || [];
+        if (typeof prodDetails === 'string') {
+          try { prodDetails = JSON.parse(prodDetails); } catch (e) { prodDetails = []; }
+        }
+        if (!Array.isArray(prodDetails)) prodDetails = [];
+
         setFormData({
           name: data.name || data.title || '',
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
           description: data.description || '',
+          nameOptions: nameOpts,
+          productDetails: prodDetails,
           originalPrice: origPrice,
           discountPercent: calcDiscount,
           price: currPrice,
           stockQuantity: data.stockQuantity ?? data.quantity ?? 0,
           active: data.active !== false && data.is_active !== false,
           promoted: Boolean(data.promoted || data.is_featured),
+          is_recommended: Boolean(data.is_recommended || data.isRecommended),
           sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['XS', 'S', 'M', 'L'],
           colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
           specifications: specPairs,
@@ -132,18 +150,33 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         });
       } catch (err) {
         console.warn('Falling back to list row product data:', err);
+        let nameOpts = product?.nameOptions || product?.name_options || [];
+        if (typeof nameOpts === 'string') {
+          try { nameOpts = JSON.parse(nameOpts); } catch (e) { nameOpts = []; }
+        }
+        if (!Array.isArray(nameOpts)) nameOpts = [];
+
+        let prodDetails = product?.productDetails || product?.product_details || [];
+        if (typeof prodDetails === 'string') {
+          try { prodDetails = JSON.parse(prodDetails); } catch (e) { prodDetails = []; }
+        }
+        if (!Array.isArray(prodDetails)) prodDetails = [];
+
         setFormData({
           name: product.name || '',
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.description || '',
+          nameOptions: nameOpts,
+          productDetails: prodDetails,
           originalPrice: product.originalPrice || product.price || 0,
           discountPercent: product.discount || 0,
           price: product.price || 0,
           stockQuantity: product.stockQuantity ?? 0,
           active: product.active !== false,
           promoted: Boolean(product.promoted),
+          is_recommended: Boolean(product.is_recommended || product.isRecommended),
           sizes: Array.isArray(product.sizes) ? product.sizes : ['XS', 'S', 'M', 'L'],
           colors: Array.isArray(product.colors) ? product.colors : ['Default'],
           specifications: [],
@@ -181,6 +214,49 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   const handleBlur = (field) => {
     validateField(field, formData[field]);
+  };
+
+  // Name Options Handlers
+  const handleAddNameOption = () => {
+    setFormData(prev => ({ ...prev, nameOptions: [...(prev.nameOptions || []), ''] }));
+  };
+
+  const handleNameOptionChange = (index, value) => {
+    setFormData(prev => {
+      const updated = [...(prev.nameOptions || [])];
+      updated[index] = value;
+      return { ...prev, nameOptions: updated };
+    });
+  };
+
+  const handleRemoveNameOption = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      nameOptions: (prev.nameOptions || []).filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  // Product Details Handlers
+  const handleAddProductDetail = () => {
+    setFormData(prev => ({
+      ...prev,
+      productDetails: [...(prev.productDetails || []), { label: '', value: '' }]
+    }));
+  };
+
+  const handleProductDetailChange = (index, field, value) => {
+    setFormData(prev => {
+      const updated = [...(prev.productDetails || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, productDetails: updated };
+    });
+  };
+
+  const handleRemoveProductDetail = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      productDetails: (prev.productDetails || []).filter((_, idx) => idx !== indexToRemove)
+    }));
   };
 
   // Price & Discount auto-calculation logic
@@ -387,25 +463,39 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     setSubmitError(null);
 
     try {
+      const validNameOptions = (formData.nameOptions || []).map(n => n.trim()).filter(Boolean);
+      const validProductDetails = (formData.productDetails || []).filter(d => d.label.trim() || d.value.trim());
+
       const payload = {
         title: formData.name.trim(),
         productname: formData.name.trim(),
         category_id: formData.category_id,
         subcategory_name: formData.subCategory,
-        shortdescription: formData.shortDescription.trim(),
+        shortDescription: formData.shortDescription.trim(),
+        short_description: formData.shortDescription.trim(),
         description: formData.description.trim(),
+        nameOptions: validNameOptions,
+        name_options: validNameOptions,
+        productDetails: validProductDetails,
+        product_details: validProductDetails,
+        originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
+        discountPercent: Number(formData.discountPercent) || 0,
         discount: Number(formData.discountPercent) || 0,
         price: Number(formData.price),
+        stockQuantity: Number(formData.stockQuantity) || 0,
         stock_quantity: Number(formData.stockQuantity) || 0,
         quantity: Number(formData.stockQuantity) || 0,
         instock: Number(formData.stockQuantity) > 0,
         active: formData.active,
         is_active: formData.active,
         promoted: formData.promoted,
+        is_recommended: formData.is_recommended,
+        isRecommended: formData.is_recommended,
         sizes: formData.sizes,
         colors: formData.colors,
         specifications: formData.specifications,
+        careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
         image: formData.images[0] || ''
@@ -645,18 +735,112 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 />
               </div>
 
-              {/* 4. Description */}
+              {/* 4. Description (Website Copy) */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                  Full Description
+                  Description (Website Copy)
                 </label>
                 <textarea
                   rows={4}
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Detailed product story, craft details, silhouette, and design features..."
+                  placeholder="Everyday-easy piece that works two ways..."
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
                 />
+              </div>
+
+              {/* 4.5 PRODUCT CONTENT SECTION */}
+              <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
+                <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">Product Content</h3>
+
+                {/* Name Options (Dynamic List) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
+                      Name Options (Alternative Customer Names)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddNameOption}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Name Option
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {!formData.nameOptions || formData.nameOptions.length === 0 ? (
+                      <p className="text-xs text-neutral-400 italic">No name options added.</p>
+                    ) : (
+                      formData.nameOptions.map((nameOpt, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={nameOpt}
+                            onChange={(e) => handleNameOptionChange(idx, e.target.value)}
+                            placeholder="e.g. Ivory Heart Kurti Dress"
+                            className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveNameOption(idx)}
+                            className="p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Remove name option"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Product Details (Dynamic Key/Value List) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
+                      Product Details (Bullet Points)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddProductDetail}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {!formData.productDetails || formData.productDetails.length === 0 ? (
+                      <p className="text-xs text-neutral-400 italic">No product details added.</p>
+                    ) : (
+                      formData.productDetails.map((detail, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={detail.label}
+                            onChange={(e) => handleProductDetailChange(idx, 'label', e.target.value)}
+                            placeholder="Label (e.g. Fabric)"
+                            className="w-1/3 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={detail.value}
+                            onChange={(e) => handleProductDetailChange(idx, 'value', e.target.value)}
+                            placeholder="Value (e.g. Cora cotton - breathable)"
+                            className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProductDetail(idx)}
+                            className="p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Remove detail"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* 5. Pricing & Stock Row */}
@@ -762,6 +946,17 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-neutral-300"
                   />
                   <span className="text-xs font-medium text-brand-dark">Promoted / Featured</span>
+                </label>
+
+                {/* Recommended for You Checkbox */}
+                <label className="inline-flex items-center gap-2 cursor-pointer" title="Show this product in the Recommended for You section on the storefront.">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_recommended}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_recommended: e.target.checked }))}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-neutral-300"
+                  />
+                  <span className="text-xs font-medium text-brand-dark">Recommended for You</span>
                 </label>
               </div>
 

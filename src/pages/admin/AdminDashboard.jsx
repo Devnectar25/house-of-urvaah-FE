@@ -17,6 +17,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { getStoredUser, apiClient } from '../../lib/apiClient';
+import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
 
 // Module-level in-memory cache for Stale-While-Revalidate behavior
 let dashboardCache = null;
@@ -43,6 +44,7 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(() => !dashboardCache);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState(null);
+  const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
 
   // Fetch real counts from backend API
   const fetchDashboardData = useCallback(async (isBackground = false) => {
@@ -354,10 +356,15 @@ export const AdminDashboard = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
             {statCards.map((card) => {
               const Icon = card.icon;
+              const isCustomerCard = card.id === 'customers';
+
               return (
                 <div
                   key={card.id}
-                  className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition-all flex flex-col justify-between group"
+                  onClick={isCustomerCard ? () => setIsUsersModalOpen(true) : undefined}
+                  className={`bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition-all flex flex-col justify-between group ${
+                    isCustomerCard ? 'cursor-pointer' : ''
+                  }`}
                 >
                   {/* Top row: Label & Soft-tinted Icon Badge */}
                   <div className="flex items-center justify-between gap-1.5 mb-1">
@@ -378,15 +385,26 @@ export const AdminDashboard = () => {
                     </span>
                   </div>
 
-                  {/* Navigation Link */}
+                  {/* Navigation Link / Click Handler */}
                   <div className="pt-2 border-t border-neutral-100/90 mt-1.5">
-                    <Link
-                      to={card.link}
-                      className="text-[10.5px] font-medium text-neutral-500 hover:text-brand-dark transition-colors inline-flex items-center gap-1 group/link font-sans"
-                    >
-                      <span>Click to manage</span>
-                      <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
-                    </Link>
+                    {isCustomerCard ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsUsersModalOpen(true)}
+                        className="text-[10.5px] font-medium text-neutral-500 hover:text-brand-dark transition-colors inline-flex items-center gap-1 group/link font-sans text-left"
+                      >
+                        <span>Click to view users</span>
+                        <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
+                      </button>
+                    ) : (
+                      <Link
+                        to={card.link}
+                        className="text-[10.5px] font-medium text-neutral-500 hover:text-brand-dark transition-colors inline-flex items-center gap-1 group/link font-sans"
+                      >
+                        <span>Click to manage</span>
+                        <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               );
@@ -433,6 +451,12 @@ export const AdminDashboard = () => {
           })}
         </div>
       </section>
+
+      {/* All Registered Users Modal */}
+      <RegisteredUsersModal
+        isOpen={isUsersModalOpen}
+        onClose={() => setIsUsersModalOpen(false)}
+      />
     </div>
   );
 };
