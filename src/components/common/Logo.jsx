@@ -11,7 +11,7 @@ export const Logo = ({ className = "h-14 md:h-18", variant = "dark" }) => {
           imageRendering: '-webkit-optimize-contrast',
           filter: variant === 'light' 
             ? 'invert(1) brightness(2)' 
-            : 'contrast(1.25) brightness(0.85) drop-shadow(0 1px 1px rgba(0,0,0,0.05))'
+            : 'brightness(0) contrast(200%)'
         }}
       />
     </div>

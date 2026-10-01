@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-export const ProductCard = ({ product, onQuickView, hideColorDots = false }) => {
+export const ProductCard = ({ product, onQuickView, hideColorDots = false, hideOriginalPrice = false }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const navigate = useNavigate();
@@ -143,7 +143,7 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = false }) => 
           <span className="font-normal text-brand-dark">
             {formatPrice(product.price)}
           </span>
-          {product.originalPrice && (
+          {!hideOriginalPrice && product.originalPrice && (
             <span className="text-neutral-400 line-through text-[11px]">
               {formatPrice(product.originalPrice)}
             </span>
