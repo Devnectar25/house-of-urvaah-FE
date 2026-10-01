@@ -21,12 +21,15 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     subCategory: '',
     shortDescription: '',
     description: '',
+    nameOptions: [''],
+    productDetails: [{ label: '', value: '' }],
     originalPrice: '',
     discountPercent: '',
     price: '',
     stockQuantity: 0,
     active: true,
     promoted: false,
+    is_recommended: true,
     sizes: [],
     colors: [],
     specifications: [{ label: '', value: '' }],
@@ -161,6 +164,49 @@ const DEFAULT_CATEGORIES = [
     }));
   };
 
+  // Name Options Handlers
+  const handleAddNameOption = () => {
+    setFormData(prev => ({ ...prev, nameOptions: [...prev.nameOptions, ''] }));
+  };
+
+  const handleNameOptionChange = (index, value) => {
+    setFormData(prev => {
+      const updated = [...prev.nameOptions];
+      updated[index] = value;
+      return { ...prev, nameOptions: updated };
+    });
+  };
+
+  const handleRemoveNameOption = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      nameOptions: prev.nameOptions.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  // Product Details Handlers
+  const handleAddProductDetail = () => {
+    setFormData(prev => ({
+      ...prev,
+      productDetails: [...prev.productDetails, { label: '', value: '' }]
+    }));
+  };
+
+  const handleProductDetailChange = (index, field, value) => {
+    setFormData(prev => {
+      const updated = [...prev.productDetails];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, productDetails: updated };
+    });
+  };
+
+  const handleRemoveProductDetail = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      productDetails: prev.productDetails.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
   // Specification Key-Value Pair Handlers
   const handleAddSpecification = () => {
     setFormData(prev => ({
@@ -200,6 +246,7 @@ const DEFAULT_CATEGORIES = [
     try {
       const uploadData = new FormData();
       uploadData.append('file', file);
+      uploadData.append('image', file);
       uploadData.append('folder', 'products');
 
       const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
@@ -222,15 +269,12 @@ const DEFAULT_CATEGORIES = [
           ...prev,
           images: [...prev.images, uploadedUrl]
         }));
+      } else {
+        throw new Error('No image URL returned from server.');
       }
     } catch (err) {
       console.error('Upload failed:', err);
-      // Fallback preview using Object URL
-      const objectUrl = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, objectUrl]
-      }));
+      setSubmitError(err.message || 'Image upload failed. Please try again or provide a direct URL.');
     } finally {
       setUploadingImage(false);
       e.target.value = '';
@@ -238,17 +282,27 @@ const DEFAULT_CATEGORIES = [
   };
 
   const handleAddImageUrl = () => {
-    if (!imageUrlInput.trim()) return;
+    const url = imageUrlInput.trim();
+    if (!url) return;
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      setSubmitError('Blob or Data URLs cannot be saved. Please enter a valid HTTP/HTTPS image URL.');
+      return;
+    }
+    if (!/^https?:\/\/.+/i.test(url)) {
+      setSubmitError('Please enter a valid HTTP/HTTPS image URL.');
+      return;
+    }
     if (formData.images.length >= 5) {
       setSubmitError('Maximum 5 images allowed per product.');
       return;
     }
     setFormData(prev => ({
       ...prev,
-      images: [...prev.images, imageUrlInput.trim()]
+      images: [...prev.images, url]
     }));
     setImageUrlInput('');
     setShowUrlInput(false);
+    setSubmitError(null);
   };
 
   const handleRemoveImage = (indexToRemove) => {
@@ -272,32 +326,51 @@ const DEFAULT_CATEGORIES = [
       return;
     }
 
+    const hasBlob = formData.images.some(img => typeof img === 'string' && img.startsWith('blob:'));
+    if (hasBlob) {
+      setSubmitError('Temporary browser blob URLs cannot be saved. Please re-upload your images.');
+      return;
+    }
+
     setCreating(true);
     setSubmitError(null);
 
     try {
-      // Filter out empty specifications
+      // Filter out empty specifications, name options, and product details
       const validSpecs = formData.specifications.filter(s => s.label.trim() || s.value.trim());
+      const validNameOptions = formData.nameOptions.map(n => n.trim()).filter(Boolean);
+      const validProductDetails = formData.productDetails.filter(d => d.label.trim() || d.value.trim());
 
       const payload = {
         title: formData.name.trim(),
         productname: formData.name.trim(),
         category_id: formData.category_id,
         subcategory_name: formData.subCategory,
-        shortdescription: formData.shortDescription.trim(),
+        shortDescription: formData.shortDescription.trim(),
+        short_description: formData.shortDescription.trim(),
         description: formData.description.trim(),
+        nameOptions: validNameOptions,
+        name_options: validNameOptions,
+        productDetails: validProductDetails,
+        product_details: validProductDetails,
+        originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
+        discountPercent: Number(formData.discountPercent) || 0,
         discount: Number(formData.discountPercent) || 0,
         price: Number(formData.price),
+        stockQuantity: Number(formData.stockQuantity) || 0,
         stock_quantity: Number(formData.stockQuantity) || 0,
         quantity: Number(formData.stockQuantity) || 0,
         instock: Number(formData.stockQuantity) > 0,
         active: formData.active,
         is_active: formData.active,
         promoted: formData.promoted,
+        is_recommended: formData.is_recommended,
+        isRecommended: formData.is_recommended,
         sizes: formData.sizes.length > 0 ? formData.sizes : ['XS', 'S', 'M', 'L'],
         colors: formData.colors.length > 0 ? formData.colors : ['Default'],
         specifications: validSpecs,
+        careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
         image: formData.images[0] || ''
@@ -431,18 +504,112 @@ const DEFAULT_CATEGORIES = [
               />
             </div>
 
-            {/* 4. Description */}
+            {/* 4. Description (Website Copy) */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Description
+                Description (Website Copy)
               </label>
               <textarea
                 rows={4}
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Detailed description..."
+                placeholder="Everyday-easy piece that works two ways..."
                 className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
               />
+            </div>
+
+            {/* 4.5 PRODUCT CONTENT SECTION */}
+            <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
+              <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">Product Content</h3>
+
+              {/* Name Options (Dynamic List) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
+                    Name Options (Alternative Customer Names)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddNameOption}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Name Option
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {formData.nameOptions.length === 0 ? (
+                    <p className="text-xs text-neutral-400 italic">No name options added.</p>
+                  ) : (
+                    formData.nameOptions.map((nameOpt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={nameOpt}
+                          onChange={(e) => handleNameOptionChange(idx, e.target.value)}
+                          placeholder="e.g. Ivory Heart Kurti Dress"
+                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNameOption(idx)}
+                          className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
+                          title="Remove name option"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Product Details (Dynamic Key/Value List) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
+                    Product Details (Bullet Points)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddProductDetail}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {formData.productDetails.length === 0 ? (
+                    <p className="text-xs text-neutral-400 italic">No product details added.</p>
+                  ) : (
+                    formData.productDetails.map((detail, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={detail.label}
+                          onChange={(e) => handleProductDetailChange(idx, 'label', e.target.value)}
+                          placeholder="Label (e.g. Fabric)"
+                          className="w-1/3 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                        />
+                        <input
+                          type="text"
+                          value={detail.value}
+                          onChange={(e) => handleProductDetailChange(idx, 'value', e.target.value)}
+                          placeholder="Value (e.g. Cora cotton - breathable)"
+                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductDetail(idx)}
+                          className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
+                          title="Remove detail"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* 5. Pricing & Stock Row */}
@@ -545,6 +712,17 @@ const DEFAULT_CATEGORIES = [
                   className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-neutral-300"
                 />
                 <span className="text-xs font-medium text-brand-dark">Promoted / Featured</span>
+              </label>
+
+              {/* Recommended for You Checkbox */}
+              <label className="inline-flex items-center gap-2 cursor-pointer" title="Show this product in the Recommended for You section on the storefront.">
+                <input
+                  type="checkbox"
+                  checked={formData.is_recommended}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_recommended: e.target.checked }))}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-neutral-300"
+                />
+                <span className="text-xs font-medium text-brand-dark">Recommended for You</span>
               </label>
             </div>
 

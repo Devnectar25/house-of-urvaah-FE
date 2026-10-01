@@ -3,86 +3,13 @@ import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-const RECOMMENDED_PRODUCTS = [
-  {
-    id: 'rec-101',
-    name: 'BLUE FLORAL HALTER CO-ORD SET',
-    price: 3999,
-    formattedPrice: '₹ 3,999',
-    image: '/assets/Images/Blue02.png',
-    sizes: ['XS', 'S', 'M', 'L'],
-    description: 'Beautiful blue floral printed halter top and matching mini skirt set.'
-  },
-  {
-    id: 'rec-102',
-    name: 'PINK RIBBED FITTED TOP',
-    price: 1299,
-    formattedPrice: '₹ 1,299',
-    image: '/assets/Images/Peach01.png',
-    sizes: ['XS', 'S', 'M', 'L'],
-    description: 'Soft stretch ribbed knit fitted top with fine crew neckline in dusty rose pink.'
-  },
-  {
-    id: 'rec-103',
-    name: 'BROWN FLORAL CO-ORD SET',
-    price: 6999,
-    formattedPrice: '₹ 6,999',
-    image: '/assets/Images/Brown02.png',
-    sizes: ['S', 'M', 'L'],
-    description: 'Beautiful brown floral embroidered top and matching skirt set.'
-  },
-  {
-    id: 'rec-104',
-    name: 'DRAPED SILK MIDI DRESS',
-    price: 8999,
-    formattedPrice: '₹ 8,999',
-    image: '/assets/Images/Corset04.png',
-    sizes: ['XS', 'S', 'M'],
-    description: 'Pure silk fluid midi dress featuring asymmetric draped hemline.'
-  },
-  {
-    id: 'rec-105',
-    name: 'OVERSIZED COTTON TRENCH COAT',
-    price: 11999,
-    formattedPrice: '₹ 11,999',
-    image: '/assets/Images/Brown04.png',
-    sizes: ['S', 'M', 'L'],
-    description: 'Classic double-breasted cotton blend trench coat with belt.'
-  },
-  {
-    id: 'rec-106',
-    name: 'CHUNKY CASHMERE SWEATER',
-    price: 5499,
-    formattedPrice: '₹ 5,499',
-    image: '/assets/Images/Peach04.png',
-    sizes: ['S', 'M', 'L'],
-    description: 'Relaxed fit ribbed cashmere sweater with high neck.'
-  },
-  {
-    id: 'rec-107',
-    name: 'PLEATED WIDE LEG TROUSERS',
-    price: 4499,
-    formattedPrice: '₹ 4,499',
-    image: '/assets/Images/Blue04.png',
-    sizes: ['XS', 'S', 'M', 'L'],
-    description: 'High-waisted pleated tailored trousers in indigo navy.'
-  },
-  {
-    id: 'rec-108',
-    name: 'MINIMALIST SILK BLOUSE',
-    price: 3499,
-    formattedPrice: '₹ 3,499',
-    image: '/assets/Images/Peach02.png',
-    sizes: ['XS', 'S', 'M', 'L'],
-    description: 'Elegant silk crepe blouse with delicate boat neckline.'
-  }
-];
-
+import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../services/productApi';
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
-  const [productsList, setProductsList] = useState(RECOMMENDED_PRODUCTS);
+  const navigate = useNavigate();
+  const [productsList, setProductsList] = useState([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
@@ -93,24 +20,17 @@ export const CategoryGrid = () => {
 
     const loadRecommendedProducts = async () => {
       try {
-        const res = await productApi.getProducts({ active: 'true', limit: 20 });
+        const res = await productApi.getRecommendations({ limit: 5 });
         const data = Array.isArray(res) ? res : (res?.data || []);
         if (isMounted) {
-          if (data && data.length > 0) {
-            // Filter strictly for active products from Admin Product Management
-            const activeOnly = data.filter((p) => p.active !== false && p.inStock !== false);
-            if (activeOnly.length > 0) {
-              setProductsList(
-                activeOnly.map((p) => ({
-                  ...p,
-                  formattedPrice: p.formattedPrice || `₹ ${Number(p.price).toLocaleString('en-IN')}`,
-                }))
-              );
-            }
-          }
+          const dbProductsMapped = data.map((p) => ({
+            ...p,
+            formattedPrice: p.formattedPrice || `₹ ${Number(p.price).toLocaleString('en-IN')}`,
+          }));
+          setProductsList(dbProductsMapped);
         }
       } catch (err) {
-        console.warn('[Recommended Section]: Failed to load active products', err);
+        console.warn('[Recommended Section]: Failed to load recommended products', err);
       }
     };
 
@@ -124,8 +44,8 @@ export const CategoryGrid = () => {
     window.addEventListener('urvaah_products_updated', handleProductUpdate);
     window.addEventListener('storage', handleProductUpdate);
 
-    // Auto-polling every 8s for live real-time sync with Admin panel
-    const pollingInterval = setInterval(loadRecommendedProducts, 8000);
+    // Auto-polling every 3s for live real-time sync with Admin panel
+    const pollingInterval = setInterval(loadRecommendedProducts, 3000);
 
     return () => {
       isMounted = false;
@@ -228,7 +148,12 @@ export const CategoryGrid = () => {
             >
               {/* Product Photo Container */}
               <div
-                onClick={() => setQuickViewProduct(product)}
+                onClick={() => {
+                  if (product.id) {
+                    navigate(`/product/${product.id}`);
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                  }
+                }}
                 className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100/90 cursor-pointer"
               >
                 <img
@@ -267,7 +192,15 @@ export const CategoryGrid = () => {
               </div>
 
               {/* Product Info Below Image */}
-              <div className="mt-2.5 flex flex-col text-left">
+              <div
+                onClick={() => {
+                  if (product.id) {
+                    navigate(`/product/${product.id}`);
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                  }
+                }}
+                className="mt-2.5 flex flex-col text-left cursor-pointer hover:opacity-80 transition-opacity"
+              >
                 <h3 className="text-[11px] sm:text-xs font-semibold tracking-wider text-brand-dark uppercase line-clamp-1">
                   {product.name}
                 </h3>
