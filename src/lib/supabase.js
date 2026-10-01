@@ -18,9 +18,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
  */
 export const getSupabaseMediaUrl = (path) => {
   if (!path) return "";
-  if (path.startsWith("http://") || path.startsWith("https://")) {
+  if (typeof path !== 'string') return "";
+  
+  // If it is a localhost URL from legacy mock data or dev server on arbitrary ports, sanitize it
+  if (path.includes("localhost:")) {
+    path = path.replace(/^https?:\/\/localhost(:\d+)?\/?/, "");
+  } else if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
+
   let cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
   // Handle HOU_desktop aliases
