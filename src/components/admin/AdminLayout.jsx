@@ -92,11 +92,11 @@ export const AdminLayout = () => {
   const adminRoleDisplay = formatRoleName(currentUser?.role);
 
   return (
-    <div className="min-h-screen bg-[#FDFDFD] flex flex-col antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
+    <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
       {/* ========================================================================= */}
       {/* TOP HEADER: Crisp high-contrast top bar with House of Urvaah branding     */}
       {/* ========================================================================= */}
-      <header className="h-16 sm:h-18 bg-white border-b border-neutral-200/90 sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between shadow-2xs">
+      <header className="h-16 sm:h-18 bg-white border-b border-neutral-200/90 shrink-0 z-30 px-4 sm:px-8 flex items-center justify-between shadow-2xs">
         {/* Left: Mobile hamburger + Urvaah Brand Block */}
         <div className="flex items-center gap-3 sm:gap-5 min-w-0">
           <button
@@ -110,10 +110,10 @@ export const AdminLayout = () => {
 
           <Link
             to="/admin/dashboard"
-            className="flex items-center gap-3 select-none group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
+            className="flex items-center gap-3.5 select-none group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
             title="House of Urvaah Admin Dashboard"
           >
-            <Logo className="h-9 sm:h-10" />
+            <Logo className="h-11 sm:h-13 md:h-14 shrink-0" />
             <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors">
               Admin Panel
             </span>
@@ -159,9 +159,9 @@ export const AdminLayout = () => {
       </header>
 
       {/* ========================================================================= */}
-      {/* MAIN CONTAINER: WIDER SIDEBAR + CRISP CONTENT                             */}
+      {/* MAIN CONTAINER: FIXED SIDEBAR + SMOOTH INDEPENDENT SCROLLING CONTENT       */}
       {/* ========================================================================= */}
-      <div className="flex flex-1 relative min-h-[calc(100vh-4.5rem)]">
+      <div className="flex flex-1 overflow-hidden relative min-h-0">
         {/* Mobile Sidebar Overlay Backdrop */}
         {mobileMenuOpen && (
           <div
@@ -171,12 +171,12 @@ export const AdminLayout = () => {
           />
         )}
 
-        {/* SIDEBAR (Enlarged width w-72, crisp high contrast text and generous touch padding) */}
+        {/* SIDEBAR (Stuck on position, w-72 width, high contrast text) */}
         <aside
           className={`
             fixed top-16 sm:top-18 bottom-0 left-0 z-50 w-72 bg-white border-r border-neutral-200/90
-            flex flex-col transition-transform duration-300 ease-in-out
-            lg:sticky lg:top-18 lg:h-[calc(100vh-4.5rem)] lg:z-20 lg:translate-x-0
+            flex flex-col transition-transform duration-300 ease-in-out shrink-0 select-none
+            lg:relative lg:top-0 lg:bottom-auto lg:h-full lg:z-20 lg:translate-x-0
             ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
           `}
         >
@@ -196,7 +196,7 @@ export const AdminLayout = () => {
           </div>
 
           {/* Navigation Links List */}
-          <div className="flex-1 overflow-y-auto px-4 py-5">
+          <div className="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
             <nav className="space-y-1.5" aria-label="Admin Navigation">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
@@ -238,7 +238,7 @@ export const AdminLayout = () => {
           </div>
 
           {/* Bottom helper card */}
-          <div className="p-4 border-t border-neutral-100 bg-neutral-50/70">
+          <div className="p-4 border-t border-neutral-100 bg-neutral-50/70 shrink-0">
             <div className="px-4 py-3 rounded-xl bg-white border border-neutral-200/80 text-xs font-admin text-neutral-600 flex items-center justify-between shadow-2xs">
               <div>
                 <span className="font-bold text-neutral-900 block text-[11px] uppercase tracking-wider">
@@ -252,9 +252,9 @@ export const AdminLayout = () => {
         </aside>
 
         {/* ========================================================================= */}
-        {/* CONTENT AREA                                                              */}
+        {/* SCROLLABLE RIGHT CONTENT AREA                                             */}
         {/* ========================================================================= */}
-        <main className="flex-1 p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto h-full p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto scroll-smooth">
           <Outlet />
         </main>
       </div>
