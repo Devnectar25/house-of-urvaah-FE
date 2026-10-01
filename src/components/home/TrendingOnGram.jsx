@@ -299,10 +299,20 @@ const VideoCard = ({ item, onOpenLook }) => {
     }
   }, []);
 
+  const handleVideoClick = () => {
+    window.open('https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShopLookClick = (e) => {
+    e.stopPropagation();
+    onOpenLook();
+  };
+
   return (
     <div
-      onClick={onOpenLook}
+      onClick={handleVideoClick}
       className="group relative w-full aspect-[9/16] rounded-xl overflow-hidden bg-neutral-900 select-none transition-all duration-300 cursor-pointer hover:shadow-xl"
+      title="Click video to view on Instagram"
     >
       {/* Autoplaying Loop Video */}
       <video
@@ -332,8 +342,8 @@ const VideoCard = ({ item, onOpenLook }) => {
       />
 
       {/* Top Bar Overlay: Brand Tag */}
-      <div className="absolute top-3 left-3 z-10 pointer-events-none">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans">
+      <div className="absolute top-3 left-3 z-10">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/60 transition-colors">
           <InstagramIcon />
           <span>{item.handle}</span>
         </div>
@@ -348,9 +358,13 @@ const VideoCard = ({ item, onOpenLook }) => {
           {item.title}
         </h3>
         <div className="mt-2.5 pt-1">
-          <span className="inline-flex items-center gap-1 text-[10px] tracking-[0.2em] uppercase text-white/90 font-sans border-b border-white/40 group-hover:border-white transition-colors">
+          <button
+            type="button"
+            onClick={handleShopLookClick}
+            className="inline-flex items-center gap-1 text-[10px] tracking-[0.2em] uppercase text-white/90 font-sans border-b border-white/40 hover:border-white transition-colors cursor-pointer"
+          >
             SHOP THE LOOK
-          </span>
+          </button>
         </div>
       </div>
     </div>
@@ -430,6 +444,11 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     onClose();
   };
 
+  const handleInstagramRedirect = (e) => {
+    e.stopPropagation();
+    window.open('https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 select-none">
       {/* Darkened Backdrop */}
@@ -483,8 +502,12 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
         onClick={(e) => e.stopPropagation()}
         className="relative z-40 w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-200/60 max-h-[92vh] md:h-[640px]"
       >
-        {/* Left Side: Vertical Fashion Video */}
-        <div className="relative w-full md:w-[48%] h-[320px] sm:h-[400px] md:h-full bg-neutral-950 flex-shrink-0 overflow-hidden">
+        {/* Left Side: Vertical Fashion Video (Redirects to Instagram on click) */}
+        <div
+          onClick={handleInstagramRedirect}
+          className="relative w-full md:w-[48%] h-[320px] sm:h-[400px] md:h-full bg-neutral-950 flex-shrink-0 overflow-hidden cursor-pointer group"
+          title="Click video to view on Instagram"
+        >
           <video
             ref={(el) => {
               modalVideoRef.current = el;
@@ -509,13 +532,27 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                 e.currentTarget.muted = true;
               }
             }}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
           />
 
           {/* Reel Tag Badge */}
-          <div className="absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans">
+          <div className="absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/70 transition-colors">
             <InstagramIcon />
             <span>{look.handle}</span>
+          </div>
+
+          {/* Instagram Account Profile Pill (Matching Screenshot 2) */}
+          <div className="absolute bottom-4 left-4 z-30 inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 shadow-lg hover:bg-black/80 transition-colors">
+            <img src="/assets/logo.png" alt="House of Urvaah" className="w-6 h-6 rounded-full object-cover bg-white p-0.5" />
+            <div className="flex flex-col text-left leading-tight">
+              <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-white">
+                <span>houseofurvaah</span>
+                <svg className="w-3.5 h-3.5 text-blue-400 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.9 14.7l-3.8-3.8 1.4-1.4 2.4 2.4 6.4-6.4 1.4 1.4-7.8 7.8z" />
+                </svg>
+              </div>
+              <span className="text-[9px] text-neutral-300 font-normal">House of Urvaah</span>
+            </div>
           </div>
         </div>
 

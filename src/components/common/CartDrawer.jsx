@@ -15,7 +15,23 @@ export const CartDrawer = () => {
     updateQuantity,
     cartSubtotal,
     freeShippingProgress,
+    user,
+    openAuthModal,
+    setPendingAction,
   } = useCart();
+
+  const handleProceedToCheckout = () => {
+    setIsCartOpen(false);
+    const hasToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+    if (user || hasToken) {
+      navigate('/checkout');
+    } else {
+      if (setPendingAction) {
+        setPendingAction(() => () => navigate('/checkout'));
+      }
+      openAuthModal('login');
+    }
+  };
 
   const formatPrice = (val) => {
     return new Intl.NumberFormat('en-IN', {
@@ -180,10 +196,7 @@ export const CartDrawer = () => {
                   fullWidth
                   variant="primary"
                   className="group flex items-center justify-center gap-2 py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-colors cursor-pointer"
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    navigate('/checkout');
-                  }}
+                  onClick={handleProceedToCheckout}
                 >
                   PROCEED TO CHECKOUT
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[1.75]" />

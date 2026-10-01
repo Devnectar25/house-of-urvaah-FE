@@ -35,12 +35,6 @@ export const Wishlist = () => {
   const [resolvedProducts, setResolvedProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
-  // Protect route - open auth modal if guest
-  useEffect(() => {
-    if (!authLoading && !user) {
-      openAuthModal('login');
-    }
-  }, [user, authLoading, openAuthModal]);
 
   // Resolve product objects for wishlist IDs (checking local catalog first, then backend API)
   useEffect(() => {
