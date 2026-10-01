@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Menu, Search, User, Heart, ShoppingBag } from 'lucide-react';
+import { Menu, Search, Camera, User, Heart, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
 
@@ -77,71 +77,64 @@ export const Header = () => {
           {/* Top-Left: Hamburger Icon Only */}
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+            className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
             aria-label="Open navigation drawer"
           >
-            <Menu className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.25]" />
+            <Menu className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.5]" />
           </button>
 
           {/* Right Side: Search, Wishlist, Bag, Account Icons */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 text-brand-dark">
-            {/* Search Icon Trigger */}
+          <div className="flex items-center gap-3 sm:gap-4 text-brand-dark">
+            {/* Search Trigger (Underlined SEARCH + Camera matching header icons) */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
               aria-label="Search"
               title="Search products"
             >
-              <Search className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+              <Camera className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[1.5]" />
             </button>
 
-            {/* Mobile Search Icon */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="flex sm:hidden p-2 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
-              aria-label="Search"
-              title="Search"
-            >
-              <Search className="w-5 h-5 stroke-[2.25]" />
-            </button>
-
-            {/* Wishlist Icon + Overlapping Badge */}
+            {/* Wishlist Icon + Refined Badge */}
             <Link
               to="/wishlist"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="hidden sm:flex relative p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="hidden sm:flex relative p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Wishlist"
               title="Wishlist"
             >
-              <Heart className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <Heart className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
               {wishlistCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1.5 min-w-[17px] h-[17px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white shadow-2xs">
                   {wishlistCount}
                 </span>
               )}
             </Link>
 
-            {/* Shopping Bag Icon + Overlapping Badge */}
+            {/* Shopping Bag Icon + Refined Badge */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Shopping Bag"
               title="Shopping Bag"
             >
-              <ShoppingBag className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
-              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
-                {cartCount}
-              </span>
+              <ShoppingBag className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-[17px] h-[17px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white shadow-2xs">
+                  {cartCount}
+                </span>
+              )}
             </button>
 
             {/* Account Icon */}
             <button
               onClick={handleAccountClick}
-              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="hidden sm:flex p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Account"
               title="Account"
             >
-              <User className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <User className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>
           </div>
         </div>
@@ -164,10 +157,10 @@ export const Header = () => {
           <div className="flex items-center justify-start">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Open navigation drawer"
             >
-              <Menu className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+              <Menu className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.5]" />
             </button>
           </div>
 
@@ -179,54 +172,57 @@ export const Header = () => {
           </div>
 
           {/* Column 3 (Right): Search, Wishlist, Bag, Account Icons */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 text-brand-dark">
-            {/* Search Icon (First in right group) */}
+          <div className="flex items-center justify-end gap-3 sm:gap-4 text-brand-dark">
+            {/* Search Trigger (Underlined SEARCH + Camera matching header icons) */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
               aria-label="Search"
               title="Search products"
             >
-              <Search className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+              <Camera className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[1.5]" />
             </button>
 
-            {/* Wishlist Icon + Overlapping Badge */}
+            {/* Wishlist Icon + Refined Badge */}
             <Link
               to="/wishlist"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="hidden sm:flex relative p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="hidden sm:flex relative p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Wishlist"
               title="Wishlist"
             >
-              <Heart className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <Heart className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
               {wishlistCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1.5 min-w-[17px] h-[17px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white shadow-2xs">
                   {wishlistCount}
                 </span>
               )}
             </Link>
 
-            {/* Shopping Bag Icon + Overlapping Badge */}
+            {/* Shopping Bag Icon + Refined Badge */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-1.5 flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Shopping Bag"
               title="Shopping Bag"
             >
-              <ShoppingBag className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
-              <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-black text-white text-[9px] font-mono font-bold rounded-full flex items-center justify-center shadow-xs">
-                {cartCount}
-              </span>
+              <ShoppingBag className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-[17px] h-[17px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white shadow-2xs">
+                  {cartCount}
+                </span>
+              )}
             </button>
 
             {/* Account Icon */}
             <button
               onClick={handleAccountClick}
-              className="hidden sm:flex p-1.5 items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="hidden sm:flex p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Account"
               title="Account"
             >
-              <User className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2]" />
+              <User className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>
           </div>
         </div>

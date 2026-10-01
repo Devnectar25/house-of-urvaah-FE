@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Search, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
+import { X, User, Search, Camera, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 
@@ -169,11 +169,11 @@ export const MobileMenu = () => {
                       openAuthModal('login');
                     }
                   }}
-                  className="p-2 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  className="p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
                   aria-label="Account"
                   title="Account"
                 >
-                  <User className="w-5 h-5 stroke-[1.75]" />
+                  <User className="w-5 h-5 stroke-[1.5]" />
                 </button>
 
                 <button
@@ -181,11 +181,12 @@ export const MobileMenu = () => {
                     setIsMobileMenuOpen(false);
                     setIsSearchOpen(true);
                   }}
-                  className="p-2 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  className="p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer flex items-center justify-center gap-1 border-b border-brand-dark/70 pb-0.5 font-serif"
                   aria-label="Search"
                   title="Search"
                 >
-                  <Search className="w-5 h-5 stroke-[1.75]" />
+                  <span className="text-[10px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+                  <Camera className="w-4 h-4 stroke-[1.5]" />
                 </button>
 
                 <Link
@@ -194,14 +195,14 @@ export const MobileMenu = () => {
                     setIsMobileMenuOpen(false);
                     window.scrollTo({ top: 0, behavior: 'instant' });
                   }}
-                  className="p-2 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center gap-0.5"
+                  className="relative p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
                   aria-label="Wishlist"
                   title="Wishlist"
                 >
-                  <Heart className="w-5 h-5 stroke-[1.75]" />
+                  <Heart className="w-5 h-5 stroke-[1.5]" />
                   {wishlistCount > 0 && (
-                    <span className="text-xs font-bold font-mono tracking-wider">
-                      [{wishlistCount}]
+                    <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white">
+                      {wishlistCount}
                     </span>
                   )}
                 </Link>
@@ -211,14 +212,16 @@ export const MobileMenu = () => {
                     setIsMobileMenuOpen(false);
                     setIsCartOpen(true);
                   }}
-                  className="p-2 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center gap-0.5"
+                  className="relative p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
                   aria-label="Shopping Bag"
                   title="Shopping Bag"
                 >
-                  <ShoppingBag className="w-5 h-5 stroke-[1.75]" />
-                  <span className="text-xs font-bold font-mono tracking-wider">
-                    [{cartCount}]
-                  </span>
+                  <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] px-1 bg-black text-white text-[9px] font-mono font-semibold rounded-full flex items-center justify-center border border-white">
+                      {cartCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
