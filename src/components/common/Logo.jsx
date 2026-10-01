@@ -6,7 +6,13 @@ export const Logo = ({ className = "h-14 md:h-18", variant = "dark" }) => {
       <img
         src="/assets/logo.png"
         alt="House of Urvaah"
-        className="h-full w-auto object-contain mix-blend-multiply transition-opacity duration-300 hover:opacity-85"
+        className="h-full w-auto object-contain transition-all duration-300 hover:opacity-90 shrink-0"
+        style={{
+          imageRendering: '-webkit-optimize-contrast',
+          filter: variant === 'light' 
+            ? 'invert(1) brightness(2)' 
+            : 'contrast(1.25) brightness(0.85) drop-shadow(0 1px 1px rgba(0,0,0,0.05))'
+        }}
       />
     </div>
   );
