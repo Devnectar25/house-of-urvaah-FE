@@ -265,7 +265,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin"
       onClick={handleCloseModal}
     >
       <div

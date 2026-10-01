@@ -90,18 +90,49 @@ export const CategoryGrid = () => {
 
   useEffect(() => {
     let isMounted = true;
-    productApi.getProducts({ limit: 8 })
-      .then(res => {
+
+    const loadRecommendedProducts = async () => {
+      try {
+        const res = await productApi.getProducts({ active: 'true', limit: 20 });
         const data = Array.isArray(res) ? res : (res?.data || []);
-        if (isMounted && data && data.length > 0) {
-          setProductsList(data.map(p => ({
-            ...p,
-            formattedPrice: `₹ ${Number(p.price).toLocaleString('en-IN')}`
-          })));
+        if (isMounted) {
+          if (data && data.length > 0) {
+            // Filter strictly for active products from Admin Product Management
+            const activeOnly = data.filter((p) => p.active !== false && p.inStock !== false);
+            if (activeOnly.length > 0) {
+              setProductsList(
+                activeOnly.map((p) => ({
+                  ...p,
+                  formattedPrice: p.formattedPrice || `₹ ${Number(p.price).toLocaleString('en-IN')}`,
+                }))
+              );
+            }
+          }
         }
-      })
-      .catch(() => { });
-    return () => { isMounted = false; };
+      } catch (err) {
+        console.warn('[Recommended Section]: Failed to load active products', err);
+      }
+    };
+
+    loadRecommendedProducts();
+
+    // Custom event & storage listeners for instant updates when Admin modifies products
+    const handleProductUpdate = () => {
+      loadRecommendedProducts();
+    };
+
+    window.addEventListener('urvaah_products_updated', handleProductUpdate);
+    window.addEventListener('storage', handleProductUpdate);
+
+    // Auto-polling every 8s for live real-time sync with Admin panel
+    const pollingInterval = setInterval(loadRecommendedProducts, 8000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('urvaah_products_updated', handleProductUpdate);
+      window.removeEventListener('storage', handleProductUpdate);
+      clearInterval(pollingInterval);
+    };
   }, []);
 
   const checkScrollPosition = () => {

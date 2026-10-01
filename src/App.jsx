@@ -133,6 +133,10 @@ import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminCoupons } from './pages/admin/AdminCoupons';
 import { AdminRefundDesk } from './pages/admin/AdminRefundDesk';
+import { AdminCustomers } from './pages/admin/AdminCustomers';
+import { AdminReviews } from './pages/admin/AdminReviews';
+import { AdminAnalytics } from './pages/admin/AdminAnalytics';
+import { AdminSettings } from './pages/admin/AdminSettings';
 
 
 
@@ -228,18 +232,18 @@ export function AppContent() {
         <Route index element={<AdminDashboard />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="products" element={<AdminProducts />} />
-        <Route path="products/new" element={<AdminPlaceholderPage />} />
-        <Route path="products/:id/edit" element={<AdminPlaceholderPage />} />
+        <Route path="products/new" element={<AdminProducts />} />
+        <Route path="products/:id/edit" element={<AdminProducts />} />
 
         <Route path="categories" element={<AdminCategories />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="coupons" element={<AdminCoupons />} />
-        <Route path="customers" element={<AdminPlaceholderPage />} />
+        <Route path="customers" element={<AdminCustomers />} />
         <Route path="refunds" element={<AdminRefundDesk />} />
         <Route path="refund-desk" element={<AdminRefundDesk />} />
-        <Route path="reviews" element={<AdminPlaceholderPage />} />
-        <Route path="analytics" element={<AdminPlaceholderPage />} />
-        <Route path="settings" element={<AdminPlaceholderPage />} />
+        <Route path="reviews" element={<AdminReviews />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="settings" element={<AdminSettings />} />
         <Route path="*" element={<AdminDashboard />} />
       </Route>
 
