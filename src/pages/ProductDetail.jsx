@@ -215,21 +215,6 @@ export const ProductDetail = () => {
     return '₹ ' + Number(val).toLocaleString('en-IN');
   };
 
-  const coupons = [
-    {
-      title: 'Get 10% off on your first order via APP',
-      btnText: 'DOWNLOAD NOW'
-    },
-    {
-      title: 'Buy 2 Get Additional 10% Off on Selected Styles',
-      btnText: 'VIEW ELIGIBLE PRODUCTS'
-    },
-    {
-      title: 'Flat ₹500 Off on orders above ₹4999',
-      btnText: 'APPLY AT CHECKOUT'
-    }
-  ];
-
   const accordionItems = [
     {
       title: 'SIZE DETAILS',
@@ -475,44 +460,6 @@ export const ProductDetail = () => {
                   </span>
                 )}
               </button>
-            </div>
-
-            {/* AVAILABLE OFFERS Section */}
-            <div className="pt-3.5 border-t border-neutral-200">
-              <span className="text-xs font-bold tracking-widest uppercase text-brand-dark block mb-2">
-                AVAILABLE OFFERS
-              </span>
-
-              {/* Login Banner Button */}
-              <button
-                onClick={() => !user && openAuthModal('login')}
-                className="w-full bg-black text-white py-2.5 px-3 text-[11px] tracking-widest uppercase font-semibold text-center hover:bg-neutral-800 transition-colors mb-2.5 cursor-pointer font-sans"
-              >
-                {user ? 'MEMBERS-ONLY OFFERS UNLOCKED' : 'LOGIN TO SEE THE OFFERS ON THIS PRODUCT'}
-              </button>
-
-              {/* Horizontally Scrollable Coupon Cards Row */}
-              <div className="flex gap-2.5 items-start overflow-x-auto no-scrollbar pb-0.5">
-                {coupons.map((coupon, idx) => (
-                  <div
-                    key={idx}
-                    className="h-auto self-start min-w-[240px] max-w-[270px] border border-dashed border-neutral-300 bg-neutral-50/90 p-2.5 flex items-stretch gap-2.5 relative flex-shrink-0"
-                  >
-                    <div className="w-6 self-stretch bg-neutral-900 text-white text-[8px] font-bold uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 flex items-center justify-center py-1.5 flex-shrink-0">
-                      COUPON
-                    </div>
-
-                    <div className="flex flex-col text-left flex-1 justify-between gap-2 py-0.5 font-sans">
-                      <p className="text-[10px] font-medium text-neutral-800 leading-snug">
-                        {coupon.title}
-                      </p>
-                      <button className="text-[9px] font-bold tracking-widest uppercase text-black underline underline-offset-2 hover:opacity-70 transition-opacity text-left cursor-pointer">
-                        {coupon.btnText}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* PINCODE & DELIVERY CHECK */}
