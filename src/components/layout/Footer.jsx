@@ -16,7 +16,7 @@ export const Footer = () => {
   };
 
   return (
-    <footer className="bg-white text-brand-dark border-t border-neutral-300 pt-12 sm:pt-16 pb-12 px-4 sm:px-10 md:px-12 lg:px-16 font-serif w-full">
+    <footer id="footer" className="bg-white text-brand-dark border-t border-neutral-300 pt-12 sm:pt-16 pb-12 px-4 sm:px-10 md:px-12 lg:px-16 font-serif w-full">
       <div className="max-w-[1800px] mx-auto">
         {/* 5-Column Grid Layout: Logo Block (Left) + 4 Link Columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 sm:gap-8 lg:gap-12 xl:gap-16 mb-12 sm:mb-16">
