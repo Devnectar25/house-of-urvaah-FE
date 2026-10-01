@@ -343,26 +343,27 @@ export const Account = () => {
           method: 'PUT',
           body: JSON.stringify({
             user_id: user.id || user.username || user.email,
-            address_label: item.type,
+            address_label: item.type || 'Home',
             full_address: item.street,
             city: item.city,
             state: item.state,
             postal_code: item.pincode,
-            is_default: true
+            is_default: true,
+            recipient_name: item.name,
+            phone: item.phone
           })
         });
         await loadProfileAndAddresses();
         return;
-      } catch (err) {}
+      } catch (err) {
+        console.error('Failed to set default address via API:', err);
+      }
     }
     const updatedList = addresses.map((addr, i) => ({
       ...addr,
       isDefault: i === idx
     }));
-    const res = await updateUserProfile({ addresses: updatedList });
-    if (res.success) {
-      setAddresses(updatedList);
-    }
+    setAddresses(updatedList);
   };
 
   if (authLoading) {

@@ -21,7 +21,6 @@ export const Hero = () => {
           ref={videoRef}
           autoPlay
           muted
-          defaultMuted
           loop
           playsInline
           className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
