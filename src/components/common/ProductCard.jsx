@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-export const ProductCard = ({ product, onQuickView }) => {
+export const ProductCard = ({ product, onQuickView, hideColorDots = false }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const navigate = useNavigate();
@@ -151,7 +151,7 @@ export const ProductCard = ({ product, onQuickView }) => {
         </div>
 
         {/* Color swatches preview */}
-        {product.colors && product.colors.length > 0 && (
+        {!hideColorDots && product.colors && product.colors.length > 0 && (
           <div className="flex items-center gap-1 mt-2">
             {product.colors.map((color, idx) => (
               <span
