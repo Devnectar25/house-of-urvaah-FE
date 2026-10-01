@@ -212,10 +212,6 @@ export const Account = () => {
       errors.city = 'City is required.';
     }
 
-    if (!addressForm.state || !addressForm.state.trim()) {
-      errors.state = 'Please select a state or union territory.';
-    }
-
     const cleanPincode = (addressForm.pincode || '').replace(/\D/g, '');
     if (!cleanPincode) {
       errors.pincode = 'Pincode is required.';
@@ -996,34 +992,6 @@ export const Account = () => {
                   </div>
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      STATE *
-                    </label>
-                    <select
-                      value={addressForm.state}
-                      onChange={(e) => {
-                        setAddressForm({ ...addressForm, state: e.target.value });
-                        if (addressErrors.state) setAddressErrors((prev) => ({ ...prev, state: '' }));
-                      }}
-                      className={`w-full px-3.5 py-2.5 bg-white border ${
-                        addressErrors.state ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
-                      } focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer`}
-                    >
-                      <option value="" disabled>Select State</option>
-                      {INDIAN_STATES.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                    {addressErrors.state && (
-                      <p className="text-[11px] text-red-600 mt-1">{addressErrors.state}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
                       PINCODE *
                     </label>
                     <input
@@ -1044,20 +1012,21 @@ export const Account = () => {
                       <p className="text-[11px] text-red-600 mt-1">{addressErrors.pincode}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      ADDRESS TYPE
-                    </label>
-                    <select
-                      value={addressForm.type}
-                      onChange={(e) => setAddressForm({ ...addressForm, type: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer"
-                    >
-                      <option value="Home">Home</option>
-                      <option value="Work">Work</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
+                    ADDRESS TYPE
+                  </label>
+                  <select
+                    value={addressForm.type}
+                    onChange={(e) => setAddressForm({ ...addressForm, type: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer"
+                  >
+                    <option value="Home">Home</option>
+                    <option value="Work">Work</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
