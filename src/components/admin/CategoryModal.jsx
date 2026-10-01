@@ -265,7 +265,7 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 my-8 transition-all"
         onClick={(e) => e.stopPropagation()}

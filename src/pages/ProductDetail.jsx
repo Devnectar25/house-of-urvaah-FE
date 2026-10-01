@@ -321,15 +321,15 @@ export const ProductDetail = () => {
             {/* DESKTOP VIEW (>= md): Side-by-Side Vertical Thumbnails + Main Product Viewer */}
             <div className="hidden md:flex md:flex-row gap-5 items-start flex-1 w-full">
               {/* Vertical Thumbnail Strip */}
-              <div className="flex flex-col gap-3 max-h-[560px] overflow-y-auto no-scrollbar scroll-smooth p-0.5">
+              <div className="flex flex-col gap-2.5 max-h-[560px] overflow-y-auto no-scrollbar scroll-smooth p-0.5">
                 {gallery.map((imgUrl, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(imgUrl)}
-                    className={`w-20 h-26 flex-shrink-0 bg-neutral-100 overflow-hidden transition-all border ${
+                    className={`w-16 h-20 flex-shrink-0 bg-neutral-100 overflow-hidden transition-all relative ${
                       selectedImage === imgUrl
-                        ? 'border-2 border-black opacity-100 shadow-sm'
-                        : 'border-neutral-200 opacity-60 hover:opacity-100'
+                        ? 'ring-1.5 ring-black ring-offset-1 opacity-100 shadow-sm'
+                        : 'border border-neutral-200 opacity-60 hover:opacity-100 hover:border-neutral-400'
                     }`}
                   >
                     <img
@@ -338,7 +338,7 @@ export const ProductDetail = () => {
                       onError={(e) => {
                         e.currentTarget.parentElement.style.display = 'none';
                       }}
-                      className="w-full h-full object-contain object-center p-1"
+                      className="w-full h-full object-cover object-top"
                     />
                   </button>
                 ))}

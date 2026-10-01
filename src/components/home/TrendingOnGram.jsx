@@ -316,7 +316,6 @@ const VideoCard = ({ item, onOpenLook }) => {
         src={item.src}
         autoPlay
         muted
-        defaultMuted
         loop
         playsInline
         onPlay={(e) => {
@@ -498,7 +497,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
             src={look.src}
             autoPlay
             muted
-            defaultMuted
             loop
             playsInline
             onPlay={(e) => {

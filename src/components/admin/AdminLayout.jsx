@@ -15,7 +15,8 @@ import {
   X,
   LogOut,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { getStoredUser, clearAuthSession } from '../../lib/apiClient';
@@ -76,14 +77,6 @@ export const AdminLayout = () => {
     };
   }, [mobileMenuOpen]);
 
-  // Current page title derived from active route
-  const currentNavItem = NAV_ITEMS.find((item) =>
-    item.exact
-      ? location.pathname === item.path || location.pathname === '/admin'
-      : location.pathname.startsWith(item.path)
-  );
-  const pageTitle = currentNavItem ? currentNavItem.name : 'Dashboard';
-
   // Confirmed logout handler
   const handleConfirmLogout = () => {
     setShowLogoutModal(false);
@@ -99,69 +92,66 @@ export const AdminLayout = () => {
   const adminRoleDisplay = formatRoleName(currentUser?.role);
 
   return (
-    <div className="min-h-screen bg-[#FBFBFA] flex flex-col antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
+    <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
       {/* ========================================================================= */}
-      {/* TOP HEADER: Full-width Homved layout with House of Urvaah theme & tokens  */}
+      {/* TOP HEADER: Crisp high-contrast top bar with House of Urvaah branding     */}
       {/* ========================================================================= */}
-      <header className="h-16 bg-white border-b border-neutral-200 sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
-        {/* Left: Mobile hamburger + Urvaah Brand Block + Section context */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          {/* Mobile hamburger button */}
+      <header className="h-16 sm:h-18 bg-white border-b border-neutral-200/90 shrink-0 z-30 px-4 sm:px-8 flex items-center justify-between shadow-2xs">
+        {/* Left: Mobile hamburger + Urvaah Brand Block */}
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
-            className="lg:hidden p-1.5 -ml-1 text-neutral-600 hover:text-brand-dark hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+            className="lg:hidden p-2 -ml-1 text-neutral-700 hover:text-brand-dark hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
             aria-label="Open navigation menu"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-6 h-6" />
           </button>
 
-          {/* Brand Lockup: Logo Mark + Admin Panel in brand Roboto */}
           <Link
             to="/admin/dashboard"
-            className="flex items-center gap-2.5 sm:gap-3 select-none group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark focus-visible:ring-offset-2"
+            className="flex items-center gap-3.5 select-none group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
             title="House of Urvaah Admin Dashboard"
           >
-            <Logo className="h-9 sm:h-10" />
-            <span className="font-admin font-bold text-base sm:text-lg text-brand-dark group-hover:text-neutral-600 group-focus-visible:text-neutral-600 transition-colors duration-200 tracking-wide">
+            <Logo className="h-11 sm:h-13 md:h-14 shrink-0" />
+            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors">
               Admin Panel
             </span>
           </Link>
         </div>
 
-        {/* Right: Admin details + [-> Logout] button */}
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-          {/* Customer storefront preview link */}
+        {/* Right: Store preview, Admin User info & Logout */}
+        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-admin font-medium text-neutral-500 hover:text-brand-accent transition-colors group"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 transition-all group"
             title="Open customer storefront in a new tab"
           >
             <span>View Store</span>
-            <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-brand-accent transition-colors" />
+            <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-950 transition-colors" />
           </a>
 
           {/* Admin User & Role Stack */}
           <div className="text-right flex flex-col justify-center">
-            <div className="text-[15px] font-semibold text-[#0F172A] leading-snug font-admin tracking-tight">
+            <div className="text-sm sm:text-base font-bold text-neutral-950 leading-snug font-admin tracking-tight">
               {adminName}
             </div>
-            <div className="text-xs font-normal text-[#64748B] font-admin leading-tight mt-0.5">
+            <div className="text-xs font-medium text-neutral-500 font-admin leading-tight mt-0.5">
               {adminRoleDisplay}
             </div>
           </div>
 
-          {/* Logout Button (Exact replica of reference image: soft tint pill, slate border, dark navy text & icon with black hover state) */}
+          {/* Logout Button */}
           <button
             type="button"
             onClick={() => setShowLogoutModal(true)}
-            className="inline-flex items-center gap-3 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[14px] hover:bg-black hover:border-black focus-visible:bg-black focus-visible:border-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 transition-all duration-200 cursor-pointer group"
+            className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:bg-neutral-950 hover:border-neutral-950 transition-all duration-200 cursor-pointer group shadow-2xs"
             title="Sign out of Admin Panel"
           >
-            <LogOut className="w-4 h-4 text-[#0F172A] stroke-[2] group-hover:text-white group-focus-visible:text-white transition-colors duration-200" />
-            <span className="font-admin text-sm font-semibold text-[#0F172A] group-hover:text-white group-focus-visible:text-white tracking-tight transition-colors duration-200">
+            <LogOut className="w-4 h-4 text-neutral-900 stroke-[2] group-hover:text-white transition-colors" />
+            <span className="font-admin text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-white tracking-tight transition-colors">
               Logout
             </span>
           </button>
@@ -169,9 +159,9 @@ export const AdminLayout = () => {
       </header>
 
       {/* ========================================================================= */}
-      {/* MAIN CONTAINER: SIDEBAR + CONTENT AREA                                    */}
+      {/* MAIN CONTAINER: FIXED SIDEBAR + SMOOTH INDEPENDENT SCROLLING CONTENT       */}
       {/* ========================================================================= */}
-      <div className="flex flex-1 relative min-h-[calc(100vh-4rem)]">
+      <div className="flex flex-1 overflow-hidden relative min-h-0">
         {/* Mobile Sidebar Overlay Backdrop */}
         {mobileMenuOpen && (
           <div
@@ -181,33 +171,33 @@ export const AdminLayout = () => {
           />
         )}
 
-        {/* SIDEBAR */}
+        {/* SIDEBAR (Stuck on position, w-72 width, high contrast text) */}
         <aside
           className={`
-            fixed top-16 bottom-0 left-0 z-50 w-64 bg-white border-r border-neutral-200
-            flex flex-col transition-transform duration-300 ease-in-out
-            lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:z-20 lg:translate-x-0
+            fixed top-16 sm:top-18 bottom-0 left-0 z-50 w-72 bg-white border-r border-neutral-200/90
+            flex flex-col transition-transform duration-300 ease-in-out shrink-0 select-none
+            lg:relative lg:top-0 lg:bottom-auto lg:h-full lg:z-20 lg:translate-x-0
             ${mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
           `}
         >
           {/* Mobile Drawer Header with Close button */}
           <div className="p-4 border-b border-neutral-100 flex items-center justify-between lg:hidden">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-bold font-admin">
+            <span className="text-xs uppercase tracking-[0.15em] text-neutral-400 font-bold font-admin">
               Navigation
             </span>
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
-              className="p-1.5 text-neutral-400 hover:text-brand-dark rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              className="p-1.5 text-neutral-500 hover:text-neutral-950 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
               aria-label="Close navigation menu"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Navigation Links List */}
-          <div className="flex-1 overflow-y-auto px-3 py-4">
-            <nav className="space-y-1" aria-label="Admin Navigation">
+          <div className="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
+            <nav className="space-y-1.5" aria-label="Admin Navigation">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.exact
@@ -219,27 +209,27 @@ export const AdminLayout = () => {
                     key={item.path}
                     to={item.path}
                     className={`
-                      group flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer
+                      group flex items-center justify-between px-4 py-3.5 rounded-xl text-[14px] font-semibold transition-all duration-200 cursor-pointer select-none
                       ${
                         isActive
-                          ? 'bg-brand-sand text-brand-dark font-semibold border-l-4 border-brand-dark shadow-xs'
-                          : 'text-neutral-600 hover:text-brand-dark hover:bg-brand-sand/60 border-l-4 border-transparent'
+                          ? 'bg-[#F4F1EA] text-neutral-950 border-l-[5px] border-neutral-950 shadow-2xs font-bold'
+                          : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80 border-l-[5px] border-transparent'
                       }
                     `}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3.5">
                       <Icon
-                        className={`w-4 h-4 transition-colors ${
+                        className={`w-5 h-5 transition-colors ${
                           isActive
-                            ? 'text-brand-dark stroke-[2.25]'
-                            : 'text-neutral-400 group-hover:text-brand-dark stroke-[1.75]'
+                            ? 'text-neutral-950 stroke-[2.2]'
+                            : 'text-neutral-400 group-hover:text-neutral-900 stroke-[1.8]'
                         }`}
                       />
-                      <span className="font-admin">{item.name}</span>
+                      <span className="font-admin tracking-tight">{item.name}</span>
                     </div>
 
                     {isActive && (
-                      <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-neutral-500 shrink-0" />
                     )}
                   </NavLink>
                 );
@@ -248,26 +238,29 @@ export const AdminLayout = () => {
           </div>
 
           {/* Bottom helper card */}
-          <div className="p-3 border-t border-neutral-100 bg-neutral-50/60">
-            <div className="px-3 py-2 rounded-lg bg-white border border-neutral-200/80 text-[11px] font-admin text-neutral-500">
-              <span className="font-semibold text-neutral-800 block text-[10px] uppercase tracking-wider mb-0.5">
-                Portal Status
-              </span>
-              <span>Online • Authenticated</span>
+          <div className="p-4 border-t border-neutral-100 bg-neutral-50/70 shrink-0">
+            <div className="px-4 py-3 rounded-xl bg-white border border-neutral-200/80 text-xs font-admin text-neutral-600 flex items-center justify-between shadow-2xs">
+              <div>
+                <span className="font-bold text-neutral-900 block text-[11px] uppercase tracking-wider">
+                  Portal Status
+                </span>
+                <span className="text-[11px] text-emerald-700 font-semibold">Online • Authenticated</span>
+              </div>
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             </div>
           </div>
         </aside>
 
         {/* ========================================================================= */}
-        {/* CONTENT AREA                                                              */}
+        {/* SCROLLABLE RIGHT CONTENT AREA                                             */}
         {/* ========================================================================= */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto h-full p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto scroll-smooth">
           <Outlet />
         </main>
       </div>
 
       {/* ========================================================================= */}
-      {/* LOGOUT CONFIRMATION MODAL                                                 */}
+      {/* LOGOUT CONFIRMATION MODAL (Perfect dimensions & high-contrast styling)    */}
       {/* ========================================================================= */}
       {showLogoutModal && (
         <div
@@ -276,27 +269,27 @@ export const AdminLayout = () => {
           aria-modal="true"
           aria-labelledby="logout-dialog-title"
         >
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-neutral-200 relative">
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-4 border border-amber-200">
-              <LogOut className="w-6 h-6" />
+          <div className="bg-white rounded-2xl max-w-md w-full p-7 shadow-2xl border border-neutral-200 relative animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 border border-amber-200">
+              <LogOut className="w-6 h-6 stroke-[2]" />
             </div>
 
             <h3
               id="logout-dialog-title"
-              className="text-lg sm:text-xl font-admin font-bold text-brand-dark tracking-tight mb-2 uppercase"
+              className="text-xl font-admin font-bold text-neutral-950 tracking-tight mb-2 uppercase"
             >
               Confirm Sign Out
             </h3>
 
-            <p className="text-xs sm:text-sm text-neutral-500 font-admin leading-relaxed mb-6">
-              Are you sure you want to sign out of the House of Urvaah Admin Panel? You will need to sign in again to access administrative tools and settings.
+            <p className="text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed mb-6">
+              Are you sure you want to sign out of the House of Urvaah Admin Panel? You will need to log in again to access store operations.
             </p>
 
             <div className="flex items-center justify-end gap-3 font-admin">
               <button
                 type="button"
                 onClick={() => setShowLogoutModal(false)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="px-4.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -304,7 +297,7 @@ export const AdminLayout = () => {
               <button
                 type="button"
                 onClick={handleConfirmLogout}
-                className="px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-white bg-brand-dark hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark focus-visible:ring-offset-2 transition-colors duration-200 cursor-pointer shadow-xs"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-neutral-950 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black transition-colors cursor-pointer shadow-sm"
               >
                 Yes, Sign Out
               </button>

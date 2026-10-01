@@ -123,6 +123,13 @@ export const AdminDashboard = () => {
     // If cached data is present, fetch in background (Stale-While-Revalidate); otherwise show loading skeleton
     const hasCache = Boolean(dashboardCache);
     fetchDashboardData(hasCache);
+
+    // Real-time auto sync every 15 seconds
+    const intervalTimer = setInterval(() => {
+      fetchDashboardData(true);
+    }, 15000);
+
+    return () => clearInterval(intervalTimer);
   }, [fetchDashboardData]);
 
   // Stat cards configuration adapted strictly to House of Urvaah's fashion data model
