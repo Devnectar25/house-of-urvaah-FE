@@ -67,7 +67,7 @@ export const BestSellers = ({ onQuickView }) => {
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: idx * 0.08 }}
             >
-              <ProductCard product={product} onQuickView={onQuickView} />
+              <ProductCard product={product} onQuickView={onQuickView} hideColorDots={true} />
             </motion.div>
           ))}
         </div>
