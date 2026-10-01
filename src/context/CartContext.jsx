@@ -110,10 +110,18 @@ export const CartProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch & persist wishlist for logged-in user
+  // Fetch & persist wishlist for user
   useEffect(() => {
     if (!user) {
-      setWishlist([]);
+      const cached = localStorage.getItem('urvaah_guest_wishlist');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) setWishlist(parsed.map(String));
+        } catch (e) {}
+      } else {
+        setWishlist([]);
+      }
       return;
     }
 
@@ -145,10 +153,18 @@ export const CartProvider = ({ children }) => {
       });
   }, [user?.id]);
 
-  // Fetch & persist cart for logged-in user
+  // Fetch & persist cart for user
   useEffect(() => {
     if (!user) {
-      setCart([]);
+      const cached = localStorage.getItem('urvaah_guest_cart');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) setCart(parsed);
+        } catch (e) {}
+      } else {
+        setCart([]);
+      }
       return;
     }
 
@@ -220,6 +236,53 @@ export const CartProvider = ({ children }) => {
       setAuthToken(jwtToken);
     }
 
+    // Merge guest cart items into logged-in user cart
+    const guestCartStr = localStorage.getItem('urvaah_guest_cart');
+    if (guestCartStr) {
+      try {
+        const guestItems = JSON.parse(guestCartStr);
+        if (Array.isArray(guestItems) && guestItems.length > 0) {
+          setCart((prevUserCart) => {
+            const merged = [...prevUserCart];
+            for (const gItem of guestItems) {
+              const existingIdx = merged.findIndex(
+                (uItem) => String(uItem.product.id) === String(gItem.product.id) && uItem.selectedSize === gItem.selectedSize
+              );
+              if (existingIdx > -1) {
+                merged[existingIdx] = {
+                  ...merged[existingIdx],
+                  quantity: merged[existingIdx].quantity + gItem.quantity
+                };
+              } else {
+                merged.push(gItem);
+              }
+            }
+            const userId = formatted.id || 'user';
+            localStorage.setItem(`urvaah_cart_${userId}`, JSON.stringify(merged));
+            return merged;
+          });
+        }
+      } catch (e) {}
+      localStorage.removeItem('urvaah_guest_cart');
+    }
+
+    // Merge guest wishlist items into logged-in user wishlist
+    const guestWishlistStr = localStorage.getItem('urvaah_guest_wishlist');
+    if (guestWishlistStr) {
+      try {
+        const guestWishlist = JSON.parse(guestWishlistStr);
+        if (Array.isArray(guestWishlist) && guestWishlist.length > 0) {
+          setWishlist((prevWishlist) => {
+            const merged = Array.from(new Set([...prevWishlist, ...guestWishlist.map(String)]));
+            const userId = formatted.id || 'user';
+            localStorage.setItem(`urvaah_wishlist_${userId}`, JSON.stringify(merged));
+            return merged;
+          });
+        }
+      } catch (e) {}
+      localStorage.removeItem('urvaah_guest_wishlist');
+    }
+
     setIsAuthModalOpen(false);
 
     if (pendingAction) {
@@ -260,14 +323,9 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (product, selectedSize = 'M') => {
     if (!product) return;
 
-    if (!user && !getAuthToken()) {
-      setPendingAction(() => () => addToCart(product, selectedSize));
-      openAuthModal('login');
-      return;
-    }
-
-    const userId = user?.id || getStoredUser()?.id || 'user';
-    const cachedKey = `urvaah_cart_${userId}`;
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
+    const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
 
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
@@ -307,27 +365,25 @@ export const CartProvider = ({ children }) => {
 
     setIsCartOpen(true);
 
-    const numericId = parseInt(String(product.id).replace(/\D/g, ''), 10);
-    if (numericId && !isNaN(numericId)) {
-      try {
-        await apiClient('/api/cart/add', {
-          method: 'POST',
-          body: JSON.stringify({ userId, productId: numericId, quantity: 1 })
-        });
-      } catch (err) {
-        console.warn('Cart add API sync warning:', err.message);
+    if (!isGuest) {
+      const numericId = parseInt(String(product.id).replace(/\D/g, ''), 10);
+      if (numericId && !isNaN(numericId)) {
+        try {
+          await apiClient('/api/cart/add', {
+            method: 'POST',
+            body: JSON.stringify({ userId, productId: numericId, quantity: 1 })
+          });
+        } catch (err) {
+          console.warn('Cart add API sync warning:', err.message);
+        }
       }
     }
   };
 
   const removeFromCart = async (productId, selectedSize) => {
-    if (!user && !getAuthToken()) {
-      openAuthModal('login');
-      return;
-    }
-
-    const userId = user?.id || getStoredUser()?.id || 'user';
-    const cachedKey = `urvaah_cart_${userId}`;
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
+    const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
 
     setCart((prevCart) => {
       const updated = prevCart.filter(
@@ -337,36 +393,37 @@ export const CartProvider = ({ children }) => {
       return updated;
     });
 
-    const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
-    if (numericId && !isNaN(numericId)) {
-      try {
-        await apiClient(`/api/cart/item/${numericId}`, {
-          method: 'DELETE'
-        });
-      } catch (err) {
-        console.warn('Cart remove API sync warning:', err.message);
+    if (!isGuest) {
+      const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
+      if (numericId && !isNaN(numericId)) {
+        try {
+          await apiClient(`/api/cart/item/${numericId}`, {
+            method: 'DELETE'
+          });
+        } catch (err) {
+          console.warn('Cart remove API sync warning:', err.message);
+        }
       }
     }
   };
 
   const clearCart = async () => {
-    const userId = user?.id || getStoredUser()?.id || 'user';
-    const cachedKey = `urvaah_cart_${userId}`;
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
+    const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
     setCart([]);
     localStorage.removeItem(cachedKey);
-    try {
-      await apiClient(`/api/cart/${userId}`, { method: 'DELETE' });
-    } catch (e) {}
+    if (!isGuest) {
+      try {
+        await apiClient(`/api/cart/${userId}`, { method: 'DELETE' });
+      } catch (e) {}
+    }
   };
 
   const updateQuantity = async (productId, selectedSize, delta) => {
-    if (!user && !getAuthToken()) {
-      openAuthModal('login');
-      return;
-    }
-
-    const userId = user?.id || getStoredUser()?.id || 'user';
-    const cachedKey = `urvaah_cart_${userId}`;
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
+    const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
     let newQty = 0;
 
     setCart((prevCart) => {
@@ -385,19 +442,21 @@ export const CartProvider = ({ children }) => {
       return updated;
     });
 
-    const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
-    if (numericId && !isNaN(numericId)) {
-      try {
-        if (newQty <= 0) {
-          await apiClient(`/api/cart/item/${numericId}`, { method: 'DELETE' });
-        } else {
-          await apiClient('/api/cart/update', {
-            method: 'PATCH',
-            body: JSON.stringify({ userId, productId: numericId, quantity: newQty })
-          });
+    if (!isGuest) {
+      const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
+      if (numericId && !isNaN(numericId)) {
+        try {
+          if (newQty <= 0) {
+            await apiClient(`/api/cart/item/${numericId}`, { method: 'DELETE' });
+          } else {
+            await apiClient('/api/cart/update', {
+              method: 'PATCH',
+              body: JSON.stringify({ userId, productId: numericId, quantity: newQty })
+            });
+          }
+        } catch (err) {
+          console.warn('Cart update quantity API sync warning:', err.message);
         }
-      } catch (err) {
-        console.warn('Cart update quantity API sync warning:', err.message);
       }
     }
   };
@@ -416,15 +475,11 @@ export const CartProvider = ({ children }) => {
   };
 
   const toggleWishlist = async (productId) => {
-    if (!user && !getAuthToken()) {
-      openAuthModal('login');
-      return false;
-    }
-
-    const userId = user?.id || getStoredUser()?.id || 'user';
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
     const stringId = String(productId).trim();
     const numId = stringId.replace(/\D/g, '');
-    const cachedKey = `urvaah_wishlist_${userId}`;
+    const cachedKey = isGuest ? 'urvaah_guest_wishlist' : `urvaah_wishlist_${userId}`;
 
     const isCurrentlyIn = isInWishlist(stringId);
     let updated;
@@ -443,28 +498,26 @@ export const CartProvider = ({ children }) => {
     setWishlist(updated);
     localStorage.setItem(cachedKey, JSON.stringify(updated));
 
-    try {
-      await apiClient('/api/wishlist/toggle', {
-        method: 'POST',
-        body: JSON.stringify({ userId, productId: stringId })
-      });
-    } catch (err) {
-      console.warn('Wishlist toggle API sync warning:', err.message);
+    if (!isGuest) {
+      try {
+        await apiClient('/api/wishlist/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ userId, productId: stringId })
+        });
+      } catch (err) {
+        console.warn('Wishlist toggle API sync warning:', err.message);
+      }
     }
 
     return !isCurrentlyIn;
   };
 
   const removeFromWishlist = async (productId) => {
-    if (!user && !getAuthToken()) {
-      openAuthModal('login');
-      return;
-    }
-
-    const userId = user?.id || getStoredUser()?.id || 'user';
+    const isGuest = !user && !getAuthToken();
+    const userId = user?.id || getStoredUser()?.id || 'guest';
     const stringId = String(productId).trim();
     const numId = stringId.replace(/\D/g, '');
-    const cachedKey = `urvaah_wishlist_${userId}`;
+    const cachedKey = isGuest ? 'urvaah_guest_wishlist' : `urvaah_wishlist_${userId}`;
     const updated = wishlist.filter((id) => {
       const itemStr = String(id).trim();
       const itemNum = itemStr.replace(/\D/g, '');
@@ -476,12 +529,14 @@ export const CartProvider = ({ children }) => {
     setWishlist(updated);
     localStorage.setItem(cachedKey, JSON.stringify(updated));
 
-    try {
-      await apiClient(`/api/wishlist/${userId}/${stringId}`, {
-        method: 'DELETE'
-      });
-    } catch (err) {
-      console.warn('Wishlist remove API sync warning:', err.message);
+    if (!isGuest) {
+      try {
+        await apiClient(`/api/wishlist/${userId}/${stringId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.warn('Wishlist remove API sync warning:', err.message);
+      }
     }
   };
 
@@ -517,6 +572,7 @@ export const CartProvider = ({ children }) => {
         authMode,
         setAuthMode,
         openAuthModal,
+        setPendingAction,
         user,
         setUser,
         session,

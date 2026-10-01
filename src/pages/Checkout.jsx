@@ -18,7 +18,8 @@ import {
   ChevronRight,
   AlertCircle,
   QrCode,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -37,15 +38,19 @@ export const Checkout = () => {
     cartSubtotal,
     freeShippingProgress,
     clearCart,
+    setPendingAction,
   } = useCart();
 
   // Protect route: Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
+      if (setPendingAction) {
+        setPendingAction(() => () => navigate('/checkout'));
+      }
       openAuthModal('login');
       navigate('/');
     }
-  }, [user, authLoading, openAuthModal, navigate]);
+  }, [user, authLoading, openAuthModal, navigate, setPendingAction]);
 
   // Saved Addresses State
   const [addresses, setAddresses] = useState([]);
@@ -1235,7 +1240,7 @@ export const Checkout = () => {
               >
                 {isPlacingOrder ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin text-white stroke-[2.25] shrink-0" />
                     <span>PROCESSING ORDER...</span>
                   </>
                 ) : (
