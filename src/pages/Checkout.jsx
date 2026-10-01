@@ -286,9 +286,7 @@ export const Checkout = () => {
     if (!newShippingForm.city || !newShippingForm.city.trim()) {
       errors.city = 'City is required.';
     }
-    if (!newShippingForm.state || !newShippingForm.state.trim()) {
-      errors.state = 'Please select a state.';
-    }
+
     const cleanPincode = (newShippingForm.pincode || '').replace(/\D/g, '');
     if (!cleanPincode) {
       errors.pincode = 'Pincode is required.';
@@ -327,7 +325,7 @@ export const Checkout = () => {
     if (!cleanPhone || cleanPhone.length !== 10) errors.phone = 'Valid 10-digit phone number is required.';
     if (!editingAddressForm.street || !editingAddressForm.street.trim()) errors.street = 'Street address is required.';
     if (!editingAddressForm.city || !editingAddressForm.city.trim()) errors.city = 'City is required.';
-    if (!editingAddressForm.state || !editingAddressForm.state.trim()) errors.state = 'State is required.';
+
     const cleanPincode = (editingAddressForm.pincode || '').replace(/\D/g, '');
     if (!cleanPincode || cleanPincode.length !== 6) errors.pincode = 'Valid 6-digit pincode is required.';
 
@@ -939,7 +937,7 @@ export const Checkout = () => {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
                         CITY *
@@ -958,31 +956,6 @@ export const Checkout = () => {
                       />
                       {newAddressErrors.city && (
                         <p className="text-[10px] text-red-600 mt-0.5">{newAddressErrors.city}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                        STATE *
-                      </label>
-                      <select
-                        required
-                        value={newShippingForm.state}
-                        onChange={(e) =>
-                          setNewShippingForm({ ...newShippingForm, state: e.target.value })
-                        }
-                        className={`w-full px-3.5 py-2.5 bg-white border ${
-                          newAddressErrors.state ? 'border-red-500' : 'border-neutral-300'
-                        } focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm cursor-pointer`}
-                      >
-                        <option value="" disabled>Select State</option>
-                        {INDIAN_STATES.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
-                      {newAddressErrors.state && (
-                        <p className="text-[10px] text-red-600 mt-0.5">{newAddressErrors.state}</p>
                       )}
                     </div>
                     <div>
@@ -1496,7 +1469,7 @@ export const Checkout = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
                       CITY *
@@ -1509,27 +1482,6 @@ export const Checkout = () => {
                     />
                     {editingAddressErrors.city && (
                       <p className="text-[10px] text-red-600 mt-0.5">{editingAddressErrors.city}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold tracking-wider text-neutral-700 uppercase mb-1">
-                      STATE *
-                    </label>
-                    <select
-                      value={editingAddressForm.state}
-                      onChange={(e) => setEditingAddressForm({ ...editingAddressForm, state: e.target.value })}
-                      className="w-full px-3.5 py-2.5 border border-neutral-300 focus:border-black outline-none text-sm cursor-pointer"
-                    >
-                      <option value="" disabled>Select State</option>
-                      {INDIAN_STATES.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                    {editingAddressErrors.state && (
-                      <p className="text-[10px] text-red-600 mt-0.5">{editingAddressErrors.state}</p>
                     )}
                   </div>
 
