@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   AlertCircle,
@@ -64,30 +64,30 @@ function normalizeStatus(status) {
   return 'Requested';
 }
 
-// Helper: Format date & time (e.g. Jun 10, 2026, 11:25 PM)
+// Helper: Format date & time (e.g. 10 Jun 2026, 11:25 PM)
 function formatDateTime(dateStr) {
   if (!dateStr) return 'Not available';
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return 'Not available';
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  
+  const day = date.getDate();
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const year = date.getFullYear();
+  const time = date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  
+  return `${day} ${month} ${year}, ${time}`;
 }
 
-// Helper: Format date only (e.g. Jun 10, 2026)
+// Helper: Format date only (e.g. 10 Jun 2026)
 function formatDateOnly(dateStr) {
   if (!dateStr) return 'N/A';
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
+  
+  const day = date.getDate();
+  const month = date.toLocaleString('en-US', { month: 'short' });
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 // Helper: Get source / request type label
@@ -95,7 +95,7 @@ function getRequestType(order) {
   if (order.return_type === 'exchange' || order.status === 'Exchanged') {
     return 'Exchange Refund';
   }
-  if (order.is_returned_order || (order.status || '').toLowerCase().includes('return')) {
+  if (order.return_type === 'return' || order.is_returned_order || (order.status || '').toLowerCase().includes('return')) {
     return 'Return (Refund)';
   }
   return 'Order Cancellation';
@@ -144,10 +144,15 @@ export const UpdateRefundModal = ({
   initialTargetStatus,
   onSuccess
 }) => {
+  // Editable form state fields
   const [selectedStatus, setSelectedStatus] = useState('Requested');
   const [adminNote, setAdminNote] = useState('');
   const [notifyCustomer, setNotifyCustomer] = useState(true);
   const [txnId, setTxnId] = useState('');
+  const [refundAmountInput, setRefundAmountInput] = useState('');
+  const [customerReasonInput, setCustomerReasonInput] = useState('');
+
+  // Async data state
   const [fetchedItems, setFetchedItems] = useState(null);
   const [loadingItems, setLoadingItems] = useState(false);
   const [payoutInfo, setPayoutInfo] = useState(null);
@@ -162,7 +167,9 @@ export const UpdateRefundModal = ({
     status: 'Requested',
     note: '',
     notify: true,
-    txnId: ''
+    txnId: '',
+    amount: '',
+    reason: ''
   });
 
   // Lock background scroll when modal is open
@@ -177,13 +184,43 @@ export const UpdateRefundModal = ({
     };
   }, [isOpen]);
 
-  // Copy to clipboard with visual feedback
+  // Copy to clipboard with visual feedback & fallback
   const handleCopy = (key, text) => {
-    if (!text || text === 'Not Available' || text === 'N/A') return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
+    if (text === undefined || text === null) return;
+    const cleanText = String(text).trim();
+    if (!cleanText) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanText)
+        .then(() => {
+          setCopiedKey(key);
+          setTimeout(() => setCopiedKey(null), 2000);
+        })
+        .catch(() => {
+          copyFallback(cleanText);
+          setCopiedKey(key);
+          setTimeout(() => setCopiedKey(null), 2000);
+        });
+    } else {
+      copyFallback(cleanText);
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
+
+  const copyFallback = (text) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.setAttribute('readonly', '');
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    } catch (err) {
+      console.warn('Clipboard fallback failed:', err);
     }
   };
 
@@ -195,10 +232,28 @@ export const UpdateRefundModal = ({
       const initTxn = refundOrder.refund_txn_id || '';
       const initNotify = true;
 
+      const totalVal = parseFloat(refundOrder.total || 0);
+      const initAmt = parseFloat(
+        refundOrder.refund_eligible_amount !== undefined && refundOrder.refund_eligible_amount > 0
+          ? refundOrder.refund_eligible_amount
+          : refundOrder.total || 0
+      );
+      const initAmtStr = initAmt > 0 ? initAmt.toString() : (totalVal > 0 ? totalVal.toString() : '');
+
+      const initReason =
+        refundOrder.cancel_reason ||
+        refundOrder.return_reason ||
+        refundOrder.cancellation_reason ||
+        refundOrder.reason ||
+        '';
+
       setSelectedStatus(initStatus);
       setAdminNote(initNote);
       setTxnId(initTxn);
       setNotifyCustomer(initNotify);
+      setRefundAmountInput(initAmtStr);
+      setCustomerReasonInput(initReason);
+
       setErrorMsg(null);
       setShowDiscardConfirm(false);
       setFetchedItems(null);
@@ -209,7 +264,9 @@ export const UpdateRefundModal = ({
         status: initStatus,
         note: initNote,
         notify: initNotify,
-        txnId: initTxn
+        txnId: initTxn,
+        amount: initAmtStr,
+        reason: initReason
       };
 
       // 1. Fetch line items if not already populated on refundOrder
@@ -266,28 +323,22 @@ export const UpdateRefundModal = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, submitting, adminNote, selectedStatus, notifyCustomer, txnId]);
+  }, [isOpen, submitting, adminNote, selectedStatus, notifyCustomer, txnId, refundAmountInput, customerReasonInput]);
 
   if (!isOpen || !refundOrder) return null;
 
   const orderNumber =
     refundOrder.order_number || (refundOrder.id ? String(refundOrder.id).slice(0, 8) : 'N/A');
   const requestDate =
-    refundOrder.return_request_at || refundOrder.updated_at || refundOrder.created_at;
-  const customerReason =
-    refundOrder.cancel_reason ||
-    refundOrder.return_reason ||
-    refundOrder.reason ||
-    null;
+    refundOrder.return_request_at ||
+    refundOrder.cancelled_at ||
+    refundOrder.updated_at ||
+    refundOrder.created_at;
   const requestType = getRequestType(refundOrder);
 
   const totalOrderAmount = parseFloat(refundOrder.total || 0);
-  const eligibleAmount = parseFloat(
-    refundOrder.refund_eligible_amount !== undefined && refundOrder.refund_eligible_amount > 0
-      ? refundOrder.refund_eligible_amount
-      : refundOrder.total || 0
-  );
-  const isPartial = eligibleAmount > 0 && eligibleAmount < totalOrderAmount;
+  const currentEligibleAmount = parseFloat(refundAmountInput) || 0;
+  const isPartial = currentEligibleAmount > 0 && currentEligibleAmount < totalOrderAmount;
 
   const paymentMethod = (
     payoutInfo?.payment_method ||
@@ -306,44 +357,43 @@ export const UpdateRefundModal = ({
     ? refundOrder.items
     : [];
 
-  // Payout / Bank details resolution
-  const rawHolder =
+  // Read-only Payout / Bank details
+  const holderName =
     payoutInfo?.payout_holder_name ||
     payoutInfo?.refund_holder_name ||
-    refundOrder.refund_holder_name;
-  const holderName =
-    rawHolder && rawHolder.trim().length > 0
-      ? rawHolder.trim()
-      : payoutInfo?.customer_name || refundOrder.customer_name || 'Not Available';
+    refundOrder.refund_holder_name ||
+    payoutInfo?.customer_name ||
+    refundOrder.customer_name ||
+    'Not Available';
 
-  const rawAcc =
+  const rawAccountNumber =
+    payoutInfo?.raw_payout_bank_account ||
     payoutInfo?.payout_bank_account ||
     payoutInfo?.refund_bank_account ||
-    refundOrder.refund_bank_account;
-  const accountNumber = rawAcc
-    ? String(rawAcc).startsWith('*')
-      ? String(rawAcc)
-      : `******${String(rawAcc).slice(-4)}`
-    : 'Not Available';
+    refundOrder.refund_bank_account ||
+    '';
 
-  const rawIfsc =
+  const accountNumber = rawAccountNumber || 'Not Available';
+
+  const ifscCode =
     payoutInfo?.payout_ifsc_code ||
     payoutInfo?.refund_ifsc_code ||
-    refundOrder.refund_ifsc_code;
-  const ifscCode =
-    rawIfsc && rawIfsc.trim().length > 0 ? rawIfsc.trim().toUpperCase() : 'Not Available';
+    refundOrder.refund_ifsc_code ||
+    'Not Available';
 
   const hasBankData =
-    (rawHolder && rawHolder.trim().length > 0) ||
-    (rawAcc && String(rawAcc).trim().length > 0) ||
-    (rawIfsc && rawIfsc.trim().length > 0);
+    (holderName && holderName !== 'Not Available') ||
+    (accountNumber && accountNumber !== 'Not Available') ||
+    (ifscCode && ifscCode !== 'Not Available');
 
   // Check if form has unsaved modifications
   const hasUnsavedChanges =
     selectedStatus !== initialRef.current.status ||
     adminNote.trim() !== initialRef.current.note.trim() ||
     notifyCustomer !== initialRef.current.notify ||
-    txnId.trim() !== initialRef.current.txnId.trim();
+    txnId.trim() !== initialRef.current.txnId.trim() ||
+    refundAmountInput.trim() !== initialRef.current.amount.trim() ||
+    customerReasonInput.trim() !== initialRef.current.reason.trim();
 
   const handleAttemptClose = () => {
     if (hasUnsavedChanges) {
@@ -355,10 +405,21 @@ export const UpdateRefundModal = ({
 
   // Form submission & backend persistence
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setErrorMsg(null);
 
-    // Section 6 Validation: Admin notes / rejection reason mandatory if Failed or On Hold
+    // Validation: Amount check
+    const numAmount = parseFloat(refundAmountInput);
+    if (isNaN(numAmount) || numAmount < 0) {
+      setErrorMsg('Please enter a valid non-negative refund amount.');
+      return;
+    }
+    if (totalOrderAmount > 0 && numAmount > totalOrderAmount * 1.5) {
+      setErrorMsg(`Refund amount cannot exceed order total (₹${totalOrderAmount.toLocaleString('en-IN')}).`);
+      return;
+    }
+
+    // Validation: Admin notes / rejection reason mandatory if Failed or On Hold
     if ((selectedStatus === 'Failed' || selectedStatus === 'On Hold') && !adminNote.trim()) {
       setErrorMsg(
         selectedStatus === 'Failed'
@@ -383,7 +444,9 @@ export const UpdateRefundModal = ({
         refundStatus: selectedStatus,
         adminNote: adminNote.trim() || undefined,
         txnId: txnId.trim() || undefined,
-        notifyCustomer: notifyCustomer
+        notifyCustomer: notifyCustomer,
+        refundAmount: numAmount,
+        customerReason: customerReasonInput.trim() || undefined
       };
 
       const response = await apiClient(`/api/admin/refund/${refundOrder.id}/status`, {
@@ -397,8 +460,10 @@ export const UpdateRefundModal = ({
           updated || {
             ...refundOrder,
             refund_status: selectedStatus,
+            refund_eligible_amount: numAmount,
             refund_admin_note: adminNote.trim(),
-            refund_txn_id: txnId.trim() || refundOrder.refund_txn_id
+            refund_txn_id: txnId.trim() || refundOrder.refund_txn_id,
+            cancel_reason: customerReasonInput.trim() || refundOrder.cancel_reason
           }
         );
       }
@@ -436,12 +501,27 @@ export const UpdateRefundModal = ({
               <RotateCcw className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3
-                id="update-refund-modal-title"
-                className="text-lg sm:text-xl font-admin font-bold text-brand-dark tracking-tight leading-tight truncate"
-              >
-                Update Order #{orderNumber}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  id="update-refund-modal-title"
+                  className="text-lg sm:text-xl font-admin font-bold text-brand-dark tracking-tight leading-tight truncate"
+                >
+                  Update Order #{orderNumber}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('header_order', orderNumber)}
+                  className="p-1 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-md transition-colors cursor-pointer shrink-0"
+                  title="Copy Order #"
+                  aria-label="Copy Order #"
+                >
+                  {copiedKey === 'header_order' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
               <p className="text-xs sm:text-[13px] text-neutral-500 font-sans mt-0.5 leading-snug">
                 Review details and update refund status. Ensure bank info is verified before completing.
               </p>
@@ -500,184 +580,238 @@ export const UpdateRefundModal = ({
           )}
 
           {/* ======================================================================= */}
-          {/* SECTION 1 — REFUND SUMMARY                                             */}
+          {/* SECTION 1 — REFUND SUMMARY (Amount Editable)                            */}
           {/* ======================================================================= */}
           <div className="bg-[#FBFBFA] border border-neutral-200/80 rounded-xl p-4 sm:p-5 shadow-2xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-              {/* Left Column: Amount To Refund */}
+              {/* Left Column: Editable Amount To Refund */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block">
+                <label
+                  htmlFor="refund-amount-input"
+                  className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block"
+                >
                   AMOUNT TO REFUND
-                </span>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-admin font-bold text-2xl sm:text-3xl text-brand-dark tracking-tight">
-                    ₹{eligibleAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
+                </label>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="relative inline-flex items-center">
+                    <span className="absolute left-3 text-brand-dark font-bold font-admin text-base sm:text-lg pointer-events-none">
+                      ₹
+                    </span>
+                    <input
+                      id="refund-amount-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={totalOrderAmount > 0 ? totalOrderAmount * 2 : 999999}
+                      value={refundAmountInput}
+                      onChange={(e) => setRefundAmountInput(e.target.value)}
+                      className="pl-7 pr-3 py-1.5 bg-white border border-neutral-200 rounded-xl text-base sm:text-lg font-bold font-admin text-brand-dark w-36 sm:w-44 focus:outline-none focus:ring-1 focus:ring-brand-dark shadow-2xs transition-all"
+                      placeholder="0.00"
+                    />
+                  </div>
                   {isPartial ? (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-50 text-amber-700 border border-amber-200 font-admin">
+                    <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-50 text-amber-700 border border-amber-200 font-admin">
                       PARTIAL REFUND
                     </span>
                   ) : (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-neutral-100 text-neutral-700 border border-neutral-200 font-admin">
+                    <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-neutral-100 text-neutral-700 border border-neutral-200 font-admin">
                       FULL REFUND
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Right Column: Original Method */}
+              {/* Right Column: Original Method (Read-Only with Copy) */}
               <div className="sm:text-right space-y-1.5">
                 <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block sm:text-right">
                   ORIGINAL METHOD
                 </span>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-neutral-200/90 rounded-lg text-xs font-semibold text-brand-dark shadow-2xs font-admin">
+                <button
+                  type="button"
+                  onClick={() => handleCopy('orig_method', paymentMethod)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-neutral-50 border border-neutral-200/90 rounded-lg text-xs font-semibold text-brand-dark shadow-2xs font-admin cursor-pointer transition-colors"
+                  title="Click to copy Original Method"
+                >
                   {renderPaymentIcon(paymentMethod)}
                   <span>{paymentMethod}</span>
-                </div>
+                  {copiedKey === 'orig_method' ? (
+                    <Check className="w-3 h-3 text-emerald-600 ml-0.5" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-neutral-400 opacity-60 ml-0.5" />
+                  )}
+                </button>
               </div>
             </div>
           </div>
 
           {/* ======================================================================= */}
-          {/* SECTION 2 — RETURN REQUEST DETAILS                                     */}
+          {/* SECTION 2 — RETURN REQUEST DETAILS & ITEMS REQUESTED                    */}
           {/* ======================================================================= */}
-          <div className="bg-[#FBFBFA] border border-neutral-200/80 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+          <div className="bg-[#FBFBFA] border border-neutral-200/80 rounded-xl p-4 sm:p-5 shadow-2xs space-y-4">
+            {/* Header: RETURN REQUEST DETAILS */}
             <div className="text-xs font-semibold text-brand-dark uppercase tracking-wider font-admin border-b border-neutral-200/60 pb-2.5 flex items-center gap-2">
               <RotateCcw className="w-3.5 h-3.5 text-neutral-500" />
               <span>RETURN REQUEST DETAILS</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              {/* Request Type */}
+            {/* Metadata Grid: Request Type (Read-Only) | Requested On (Read-Only) | Customer Reason (Editable) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs items-start">
+              {/* Request Type (Read-Only with Copy) */}
               <div>
                 <span className="text-neutral-400 text-[10px] font-semibold uppercase tracking-wider font-admin block mb-1">
                   REQUEST TYPE
                 </span>
-                <span className="font-semibold text-brand-dark text-xs block font-admin">
-                  {requestType}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('req_type', requestType)}
+                  className="font-semibold text-brand-dark text-xs font-admin py-1 inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  title="Click to copy Request Type"
+                >
+                  <span>{requestType}</span>
+                  {copiedKey === 'req_type' ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-neutral-400 opacity-60 hover:opacity-100" />
+                  )}
+                </button>
               </div>
 
-              {/* Requested On */}
+              {/* Requested On (Read-Only with Copy) */}
               <div>
                 <span className="text-neutral-400 text-[10px] font-semibold uppercase tracking-wider font-admin block mb-1">
                   REQUESTED ON
                 </span>
-                <span className="text-neutral-700 text-xs block">
-                  {formatDateTime(requestDate)}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('req_on', formatDateTime(requestDate))}
+                  className="text-neutral-700 text-xs py-1 font-sans inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  title="Click to copy Requested Date & Time"
+                >
+                  <span>{formatDateTime(requestDate)}</span>
+                  {copiedKey === 'req_on' ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-neutral-400 opacity-60 hover:opacity-100" />
+                  )}
+                </button>
               </div>
 
-              {/* Customer Reason */}
+              {/* Customer Reason (Editable) */}
               <div>
-                <span className="text-neutral-400 text-[10px] font-semibold uppercase tracking-wider font-admin block mb-1">
+                <label
+                  htmlFor="customer-reason-input"
+                  className="text-neutral-400 text-[10px] font-semibold uppercase tracking-wider font-admin block mb-1"
+                >
                   CUSTOMER REASON
-                </span>
-                <span className="text-neutral-700 text-xs italic block bg-white px-2.5 py-1.5 rounded-lg border border-neutral-200/80">
-                  {customerReason ? `"${customerReason}"` : 'Not specified by customer'}
-                </span>
+                </label>
+                <input
+                  id="customer-reason-input"
+                  type="text"
+                  value={customerReasonInput}
+                  onChange={(e) => setCustomerReasonInput(e.target.value)}
+                  placeholder="Reason for return/refund"
+                  className="w-full bg-white border border-neutral-200/90 rounded-lg px-2.5 py-1.5 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark shadow-2xs font-sans transition-all"
+                />
               </div>
             </div>
-          </div>
 
-          {/* ======================================================================= */}
-          {/* SECTION 3 — ITEMS REQUESTED                                             */}
-          {/* ======================================================================= */}
-          <div className="border border-neutral-200/80 rounded-xl overflow-hidden bg-white shadow-2xs">
-            <div className="px-4 py-3 bg-neutral-50/80 border-b border-neutral-200/80 text-xs font-semibold text-brand-dark uppercase tracking-wider font-admin flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-neutral-500" />
-                <span>ITEMS REQUESTED ({itemsList.length})</span>
+            {/* Nested Section: ITEMS REQUESTED (Read-Only) */}
+            <div className="border border-neutral-200/80 rounded-xl overflow-hidden bg-white shadow-2xs mt-3">
+              <div className="px-4 py-2.5 bg-neutral-50/90 border-b border-neutral-200/80 text-xs font-semibold text-brand-dark uppercase tracking-wider font-admin flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>ITEMS REQUESTED {itemsList.length > 0 ? `(${itemsList.length})` : ''}</span>
+                </div>
+                {loadingItems && (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 font-sans font-normal">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading items...
+                  </span>
+                )}
               </div>
-              {loadingItems && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 font-sans font-normal">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Loading items...
-                </span>
-              )}
-            </div>
 
-            <div className="divide-y divide-neutral-200/60 max-h-64 overflow-y-auto">
-              {loadingItems ? (
-                <div className="p-4 space-y-3 animate-pulse">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-neutral-200 rounded-lg shrink-0" />
-                    <div className="space-y-1.5 flex-1">
-                      <div className="h-3.5 bg-neutral-200 rounded w-3/4" />
-                      <div className="h-3 bg-neutral-200 rounded w-1/3" />
+              <div className="divide-y divide-neutral-200/60 max-h-60 overflow-y-auto">
+                {loadingItems ? (
+                  <div className="p-4 space-y-3 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-neutral-200 rounded-lg shrink-0" />
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3.5 bg-neutral-200 rounded w-3/4" />
+                        <div className="h-3 bg-neutral-200 rounded w-1/3" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : itemsList.length > 0 ? (
-                itemsList.map((item, idx) => {
-                  const rawImg =
-                    item.image ||
-                    item.image_url ||
-                    (Array.isArray(item.images) ? item.images[0] : item.images) ||
-                    item.category_image;
-                  const imgUrl = rawImg ? getSupabaseMediaUrl(rawImg) : '';
-                  const unitPrice = parseFloat(item.price) || 0;
-                  const qty = parseInt(item.quantity, 10) || 1;
-                  const itemTotal = unitPrice * qty;
-                  const itemReceivedState = getItemReceivedStatus(item, refundOrder);
+                ) : itemsList.length > 0 ? (
+                  itemsList.map((item, idx) => {
+                    const rawImg =
+                      item.image ||
+                      item.image_url ||
+                      (Array.isArray(item.images) ? item.images[0] : item.images) ||
+                      item.category_image;
+                    const imgUrl = rawImg ? getSupabaseMediaUrl(rawImg) : '';
+                    const unitPrice = parseFloat(item.price) || 0;
+                    const qty = parseInt(item.quantity, 10) || 1;
+                    const itemTotal = unitPrice * qty;
+                    const itemReceivedState = getItemReceivedStatus(item, refundOrder);
 
-                  return (
-                    <div
-                      key={item.id || idx}
-                      className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-neutral-50/50 transition-colors"
-                    >
-                      {/* Left: Product Thumbnail + Title + Qty/Price */}
-                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                        <div className="w-12 h-12 rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden shrink-0 flex items-center justify-center">
-                          {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={item.name || item.title || 'Product'}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = '/assets/Images/Corset01.png';
-                              }}
-                            />
-                          ) : (
-                            <ImageIcon className="w-5 h-5 text-neutral-300" />
-                          )}
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-neutral-50/50 transition-colors"
+                      >
+                        {/* Left: Product Thumbnail + Title + Qty/Price (Read-Only) */}
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                          <div className="w-12 h-12 rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden shrink-0 flex items-center justify-center">
+                            {imgUrl ? (
+                              <img
+                                src={imgUrl}
+                                alt={item.name || item.title || 'Product'}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = '/assets/Images/Corset01.png';
+                                }}
+                              />
+                            ) : (
+                              <ImageIcon className="w-5 h-5 text-neutral-300" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="font-admin font-bold text-brand-dark text-xs sm:text-[13px] truncate">
+                              {item.name || item.title || `Product #${item.product_id || idx + 1}`}
+                            </h4>
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                              Qty: <strong className="text-brand-dark font-semibold">{qty}</strong>{' '}
+                              × ₹{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="min-w-0">
-                          <h4 className="font-admin font-bold text-brand-dark text-xs sm:text-[13px] truncate">
-                            {item.name || item.title || `Product #${item.product_id || idx + 1}`}
-                          </h4>
-                          <p className="text-[11px] text-neutral-500 mt-0.5">
-                            Qty: <strong className="text-brand-dark font-semibold">{qty}</strong>{' '}
-                            × ₹{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </p>
+                        {/* Right: Item Total + Return Status Badge (Read-Only) */}
+                        <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 shrink-0">
+                          <span className="font-admin font-bold text-brand-dark text-xs sm:text-[13px]">
+                            ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-neutral-100 text-neutral-700 border border-neutral-200 font-admin">
+                            {itemReceivedState}
+                          </span>
                         </div>
                       </div>
-
-                      {/* Right: Item Total + Return Status Badge */}
-                      <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 shrink-0">
-                        <span className="font-admin font-bold text-brand-dark text-xs sm:text-[13px]">
-                          ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-neutral-100 text-neutral-700 border border-neutral-200 font-admin">
-                          {itemReceivedState}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="p-6 text-center text-neutral-400 italic text-xs space-y-1">
-                  <Package className="w-6 h-6 text-neutral-300 mx-auto mb-1" />
-                  <p className="font-semibold text-neutral-600 not-italic">No Products Requested</p>
-                  <p className="text-[11px]">No line items found for this refund record.</p>
-                </div>
-              )}
+                    );
+                  })
+                ) : (
+                  <div className="p-6 text-center text-neutral-400 italic text-xs space-y-1">
+                    <Package className="w-6 h-6 text-neutral-300 mx-auto mb-1" />
+                    <p className="font-semibold text-neutral-600 not-italic">No Products Requested</p>
+                    <p className="text-[11px]">No line items found for this refund record.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* ======================================================================= */}
-          {/* SECTION 4 — PAYOUT DETAILS                                              */}
+          {/* SECTION 3 — PAYOUT DETAILS (Read-Only with Copy Options)                */}
           {/* ======================================================================= */}
           <div className="bg-[#FBFBFA] border border-neutral-200/80 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3.5">
             {/* Payout Header Bar: Title + Order Reference + Method + Date + Verify Status */}
@@ -690,13 +824,55 @@ export const UpdateRefundModal = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className="font-admin font-bold text-brand-dark">#{orderNumber}</span>
+                {/* 1. Order Number (Click to copy) */}
+                <button
+                  type="button"
+                  onClick={() => handleCopy('order_ref', orderNumber)}
+                  className="font-admin font-bold text-brand-dark hover:text-black hover:underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  title="Click to copy Order #"
+                >
+                  <span>#{orderNumber}</span>
+                  {copiedKey === 'order_ref' ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-neutral-400 opacity-60 hover:opacity-100" />
+                  )}
+                </button>
+
                 <span className="text-neutral-300">•</span>
-                <span className="inline-block px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-semibold text-[10px] uppercase font-admin">
-                  {paymentMethod}
-                </span>
+
+                {/* 2. Payment Method (Click to copy) */}
+                <button
+                  type="button"
+                  onClick={() => handleCopy('pay_method', paymentMethod)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-100 hover:bg-neutral-200/80 text-neutral-700 font-semibold text-[10px] uppercase font-admin cursor-pointer transition-colors"
+                  title="Click to copy Payment Method"
+                >
+                  <span>{paymentMethod}</span>
+                  {copiedKey === 'pay_method' ? (
+                    <Check className="w-2.5 h-2.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-2.5 h-2.5 text-neutral-400 opacity-60" />
+                  )}
+                </button>
+
                 <span className="text-neutral-300">•</span>
-                <span className="text-neutral-500 text-[11px]">{formatDateOnly(requestDate)}</span>
+
+                {/* 3. Request Date (Click to copy) */}
+                <button
+                  type="button"
+                  onClick={() => handleCopy('req_date', formatDateOnly(requestDate))}
+                  className="text-neutral-500 hover:text-brand-dark text-[11px] cursor-pointer inline-flex items-center gap-1 py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  title="Click to copy Date"
+                >
+                  <span>{formatDateOnly(requestDate)}</span>
+                  {copiedKey === 'req_date' ? (
+                    <Check className="w-2.5 h-2.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-2.5 h-2.5 text-neutral-400 opacity-60 hover:opacity-100" />
+                  )}
+                </button>
+
                 {hasBankData && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold font-admin">
                     <ShieldCheck className="w-3 h-3 text-emerald-600" />
@@ -706,103 +882,147 @@ export const UpdateRefundModal = ({
               </div>
             </div>
 
-            {/* Payout Data Grid: Account Holder / Acc No / IFSC */}
+            {/* Payout Data Grid: Account Holder / Acc No / IFSC (All Cards Always Copyable with Visible Copy Button) */}
             {loadingPayout ? (
               <div className="py-4 text-center text-xs text-neutral-400 flex items-center justify-center gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading payout details...
               </div>
-            ) : hasBankData ? (
+            ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                {/* 1. Account Holder */}
-                <div className="bg-white border border-neutral-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-2xs">
+                {/* 1. Account Holder (Always Copyable with Button) */}
+                <div
+                  onClick={() => handleCopy('holder', holderName)}
+                  className={`bg-white border rounded-lg p-3 shadow-2xs flex items-center justify-between gap-2 transition-all cursor-pointer select-none ${
+                    copiedKey === 'holder'
+                      ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/20'
+                      : 'border-neutral-200/80 hover:border-neutral-300 hover:bg-neutral-50/50'
+                  }`}
+                  title="Click to copy Account Holder"
+                >
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block">
-                      ACCOUNT HOLDER
-                    </span>
-                    <span className="text-xs font-bold text-brand-dark font-admin truncate block mt-0.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block leading-tight">
+                        ACCOUNT HOLDER
+                      </span>
+                      {copiedKey === 'holder' && (
+                        <span className="text-[9px] font-bold text-emerald-600 uppercase font-admin tracking-wider animate-fadeIn">
+                          • COPIED
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-brand-dark font-admin truncate block">
                       {holderName}
                     </span>
                   </div>
-                  {holderName !== 'Not Available' && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopy('holder', holderName)}
-                      className="p-1 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded transition-colors cursor-pointer shrink-0"
-                      title="Copy Account Holder"
-                      aria-label="Copy Account Holder"
-                    >
-                      {copiedKey === 'holder' ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopy('holder', holderName);
+                    }}
+                    className="p-1.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-md transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                    title="Copy Account Holder"
+                    aria-label="Copy Account Holder"
+                  >
+                    {copiedKey === 'holder' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
 
-                {/* 2. Account Number */}
-                <div className="bg-white border border-neutral-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-2xs">
+                {/* 2. Account Number (Always Copyable with Button) */}
+                <div
+                  onClick={() => handleCopy('acc', rawAccountNumber || accountNumber)}
+                  className={`bg-white border rounded-lg p-3 shadow-2xs flex items-center justify-between gap-2 transition-all cursor-pointer select-none ${
+                    copiedKey === 'acc'
+                      ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/20'
+                      : 'border-neutral-200/80 hover:border-neutral-300 hover:bg-neutral-50/50'
+                  }`}
+                  title="Click to copy Account Number"
+                >
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block">
-                      ACC NO.
-                    </span>
-                    <span className="text-xs font-bold text-brand-dark font-mono truncate block mt-0.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block leading-tight">
+                        ACC NO.
+                      </span>
+                      {copiedKey === 'acc' && (
+                        <span className="text-[9px] font-bold text-emerald-600 uppercase font-admin tracking-wider animate-fadeIn">
+                          • COPIED
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-brand-dark font-mono tracking-wider truncate block">
                       {accountNumber}
                     </span>
                   </div>
-                  {accountNumber !== 'Not Available' && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopy('acc', accountNumber)}
-                      className="p-1 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded transition-colors cursor-pointer shrink-0"
-                      title="Copy Account Number"
-                      aria-label="Copy Account Number"
-                    >
-                      {copiedKey === 'acc' ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopy('acc', rawAccountNumber || accountNumber);
+                    }}
+                    className="p-1.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-md transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                    title="Copy Account Number"
+                    aria-label="Copy Account Number"
+                  >
+                    {copiedKey === 'acc' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
 
-                {/* 3. IFSC Code */}
-                <div className="bg-white border border-neutral-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-2xs">
+                {/* 3. IFSC Code (Always Copyable with Button) */}
+                <div
+                  onClick={() => handleCopy('ifsc', ifscCode)}
+                  className={`bg-white border rounded-lg p-3 shadow-2xs flex items-center justify-between gap-2 transition-all cursor-pointer select-none ${
+                    copiedKey === 'ifsc'
+                      ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/20'
+                      : 'border-neutral-200/80 hover:border-neutral-300 hover:bg-neutral-50/50'
+                  }`}
+                  title="Click to copy IFSC Code"
+                >
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block">
-                      IFSC
-                    </span>
-                    <span className="text-xs font-bold text-brand-dark font-mono truncate block mt-0.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider font-admin block leading-tight">
+                        IFSC
+                      </span>
+                      {copiedKey === 'ifsc' && (
+                        <span className="text-[9px] font-bold text-emerald-600 uppercase font-admin tracking-wider animate-fadeIn">
+                          • COPIED
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-brand-dark font-mono uppercase tracking-wider truncate block">
                       {ifscCode}
                     </span>
                   </div>
-                  {ifscCode !== 'Not Available' && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopy('ifsc', ifscCode)}
-                      className="p-1 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded transition-colors cursor-pointer shrink-0"
-                      title="Copy IFSC Code"
-                      aria-label="Copy IFSC Code"
-                    >
-                      {copiedKey === 'ifsc' ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopy('ifsc', ifscCode);
+                    }}
+                    className="p-1.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-md transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                    title="Copy IFSC Code"
+                    aria-label="Copy IFSC Code"
+                  >
+                    {copiedKey === 'ifsc' ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="p-3 bg-white border border-neutral-200/80 rounded-lg text-neutral-500 text-xs italic">
-                Payout details not available.
               </div>
             )}
           </div>
 
           {/* ======================================================================= */}
-          {/* SECTION 5 — REFUND STAGE                                                */}
+          {/* SECTION 4 — REFUND STAGE (Editable Dropdown)                            */}
           {/* ======================================================================= */}
           <div className="space-y-1.5">
             <label
@@ -816,7 +1036,7 @@ export const UpdateRefundModal = ({
                 id="refund-stage-select"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2.5 text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all cursor-pointer appearance-none font-admin"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2.5 text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all cursor-pointer appearance-none font-admin shadow-2xs"
               >
                 {REFUND_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -829,7 +1049,7 @@ export const UpdateRefundModal = ({
           </div>
 
           {/* ======================================================================= */}
-          {/* SECTION 6 — ADMIN NOTES / REJECTION REASON                             */}
+          {/* SECTION 5 — ADMIN NOTES / REJECTION REASON (Editable Textarea)          */}
           {/* ======================================================================= */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -851,12 +1071,12 @@ export const UpdateRefundModal = ({
               value={adminNote}
               onChange={(e) => setAdminNote(e.target.value)}
               placeholder="Details about this refund decision..."
-              className="w-full p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all resize-none font-sans"
+              className="w-full p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all resize-none font-sans shadow-2xs"
             />
           </div>
 
           {/* Optional Txn Reference (shown if completed/processing) */}
-          {selectedStatus === 'Completed' && (
+          {(selectedStatus === 'Completed' || selectedStatus === 'Processing') && (
             <div className="space-y-1.5 animate-fadeIn">
               <label
                 htmlFor="txn-id-input"
@@ -870,13 +1090,13 @@ export const UpdateRefundModal = ({
                 value={txnId}
                 onChange={(e) => setTxnId(e.target.value)}
                 placeholder="e.g. UTR12345678 or Razorpay Refund ID"
-                className="w-full p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark font-mono placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all"
+                className="w-full p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark font-mono placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all shadow-2xs"
               />
             </div>
           )}
 
           {/* ======================================================================= */}
-          {/* SECTION 7 — NOTIFY CUSTOMER                                            */}
+          {/* SECTION 6 — NOTIFY CUSTOMER (Editable Checkbox)                         */}
           {/* ======================================================================= */}
           <div className="p-3.5 bg-[#FBFBFA] border border-neutral-200/80 rounded-xl flex items-start gap-3">
             <input
@@ -899,13 +1119,13 @@ export const UpdateRefundModal = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* FIXED FOOTER                                                              */}
+        {/* FIXED FOOTER (Single Cancel & Save Changes)                               */}
         {/* ========================================================================= */}
         <div className="px-6 py-4 sm:px-7 border-t border-neutral-200/80 bg-white sm:bg-neutral-50/60 flex items-center justify-end gap-3 shrink-0">
           {/* 1. Cancel Button */}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleAttemptClose}
             disabled={submitting}
             className="px-5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-neutral-700 bg-white hover:bg-neutral-100 hover:text-brand-dark border border-neutral-200 hover:border-neutral-300 transition-all duration-150 cursor-pointer disabled:opacity-50 font-admin shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
           >
