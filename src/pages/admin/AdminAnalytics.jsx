@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
+import { ActiveCustomersModal } from '../../components/admin/ActiveCustomersModal';
+import { RevenueBreakdownModal } from '../../components/admin/RevenueBreakdownModal';
+import { TopCustomersModal } from '../../components/admin/TopCustomersModal';
 
 // Number formatting helpers
 function formatNumber(val) {
@@ -46,6 +49,9 @@ function formatCurrency(val) {
 export const AdminAnalytics = () => {
   const [period, setPeriod] = useState('7d'); // 'today' | '7d' | '30d'
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
+  const [isActiveUsersModalOpen, setIsActiveUsersModalOpen] = useState(false);
+  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
+  const [isTopCustomersModalOpen, setIsTopCustomersModalOpen] = useState(false);
 
   // Primary data states
   const [summary, setSummary] = useState(null);
@@ -150,7 +156,7 @@ export const AdminAnalytics = () => {
     return topUsers.reduce((sum, u) => sum + (Number(u.totalRevenue) || 0), 0);
   }, [topUsers]);
 
-  // Trend indicator component
+  // Trend indicator component (badge style)
   const renderTrendBadge = (trend) => {
     if (trend === null || trend === undefined) return null;
     const isPos = trend >= 0;
@@ -170,6 +176,27 @@ export const AdminAnalytics = () => {
         )}
         {Math.abs(trend)}%
       </span>
+    );
+  };
+
+  // Inline trend line helper matching Screenshot 2 design
+  const renderTrendLine = (trend) => {
+    if (trend === null || trend === undefined) return null;
+    const isPos = trend >= 0;
+    return (
+      <div
+        className={`flex items-center gap-1 text-xs font-semibold mt-1.5 ${
+          isPos ? 'text-emerald-600' : 'text-rose-600'
+        }`}
+        title={`Comparison with prior ${period === 'today' ? 'day' : period === '30d' ? '30-day period' : '7-day period'}`}
+      >
+        {isPos ? (
+          <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
+        ) : (
+          <TrendingDown className="w-3.5 h-3.5 stroke-[2.5]" />
+        )}
+        <span>{isPos ? '▲' : '▼'} {Math.abs(trend)}%</span>
+      </div>
     );
   };
 
@@ -298,152 +325,127 @@ export const AdminAnalytics = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. TOP STAT CARDS ROW: Total Users, Active Users, Total Revenue, Top Cust */}
+      {/* 2. CORE PERFORMANCE KPI CARDS (2-Row Grid matching Screenshot 2)         */}
       {/* ========================================================================= */}
       <section aria-label="Core Performance KPIs">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs animate-pulse flex flex-col justify-between h-32"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="h-3 w-20 bg-neutral-200 rounded" />
-                  <div className="w-8 h-8 rounded-xl bg-neutral-200" />
-                </div>
-                <div className="h-7 w-24 bg-neutral-200 rounded my-2" />
-                <div className="h-3 w-28 bg-neutral-100 rounded" />
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="col-span-1 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs animate-pulse h-36 flex flex-col justify-between" />
+            <div className="col-span-1 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs animate-pulse h-36 flex flex-col justify-between" />
+            <div className="col-span-1 md:col-span-2 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs animate-pulse h-36 flex flex-col justify-between" />
+            <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs animate-pulse h-36 flex flex-col justify-between" />
+            <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs animate-pulse h-36 flex flex-col justify-between" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Total Users */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Row 1, Card 1: Total Users (1 col) */}
             <div
               onClick={() => setIsUsersModalOpen(true)}
-              className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer"
+              className="col-span-1 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin group-hover:text-brand-dark transition-colors">
+                <span className="text-sm font-medium text-neutral-600 font-sans group-hover:text-neutral-900 transition-colors">
                   Total Users
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-stone-100 text-stone-800 border border-stone-200 flex items-center justify-center shrink-0 group-hover:bg-brand-dark group-hover:text-white transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <Users className="w-4 h-4 stroke-[2]" />
                 </div>
               </div>
-              <div className="my-2.5 flex items-baseline justify-between gap-2">
-                <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">
+              <div className="mt-3">
+                <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   {formatNumber(totalUsersVal)}
-                </span>
-                {renderTrendBadge(totalUsersTrend)}
-              </div>
-              <div className="text-[11px] text-neutral-400 font-sans truncate group-hover:text-neutral-600 transition-colors flex items-center justify-between">
-                <span>Click to view registered users</span>
-                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                {renderTrendLine(totalUsersTrend)}
               </div>
             </div>
 
-            {/* Card 2: Active Users */}
-            <div className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition-all flex flex-col justify-between group">
+            {/* Row 1, Card 2: Active Users (1 col) */}
+            <div
+              onClick={() => setIsActiveUsersModalOpen(true)}
+              className="col-span-1 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+            >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
+                <span className="text-sm font-medium text-neutral-600 font-sans group-hover:text-neutral-900 transition-colors">
                   Active Users
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-800 border border-purple-200 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <UserCheck className="w-4 h-4 stroke-[2]" />
                 </div>
               </div>
-              <div className="my-2.5 flex items-baseline justify-between gap-2">
-                <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">
+              <div className="mt-3">
+                <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   {formatNumber(activeUsersVal)}
-                </span>
-                {renderTrendBadge(activeUsersTrend)}
-              </div>
-              <div className="text-[11px] text-neutral-400 font-sans truncate">
-                Active buyers in {periodLabel.toLowerCase()}
+                </div>
+                {renderTrendLine(activeUsersTrend)}
               </div>
             </div>
 
-            {/* Card 3: Total Revenue */}
-            <div className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition-all flex flex-col justify-between group">
+            {/* Row 1, Card 3: Total Revenue (2 cols) */}
+            <div
+              onClick={() => setIsRevenueModalOpen(true)}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+            >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
+                <span className="text-sm font-medium text-neutral-600 font-sans group-hover:text-neutral-900 transition-colors">
                   Total Revenue
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <CreditCard className="w-4 h-4 stroke-[2]" />
                 </div>
               </div>
-              <div className="my-2.5 flex items-baseline justify-between gap-2">
-                <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">
+              <div className="mt-3">
+                <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   ₹{formatCurrency(totalRevenueVal)}
-                </span>
-                {renderTrendBadge(totalRevenueTrend)}
-              </div>
-              <div className="text-[11px] text-neutral-400 font-sans truncate">
-                Net sales from confirmed orders
+                </div>
+                {renderTrendLine(totalRevenueTrend)}
               </div>
             </div>
 
-            {/* Card 4: Top Customers */}
-            <div className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs hover:border-neutral-300 hover:shadow-xs transition-all flex flex-col justify-between group">
+            {/* Row 2, Card 4: Top Customers (Top 15) (2 cols) */}
+            <div
+              onClick={() => setIsTopCustomersModalOpen(true)}
+              className="col-span-1 md:col-span-1 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+            >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
-                  Top Customers
+                <span className="text-sm font-medium text-neutral-600 font-sans group-hover:text-neutral-900 transition-colors">
+                  Top Customers (Top 15)
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center shrink-0">
-                  <Award className="w-4 h-4 stroke-[2]" />
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                  <Users className="w-4 h-4 stroke-[2]" />
                 </div>
               </div>
-              <div className="my-2.5 flex items-baseline justify-between gap-2">
-                <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">
-                  Top {topUsers.length || 0}
-                </span>
-                <span className="text-xs font-semibold text-neutral-500 font-sans">
-                  ₹{formatCurrency(topUsersTotalSpend)}
-                </span>
+              <div className="mt-3">
+                <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
+                  Top {topUsers.length || 15}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-sans mt-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-neutral-400 stroke-[2]" />
+                  <span>Users with purchases in selected period</span>
+                </div>
               </div>
-              <div className="text-[11px] text-neutral-400 font-sans truncate">
-                Ranked by spend in {periodLabel.toLowerCase()}
+            </div>
+
+            {/* Row 2, Card 5: Average Order Value (2 cols) */}
+            <div
+              className="col-span-1 md:col-span-1 lg:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs hover:border-neutral-300 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-neutral-600 font-sans group-hover:text-neutral-900 transition-colors">
+                  Average Order Value
+                </span>
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <ShoppingBag className="w-4 h-4 stroke-[2]" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
+                  ₹{formatCurrency(aovVal)}
+                </div>
+                {renderTrendLine(aovTrend)}
               </div>
             </div>
           </div>
         )}
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 3. SECONDARY STAT CARD: Average Order Value                               */}
-      {/* ========================================================================= */}
-      <section aria-label="Secondary Store Metrics">
-        <div className="bg-white border border-neutral-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 flex items-center justify-center shrink-0">
-              <ShoppingBag className="w-5 h-5 stroke-[2]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
-                  Average Order Value (AOV)
-                </span>
-                {renderTrendBadge(aovTrend)}
-              </div>
-              <div className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 mt-0.5">
-                ₹{formatCurrency(aovVal)}
-              </div>
-            </div>
-          </div>
-
-          <div className="text-xs font-sans text-neutral-500 sm:text-right">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 rounded-lg text-[11px] font-semibold text-neutral-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live scoped to {periodLabel}
-            </span>
-            <p className="mt-1 text-[11px] text-neutral-400">
-              Total revenue divided by {totalOrdersVal} confirmed {totalOrdersVal === 1 ? 'order' : 'orders'}.
-            </p>
-          </div>
-        </div>
       </section>
 
       {/* ========================================================================= */}
@@ -532,7 +534,7 @@ export const AdminAnalytics = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4 mb-6">
                   <div>
                     <h2 className="text-lg font-admin font-bold text-neutral-900 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-[#10b981]" />
+                      <BarChart3 className="w-5 h-5 text-neutral-900" />
                       <span>Graph</span>
                     </h2>
                     <p className="text-xs text-neutral-500 font-sans mt-0.5">
@@ -609,9 +611,9 @@ export const AdminAnalytics = () => {
                               </div>
                             )}
 
-                            {/* Solid Teal/Emerald Bar matching Reference Screenshot */}
+                            {/* Solid Primary Dark Bar matching Theme Palette */}
                             <div
-                              className="w-full bg-[#10b981] hover:bg-[#059669] transition-all duration-300 rounded-t-md shadow-2xs"
+                              className="w-full bg-neutral-900 hover:bg-neutral-700 transition-all duration-300 rounded-t-md shadow-2xs"
                               style={{
                                 height: `${Math.max(heightPercent, stage.value > 0 ? 2 : 0.8)}%`,
                                 minHeight: stage.value > 0 ? '4px' : '2px'
@@ -642,7 +644,7 @@ export const AdminAnalytics = () => {
                     <span className="text-[10.5px] sm:text-[11px] font-bold font-admin uppercase tracking-wider text-neutral-400 block">
                       VIEW TO CART
                     </span>
-                    <div className="text-2xl sm:text-3xl font-bold font-admin text-[#10b981] my-1">
+                    <div className="text-2xl sm:text-3xl font-bold font-admin text-neutral-950 my-1">
                       {viewToCartRate}
                     </div>
                     <span className="text-[11px] sm:text-xs text-neutral-400 font-medium font-sans block">
@@ -655,7 +657,7 @@ export const AdminAnalytics = () => {
                     <span className="text-[10.5px] sm:text-[11px] font-bold font-admin uppercase tracking-wider text-neutral-400 block">
                       CART TO CHECKOUT
                     </span>
-                    <div className="text-2xl sm:text-3xl font-bold font-admin text-[#10b981] my-1">
+                    <div className="text-2xl sm:text-3xl font-bold font-admin text-neutral-950 my-1">
                       {cartToCheckoutRate}
                     </div>
                     <span className="text-[11px] sm:text-xs text-neutral-400 font-medium font-sans block">
@@ -668,7 +670,7 @@ export const AdminAnalytics = () => {
                     <span className="text-[10.5px] sm:text-[11px] font-bold font-admin uppercase tracking-wider text-neutral-400 block">
                       CHECKOUT TO PURCHASE
                     </span>
-                    <div className="text-2xl sm:text-3xl font-bold font-admin text-[#10b981] my-1">
+                    <div className="text-2xl sm:text-3xl font-bold font-admin text-neutral-950 my-1">
                       {checkoutToPurchaseRate}
                     </div>
                     <span className="text-[11px] sm:text-xs text-neutral-400 font-medium font-sans block">
@@ -1053,6 +1055,28 @@ export const AdminAnalytics = () => {
       <RegisteredUsersModal
         isOpen={isUsersModalOpen}
         onClose={() => setIsUsersModalOpen(false)}
+        period={period}
+      />
+
+      {/* Active Customers Modal */}
+      <ActiveCustomersModal
+        isOpen={isActiveUsersModalOpen}
+        onClose={() => setIsActiveUsersModalOpen(false)}
+        period={period}
+      />
+
+      {/* Revenue Breakdown Modal */}
+      <RevenueBreakdownModal
+        isOpen={isRevenueModalOpen}
+        onClose={() => setIsRevenueModalOpen(false)}
+        period={period}
+      />
+
+      {/* Top Customers Modal */}
+      <TopCustomersModal
+        isOpen={isTopCustomersModalOpen}
+        onClose={() => setIsTopCustomersModalOpen(false)}
+        period={period}
       />
     </div>
   );
