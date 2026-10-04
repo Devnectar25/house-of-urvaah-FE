@@ -22,7 +22,12 @@ import {
   Info,
   Check,
   Filter,
-  BarChart3
+  BarChart3,
+  Search,
+  Globe,
+  Share2,
+  MousePointer,
+  ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
@@ -743,12 +748,10 @@ export const AdminAnalytics = () => {
                 {formatNumber(potentialUsersVal)}
               </span>
             </div>
-            <div className="text-[11px] text-neutral-500 font-sans pt-2 border-t border-neutral-100">
-              Online checkouts with pending payment in {periodLabel.toLowerCase()}
-            </div>
           </div>
         </div>
       </section>
+
 
       {/* ========================================================================= */}
       {/* 5. BOTTOM SECTION: Top Products & Top Categories Tables                   */}
