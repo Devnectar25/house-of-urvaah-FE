@@ -111,6 +111,26 @@
     scrollbar-width: none;
   }
 
+  .custom-modal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    display: block !important;
+  }
+  .custom-modal-scrollbar::-webkit-scrollbar-track {
+    background: #f4f4f5;
+    border-radius: 9999px;
+  }
+  .custom-modal-scrollbar::-webkit-scrollbar-thumb {
+    background: #71717a;
+    border-radius: 9999px;
+  }
+  .custom-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+  }
+  .custom-modal-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #71717a #f4f4f5;
+  }
+
   .text-shadow-subtle {
     text-shadow: 0 2px 10px rgba(0,0,0,0.3);
   }
