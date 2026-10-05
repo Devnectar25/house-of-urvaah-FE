@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, Scissors, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SEOHead } from '../components/common/SEOHead';
+import { getSupabaseMediaUrl } from '../lib/supabase';
 
 export const AboutUs = () => {
   // Ensure page scrolls to top on navigation mount
@@ -114,13 +115,13 @@ export const AboutUs = () => {
           >
             {/* Primary Image: Corset01 */}
             <img
-              src="/assets/Images/Corset01.png"
+              src={getSupabaseMediaUrl('Images/Corset01.png')}
               alt="House of Urvaah Editorial Portrait"
               className="w-full h-full object-contain filter brightness-[0.97] transition-all duration-700 ease-out group-hover:opacity-0 group-hover:scale-105"
             />
             {/* Hover Image: Corset03 */}
             <img
-              src="/assets/Images/Corset03.png"
+              src={getSupabaseMediaUrl('Images/Corset03.png')}
               alt="House of Urvaah Editorial Portrait Hover"
               className="absolute inset-0 w-full h-full object-contain filter brightness-[0.97] opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:scale-105"
             />

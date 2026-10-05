@@ -379,8 +379,8 @@ export const AdminOrders = () => {
       label: 'Total Orders',
       count: stats?.total ?? 0,
       icon: ShoppingBag,
-      colorClass: 'bg-neutral-900 text-white',
-      badgeBg: 'bg-neutral-100 text-brand-dark',
+      colorClass: 'bg-neutral-100 text-neutral-900 border border-neutral-200/80',
+      badgeBg: 'bg-neutral-200/80 text-brand-dark',
       statusFilter: 'all'
     },
     {

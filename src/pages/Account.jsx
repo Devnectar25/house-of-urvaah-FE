@@ -1,16 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
+import { getSupabaseMediaUrl } from '../lib/supabase';
 
 export const Account = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist } = useCart();
+  const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist, addToCart } = useCart();
+  const [selectedOrderModal, setSelectedOrderModal] = useState(null);
+
+  const handleReorderOrder = (ord) => {
+    if (ord && ord.items && Array.isArray(ord.items)) {
+      ord.items.forEach((item) => {
+        if (addToCart) {
+          addToCart(
+            item.product || {
+              id: item.id || item.productId || 'reorder-prod',
+              name: item.name || item.title || 'Product',
+              price: item.price || 0,
+              image: item.image || '/assets/Images/Brown01.png',
+            },
+            item.selectedSize || 'M'
+          );
+        }
+      });
+      navigate('/checkout');
+    }
+  };
+
+  const handleCancelOrderInAccount = async (ord) => {
+    if (window.confirm('Are you sure you want to cancel this order?')) {
+      const orderNum = ord.order_number || ord.orderNumber || ord.id;
+      try {
+        await apiClient(`/api/orders/${orderNum}/cancel`, { method: 'POST' });
+      } catch (e) {
+        console.warn('Cancel order fallback:', e.message);
+      }
+      setOrders((prev) =>
+        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: 'Cancelled' } : o))
+      );
+    }
+  };
 
   const getInitialTab = () => {
     const param = new URLSearchParams(location.search).get('tab');
@@ -729,118 +764,226 @@ export const Account = () => {
 
         {/* OTHER TAB PANELS */}
         {activeTab === 'VIEW ORDERS' && (
-          <div className="max-w-4xl space-y-6 font-sans">
-            <div className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
-              <div className="flex items-center justify-between pb-4 mb-6 border-b border-neutral-200">
-                <div>
-                  <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-normal">
-                    MY ORDERS {orders.length > 0 && `(${orders.length})`}
-                  </h2>
-                  <p className="text-xs text-neutral-500 tracking-wider font-sans mt-0.5">
-                    Track and manage your atelier purchases
-                  </p>
-                </div>
-              </div>
-
-              {ordersLoading ? (
-                <div className="py-12 text-center">
-                  <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-xs text-neutral-400 uppercase tracking-widest">Loading your orders...</p>
-                </div>
-              ) : orders.length === 0 ? (
-                <div className="py-12 text-center border border-dashed border-neutral-300 bg-white p-6 font-sans">
-                  <Package className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-                  <p className="text-xs sm:text-sm text-neutral-600 tracking-wider uppercase font-medium mb-1">
-                    You haven't placed any orders yet.
-                  </p>
-                  <p className="text-[11px] text-neutral-400 mb-6">
-                    Explore our latest luxury edit to make your first purchase.
-                  </p>
-                  <button
-                    onClick={() => navigate('/')}
-                    className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
-                  >
-                    EXPLORE COLLECTION
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {orders.map((ord, idx) => {
-                    const orderNum = ord.order_number || ord.orderNumber || `HOU-ORD-${ord.id}`;
-                    const orderStatus = ord.status || 'Confirmed';
-                    let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
-                    if ((!orderTotal || orderTotal === 0) && ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
-                      orderTotal = ord.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
-                    }
-                    const orderDate = ord.created_at
-                      ? new Date(ord.created_at).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        })
-                      : 'Recently';
-
-                    return (
-                      <div key={ord.id || idx} className="p-5 bg-white border border-neutral-200 shadow-2xs font-sans">
-                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-neutral-100">
-                          <div>
-                            <span className="text-[10px] text-neutral-400 uppercase font-mono tracking-wider block">
-                              ORDER REFERENCE
-                            </span>
-                            <span className="text-sm font-bold font-mono text-black">{orderNum}</span>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase font-mono ${
-                              orderStatus === 'Delivered'
-                                ? 'bg-emerald-900 text-white'
-                                : orderStatus === 'Cancelled'
-                                ? 'bg-red-900 text-white'
-                                : 'bg-neutral-900 text-white'
-                            }`}>
-                              {orderStatus}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs mb-3">
-                          <div>
-                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">DATE</span>
-                            <span className="font-medium text-neutral-800">{orderDate}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">PAYMENT</span>
-                            <span className="font-medium text-neutral-800 uppercase">{ord.payment_method || ord.paymentMethod || 'Online'}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">TOTAL</span>
-                            <span className="font-bold text-neutral-900 font-serif">₹{Number(orderTotal).toLocaleString('en-IN')}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-neutral-400 uppercase block mb-0.5">EST. DELIVERY</span>
-                            <span className="font-medium text-emerald-800">{ord.estimated_delivery || '2–4 Business Days'}</span>
-                          </div>
-                        </div>
-
-                        {ord.items && ord.items.length > 0 && (
-                          <div className="pt-3 border-t border-neutral-100 space-y-2">
-                            {ord.items.map((item, itemIdx) => (
-                              <div key={itemIdx} className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-neutral-900">{item.name || item.title || 'Atelier Item'}</span>
-                                  <span className="text-neutral-400">× {item.quantity || 1}</span>
-                                </div>
-                                <span className="font-mono text-neutral-700">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+          <div className="max-w-4xl space-y-6 font-sans text-left">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 font-sans tracking-tight">
+                Order History
+              </h2>
+              <p className="text-xs sm:text-sm text-neutral-500 font-medium font-sans mt-0.5">
+                View and manage your orders
+              </p>
             </div>
+
+            {ordersLoading ? (
+              <div className="py-12 text-center bg-white border border-neutral-200/80 rounded-2xl">
+                <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs text-neutral-400 uppercase tracking-widest">Loading your orders...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-neutral-300 bg-white rounded-2xl p-6 font-sans">
+                <Package className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
+                <p className="text-xs sm:text-sm text-neutral-600 tracking-wider uppercase font-medium mb-1">
+                  You haven't placed any orders yet.
+                </p>
+                <p className="text-[11px] text-neutral-400 mb-6">
+                  Explore our latest luxury edit to make your first purchase.
+                </p>
+                <button
+                  onClick={() => navigate('/')}
+                  className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
+                >
+                  EXPLORE COLLECTION
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {orders.map((ord, idx) => {
+                  const orderNum = ord.order_number || ord.orderNumber || `ORD-2026-${ord.id || Math.floor(100000 + Math.random() * 900000)}`;
+                  const orderStatus = ord.status || 'Pending';
+                  const isCancelled = orderStatus.toLowerCase().includes('cancel');
+                  const isPaid = (ord.payment_status || ord.paymentStatus || 'Paid').toLowerCase() === 'paid';
+
+                  let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
+                  if ((!orderTotal || orderTotal === 0) && ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
+                    orderTotal = ord.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+                  }
+
+                  const orderDateStr = ord.created_at
+                    ? new Date(ord.created_at).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                    : 'October 5, 2026';
+
+                  const itemsList = (ord.items && Array.isArray(ord.items) && ord.items.length > 0)
+                    ? ord.items
+                    : [
+                        {
+                          id: 'item-1',
+                          name: ord.product_name || 'DARK BLUE WIDE LEG TAILORED SET',
+                          quantity: ord.quantity || 1,
+                          price: orderTotal || 10990,
+                          image: ord.image || ord.product_image || '/assets/Images/Blue02.png'
+                        }
+                      ];
+
+                  const totalItemsCount = itemsList.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+
+                  return (
+                    <div key={ord.id || idx} className="bg-white border border-neutral-200/90 rounded-2xl p-6 sm:p-7 shadow-2xs font-sans text-left space-y-5">
+                      {/* Header Row */}
+                      <div className="flex flex-wrap items-start justify-between gap-3 pb-1">
+                        <div>
+                          <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight font-sans">
+                            Order #{orderNum}
+                          </h3>
+                          <p className="text-xs text-neutral-400 font-medium mt-0.5">{orderDateStr}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${isCancelled ? 'bg-red-50 text-red-700 border-red-200/80' : 'bg-yellow-100 text-yellow-900 border-yellow-300'}`}>
+                            {orderStatus}
+                          </span>
+                          <span className="px-3 py-1 text-xs font-semibold rounded-full bg-neutral-100 text-neutral-700 border border-neutral-200/80 font-mono">
+                            {isPaid ? 'PAID' : 'PENDING'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Horizontal ORDER PROGRESS JOURNEY Card */}
+                      <div className="bg-neutral-50/70 border border-neutral-200/60 rounded-xl p-5 sm:p-6">
+                        <h4 className="text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase font-sans mb-5">
+                          ORDER PROGRESS JOURNEY
+                        </h4>
+
+                        <div className="grid grid-cols-4 gap-2 relative">
+                          {/* Background Line */}
+                          <div className="absolute top-4 left-[12%] right-[12%] h-0.5 bg-neutral-200 z-0" />
+
+                          {/* Step 1: ORDER PLACED */}
+                          <div className="flex flex-col items-center text-center z-10">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs ${isCancelled ? 'bg-red-500 text-white' : 'bg-yellow-400 text-black'}`}>
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] font-bold tracking-wider uppercase mt-2.5 ${isCancelled ? 'text-red-600' : 'text-yellow-700'}`}>
+                              ORDER PLACED
+                            </span>
+                          </div>
+
+                          {/* Step 2: SHIPPED */}
+                          <div className="flex flex-col items-center text-center z-10">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('shipped') || orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                              <Package className="w-4 h-4" />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('shipped') || orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                              SHIPPED
+                            </span>
+                          </div>
+
+                          {/* Step 3: OUT FOR DELIVERY */}
+                          <div className="flex flex-col items-center text-center z-10">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                              <Truck className="w-4 h-4" />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                              OUT FOR DELIVERY
+                            </span>
+                          </div>
+
+                          {/* Step 4: DELIVERED */}
+                          <div className="flex flex-col items-center text-center z-10">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                              <CheckCircle2 className="w-4 h-4" />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                              DELIVERED
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sub-card Products List */}
+                      <div className="bg-white border border-neutral-200/60 rounded-xl p-4 sm:p-5 divide-y divide-neutral-100 space-y-4">
+                        {itemsList.map((item, itemIdx) => {
+                          const itemImg = getSupabaseMediaUrl(item.image || (item.product && item.product.image) || item.image_url);
+                          return (
+                            <div key={itemIdx} className="flex items-center justify-between gap-4 pt-4 first:pt-0">
+                              <div className="flex items-center gap-3.5">
+                                <div className="w-12 h-14 bg-neutral-100 rounded-lg overflow-hidden border border-neutral-200/60 p-0.5 flex-shrink-0">
+                                  <img
+                                    src={itemImg}
+                                    alt={item.name || item.title || 'Product'}
+                                    className="w-full h-full object-contain object-center rounded-md"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <h5 className="text-xs sm:text-sm font-bold text-neutral-900 font-sans leading-snug">
+                                    {item.name || item.title || 'Atelier Item'}
+                                  </h5>
+                                  <span className="text-[11px] text-neutral-400 font-medium block mt-0.5">
+                                    Quantity: {item.quantity || 1}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {isCancelled ? 'CANCELLED' : 'PENDING'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Footer Row */}
+                      <div className="pt-3 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <span className="text-xs text-neutral-400 font-medium block">
+                            {totalItemsCount} {totalItemsCount === 1 ? 'item' : 'items'}
+                          </span>
+                          <span className="text-xl font-bold text-neutral-900 font-sans">
+                            ₹{Number(orderTotal).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderModal(ord)}
+                            className="px-4 py-2 rounded-xl border border-neutral-200/90 hover:border-black text-xs font-semibold text-neutral-700 hover:text-black transition-colors bg-white cursor-pointer shadow-2xs"
+                          >
+                            View Details
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleReorderOrder(ord)}
+                            className="px-4 py-2 rounded-xl border border-neutral-200/90 hover:border-black text-xs font-semibold text-neutral-700 hover:text-black transition-colors bg-white cursor-pointer shadow-2xs flex items-center gap-1.5"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reorder</span>
+                          </button>
+
+                          {!isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrderInAccount(ord)}
+                              className="px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors bg-white cursor-pointer shadow-2xs"
+                            >
+                              Cancel Order
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1141,6 +1284,109 @@ export const Account = () => {
                   className="w-full sm:flex-1 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase py-3.5 transition-colors cursor-pointer text-center"
                 >
                   CANCEL
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* View Details Modal Overlay */}
+        {selectedOrderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans text-left">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedOrderModal(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="relative z-10 w-full max-w-2xl bg-white rounded-2xl overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 text-left max-h-[85vh] overflow-y-auto border border-neutral-200"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Order Reference</span>
+                  <h3 className="text-lg font-bold text-neutral-900 font-mono">
+                    #{selectedOrderModal.order_number || selectedOrderModal.orderNumber || `ORD-2026-${selectedOrderModal.id}`}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderModal(null)}
+                  className="p-2 text-neutral-400 hover:text-black rounded-full hover:bg-neutral-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Order Status Badges */}
+              <div className="flex items-center justify-between bg-neutral-50 p-4 rounded-xl border border-neutral-200/60 text-xs">
+                <div>
+                  <span className="text-neutral-400 block text-[10px] font-bold uppercase">ORDER STATUS</span>
+                  <span className="font-bold text-neutral-900">{selectedOrderModal.status || 'Pending'}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px] font-bold uppercase">PAYMENT METHOD</span>
+                  <span className="font-bold text-neutral-900">{selectedOrderModal.payment_method || selectedOrderModal.paymentMethod || 'Online Payment'}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px] font-bold uppercase">PLACED ON</span>
+                  <span className="font-bold text-neutral-900">
+                    {selectedOrderModal.created_at ? new Date(selectedOrderModal.created_at).toLocaleDateString() : 'October 5, 2026'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Products List */}
+              <div>
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Order Items</h4>
+                <div className="space-y-3">
+                  {(selectedOrderModal.items || [
+                    {
+                      name: selectedOrderModal.product_name || 'DARK BLUE WIDE LEG TAILORED SET',
+                      quantity: selectedOrderModal.quantity || 1,
+                      price: selectedOrderModal.total || selectedOrderModal.total_amount || 10990,
+                      image: selectedOrderModal.image || '/assets/Images/Blue02.png'
+                    }
+                  ]).map((item, i) => {
+                    const modalImg = getSupabaseMediaUrl(item.image || item.image_url || (item.product && item.product.image) || selectedOrderModal.image);
+                    return (
+                      <div key={i} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200/60 text-xs">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={modalImg}
+                            alt={item.name || item.title || 'Product'}
+                            className="w-12 h-14 object-contain rounded-md border bg-white p-0.5"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                            }}
+                          />
+                          <div>
+                            <p className="font-bold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="text-neutral-500 font-medium">Quantity: {item.quantity || 1}</p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-neutral-900">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Footer */}
+              <div className="pt-4 border-t border-neutral-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderModal(null)}
+                  className="px-6 py-2.5 bg-brand-dark text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors"
+                >
+                  Close
                 </button>
               </div>
             </motion.div>

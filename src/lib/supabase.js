@@ -17,26 +17,40 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
  * Ensures 100% of images and videos are loaded directly from Supabase Storage CDN
  */
 export const getSupabaseMediaUrl = (path) => {
-  if (!path) return "";
-  if (typeof path !== 'string') return "";
-  
-  // If it is a localhost URL from legacy mock data or dev server on arbitrary ports, sanitize it
-  if (path.includes("localhost:")) {
-    path = path.replace(/^https?:\/\/localhost(:\d+)?\/?/, "");
-  } else if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
+  if (!path || typeof path !== 'string' || path.trim() === '') {
+    return `${CDN_BASE_URL}/Images/Blue02.png`;
   }
 
-  let cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  let cleanPath = path.trim();
+
+  // If already absolute URL or data URL
+  if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://") || cleanPath.startsWith("data:")) {
+    return cleanPath;
+  }
+
+  // Handle localhost links
+  if (cleanPath.includes("localhost:")) {
+    cleanPath = cleanPath.replace(/^https?:\/\/localhost(:\d+)?\/?/, "");
+  }
+
+  // Strip leading slash
+  if (cleanPath.startsWith("/")) {
+    cleanPath = cleanPath.slice(1);
+  }
+
+  // Remove "assets/" prefix if present to route directly to Supabase CDN bucket
+  if (cleanPath.startsWith("assets/")) {
+    cleanPath = cleanPath.replace(/^assets\//, "");
+  }
+
+  // Handle legacy broken Corset_Blue1 reference
+  if (cleanPath.includes("Corset_Blue1")) {
+    cleanPath = "Images/Blue02.png";
+  }
 
   // Handle HOU_desktop aliases
   if (cleanPath.includes("HOU_desktop")) {
     return `${CDN_BASE_URL}/videos/HOU_desktop%20video.mp4.mp4`;
-  }
-
-  // Remove "assets/" prefix if present
-  if (cleanPath.startsWith("assets/")) {
-    cleanPath = cleanPath.replace(/^assets\//, "");
   }
 
   // Normalize "video/" to "videos/" to match Supabase bucket folder
