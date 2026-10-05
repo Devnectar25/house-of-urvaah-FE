@@ -113,6 +113,7 @@ export const Checkout = () => {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [placedOrderNumber, setPlacedOrderNumber] = useState('');
   const [paymentErrorMessage, setPaymentErrorMessage] = useState('');
+  const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(0);
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -235,7 +236,9 @@ export const Checkout = () => {
     });
   };
 
-  const finalizeOrderSuccess = (orderNumber) => {
+  const finalizeOrderSuccess = (orderNumber, amount) => {
+    const finalPaid = (amount !== undefined && amount > 0) ? amount : (grandTotal || 0);
+    setConfirmedGrandTotal(finalPaid);
     if (clearCart) clearCart();
     setPlacedOrderNumber(orderNumber);
     setIsPlacingOrder(false);
@@ -243,7 +246,7 @@ export const Checkout = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const verifyAndCompletePayment = async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id, orderNumber }) => {
+  const verifyAndCompletePayment = async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id, orderNumber, amountPaid }) => {
     try {
       const verifyRes = await apiClient('/api/payments/verify', {
         method: 'POST',
@@ -256,7 +259,7 @@ export const Checkout = () => {
       });
 
       if (verifyRes && verifyRes.success) {
-        finalizeOrderSuccess(orderNumber);
+        finalizeOrderSuccess(orderNumber, amountPaid || grandTotal);
       } else {
         setIsPlacingOrder(false);
         setPaymentErrorMessage(verifyRes?.message || 'Payment verification failed. Your items remain saved in your bag so you can try again.');
@@ -264,7 +267,7 @@ export const Checkout = () => {
     } catch (err) {
       console.warn('Payment verification API warning:', err.message);
       // Finalize order gracefully so user is confirmed
-      finalizeOrderSuccess(orderNumber);
+      finalizeOrderSuccess(orderNumber, amountPaid || grandTotal);
     }
   };
 
@@ -278,7 +281,7 @@ export const Checkout = () => {
     if (!cleanPhone) {
       errors.phone = 'Phone number is required.';
     } else if (cleanPhone.length !== 10) {
-      errors.phone = 'Phone number must be a valid 10-digit mobile number.';
+      errors.phone = 'Phone number must be exactly 10 digits.';
     }
     if (!newShippingForm.street || !newShippingForm.street.trim()) {
       errors.street = 'Street address / flat / building is required.';
@@ -368,6 +371,7 @@ export const Checkout = () => {
     e.preventDefault();
     setIsPlacingOrder(true);
     setPaymentErrorMessage('');
+    setConfirmedGrandTotal(grandTotal);
 
     try {
       const selectedAddr = (showNewAddressForm || addresses.length === 0)
@@ -441,13 +445,13 @@ export const Checkout = () => {
             body: JSON.stringify(orderPayload)
           });
           if (res && res.success && res.data) {
-            finalizeOrderSuccess(res.data.order_number || randomOrderNum);
+            finalizeOrderSuccess(res.data.order_number || randomOrderNum, grandTotal);
             return;
           }
         } catch (err) {
           console.warn('COD order API fallback:', err.message);
         }
-        finalizeOrderSuccess(randomOrderNum);
+        finalizeOrderSuccess(randomOrderNum, grandTotal);
         return;
       }
 
@@ -628,7 +632,7 @@ export const Checkout = () => {
                 Total Paid
               </span>
               <span className="text-base font-bold text-neutral-900 font-serif">
-                {formatPrice(grandTotal)}
+                {formatPrice(confirmedGrandTotal || grandTotal)}
               </span>
             </div>
           </div>
@@ -639,7 +643,8 @@ export const Checkout = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              to="/account"
+              to="/account?tab=VIEW ORDERS"
+              state={{ tab: 'VIEW ORDERS' }}
               className="w-full sm:w-auto bg-brand-dark text-white text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:bg-neutral-800 transition-colors"
             >
               VIEW MY ORDERS
@@ -901,14 +906,21 @@ export const Checkout = () => {
                       <input
                         type="tel"
                         required
+                        maxLength={10}
                         value={newShippingForm.phone}
-                        onChange={(e) =>
-                          setNewShippingForm({ ...newShippingForm, phone: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setNewShippingForm({ ...newShippingForm, phone: val });
+                          if (val.length > 0 && val.length !== 10) {
+                            setNewAddressErrors((prev) => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+                          } else {
+                            setNewAddressErrors((prev) => ({ ...prev, phone: null }));
+                          }
+                        }}
                         className={`w-full px-3.5 py-2.5 bg-white border ${
                           newAddressErrors.phone ? 'border-red-500' : 'border-neutral-300'
                         } focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
-                        placeholder="+91 98765 43210"
+                        placeholder="+91 XXXXX XXXXX"
                       />
                       {newAddressErrors.phone && (
                         <p className="text-[10px] text-red-600 mt-0.5">{newAddressErrors.phone}</p>
@@ -965,10 +977,17 @@ export const Checkout = () => {
                       <input
                         type="text"
                         required
+                        maxLength={6}
                         value={newShippingForm.pincode}
-                        onChange={(e) =>
-                          setNewShippingForm({ ...newShippingForm, pincode: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                          setNewShippingForm({ ...newShippingForm, pincode: val });
+                          if (val.length > 0 && val.length !== 6) {
+                            setNewAddressErrors((prev) => ({ ...prev, pincode: 'Pincode must be exactly 6 digits.' }));
+                          } else {
+                            setNewAddressErrors((prev) => ({ ...prev, pincode: null }));
+                          }
+                        }}
                         className={`w-full px-3.5 py-2.5 bg-white border ${
                           newAddressErrors.pincode ? 'border-red-500' : 'border-neutral-300'
                         } focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
@@ -1111,98 +1130,7 @@ export const Checkout = () => {
               </div>
             </section>
 
-            {/* 4. BILLING ADDRESS SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
-              <div className="mb-4 pb-3 border-b border-neutral-200">
-                <h2 className="text-base sm:text-lg font-serif tracking-[0.15em] uppercase text-black font-medium flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center font-sans font-bold">
-                    4
-                  </span>
-                  BILLING ADDRESS
-                </h2>
-              </div>
 
-              <div className="space-y-3 font-sans text-xs">
-                <label
-                  onClick={() => setBillingOption('same')}
-                  className={`block p-3.5 bg-white border cursor-pointer transition-all ${
-                    billingOption === 'same'
-                      ? 'border-brand-dark ring-2 ring-brand-dark/20'
-                      : 'border-neutral-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="billingOption"
-                      checked={billingOption === 'same'}
-                      onChange={() => setBillingOption('same')}
-                      className="accent-black"
-                    />
-                    <span className="font-semibold text-neutral-900 uppercase">
-                      SAME AS SHIPPING ADDRESS
-                    </span>
-                  </div>
-                </label>
-
-                <label
-                  onClick={() => setBillingOption('different')}
-                  className={`block p-3.5 bg-white border cursor-pointer transition-all ${
-                    billingOption === 'different'
-                      ? 'border-brand-dark ring-2 ring-brand-dark/20'
-                      : 'border-neutral-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="billingOption"
-                      checked={billingOption === 'different'}
-                      onChange={() => setBillingOption('different')}
-                      className="accent-black"
-                    />
-                    <span className="font-semibold text-neutral-900 uppercase">
-                      USE A DIFFERENT BILLING ADDRESS
-                    </span>
-                  </div>
-                </label>
-
-                {billingOption === 'different' && (
-                  <div className="pt-3 space-y-3 bg-white p-4 border border-neutral-200 mt-2">
-                    <input
-                      type="text"
-                      placeholder="Billing Full Name"
-                      value={billingForm.fullName}
-                      onChange={(e) => setBillingForm({ ...billingForm, fullName: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Billing Address / Flat / Building"
-                      value={billingForm.street}
-                      onChange={(e) => setBillingForm({ ...billingForm, street: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 text-xs"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        placeholder="City"
-                        value={billingForm.city}
-                        onChange={(e) => setBillingForm({ ...billingForm, city: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 text-xs"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Pincode"
-                        value={billingForm.pincode}
-                        onChange={(e) => setBillingForm({ ...billingForm, pincode: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 text-xs"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
 
             {/* 5. PRIMARY CTA BUTTON */}
             <div className="pt-2">
@@ -1445,8 +1373,18 @@ export const Checkout = () => {
                   </label>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={editingAddressForm.phone}
-                    onChange={(e) => setEditingAddressForm({ ...editingAddressForm, phone: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setEditingAddressForm({ ...editingAddressForm, phone: val });
+                      if (val.length > 0 && val.length !== 10) {
+                        setEditingAddressErrors((prev) => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+                      } else {
+                        setEditingAddressErrors((prev) => ({ ...prev, phone: null }));
+                      }
+                    }}
+                    placeholder="+91 XXXXX XXXXX"
                     className="w-full px-3.5 py-2.5 border border-neutral-300 focus:border-black outline-none text-sm"
                   />
                   {editingAddressErrors.phone && (
@@ -1491,8 +1429,17 @@ export const Checkout = () => {
                     </label>
                     <input
                       type="text"
+                      maxLength={6}
                       value={editingAddressForm.pincode}
-                      onChange={(e) => setEditingAddressForm({ ...editingAddressForm, pincode: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setEditingAddressForm({ ...editingAddressForm, pincode: val });
+                        if (val.length > 0 && val.length !== 6) {
+                          setEditingAddressErrors((prev) => ({ ...prev, pincode: 'Pincode must be exactly 6 digits.' }));
+                        } else {
+                          setEditingAddressErrors((prev) => ({ ...prev, pincode: null }));
+                        }
+                      }}
                       className="w-full px-3.5 py-2.5 border border-neutral-300 focus:border-black outline-none text-sm"
                     />
                     {editingAddressErrors.pincode && (

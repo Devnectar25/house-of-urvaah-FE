@@ -547,22 +547,22 @@ export const AuthModal = () => {
                           PHONE NUMBER *
                         </label>
                         <div className="relative">
-                          <div className="absolute left-3 top-2.5 text-xs text-neutral-500 font-medium flex items-center gap-1 border-r border-neutral-300 pr-2">
+                          <div className="absolute left-3 top-2.5 text-xs text-neutral-500 font-medium flex items-center gap-1.5 border-r border-neutral-300 pr-2">
                             <span>+91</span>
                           </div>
                           <input
                             type="tel"
-                            value={phone}
-                            maxLength={10}
+                            value={phone.length > 5 ? `${phone.slice(0, 5)} ${phone.slice(5, 10)}` : phone}
+                            maxLength={11}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '');
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
                               setPhone(val);
                               if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: '' }));
                             }}
-                            placeholder="9876543210"
+                            placeholder="XXXXX XXXXX"
                             className={`w-full bg-white border ${
                               fieldErrors.phone ? 'border-red-500' : 'border-neutral-300'
-                            } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                            } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium tracking-wider focus:outline-none focus:border-black transition-colors`}
                             autoFocus
                           />
                         </div>

@@ -99,52 +99,6 @@ const GRAM_VIDEOS = [
     }
   },
   {
-    id: 'gram-3',
-    src: '/assets/video/Video3.mp4',
-    title: 'SUMMER DRESSES',
-    category: 'EDITORIAL CAPSULE',
-    handle: '@houseofurvaah',
-    link: '#summer-dresses',
-    product: {
-      id: 'gram-prod-3',
-      name: 'BLUE FLORAL HALTER CO-ORD SET',
-      price: 3999,
-      formattedPrice: '₹ 3,999',
-      category: 'SUMMER DRESSES',
-      subcategory: 'Printed Ensembles',
-      tag: 'VIRAL LOOK',
-      image: '/assets/Images/Blue_Halter.jpg',
-      hoverImage: '/assets/Images/Blue02.png',
-      gallery: [
-        '/assets/Images/Blue_Halter.jpg',
-        '/assets/Images/Blue02.png',
-        '/assets/Images/Blue03.png'
-      ],
-      colors: ['#5B9BD5', '#E8EFF9'],
-      sizes: ['XS', 'S', 'M', 'L'],
-      description: 'Airy cyan blue botanical printed halter ensemble with tassel pom-pom trim and tie-back backless detail.',
-      specs: {
-        color: 'Cyan Floral Multi',
-        fabric: 'Fine Cotton Voile',
-        topTitle: 'Top:',
-        top: {
-          'Type': 'Halter Crop Top',
-          'Fit': 'Slim Fit',
-          'Length': 'Crop',
-          'Neck': 'Self-Tie Halter Neck',
-          'Sleeves': 'Sleeveless'
-        },
-        bottomTitle: 'Skirt:',
-        bottom: {
-          'Length': '17 Inches',
-          'Fit': 'Flared with Pom-Pom Hem',
-          'Waist': 'High Rise',
-          'Closure': 'Elasticized Smocked Waist'
-        }
-      }
-    }
-  },
-  {
     id: 'gram-4',
     src: '/assets/video/Video4.mp4',
     title: 'PARTY WEAR',
@@ -236,46 +190,47 @@ const GRAM_VIDEOS = [
     }
   },
   {
-    id: 'gram-6',
-    src: '/assets/video/Video1.mp4',
-    title: 'TAILORED BLAZERS',
-    category: 'RUNWAY EDIT',
+    id: 'gram-3',
+    src: '/assets/video/Video3.mp4',
+    title: 'SUMMER DRESSES',
+    category: 'EDITORIAL CAPSULE',
     handle: '@houseofurvaah',
-    link: '#runway',
+    link: '#summer-dresses',
     product: {
-      id: 'gram-prod-6',
-      name: 'DOUBLE-BREASTED OVERSIZED BLAZER',
-      price: 8990,
-      formattedPrice: '₹ 8,990',
-      category: 'PARTY WEAR',
-      subcategory: 'Blazers & Tailoring',
-      tag: 'ICONIC',
-      image: '/assets/Images/Brown02.png',
-      hoverImage: '/assets/Images/Brown01.png',
+      id: 'gram-prod-3',
+      name: 'BLUE FLORAL HALTER CO-ORD SET',
+      price: 3999,
+      formattedPrice: '₹ 3,999',
+      category: 'SUMMER DRESSES',
+      subcategory: 'Printed Ensembles',
+      tag: 'VIRAL LOOK',
+      image: '/assets/Images/Blue_Halter.jpg',
+      hoverImage: '/assets/Images/Blue02.png',
       gallery: [
-        '/assets/Images/Brown02.png',
-        '/assets/Images/Brown01.png',
-        '/assets/Images/Brown04.png'
+        '/assets/Images/Blue_Halter.jpg',
+        '/assets/Images/Blue02.png',
+        '/assets/Images/Blue03.png'
       ],
-      colors: ['#4A3B32', '#111111'],
+      colors: ['#5B9BD5', '#E8EFF9'],
       sizes: ['XS', 'S', 'M', 'L'],
-      description: 'Architectural oversized tailored blazer with structured shoulders, peak lapels, and horn buttons.',
+      description: 'Airy cyan blue botanical printed halter ensemble with tassel pom-pom trim and tie-back backless detail.',
       specs: {
-        color: 'Taupe Umber',
-        fabric: 'Wool Blend Suiting Crepe',
-        topTitle: 'Blazer:',
+        color: 'Cyan Floral Multi',
+        fabric: 'Fine Cotton Voile',
+        topTitle: 'Top:',
         top: {
-          'Type': 'Double-Breasted Blazer',
-          'Fit': 'Oversized Boyfriend Silhouette',
-          'Length': '30 Inches',
-          'Lapel': 'Peak Lapel',
-          'Sleeves': 'Long Sleeves with Horn Buttons'
+          'Type': 'Halter Crop Top',
+          'Fit': 'Slim Fit',
+          'Length': 'Crop',
+          'Neck': 'Self-Tie Halter Neck',
+          'Sleeves': 'Sleeveless'
         },
-        bottomTitle: 'Details:',
+        bottomTitle: 'Skirt:',
         bottom: {
-          'Pockets': 'Flap Jet Pockets',
-          'Vents': 'Dual Back Vents',
-          'Lining': 'Full Viscose Satin'
+          'Length': '17 Inches',
+          'Fit': 'Flared with Pom-Pom Hem',
+          'Waist': 'High Rise',
+          'Closure': 'Elasticized Smocked Waist'
         }
       }
     }
@@ -757,7 +712,7 @@ export const TrendingOnGram = () => {
   };
 
   return (
-    <section className="py-12 md:py-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
+    <section className="pt-[100px] pb-12 md:pb-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching BestSellers typography and left alignment */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
@@ -773,7 +728,7 @@ export const TrendingOnGram = () => {
           - Desktop (lg): 4-column horizontal layout showing exactly the 4 primary videos
           - Mobile / Tablet (< lg): Smooth horizontal scroll carousel showing 1-2 cards at a time
       */}
-      <div className="flex lg:grid lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none">
+      <div className="flex lg:grid lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none">
         {GRAM_VIDEOS.map((item, idx) => (
           <motion.div
             key={item.id}
@@ -781,8 +736,7 @@ export const TrendingOnGram = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
-            className={`snap-center flex-shrink-0 w-[72vw] sm:w-[46vw] md:w-[36vw] lg:w-auto ${idx >= 4 ? 'lg:hidden' : ''
-              }`}
+            className="snap-center flex-shrink-0 w-[72vw] sm:w-[46vw] md:w-[36vw] lg:w-auto"
           >
             <VideoCard
               item={item}
