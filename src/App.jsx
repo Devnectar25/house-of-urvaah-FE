@@ -37,6 +37,27 @@ import { AdminCustomers } from './pages/admin/AdminCustomers';
 import { AdminReviews } from './pages/admin/AdminReviews';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminSettings } from './pages/admin/AdminSettings';
+import { AdminSubAdmins } from './pages/admin/AdminSubAdmins';
+import { getStoredUser } from './lib/apiClient';
+
+function PermissionGuard({ moduleKey, children }) {
+  const user = getStoredUser();
+  const isSuperAdmin = !user?.role || user?.role === 'super_admin' || user?.username === 'Admin';
+  const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+
+  const hasAccess =
+    isSuperAdmin ||
+    permissions.includes(moduleKey) ||
+    (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
+
+  if (hasAccess) {
+    return children;
+  }
+
+  return <Navigate to="/admin/dashboard?error=restricted" replace />;
+}
+
+
 
 import { useCart } from './context/CartContext';
 import { SEOHead } from './components/common/SEOHead';
@@ -156,20 +177,22 @@ export function AppContent() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="products" element={<AdminProducts />} />
-        <Route path="products/new" element={<AdminProducts />} />
-        <Route path="products/:id/edit" element={<AdminProducts />} />
+        <Route path="products" element={<PermissionGuard moduleKey="products"><AdminProducts /></PermissionGuard>} />
+        <Route path="products/new" element={<PermissionGuard moduleKey="products"><AdminProducts /></PermissionGuard>} />
+        <Route path="products/:id/edit" element={<PermissionGuard moduleKey="products"><AdminProducts /></PermissionGuard>} />
 
-        <Route path="categories" element={<AdminCategories />} />
-        <Route path="orders" element={<AdminOrders />} />
-        <Route path="coupons" element={<AdminCoupons />} />
-        <Route path="customers" element={<AdminCustomers />} />
-        <Route path="refunds" element={<AdminRefundDesk />} />
-        <Route path="refund-desk" element={<AdminRefundDesk />} />
-        <Route path="reviews" element={<AdminReviews />} />
-        <Route path="analytics" element={<AdminAnalytics />} />
-        <Route path="settings" element={<AdminSettings />} />
+        <Route path="categories" element={<PermissionGuard moduleKey="categories"><AdminCategories /></PermissionGuard>} />
+        <Route path="orders" element={<PermissionGuard moduleKey="orders"><AdminOrders /></PermissionGuard>} />
+        <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} />
+        <Route path="customers" element={<PermissionGuard moduleKey="customers"><AdminCustomers /></PermissionGuard>} />
+        <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
+        <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
+        <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
+        <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
+        <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
+        <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />
         <Route path="*" element={<AdminDashboard />} />
+
       </Route>
 
       {/* Customer Storefront Routes */}

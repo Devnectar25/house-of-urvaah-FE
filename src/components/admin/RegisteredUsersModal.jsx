@@ -92,11 +92,11 @@ export const RegisteredUsersModal = ({ isOpen, onClose, period = '30d' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-neutral-200">
+    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
+      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
         
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-white sticky top-0 z-20">
+        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-900 border border-neutral-200 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5 stroke-[2]" />
@@ -126,7 +126,7 @@ export const RegisteredUsersModal = ({ isOpen, onClose, period = '30d' }) => {
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full border border-neutral-300 hover:border-neutral-900 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full border border-neutral-300 hover:border-neutral-900 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title="Close modal"
             >
               <X className="w-4 h-4 stroke-[2]" />
@@ -135,7 +135,7 @@ export const RegisteredUsersModal = ({ isOpen, onClose, period = '30d' }) => {
         </div>
 
         {/* Modal Toolbar: Search & Count Summary */}
-        <div className="px-6 py-3 border-b border-neutral-200/80 bg-neutral-50/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="px-6 py-3 border-b border-neutral-200/80 bg-neutral-50/60 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -277,7 +277,7 @@ export const RegisteredUsersModal = ({ isOpen, onClose, period = '30d' }) => {
 
         {/* Modal Footer: Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-center text-xs text-neutral-500 font-sans">
+          <div className="px-6 py-3 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-center text-xs text-neutral-500 font-sans shrink-0">
             <div className="flex items-center gap-2">
               <span className="mr-2 text-neutral-600 text-[11px]">
                 Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>

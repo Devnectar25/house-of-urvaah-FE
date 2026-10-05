@@ -16,23 +16,27 @@ import {
   LogOut,
   ExternalLink,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
-import { getStoredUser, clearAuthSession } from '../../lib/apiClient';
+import { getStoredUser, setStoredUser, clearAuthSession, apiClient } from '../../lib/apiClient';
+
 import { useCart } from '../../context/CartContext';
 
-const NAV_ITEMS = [
-  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, exact: true },
-  { name: 'Products', path: '/admin/products', icon: Package },
-  { name: 'Categories', path: '/admin/categories', icon: FolderTree },
-  { name: 'Orders', path: '/admin/orders', icon: ShoppingCart },
-  { name: 'Coupons', path: '/admin/coupons', icon: Ticket },
-  { name: 'Customers', path: '/admin/customers', icon: Users },
-  { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw },
-  { name: 'Reviews', path: '/admin/reviews', icon: Star },
-  { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
-  { name: 'Settings', path: '/admin/settings', icon: Settings },
+
+const ALL_NAV_ITEMS = [
+  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, exact: true, key: 'dashboard' },
+  { name: 'Analytics', path: '/admin/analytics', icon: BarChart3, key: 'analytics' },
+  { name: 'Products', path: '/admin/products', icon: Package, key: 'products' },
+  { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
+  { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
+  { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw, key: 'refunds' },
+  { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
+  { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
+  { name: 'Reviews', path: '/admin/reviews', icon: Star, key: 'reviews' },
+  { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },
+  { name: 'Sub-Admins', path: '/admin/subadmins', icon: UserCheck, key: 'subadmins', superAdminOnly: true },
 ];
 
 function formatRoleName(role) {
@@ -57,13 +61,30 @@ export const AdminLayout = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Keep user profile in sync
+  // Keep user profile in sync and re-fetch fresh permissions from backend on mount/navigation
   useEffect(() => {
+    let isMounted = true;
     const user = getStoredUser();
     if (user) {
       setCurrentUser(user);
     }
-  }, []);
+    apiClient('/api/auth/me')
+      .then((res) => {
+        if (!isMounted) return;
+        const freshUser = res?.admin || res?.user;
+        if (freshUser) {
+          setStoredUser(freshUser);
+          setCurrentUser(freshUser);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location.pathname]);
+
+
 
   // Prevent background scrolling when mobile sidebar is open
   useEffect(() => {
@@ -90,6 +111,19 @@ export const AdminLayout = () => {
   const rawName = currentUser?.name || currentUser?.username;
   const adminName = (!rawName || rawName === 'Atelier Member') ? 'Admin' : rawName;
   const adminRoleDisplay = formatRoleName(currentUser?.role);
+
+  const isSuperAdmin = !currentUser?.role || currentUser?.role === 'super_admin' || currentUser?.username === 'Admin';
+  const userPermissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+
+  const navItems = ALL_NAV_ITEMS.filter((item) => {
+    if (item.superAdminOnly) {
+      return isSuperAdmin;
+    }
+    if (isSuperAdmin || item.key === 'dashboard') {
+      return true;
+    }
+    return userPermissions.includes(item.key);
+  });
 
   return (
     <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
@@ -198,7 +232,8 @@ export const AdminLayout = () => {
           {/* Navigation Links List */}
           <div className="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
             <nav className="space-y-1.5" aria-label="Admin Navigation">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
+
                 const Icon = item.icon;
                 const isActive = item.exact
                   ? location.pathname === item.path || location.pathname === '/admin'

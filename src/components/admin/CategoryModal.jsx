@@ -265,13 +265,13 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 font-admin">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 my-8 transition-all"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 flex flex-col max-h-[85vh] sm:max-h-[88vh] transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/80 shrink-0">
           <div>
             <h2 className="text-lg font-admin font-bold text-brand-dark tracking-tight">
               {isEdit ? 'Edit Category' : 'Add Category'}
@@ -291,7 +291,9 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+
           {/* Submit Error Banner */}
           {submitError && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2.5">
@@ -486,13 +488,15 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
             </p>
           </div>
 
+          </div>
+
           {/* Modal Footer Buttons */}
-          <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-3">
+          <div className="px-6 py-4 border-t border-neutral-100 bg-neutral-50/80 shrink-0 flex items-center justify-end gap-3 font-admin">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2.5 border border-neutral-200 text-neutral-600 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 h-10 border border-neutral-300 text-neutral-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 hover:text-neutral-950 transition-all cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
@@ -500,12 +504,12 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
             <button
               type="submit"
               disabled={submitting || uploadingImage}
-              className="px-5 py-2.5 bg-brand-dark text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 h-10 bg-neutral-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-black transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
             >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{isEdit ? 'Updating Category...' : 'Creating Category...'}</span>
+                  <span>{isEdit ? 'Updating...' : 'Creating...'}</span>
                 </>
               ) : (
                 <span>{isEdit ? 'Update Category' : 'Create Category'}</span>
@@ -515,5 +519,6 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
         </form>
       </div>
     </div>
+
   );
 };

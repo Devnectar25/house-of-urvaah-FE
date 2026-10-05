@@ -225,11 +225,12 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-neutral-200">
+    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
         
         {/* ── Modal Header ──────────────────────────────────────────────────── */}
-        <div className="px-6 py-4.5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/80 sticky top-0 z-20">
+        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/90 shrink-0">
+
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-brand-dark text-white shadow-xs">
               <UserCheck className="w-5 h-5" />
@@ -554,9 +555,9 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
 
         </div>
 
-        {/* ── Sticky Modal Footer ───────────────────────────────────────────── */}
-        <div className="px-6 py-4 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-between sticky bottom-0 z-20 font-sans">
-          <span className="text-xs font-bold text-brand-dark">
+        {/* ── Modal Footer ───────────────────────────────────────────── */}
+        <div className="px-6 py-4 border-t border-neutral-200 bg-neutral-50/90 shrink-0 flex items-center justify-between font-admin">
+          <span className="text-xs font-bold text-neutral-950 uppercase tracking-wider">
             {selectedUserIds.length} user{selectedUserIds.length === 1 ? '' : 's'} selected
           </span>
 
@@ -565,7 +566,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
               type="button"
               onClick={onClose}
               disabled={assigning}
-              className="px-6 py-2.5 min-w-[110px] inline-flex items-center justify-center text-center border border-neutral-300 text-neutral-700 rounded-xl text-xs font-semibold hover:bg-neutral-100 hover:text-brand-dark transition-colors cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 h-10 border border-neutral-300 text-neutral-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 hover:text-neutral-950 transition-all cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
@@ -574,7 +575,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
               type="button"
               onClick={handleAssignSelected}
               disabled={assigning || selectedUserIds.length === 0}
-              className="px-6 py-2.5 min-w-[140px] inline-flex items-center justify-center text-center bg-brand-dark text-white rounded-xl text-xs font-semibold hover:bg-black transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+              className="px-6 py-2.5 h-10 bg-neutral-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-black transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {assigning ? (
                 <>
@@ -587,6 +588,7 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
             </button>
           </div>
         </div>
+
 
       </div>
     </div>

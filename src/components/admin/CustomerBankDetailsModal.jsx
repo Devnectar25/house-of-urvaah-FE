@@ -129,7 +129,7 @@ export const CustomerBankDetailsModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fadeIn font-admin text-brand-dark"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/70 backdrop-blur-xs animate-fadeIn font-admin text-brand-dark"
       role="dialog"
       aria-modal="true"
       aria-labelledby="customer-bank-details-title"
@@ -137,7 +137,7 @@ export const CustomerBankDetailsModal = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-2xl max-w-[400px] w-[calc(100%-32px)] sm:w-[400px] p-6 shadow-2xl border border-neutral-200/90 relative max-h-[90vh] overflow-y-auto flex flex-col">
+      <div className="bg-white rounded-2xl max-w-[420px] w-full p-6 shadow-2xl border border-neutral-200 relative max-h-[85vh] sm:max-h-[88vh] overflow-hidden flex flex-col">
         {/* Close (X) Button */}
         <button
           type="button"
@@ -160,7 +160,7 @@ export const CustomerBankDetailsModal = ({
             >
               Customer Bank Details
             </h3>
-            <p className="text-[11px] sm:text-xs text-neutral-500 font-sans mt-1 leading-snug">
+            <p className="text-xs text-neutral-500 font-sans mt-1 leading-snug">
               Provided for manual refund processing of order{' '}
               <span className="font-bold text-brand-dark font-admin">#{orderNumber}</span>
             </p>
@@ -169,7 +169,7 @@ export const CustomerBankDetailsModal = ({
 
         {/* Loading State */}
         {loading ? (
-          <div className="py-10 text-center space-y-3">
+          <div className="py-10 text-center space-y-3 shrink-0">
             <Loader2 className="w-7 h-7 text-neutral-400 animate-spin mx-auto" />
             <p className="text-xs text-neutral-500 font-sans">
               Loading customer bank details...
@@ -177,24 +177,24 @@ export const CustomerBankDetailsModal = ({
           </div>
         ) : error ? (
           /* Error State with Retry */
-          <div className="p-5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-center space-y-3 my-2">
+          <div className="p-5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-center space-y-3 my-2 shrink-0">
             <AlertCircle className="w-7 h-7 text-neutral-500 mx-auto" />
             <h4 className="text-xs font-semibold text-brand-dark">
               Unable to load customer bank details
             </h4>
-            <p className="text-[11px] text-neutral-600 max-w-xs mx-auto font-sans">{error}</p>
+            <p className="text-xs text-neutral-600 max-w-xs mx-auto font-sans">{error}</p>
             <button
               type="button"
               onClick={fetchBankDetails}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-brand-dark text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors cursor-pointer shadow-xs mt-1"
+              className="inline-flex items-center gap-1.5 px-4 py-2 h-10 bg-brand-dark text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-black transition-colors cursor-pointer shadow-xs mt-1"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry</span>
             </button>
           </div>
         ) : (
           /* Main Bank Details Content Cards */
-          <div className="space-y-3 flex-1">
+          <div className="space-y-3 flex-1 overflow-y-auto custom-modal-scrollbar pr-1">
             {/* 1. Account Holder Name Card */}
             <div className="bg-[#FBFBFA] border border-neutral-200/80 rounded-xl p-3 sm:px-3.5 sm:py-3 flex items-center justify-between gap-3 shadow-2xs min-h-[64px]">
               <div className="min-w-0 flex-1">
@@ -301,7 +301,7 @@ export const CustomerBankDetailsModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full h-10 sm:h-11 px-4 bg-brand-dark hover:bg-black text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark flex items-center justify-center"
+            className="w-full h-10 px-4 bg-brand-dark hover:bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark flex items-center justify-center"
           >
             Got it
           </button>

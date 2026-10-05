@@ -478,7 +478,7 @@ export const UpdateRefundModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-neutral-950/60 backdrop-blur-xs animate-fadeIn font-admin text-brand-dark"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-neutral-950/70 backdrop-blur-xs animate-fadeIn font-admin text-brand-dark"
       role="dialog"
       aria-modal="true"
       aria-labelledby="update-refund-modal-title"
@@ -489,7 +489,7 @@ export const UpdateRefundModal = ({
       }}
     >
       <div
-        className="bg-white rounded-2xl max-w-[900px] w-[calc(100%-32px)] shadow-2xl border border-neutral-200/90 relative max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl max-w-[900px] w-full shadow-2xl border border-neutral-200 relative max-h-[85vh] sm:max-h-[88vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================================= */}
@@ -1121,13 +1121,13 @@ export const UpdateRefundModal = ({
         {/* ========================================================================= */}
         {/* FIXED FOOTER (Single Cancel & Save Changes)                               */}
         {/* ========================================================================= */}
-        <div className="px-6 py-4 sm:px-7 border-t border-neutral-200/80 bg-white sm:bg-neutral-50/60 flex items-center justify-end gap-3 shrink-0">
+        <div className="px-6 py-4 sm:px-7 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-end gap-3 shrink-0 font-admin">
           {/* 1. Cancel Button */}
           <button
             type="button"
             onClick={handleAttemptClose}
             disabled={submitting}
-            className="px-5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-neutral-700 bg-white hover:bg-neutral-100 hover:text-brand-dark border border-neutral-200 hover:border-neutral-300 transition-all duration-150 cursor-pointer disabled:opacity-50 font-admin shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+            className="px-5 py-2.5 h-10 border border-neutral-300 text-neutral-700 hover:bg-neutral-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
           >
             Cancel
           </button>
@@ -1137,7 +1137,7 @@ export const UpdateRefundModal = ({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold uppercase tracking-wider text-white bg-brand-dark hover:bg-black active:scale-[0.99] transition-all duration-150 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed font-admin min-w-[140px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-neutral-950 hover:bg-black transition-all cursor-pointer shadow-xs disabled:opacity-50 min-w-[140px]"
           >
             {submitting ? (
               <>
