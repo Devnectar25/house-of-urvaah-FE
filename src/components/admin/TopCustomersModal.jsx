@@ -241,8 +241,8 @@ export const TopCustomersModal = ({ isOpen, onClose, period = '30d' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-neutral-200">
+    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
         
         {/* Success Toast Notification */}
         {successToast && (
@@ -253,7 +253,7 @@ export const TopCustomersModal = ({ isOpen, onClose, period = '30d' }) => {
         )}
 
         {/* Modal Header matching Reference Layout */}
-        <div className="px-6 pt-6 pb-4 flex items-start justify-between bg-white sticky top-0 z-20 border-b border-neutral-100">
+        <div className="px-6 pt-6 pb-4 flex items-start justify-between bg-white shrink-0 border-b border-neutral-100">
           <div>
             <h2 className="text-xl font-bold font-admin text-neutral-900 tracking-tight flex items-center gap-2">
               <span>Top Customers</span>
@@ -609,7 +609,7 @@ export const TopCustomersModal = ({ isOpen, onClose, period = '30d' }) => {
 
             {/* Modal Footer: Pagination */}
             {totalPages > 1 && (
-              <div className="px-6 py-3 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-center text-xs text-neutral-500 font-sans">
+              <div className="px-6 py-3 border-t border-neutral-200 bg-neutral-50/90 flex items-center justify-center text-xs text-neutral-500 font-sans shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="mr-2 text-neutral-600 text-[11px]">
                     Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>

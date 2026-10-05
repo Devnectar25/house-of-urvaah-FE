@@ -114,11 +114,11 @@ export const RevenueBreakdownModal = ({ isOpen, onClose, period = '30d' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-neutral-200">
+    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fadeIn font-admin">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
         
         {/* Modal Header matching Reference Layout */}
-        <div className="px-6 pt-6 pb-4 flex items-start justify-between bg-white">
+        <div className="px-6 pt-6 pb-4 flex items-start justify-between bg-white shrink-0">
           <div>
             <h2 className="text-xl font-bold font-admin text-neutral-900 tracking-tight">
               Revenue Breakdown
@@ -276,7 +276,7 @@ export const RevenueBreakdownModal = ({ isOpen, onClose, period = '30d' }) => {
 
         {/* Modal Pagination Footer (Renders when totalPages > 1) */}
         {totalPages > 1 && (
-          <div className="px-6 pb-4 pt-1 flex items-center justify-center text-xs text-neutral-500 font-sans">
+          <div className="px-6 pb-4 pt-1 flex items-center justify-center text-xs text-neutral-500 font-sans shrink-0">
             <div className="flex items-center gap-2">
               <span className="mr-2 text-neutral-600 text-[11px]">
                 Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>

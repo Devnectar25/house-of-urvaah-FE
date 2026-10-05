@@ -256,6 +256,30 @@ export const AdminDashboard = () => {
   ];
 
   const adminName = currentUser?.name || currentUser?.username || 'Administrator';
+  const isSuperAdmin = !currentUser?.role || currentUser?.role === 'super_admin' || currentUser?.username === 'Admin';
+  const userPermissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+
+  const isPermittedModule = (moduleKey) => {
+    if (isSuperAdmin) return true;
+    if (['orders', 'delivered', 'pending', 'processing', 'cancelled'].includes(moduleKey)) {
+      return userPermissions.includes('orders');
+    }
+    if (moduleKey === 'refunds') {
+      return userPermissions.includes('refunds') || userPermissions.includes('refund-desk');
+    }
+    return userPermissions.includes(moduleKey);
+  };
+
+  const visibleStatCards = statCards.filter((card) => isPermittedModule(card.id));
+  const visibleQuickActions = quickActions.filter((action) => {
+    if (action.link.includes('products')) return isPermittedModule('products');
+    if (action.link.includes('categories')) return isPermittedModule('categories');
+    if (action.link.includes('orders')) return isPermittedModule('orders');
+    if (action.link.includes('coupons')) return isPermittedModule('coupons');
+    if (action.link.includes('customers')) return isPermittedModule('customers');
+    return true;
+  });
+
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -354,7 +378,7 @@ export const AdminDashboard = () => {
         {/* Loaded State: Compact, high-density stat cards matching reference 6-col desktop layout */}
         {!loading && !error && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
-            {statCards.map((card) => {
+            {visibleStatCards.map((card) => {
               const Icon = card.icon;
               const isCustomerCard = card.id === 'customers';
 
@@ -416,41 +440,44 @@ export const AdminDashboard = () => {
       {/* ========================================================================= */}
       {/* QUICK ACTIONS SECTION                                                     */}
       {/* ========================================================================= */}
-      <section aria-label="Administrative Quick Actions" className="pt-2">
-        <div className="mb-3 sm:mb-4">
-          <h2 className="text-lg sm:text-xl font-admin font-bold text-brand-dark uppercase tracking-wider">
-            Quick Actions
-          </h2>
-        </div>
+      {visibleQuickActions.length > 0 && (
+        <section aria-label="Administrative Quick Actions" className="pt-2">
+          <div className="mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl font-admin font-bold text-brand-dark uppercase tracking-wider">
+              Quick Actions
+            </h2>
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {quickActions.map((action, idx) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={idx}
-                to={action.link}
-                className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs hover:border-brand-dark/50 hover:bg-brand-sand/40 hover:shadow-xs transition-all group flex items-start gap-4"
-              >
-                <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0 group-hover:bg-brand-dark group-hover:text-white transition-colors shadow-2xs">
-                  <Icon className="w-5 h-5 stroke-[1.75]" />
-                </div>
-                <div className="flex-1 min-w-0 font-sans">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs sm:text-[13px] font-bold text-brand-dark font-admin uppercase tracking-wider group-hover:text-brand-dark transition-colors truncate">
-                      {action.title}
-                    </h3>
-                    <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-brand-dark group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visibleQuickActions.map((action, idx) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={idx}
+                  to={action.link}
+                  className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs hover:border-brand-dark/50 hover:bg-brand-sand/40 hover:shadow-xs transition-all group flex items-start gap-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0 group-hover:bg-brand-dark group-hover:text-white transition-colors shadow-2xs">
+                    <Icon className="w-5 h-5 stroke-[1.75]" />
                   </div>
-                  <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2 leading-relaxed">
-                    {action.description}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+                  <div className="flex-1 min-w-0 font-sans">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs sm:text-[13px] font-bold text-brand-dark font-admin uppercase tracking-wider group-hover:text-brand-dark transition-colors truncate">
+                        {action.title}
+                      </h3>
+                      <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-brand-dark group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2 leading-relaxed">
+                      {action.description}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
 
       {/* All Registered Users Modal */}
       <RegisteredUsersModal

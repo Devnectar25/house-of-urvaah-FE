@@ -265,15 +265,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200 font-admin"
       onClick={handleCloseModal}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-neutral-200 my-8 transition-all max-h-[90vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-neutral-200 my-auto transition-all max-h-[85vh] sm:max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4.5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50 flex-shrink-0">
+        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50 shrink-0">
           <div>
             <h2 className="text-base sm:text-lg font-admin font-bold text-brand-dark tracking-tight">
               Order Details - {order?.order_number || order?.id?.slice(0, 8) || orderId}
@@ -485,7 +485,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     <button
                       type="submit"
                       disabled={savingStatus || !hasUnsavedChanges}
-                      className="px-4 py-2 bg-brand-dark text-white rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-5 py-2.5 h-10 bg-neutral-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingStatus ? (
                         <>
@@ -603,11 +603,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-end bg-neutral-50/30 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-neutral-200 flex items-center justify-end bg-neutral-50/90 shrink-0 font-admin">
           <button
             type="button"
             onClick={handleCloseModal}
-            className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 rounded-xl text-xs font-semibold text-brand-dark transition-colors cursor-pointer"
+            className="px-5 py-2.5 h-10 border border-neutral-300 text-neutral-700 hover:bg-neutral-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center"
           >
             Close
           </button>
