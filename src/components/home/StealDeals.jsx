@@ -47,12 +47,12 @@ export const StealDeals = () => {
           transition={{ duration: 0.5 }}
         >
           {/* Small Uppercase Kicker Label */}
-          <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
+          <span className="text-[10px] tracking-[0.15em] uppercase text-neutral-400 font-serif block mb-1">
             THE URVAAH
           </span>
 
           {/* Main Heading in Le Jour Serif */}
-          <h2 className="section-heading font-serif tracking-[0.2em] uppercase text-brand-dark">
+          <h2 className="section-heading font-serif tracking-[0.08em] uppercase text-brand-dark">
             PRICE DROP ERA
           </h2>
         </motion.div>

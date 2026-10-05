@@ -254,7 +254,7 @@ export const AdminSubAdmins = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-neutral-200/90 shadow-2xs">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-950 flex items-center gap-3 font-admin">
-            <UserCheck className="w-8 h-8 text-teal-600 stroke-[2]" />
+            <UserCheck className="w-8 h-8 text-neutral-900 stroke-[2]" />
             Sub-Admin Management
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 mt-1 font-sans">
@@ -276,7 +276,7 @@ export const AdminSubAdmins = () => {
           <button
             type="button"
             onClick={() => openModal()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#111111] hover:bg-neutral-800 active:bg-black text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer"
           >
             <UserPlus className="w-4.5 h-4.5 stroke-[2.2]" />
             <span>Add Sub-Admin</span>
@@ -302,7 +302,7 @@ export const AdminSubAdmins = () => {
               placeholder="Search by username..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 transition-all font-sans"
+              className="w-full pl-9 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all font-sans"
             />
           </div>
         </div>
@@ -310,7 +310,7 @@ export const AdminSubAdmins = () => {
         {/* Table Container */}
         {loading ? (
           <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+            <Loader2 className="w-8 h-8 text-neutral-900 animate-spin" />
             <p className="text-xs uppercase tracking-widest font-bold text-neutral-500 font-admin">
               Loading Sub-Admins...
             </p>
@@ -356,7 +356,7 @@ export const AdminSubAdmins = () => {
                     {/* Username Column */}
                     <td className="py-4 px-6 font-semibold text-neutral-950 font-admin">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-teal-50 border border-teal-200 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 font-bold text-xs flex items-center justify-center shrink-0">
                           {subAdmin.username.charAt(0).toUpperCase()}
                         </div>
                         <span className="truncate max-w-[200px]">{subAdmin.username}</span>
@@ -370,7 +370,7 @@ export const AdminSubAdmins = () => {
                           subAdmin.permissions.map((perm) => (
                             <span
                               key={perm}
-                              className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200/80 font-admin capitalize"
+                              className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200/80 font-admin capitalize"
                             >
                               {perm}
                             </span>
@@ -388,8 +388,8 @@ export const AdminSubAdmins = () => {
                           type="button"
                           onClick={() => handleToggleActive(subAdmin)}
                           disabled={togglingId === subAdmin.id}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-600/30 ${
-                            subAdmin.active ? 'bg-teal-600' : 'bg-neutral-200'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-black/10 ${
+                            subAdmin.active ? 'bg-black' : 'bg-neutral-200'
                           }`}
                           title={`Click to ${subAdmin.active ? 'deactivate' : 'activate'}`}
                         >
@@ -423,7 +423,7 @@ export const AdminSubAdmins = () => {
                         <button
                           type="button"
                           onClick={() => openModal(subAdmin)}
-                          className="p-2 rounded-xl text-neutral-600 hover:text-teal-700 hover:bg-teal-50 border border-transparent hover:border-teal-200 transition-all cursor-pointer"
+                          className="p-2 rounded-xl text-neutral-600 hover:text-black hover:bg-neutral-100 border border-transparent hover:border-neutral-200 transition-all cursor-pointer"
                           title="Edit Sub-Admin"
                         >
                           <Pencil className="w-4 h-4 stroke-[2]" />
@@ -494,7 +494,7 @@ export const AdminSubAdmins = () => {
                     placeholder="Enter username or email"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-teal-600/40 rounded-xl text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 transition-all font-admin font-semibold"
+                    className="w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all font-admin font-semibold"
                   />
                 </div>
 
@@ -509,7 +509,7 @@ export const AdminSubAdmins = () => {
                       placeholder="Enter password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600 transition-all"
+                      className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all"
                     />
                     <Lock className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
                   </div>
@@ -529,14 +529,14 @@ export const AdminSubAdmins = () => {
                           onClick={() => togglePermission(opt.id)}
                           className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none ${
                             isSelected
-                              ? 'bg-teal-50/60 border-teal-500 text-neutral-950'
+                              ? 'bg-neutral-100 border-neutral-900 text-neutral-950 font-semibold shadow-2xs'
                               : 'bg-white border-neutral-200/80 text-neutral-700 hover:bg-neutral-50'
                           }`}
                         >
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                               isSelected
-                                ? 'bg-teal-600 border-teal-600 text-white'
+                                ? 'bg-black border-black text-white'
                                 : 'border-neutral-300 bg-white'
                             }`}
                           >
@@ -564,7 +564,7 @@ export const AdminSubAdmins = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 h-10 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-[#111111] hover:bg-neutral-800 active:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black transition-all cursor-pointer shadow-sm disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>

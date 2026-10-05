@@ -56,14 +56,14 @@ export const BestSellers = ({ onQuickView }) => {
   }, []);
 
   return (
-    <section id="best-sellers" className="py-16 md:py-20 bg-white font-serif scroll-mt-20">
+    <section id="best-sellers" className="pt-12 md:pt-16 pb-0 bg-white font-serif scroll-mt-20">
       <div className="max-w-[1800px] mx-auto px-4 md:px-8">
         {/* Section Heading */}
         <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7">
-          <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
+          <span className="text-[10px] tracking-[0.15em] uppercase text-neutral-400 font-serif block mb-1">
             CURATED ESSENTIALS
           </span>
-          <h2 className="section-heading font-serif tracking-[0.2em] text-brand-dark">
+          <h2 className="section-heading font-serif tracking-[0.08em] text-brand-dark">
             BEST SELLERS
           </h2>
         </div>

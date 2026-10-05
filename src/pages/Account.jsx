@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -9,9 +9,27 @@ import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 
 export const Account = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist } = useCart();
 
-  const [activeTab, setActiveTab] = useState('ACCOUNT DETAILS');
+  const getInitialTab = () => {
+    const param = new URLSearchParams(location.search).get('tab');
+    if (param) return param;
+    if (location.state?.tab) return location.state.tab;
+    return 'VIEW ORDERS';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  useEffect(() => {
+    const param = new URLSearchParams(location.search).get('tab');
+    if (param) {
+      setActiveTab(param);
+    } else if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+  }, [location.search, location.state]);
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [fullNameInput, setFullNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
@@ -750,7 +768,10 @@ export const Account = () => {
                   {orders.map((ord, idx) => {
                     const orderNum = ord.order_number || ord.orderNumber || `HOU-ORD-${ord.id}`;
                     const orderStatus = ord.status || 'Confirmed';
-                    const orderTotal = ord.total || ord.total_amount || 0;
+                    let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
+                    if ((!orderTotal || orderTotal === 0) && ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
+                      orderTotal = ord.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+                    }
                     const orderDate = ord.created_at
                       ? new Date(ord.created_at).toLocaleDateString('en-IN', {
                           day: 'numeric',

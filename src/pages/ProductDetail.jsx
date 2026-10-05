@@ -363,18 +363,18 @@ export const ProductDetail = () => {
             </div>
           </div>
 
-          {/* RIGHT SIDE: Product Info & Actions Panel */}
-          <div className="lg:col-span-5 flex flex-col text-left space-y-4">
+          {/* RIGHT SIDE: Product Info & Actions Panel (Compact & Proportionate) */}
+          <div className="lg:col-span-5 flex flex-col text-left space-y-2.5 sm:space-y-3 max-w-md pt-[70px]">
             {/* Title & Brand */}
             <div>
-              <span className="text-[10px] font-serif tracking-[0.3em] uppercase text-neutral-400 block mb-1">
+              <span className="text-[9px] sm:text-[9.5px] font-serif tracking-[0.25em] uppercase text-neutral-400 block mb-0.5">
                 HOUSE OF URVAAH
               </span>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-[0.15em] uppercase text-brand-dark leading-tight">
+              <h1 className="text-base sm:text-lg font-semibold tracking-[0.08em] uppercase text-brand-dark leading-tight">
                 {product.name}
               </h1>
               {product.shortDescription && (
-                <p className="text-xs text-neutral-500 font-sans mt-1.5 leading-relaxed">
+                <p className="text-[11px] text-neutral-500 font-sans mt-0.5 leading-snug">
                   {product.shortDescription}
                 </p>
               )}
@@ -382,16 +382,16 @@ export const ProductDetail = () => {
               {/* NAME OPTIONS (Rendered dynamically if available) */}
               {Array.isArray(product.nameOptions || product.name_options) &&
                 (product.nameOptions || product.name_options).filter(Boolean).length > 0 && (
-                  <div className="mt-3.5 pt-3 border-t border-neutral-100/80">
-                    <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-neutral-800 block mb-1.5 font-serif">
+                  <div className="mt-2 pt-1.5 border-t border-neutral-100/80">
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-neutral-800 block mb-0.5 font-serif">
                       NAME OPTIONS
                     </span>
-                    <ul className="space-y-1 font-sans text-xs text-neutral-600">
+                    <ul className="space-y-0.5 font-sans text-[11px] text-neutral-600">
                       {(product.nameOptions || product.name_options)
                         .filter(Boolean)
                         .map((optName, idx) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0" />
+                          <li key={idx} className="flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-neutral-800 shrink-0" />
                             <span>{optName}</span>
                           </li>
                         ))}
@@ -401,23 +401,23 @@ export const ProductDetail = () => {
             </div>
 
             {/* Price Section */}
-            <div className="border-b border-neutral-200 pb-3">
-              <div className="flex items-baseline gap-3">
-                <span className="text-2xl md:text-3xl font-bold tracking-wider text-brand-dark font-sans">
+            <div className="border-b border-neutral-200/80 pb-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg sm:text-xl font-bold tracking-wider text-brand-dark font-sans">
                   {formatPrice(product.price)}
                 </span>
                 {product.originalPrice && product.originalPrice > product.price && (
                   <>
-                    <span className="text-sm text-neutral-400 line-through font-sans">
+                    <span className="text-xs text-neutral-400 line-through font-sans">
                       {formatPrice(product.originalPrice)}
                     </span>
-                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
+                    <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded font-sans tracking-wide">
                       {product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
                     </span>
                   </>
                 )}
               </div>
-              <span className="text-xs text-neutral-400 font-normal tracking-wide mt-1 block font-sans">
+              <span className="text-[10px] text-neutral-400 font-normal tracking-wide block font-sans">
                 Inclusive of All Taxes
               </span>
             </div>
@@ -425,14 +425,14 @@ export const ProductDetail = () => {
             {/* COLORS Selection */}
             {product.colors && product.colors.length > 0 && (
               <div>
-                <span className="text-xs font-bold tracking-widest uppercase text-brand-dark block mb-2">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark block mb-1">
                   COLOR: <span className="font-normal text-neutral-600">{product.colors.join(', ')}</span>
                 </span>
-                <div className="flex flex-wrap gap-2 font-sans">
+                <div className="flex flex-wrap gap-1 font-sans">
                   {product.colors.map((col, idx) => (
                     <span
                       key={idx}
-                      className="px-3 py-1.5 border border-neutral-300 text-xs font-medium bg-neutral-50 text-brand-dark rounded-xs"
+                      className="px-2 py-0.5 border border-neutral-300 text-[10px] font-medium bg-neutral-50 text-brand-dark rounded-xs"
                     >
                       {col}
                     </span>
@@ -443,28 +443,28 @@ export const ProductDetail = () => {
 
             {/* SIZE Selection */}
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold tracking-widest uppercase text-brand-dark">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark">
                   SIZE:
                 </span>
                 <button
                   onClick={() => setIsSizeChartOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-xs text-brand-dark font-medium underline underline-offset-4 hover:opacity-75 transition-opacity cursor-pointer font-sans"
+                  className="inline-flex items-center gap-1 text-[10px] text-brand-dark font-medium underline underline-offset-2 hover:opacity-75 transition-opacity cursor-pointer font-sans"
                 >
-                  <Ruler className="w-3.5 h-3.5" />
+                  <Ruler className="w-3 h-3" />
                   Size Chart
                 </button>
               </div>
 
               {/* Selectable Size Boxes */}
-              <div className="flex flex-wrap gap-2 font-sans">
+              <div className="flex flex-wrap gap-1.5 font-sans">
                 {availableSizes.map((sz) => (
                   <button
                     key={sz}
                     onClick={() => setSelectedSize(sz)}
-                    className={`w-11 h-11 border flex items-center justify-center text-xs font-semibold tracking-wider uppercase transition-all cursor-pointer ${
+                    className={`w-8 h-8 sm:w-8.5 sm:h-8.5 border flex items-center justify-center text-[11px] font-semibold tracking-wider uppercase transition-all cursor-pointer ${
                       selectedSize === sz
-                        ? 'bg-black text-white border-black shadow-md'
+                        ? 'bg-black text-white border-black shadow-xs'
                         : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
                     }`}
                   >
@@ -475,17 +475,17 @@ export const ProductDetail = () => {
             </div>
 
             {/* CTA Buttons: ADD TO CART + Wishlist + Share */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 pt-0.5">
               <button
                 onClick={handleAddToCart}
                 disabled={product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)}
-                className={`flex-1 py-3.5 sm:py-4 px-4 text-xs font-semibold tracking-[0.2em] uppercase transition-colors shadow-md flex items-center justify-center gap-2 font-sans ${
+                className={`flex-1 h-9 sm:h-9.5 px-3 text-[10.5px] font-semibold tracking-[0.15em] uppercase transition-colors shadow-xs flex items-center justify-center gap-1.5 font-sans cursor-pointer ${
                   product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
                     ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                    : 'bg-black text-white hover:bg-neutral-800 cursor-pointer'
+                    : 'bg-black text-white hover:bg-neutral-800'
                 }`}
               >
-                <ShoppingBag className="w-4 h-4" />
+                <ShoppingBag className="w-3.5 h-3.5" />
                 {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
                   ? 'OUT OF STOCK'
                   : (isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG')}
@@ -494,7 +494,7 @@ export const ProductDetail = () => {
               {/* Wishlist Heart Icon Button */}
               <button
                 onClick={() => toggleWishlist(product.id)}
-                className={`w-12 h-12 border flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-9 h-9 sm:w-9.5 sm:h-9.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                   isWishlisted
                     ? 'border-red-600 bg-red-50 text-red-600'
                     : 'border-neutral-300 text-brand-dark hover:border-black'
@@ -502,19 +502,19 @@ export const ProductDetail = () => {
                 aria-label="Wishlist toggle"
                 title="Save to Wishlist"
               >
-                <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
               </button>
 
               {/* Share Icon Button */}
               <button
                 onClick={handleShare}
-                className="w-12 h-12 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black transition-all relative cursor-pointer"
+                className="w-9 h-9 sm:w-9.5 sm:h-9.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black transition-all relative cursor-pointer shrink-0"
                 aria-label="Share product"
                 title="Share product link"
               >
-                <Share2 className="w-4 h-4 stroke-[1.5]" />
+                <Share2 className="w-3.5 h-3.5 stroke-[1.5]" />
                 {copiedToast && (
-                  <span className="absolute -top-8 bg-black text-white text-[10px] py-1 px-2 font-mono whitespace-nowrap shadow-lg">
+                  <span className="absolute -top-7 bg-black text-white text-[9px] py-0.5 px-1.5 font-mono whitespace-nowrap shadow-lg">
                     Link Copied!
                   </span>
                 )}
@@ -522,31 +522,31 @@ export const ProductDetail = () => {
             </div>
 
             {/* PINCODE & DELIVERY CHECK */}
-            <div className="pt-3.5 border-t border-neutral-200">
-              <span className="text-xs font-bold tracking-widest uppercase text-brand-dark block mb-2">
+            <div className="pt-2 border-t border-neutral-200">
+              <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark block mb-1">
                 CHECK DELIVERY & SERVICES
               </span>
 
-              <div className="flex gap-2 max-w-sm font-sans">
+              <div className="flex gap-1.5 max-w-xs font-sans">
                 <input
                   type="text"
                   value={pincode}
                   onChange={(e) => setPincode(e.target.value)}
-                  placeholder="Enter Pincode"
+                  placeholder="ENTER PINCODE"
                   maxLength={6}
-                  className="flex-1 border border-neutral-300 px-3 py-2 text-xs font-mono tracking-wider uppercase focus:outline-none focus:border-black"
+                  className="flex-1 border border-neutral-300 px-2.5 py-1 text-[11px] font-mono tracking-wider uppercase focus:outline-none focus:border-black h-8"
                 />
                 <button
                   onClick={handleCheckPincode}
-                  className="bg-black text-white px-5 py-2 text-xs font-semibold tracking-widest uppercase hover:bg-neutral-800 transition-colors cursor-pointer"
+                  className="bg-black text-white px-3 py-1 text-[10.5px] font-semibold tracking-wider uppercase hover:bg-neutral-800 transition-colors cursor-pointer h-8"
                 >
-                  Check
+                  CHECK
                 </button>
               </div>
 
               {/* Delivery Estimate Line */}
-              <div className="flex items-center gap-2 text-xs text-neutral-600 mt-2 font-sans">
-                <Truck className="w-4 h-4 text-brand-dark flex-shrink-0" />
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 mt-1 font-sans">
+                <Truck className="w-3 h-3 text-brand-dark flex-shrink-0" />
                 <span>
                   Delivery between <strong className="text-black font-semibold">{deliveryDate}</strong>
                 </span>
@@ -554,19 +554,19 @@ export const ProductDetail = () => {
             </div>
 
             {/* ACCORDION SECTIONS */}
-            <div className="pt-3 border-t border-neutral-200 space-y-0.5">
+            <div className="pt-2 border-t border-neutral-200 space-y-0.5">
               {/* Product Description */}
               {product.description && (
-                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                <div className="border-b border-neutral-200/80 pb-1.5 pt-0.5">
                   <button
                     onClick={() => toggleAccordion('desc')}
-                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>PRODUCT DESCRIPTION</span>
-                    {openAccordion === 'desc' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordion === 'desc' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
                   </button>
                   {openAccordion === 'desc' && (
-                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
+                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
                       {product.description}
                     </div>
                   )}
@@ -576,22 +576,22 @@ export const ProductDetail = () => {
               {/* Product Details (Dynamic Bullet Points) */}
               {Array.isArray(product.productDetails || product.product_details) &&
                 (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
-                  <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                  <div className="border-b border-neutral-200 pb-1.5 pt-1">
                     <button
                       onClick={() => toggleAccordion('pdetails')}
-                      className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                      className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                     >
                       <span>PRODUCT DETAILS</span>
-                      {openAccordion === 'pdetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                      {openAccordion === 'pdetails' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
                     </button>
                     {openAccordion === 'pdetails' && (
-                      <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
-                        <ul className="space-y-1.5">
+                      <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
+                        <ul className="space-y-1">
                           {(product.productDetails || product.product_details)
                             .filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim()))
                             .map((detail, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
+                              <li key={idx} className="flex items-start gap-1.5">
+                                <span className="w-1 h-1 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
                                 <div>
                                   {detail.label && detail.label.trim() && (
                                     <strong className="font-semibold text-neutral-900">{detail.label.trim()}: </strong>
@@ -608,18 +608,18 @@ export const ProductDetail = () => {
 
               {/* Specifications Accordion */}
               {Array.isArray(product.specifications) && product.specifications.length > 0 && (
-                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                <div className="border-b border-neutral-200 pb-1.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('specs')}
-                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>SPECIFICATIONS</span>
-                    {openAccordion === 'specs' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordion === 'specs' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
                   </button>
                   {openAccordion === 'specs' && (
-                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
+                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2 space-y-1">
                       {product.specifications.map((sp, idx) => (
-                        <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-1">
+                        <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-0.5">
                           <span className="font-semibold text-neutral-700">{sp.label}:</span>
                           <span className="text-neutral-600">{sp.value}</span>
                         </div>
@@ -631,16 +631,16 @@ export const ProductDetail = () => {
 
               {/* Care Instructions Accordion */}
               {(product.careInstructions || product.care_instructions) && (
-                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                <div className="border-b border-neutral-200 pb-1.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('care')}
-                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>CARE INSTRUCTIONS</span>
-                    {openAccordion === 'care' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordion === 'care' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
                   </button>
                   {openAccordion === 'care' && (
-                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
+                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
                       {product.careInstructions || product.care_instructions}
                     </div>
                   )}
@@ -649,16 +649,16 @@ export const ProductDetail = () => {
 
               {/* Additional Information Accordion */}
               {product.additionalInfo && (
-                <div className="border-b border-neutral-200 pb-2.5 pt-1.5">
+                <div className="border-b border-neutral-200 pb-1.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('info')}
-                    className="w-full flex justify-between items-center text-xs font-bold tracking-[0.2em] uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>ADDITIONAL INFORMATION</span>
-                    {openAccordion === 'info' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordion === 'info' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
                   </button>
                   {openAccordion === 'info' && (
-                    <div className="mt-2.5 text-xs text-neutral-600 font-sans leading-relaxed pr-2">
+                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
                       {product.additionalInfo}
                     </div>
                   )}
