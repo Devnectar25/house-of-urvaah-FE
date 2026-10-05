@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Hero } from './Hero';
 import { DualCampaignBanner } from './DualCampaignBanner';
 import { useCart } from '../../context/CartContext';
+import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 export const HeroParallaxBlock = () => {
   const containerRef = useRef(null);
@@ -93,8 +94,12 @@ export const HeroParallaxBlock = () => {
               }`}
             >
               <img
-                src="/assets/logo.png"
+                src={getSupabaseMediaUrl('logo.png')}
                 alt="House of Urvaah"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/assets/logo.png';
+                }}
                 className={`h-full w-auto object-contain transition-all duration-500 ease-in-out ${
                   isMobileMenuOpen
                     ? 'mix-blend-normal brightness-0 drop-shadow-sm'

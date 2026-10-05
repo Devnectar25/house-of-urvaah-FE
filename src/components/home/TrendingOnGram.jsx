@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 const GRAM_VIDEOS = [
   {
@@ -498,7 +499,15 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
 
           {/* Instagram Account Profile Pill (Matching Screenshot 2) */}
           <div className="absolute bottom-4 left-4 z-30 inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 shadow-lg hover:bg-black/80 transition-colors">
-            <img src="/assets/logo.png" alt="House of Urvaah" className="w-6 h-6 rounded-full object-cover bg-white p-0.5" />
+            <img
+              src={getSupabaseMediaUrl('logo.png')}
+              alt="House of Urvaah"
+              className="w-6 h-6 rounded-full object-cover bg-white p-0.5"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/assets/logo.png';
+              }}
+            />
             <div className="flex flex-col text-left leading-tight">
               <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-white">
                 <span>houseofurvaah</span>

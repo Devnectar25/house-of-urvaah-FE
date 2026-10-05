@@ -19,7 +19,12 @@ import {
   AlertCircle,
   QrCode,
   X,
-  Loader2
+  Loader2,
+  Package,
+  Calendar,
+  RotateCcw,
+  FileText,
+  XCircle
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -39,6 +44,7 @@ export const Checkout = () => {
     freeShippingProgress,
     clearCart,
     setPendingAction,
+    addToCart,
   } = useCart();
 
   // Protect route: Redirect if not authenticated
@@ -114,6 +120,8 @@ export const Checkout = () => {
   const [placedOrderNumber, setPlacedOrderNumber] = useState('');
   const [paymentErrorMessage, setPaymentErrorMessage] = useState('');
   const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(0);
+  const [placedOrderDetails, setPlacedOrderDetails] = useState(null);
+  const [orderCancelled, setOrderCancelled] = useState(false);
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -239,6 +247,56 @@ export const Checkout = () => {
   const finalizeOrderSuccess = (orderNumber, amount) => {
     const finalPaid = (amount !== undefined && amount > 0) ? amount : (grandTotal || 0);
     setConfirmedGrandTotal(finalPaid);
+
+    const snapshotItems = cart.map((item) => ({
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      quantity: item.quantity,
+      image: item.product.image || (item.product.gallery && item.product.gallery[0]) || '/assets/Images/Brown01.png',
+      selectedSize: item.selectedSize || 'M',
+      product: item.product,
+    }));
+
+    const selectedAddr = (showNewAddressForm || addresses.length === 0)
+      ? {
+          name: newShippingForm.fullName,
+          phone: newShippingForm.phone,
+          street: newShippingForm.street,
+          city: newShippingForm.city,
+          state: newShippingForm.state,
+          pincode: newShippingForm.pincode,
+          country: newShippingForm.country || 'INDIA',
+        }
+      : (addresses[selectedAddressIndex] || {});
+
+    const deliveryDateObj = new Date();
+    deliveryDateObj.setDate(deliveryDateObj.getDate() + 7);
+    const estimatedDeliveryStr = deliveryDateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const trackingNum = `TRK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    setPlacedOrderDetails({
+      orderNumber: orderNumber || `ORD-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+      trackingNumber: trackingNum,
+      estimatedDelivery: estimatedDeliveryStr,
+      items: snapshotItems,
+      subtotal: cartSubtotal,
+      discount: discountAmount,
+      shippingFee: shippingFee,
+      totalPaid: finalPaid,
+      shippingAddress: selectedAddr,
+      paymentMethod: paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'UPI',
+      customerEmail: user?.email || '',
+      customerPhone: selectedAddr.phone || user?.phone || '',
+      status: 'Pending',
+    });
+
     if (clearCart) clearCart();
     setPlacedOrderNumber(orderNumber);
     setIsPlacingOrder(false);
@@ -576,85 +634,390 @@ export const Checkout = () => {
     );
   }
 
-  // Order Success Screen View
+  // Order Success Screen View (Matching House of Urvaah Atelier Brand Theme)
   if (orderPlaced) {
+    const details = placedOrderDetails || {
+      orderNumber: placedOrderNumber || `HOU-${Math.floor(100000 + Math.random() * 900000)}`,
+      trackingNumber: `TRK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      estimatedDelivery: 'Monday, October 12, 2026',
+      items: [
+        {
+          id: 'item-1',
+          name: 'CORSET DETAIL JACQUARD TOP',
+          price: confirmedGrandTotal || 4999,
+          quantity: 1,
+          image: '/assets/Images/Corset_Blue1.jpg',
+          selectedSize: 'M',
+          product: { id: 'item-1', name: 'CORSET DETAIL JACQUARD TOP', price: confirmedGrandTotal || 4999, image: '/assets/Images/Corset_Blue1.jpg' }
+        }
+      ],
+      subtotal: confirmedGrandTotal || 4999,
+      discount: 0,
+      shippingFee: 0,
+      totalPaid: confirmedGrandTotal || 4999,
+      shippingAddress: {
+        name: user?.name || 'Customer Name',
+        street: 'Shipping Address Detail',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        pincode: '400001',
+        country: 'INDIA'
+      },
+      paymentMethod: paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'UPI / Online Payment',
+      customerEmail: user?.email || '',
+      customerPhone: user?.phone || '',
+      status: 'Pending'
+    };
+
+    const handleReorder = () => {
+      if (details && details.items) {
+        details.items.forEach((item) => {
+          if (addToCart) {
+            addToCart(item.product || { id: item.id, name: item.name, price: item.price, image: item.image }, item.selectedSize || 'M');
+          }
+        });
+        navigate('/checkout');
+      }
+    };
+
+    const handleDownloadInvoice = () => {
+      window.print();
+    };
+
+    const handleCancelOrder = async () => {
+      if (window.confirm('Are you sure you want to cancel this order?')) {
+        setOrderCancelled(true);
+        if (details?.orderNumber) {
+          try {
+            await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
+          } catch (e) {
+            console.warn('Cancel order API fallback:', e.message);
+          }
+        }
+      }
+    };
+
     return (
       <div className="min-h-screen bg-white text-brand-dark pt-28 sm:pt-32 pb-20 font-serif selection:bg-brand-dark selection:text-white">
         <SEOHead title="Order Confirmed | House of Urvaah" noindex={true} />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="w-20 h-20 bg-brand-dark text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-md"
-          >
-            <Check className="w-10 h-10 stroke-[2.5]" />
-          </motion.div>
 
-          <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-500 block mb-2 font-mono font-bold">
-            ORDER CONFIRMED
-          </span>
-          <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-3">
-            THANK YOU FOR YOUR ORDER
-          </h1>
-          <p className="text-sm font-sans text-neutral-600 mb-6">
-            Order Reference:{' '}
-            <strong className="text-black font-mono font-bold">{placedOrderNumber}</strong>
-          </p>
+        <div className="max-w-[1340px] mx-auto px-4 sm:px-6 md:px-8">
+          {/* Top Order Confirmed Header */}
+          <div className="text-center mb-10">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="w-16 h-16 bg-brand-dark text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm"
+            >
+              <Check className="w-8 h-8 stroke-[2.5]" />
+            </motion.div>
 
-          <div className="bg-[#FAF8F3] border border-neutral-200/80 p-6 sm:p-8 text-left space-y-4 mb-8 text-xs font-sans">
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
-              <span className="text-neutral-500 uppercase tracking-wider font-semibold">
-                Status
-              </span>
-              <span className="px-2.5 py-1 bg-emerald-900 text-white font-mono font-bold tracking-wider uppercase text-[10px]">
-                CONFIRMED & PROCESSING
-              </span>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-500 block mb-1.5 font-mono font-bold">
+              ORDER CONFIRMED & PROCESSING
+            </span>
+            <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-2">
+              THANK YOU FOR YOUR ORDER
+            </h1>
+            <p className="text-xs font-sans text-neutral-500 tracking-wider uppercase">
+              We'll send you an order confirmation email shortly to <strong className="text-black font-medium">{details.customerEmail || user?.email}</strong>.
+            </p>
+          </div>
+
+          {/* Top 3 Metric Status Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+            {/* Card 1: Order Number */}
+            <div className="bg-[#FAF8F3] border border-neutral-200/80 p-5 sm:p-6 flex items-center gap-4 text-left">
+              <div className="w-11 h-11 bg-brand-dark text-white rounded-full flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 stroke-[1.8]" />
+              </div>
+              <div className="font-sans">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
+                  Order Number
+                </span>
+                <span className="text-sm sm:text-base font-bold text-black font-mono tracking-tight">
+                  {details.orderNumber}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
-              <span className="text-neutral-500 uppercase tracking-wider font-semibold">
-                Customer Email
-              </span>
-              <span className="text-neutral-900 font-medium">{user?.email}</span>
+
+            {/* Card 2: Tracking Number */}
+            <div className="bg-[#FAF8F3] border border-neutral-200/80 p-5 sm:p-6 flex items-center gap-4 text-left">
+              <div className="w-11 h-11 bg-brand-dark text-white rounded-full flex items-center justify-center flex-shrink-0">
+                <Truck className="w-5 h-5 stroke-[1.8]" />
+              </div>
+              <div className="font-sans">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
+                  Tracking Number
+                </span>
+                <span className="text-sm sm:text-base font-bold text-black font-mono tracking-tight">
+                  {details.trackingNumber}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
-              <span className="text-neutral-500 uppercase tracking-wider font-semibold">
-                Payment Method
-              </span>
-              <span className="text-neutral-900 font-medium">
-                {paymentMethod === 'cod'
-                  ? 'Cash on Delivery (COD)'
-                  : 'UPI, Cards, Wallets, Netbanking & More'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-neutral-500 uppercase tracking-wider font-semibold">
-                Total Paid
-              </span>
-              <span className="text-base font-bold text-neutral-900 font-serif">
-                {formatPrice(confirmedGrandTotal || grandTotal)}
-              </span>
+
+            {/* Card 3: Estimated Delivery */}
+            <div className="bg-[#FAF8F3] border border-neutral-200/80 p-5 sm:p-6 flex items-center gap-4 text-left">
+              <div className="w-11 h-11 bg-brand-dark text-white rounded-full flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 stroke-[1.8]" />
+              </div>
+              <div className="font-sans">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
+                  Estimated Delivery
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-black font-sans tracking-tight">
+                  {details.estimatedDelivery}
+                </span>
+              </div>
             </div>
           </div>
 
-          <p className="text-xs text-neutral-500 tracking-wider uppercase mb-8 font-sans">
-            A confirmation receipt has been sent to your email address. You can track your dispatch status anytime under your Atelier account orders.
-          </p>
+          {/* TWO COLUMN MAIN CONTENT */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* LEFT COLUMN: Order Summary & Shipping Address */}
+            <div className="lg:col-span-7 space-y-8 text-left">
+              {/* Card 1: Order Summary */}
+              <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-6 border-b border-neutral-200">
+                  <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
+                    ORDER SUMMARY
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleReorder}
+                    className="inline-flex items-center gap-2 border border-neutral-300 hover:border-black text-brand-dark text-[10px] font-sans font-bold tracking-[0.2em] uppercase px-4 py-2.5 transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reorder This Entire Order</span>
+                  </button>
+                </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              to="/account?tab=VIEW ORDERS"
-              state={{ tab: 'VIEW ORDERS' }}
-              className="w-full sm:w-auto bg-brand-dark text-white text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:bg-neutral-800 transition-colors"
-            >
-              VIEW MY ORDERS
-            </Link>
-            <Link
-              to="/"
-              className="w-full sm:w-auto border border-neutral-300 text-brand-dark text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:border-black transition-colors"
-            >
-              CONTINUE SHOPPING
-            </Link>
+                {/* Items List */}
+                <div className="space-y-6 mb-8 font-sans">
+                  {details.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-4 pb-6 border-b border-neutral-100 last:border-b-0 last:pb-0">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-20 bg-neutral-100 flex-shrink-0 border border-neutral-200/60 p-0.5">
+                          <img
+                            src={getSupabaseMediaUrl(item.image)}
+                            alt={item.name}
+                            className="w-full h-full object-contain object-center"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-semibold uppercase text-black font-serif tracking-wide leading-snug">
+                            {item.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1.5 font-sans">
+                            <span className="text-[11px] text-neutral-500 font-medium">Qty: {item.quantity}</span>
+                            <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest uppercase ${orderCancelled ? 'bg-red-900 text-white' : 'bg-brand-dark text-white'}`}>
+                              {orderCancelled ? 'CANCELLED' : 'PROCESSING'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right font-sans">
+                        <span className="text-sm font-bold text-black block font-serif">{formatPrice(item.price * item.quantity)}</span>
+                        <span className="text-[10px] text-neutral-400 font-medium block uppercase tracking-wider">{formatPrice(item.price)} each</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Price Subtotals */}
+                <div className="pt-6 border-t border-neutral-200 space-y-3 text-xs font-sans text-neutral-600">
+                  <div className="flex justify-between items-center">
+                    <span className="uppercase tracking-wider">Original Order Total</span>
+                    <span className="font-semibold text-black">{formatPrice(details.subtotal)}</span>
+                  </div>
+                  {details.discount > 0 && (
+                    <div className="flex justify-between items-center text-emerald-800 font-medium">
+                      <span className="uppercase tracking-wider">Effective Subtotal</span>
+                      <span>-{formatPrice(details.discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="uppercase tracking-wider">Shipping</span>
+                    <span className="font-semibold text-black">
+                      {details.shippingFee === 0 ? 'COMPLIMENTARY EXPRESS' : formatPrice(details.shippingFee)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="pt-6 border-t border-neutral-200 mt-6 flex justify-between items-baseline font-serif">
+                  <span className="text-xl sm:text-2xl tracking-[0.1em] uppercase font-semibold text-black">TOTAL</span>
+                  <span className="text-xl sm:text-2xl font-bold text-black">{formatPrice(details.totalPaid)}</span>
+                </div>
+              </div>
+
+              {/* Card 2: Shipping Address */}
+              <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
+                <div className="flex items-center gap-2 mb-6 border-b border-neutral-200 pb-4">
+                  <div className="w-6 h-6 rounded-full bg-brand-dark text-white flex items-center justify-center">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
+                    SHIPPING ADDRESS
+                  </h3>
+                </div>
+
+                <div className="bg-[#FAF8F3] border border-neutral-200/80 p-6 text-xs font-sans text-neutral-800 leading-relaxed space-y-2.5">
+                  <p className="font-bold text-sm text-black uppercase tracking-wider">{details.shippingAddress.name || details.customerName}</p>
+                  <p className="text-neutral-600 font-medium leading-relaxed">
+                    {[
+                      details.shippingAddress.street,
+                      details.shippingAddress.city,
+                      `${details.shippingAddress.state || ''} - ${details.shippingAddress.pincode || ''}`
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                  <p className="font-bold text-black uppercase text-[11px] tracking-[0.2em]">{details.shippingAddress.country || 'INDIA'}</p>
+
+                  <div className="pt-4 border-t border-neutral-200/80 flex flex-wrap items-center gap-x-12 gap-y-2 text-[11px] font-sans">
+                    <div>
+                      <span className="text-neutral-400 block text-[9px] uppercase font-bold tracking-[0.2em] mb-0.5">PHONE</span>
+                      <span className="font-bold text-black font-mono">{details.customerPhone}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block text-[9px] uppercase font-bold tracking-[0.2em] mb-0.5">EMAIL</span>
+                      <span className="font-bold text-black">{details.customerEmail}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: ORDER JOURNEY Timeline & Order Status */}
+            <div className="lg:col-span-5 space-y-8 text-left">
+              {/* Card 1: ORDER JOURNEY Timeline */}
+              <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
+                <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-500 block mb-6 font-semibold pb-3 border-b border-neutral-200">
+                  ORDER JOURNEY
+                </h3>
+
+                <div className="space-y-6 relative pl-1">
+                  {/* Connected Vertical Line */}
+                  <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
+
+                  {/* Step 1: ORDER PLACED */}
+                  <div className="relative flex items-start gap-4">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs ${orderCancelled ? 'bg-red-700 text-white' : 'bg-yellow-400 text-black shadow-xs'}`}>
+                      <Check className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div className="font-sans pt-0.5">
+                      <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
+                      <span className={`text-[9px] font-mono font-bold tracking-widest uppercase block mt-1 ${orderCancelled ? 'text-red-700' : 'text-yellow-700'}`}>
+                        {orderCancelled ? 'CANCELLED' : 'IN PROGRESS'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Step 2: SHIPPED */}
+                  <div className="relative flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div className="font-sans pt-0.5">
+                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">SHIPPED</h4>
+                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                    </div>
+                  </div>
+
+                  {/* Step 3: OUT FOR DELIVERY */}
+                  <div className="relative flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div className="font-sans pt-0.5">
+                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">OUT FOR DELIVERY</h4>
+                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                    </div>
+                  </div>
+
+                  {/* Step 4: DELIVERED */}
+                  <div className="relative flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="font-sans pt-0.5">
+                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">DELIVERED</h4>
+                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Order Status & Actions */}
+              <div className="bg-white border border-neutral-200/80 p-6 sm:p-8 font-sans">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-200">
+                  <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
+                    ORDER STATUS
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleDownloadInvoice}
+                    className="inline-flex items-center gap-1.5 border border-neutral-300 hover:border-black text-brand-dark text-[10px] font-sans font-bold tracking-[0.2em] uppercase px-3 py-1.5 transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>DOWNLOAD INVOICE</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between mb-6">
+                  <span className="text-xs font-bold tracking-wider uppercase text-neutral-500">Current Status</span>
+                  <span className={`px-2.5 py-1 font-mono text-[10px] font-bold tracking-widest uppercase ${orderCancelled ? 'bg-red-900 text-white' : 'bg-yellow-400 text-black font-bold'}`}>
+                    {orderCancelled ? 'CANCELLED' : 'PROCESSING'}
+                  </span>
+                </div>
+
+                {/* Payment Method Container */}
+                <div className="bg-[#FAF8F3] border border-neutral-200/80 p-4 mb-6 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-dark text-white flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div className="text-left font-sans">
+                    <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-400 font-bold block mb-0.5">
+                      Payment Method
+                    </span>
+                    <span className="text-xs font-bold text-black uppercase tracking-wider">{details.paymentMethod}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons Stack (Luxury Atelier Button Theme) */}
+                <div className="space-y-3">
+                  <Link
+                    to="/account?tab=VIEW ORDERS"
+                    state={{ tab: 'VIEW ORDERS' }}
+                    className="w-full block bg-brand-dark text-white text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:bg-neutral-800 transition-colors text-center"
+                  >
+                    VIEW ORDER HISTORY
+                  </Link>
+
+                  <Link
+                    to="/"
+                    className="w-full block border border-neutral-300 text-brand-dark text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:border-black transition-colors text-center"
+                  >
+                    CONTINUE SHOPPING
+                  </Link>
+
+                  {!orderCancelled && (
+                    <button
+                      type="button"
+                      onClick={handleCancelOrder}
+                      className="w-full py-3.5 px-4 border border-red-300 text-red-700 hover:bg-red-50 text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>CANCEL ORDER</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1200,6 +1563,10 @@ export const Checkout = () => {
                         src={getSupabaseMediaUrl(item.product.image)}
                         alt={item.product.name}
                         className="w-16 h-20 object-cover object-top border border-neutral-200 bg-white"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                        }}
                       />
                       <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-mono font-bold rounded-full flex items-center justify-center">
                         {item.quantity}

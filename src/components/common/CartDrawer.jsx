@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
+import { getSupabaseMediaUrl } from '../../lib/supabase';
 
 export const CartDrawer = () => {
   const navigate = useNavigate();
+  const [isProceeding, setIsProceeding] = useState(false);
   const {
     cart,
     isCartOpen,
@@ -21,16 +23,22 @@ export const CartDrawer = () => {
   } = useCart();
 
   const handleProceedToCheckout = () => {
-    setIsCartOpen(false);
-    const hasToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
-    if (user || hasToken) {
-      navigate('/checkout');
-    } else {
-      if (setPendingAction) {
-        setPendingAction(() => () => navigate('/checkout'));
+    if (isProceeding) return;
+    setIsProceeding(true);
+
+    setTimeout(() => {
+      setIsCartOpen(false);
+      setIsProceeding(false);
+      const hasToken = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+      if (user || hasToken) {
+        navigate('/checkout');
+      } else {
+        if (setPendingAction) {
+          setPendingAction(() => () => navigate('/checkout'));
+        }
+        openAuthModal('login');
       }
-      openAuthModal('login');
-    }
+    }, 700);
   };
 
   const formatPrice = (val) => {
@@ -126,9 +134,13 @@ export const CartDrawer = () => {
                 cart.map((item, idx) => (
                   <div key={`${item.product.id}-${item.selectedSize}-${idx}`} className="py-4 first:pt-0 last:pb-0 flex gap-4">
                     <img
-                      src={item.product.image}
+                      src={getSupabaseMediaUrl(item.product.image)}
                       alt={item.product.name}
                       className="w-20 h-24 object-cover object-top bg-neutral-100 flex-shrink-0 border border-neutral-200/60"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                      }}
                     />
 
                     <div className="flex-1 flex flex-col justify-between">
@@ -195,11 +207,21 @@ export const CartDrawer = () => {
                 <Button
                   fullWidth
                   variant="primary"
-                  className="group flex items-center justify-center gap-2 py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-colors cursor-pointer"
+                  disabled={isProceeding}
+                  className="group flex items-center justify-center gap-2.5 py-4 bg-[#111111] hover:bg-neutral-800 disabled:bg-neutral-700 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
                   onClick={handleProceedToCheckout}
                 >
-                  PROCEED TO CHECKOUT
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[1.75]" />
+                  {isProceeding ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white flex-shrink-0" />
+                      <span>REDIRECTING TO CHECKOUT...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>PROCEED TO CHECKOUT</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[1.75]" />
+                    </>
+                  )}
                 </Button>
               </div>
             )}
