@@ -247,13 +247,6 @@ export const AuthModal = () => {
     setFieldErrors({});
 
     const errors = {};
-    if (!firstName || !firstName.trim() || firstName.trim().length < 2) {
-      errors.firstName = 'First name is required (at least 2 characters)';
-    }
-    if (!lastName || !lastName.trim()) {
-      errors.lastName = 'Last name is required';
-    }
-
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone || cleanPhone.length !== 10) {
       errors.phone = 'Please enter a valid 10-digit mobile number';
@@ -272,14 +265,14 @@ export const AuthModal = () => {
         method: 'POST',
         body: JSON.stringify({
           email: email.trim(),
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: 'Customer',
+          lastName: '',
           phone: cleanPhone,
         }),
       });
 
       if (res.user && res.token) {
-        setSuccessMessage(`Welcome to House of Urvaah, ${res.user.firstName}!`);
+        setSuccessMessage('Welcome to House of Urvaah!');
         setTimeout(() => {
           loginUser(res.user, res.token);
           setIsSubmitting(false);
@@ -548,55 +541,6 @@ export const AuthModal = () => {
                     </div>
 
                     <form onSubmit={handleCompleteSignup} className="space-y-4" noValidate>
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
-                          FIRST NAME *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={firstName}
-                            onChange={(e) => {
-                              setFirstName(e.target.value);
-                              if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
-                            }}
-                            placeholder="Eleanor"
-                            className={`w-full bg-white border ${
-                              fieldErrors.firstName ? 'border-red-500' : 'border-neutral-300'
-                            } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
-                            autoFocus
-                          />
-                          <UserIcon className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
-                        </div>
-                        {fieldErrors.firstName && (
-                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.firstName}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
-                          LAST NAME *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={lastName}
-                            onChange={(e) => {
-                              setLastName(e.target.value);
-                              if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
-                            }}
-                            placeholder="Vance"
-                            className={`w-full bg-white border ${
-                              fieldErrors.lastName ? 'border-red-500' : 'border-neutral-300'
-                            } pl-10 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
-                          />
-                          <UserIcon className="w-4 h-4 text-neutral-700 absolute left-3 top-3 stroke-[1.75]" />
-                        </div>
-                        {fieldErrors.lastName && (
-                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.lastName}</p>
-                        )}
-                      </div>
-
                       {/* Phone Number Field */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
@@ -619,6 +563,7 @@ export const AuthModal = () => {
                             className={`w-full bg-white border ${
                               fieldErrors.phone ? 'border-red-500' : 'border-neutral-300'
                             } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors`}
+                            autoFocus
                           />
                         </div>
                         {fieldErrors.phone && (
