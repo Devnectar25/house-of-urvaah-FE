@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Camera, X, ArrowRight } from 'lucide-react';
+import { Search, X, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
@@ -8,20 +8,6 @@ import { ProductCard } from '../common/ProductCard';
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen, setQuickViewProduct } = useCart();
   const [searchTerm, setSearchTerm] = useState('');
-  const fileInputRef = useRef(null);
-
-  const handleCameraClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) {
-      setSearchTerm('Dresses');
-    }
-  };
 
   const trendingTags = [
     'Silk Dresses',
@@ -74,13 +60,6 @@ export const SearchOverlay = () => {
                   autoFocus
                   className="w-full text-base md:text-xl font-light tracking-wider uppercase bg-transparent outline-none placeholder:text-neutral-300"
                 />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  accept="image/*"
-                  className="hidden"
-                />
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm('')}
@@ -89,16 +68,6 @@ export const SearchOverlay = () => {
                     CLEAR
                   </button>
                 )}
-                {/* Visual Search Camera Icon (matching website stroke icon style) */}
-                <button
-                  type="button"
-                  onClick={handleCameraClick}
-                  title="Visual Search (Search by Image)"
-                  aria-label="Visual Search"
-                  className="p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer flex items-center justify-center mr-2"
-                >
-                  <Camera className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.75]" />
-                </button>
                 <button
                   onClick={() => setIsSearchOpen(false)}
                   className="p-1.5 text-neutral-500 hover:text-black transition-colors"
