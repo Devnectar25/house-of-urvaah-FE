@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Search, Camera, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
+import { X, User, Search, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 
@@ -186,7 +186,6 @@ export const MobileMenu = () => {
                   title="Search"
                 >
                   <span className="text-[10px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
-                  <Camera className="w-4 h-4 stroke-[1.5]" />
                 </button>
 
                 <Link

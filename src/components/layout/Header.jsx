@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { Menu, Search, Camera, User, Heart, ShoppingBag } from 'lucide-react';
+import { Menu, Search, User, Heart, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
 
@@ -85,7 +85,7 @@ export const Header = () => {
 
           {/* Right Side: Search, Wishlist, Bag, Account Icons */}
           <div className="flex items-center gap-3 sm:gap-4 text-brand-dark">
-            {/* Search Trigger (Underlined SEARCH + Camera matching header icons) */}
+            {/* Search Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
               className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
@@ -93,7 +93,6 @@ export const Header = () => {
               title="Search products"
             >
               <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
-              <Camera className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[1.5]" />
             </button>
 
             {/* Wishlist Icon + Refined Badge */}
@@ -173,7 +172,7 @@ export const Header = () => {
 
           {/* Column 3 (Right): Search, Wishlist, Bag, Account Icons */}
           <div className="flex items-center justify-end gap-3 sm:gap-4 text-brand-dark">
-            {/* Search Trigger (Underlined SEARCH + Camera matching header icons) */}
+            {/* Search Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
               className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
@@ -181,7 +180,6 @@ export const Header = () => {
               title="Search products"
             >
               <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
-              <Camera className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[1.5]" />
             </button>
 
             {/* Wishlist Icon + Refined Badge */}

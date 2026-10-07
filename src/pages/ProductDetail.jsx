@@ -10,14 +10,36 @@ import {
   Minus,
   X,
   ArrowLeft,
-  ChevronRight
+  Tag,
+  Percent,
+  Check,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
 import { productApi } from '../services/productApi';
+import { deliveryApi } from '../services/deliveryApi';
 import { SEOHead } from '../components/common/SEOHead';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
+
+const PRODUCT_COUPONS = [
+  {
+    code: 'URVAAH10',
+    title: '10% OFF ON ORDERS ABOVE ₹2,999',
+    description: 'Use code URVAAH10 at checkout for instant 10% discount.',
+    badge: '10% OFF'
+  },
+  {
+    code: 'FLAT500',
+    title: 'FLAT ₹500 OFF ON LUXURY WEAR',
+    description: 'Applicable on orders above ₹4,999.',
+    badge: 'FLAT ₹500'
+  }
+];
 
 const findLocalProduct = (id) => {
   if (!id) return null;
@@ -51,9 +73,12 @@ export const ProductDetail = () => {
 
   // Interactive UI States
   const [copiedToast, setCopiedToast] = useState(false);
+  const [copiedCoupon, setCopiedCoupon] = useState('');
+  const [isCouponsModalOpen, setIsCouponsModalOpen] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   const [pincode, setPincode] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState('8th and 9th Sep');
+  const [pincodeResult, setPincodeResult] = useState(null);
+  const [checkingPincode, setCheckingPincode] = useState(false);
   const [openAccordion, setOpenAccordion] = useState('desc');
 
   useEffect(() => {
@@ -197,16 +222,95 @@ export const ProductDetail = () => {
     }
   };
 
-  const handleCheckPincode = () => {
-    if (!pincode.trim()) return;
+  const getDeliveryDateObject = (offset1 = 5, offset2 = 6) => {
     const today = new Date();
     const d1 = new Date(today);
-    d1.setDate(today.getDate() + 3);
+    d1.setDate(today.getDate() + offset1);
     const d2 = new Date(today);
-    d2.setDate(today.getDate() + 4);
+    d2.setDate(today.getDate() + offset2);
 
-    const monthName = d1.toLocaleString('default', { month: 'short' });
-    setDeliveryDate(`${d1.getDate()}th and ${d2.getDate()}th ${monthName}`);
+    const getOrd = (n) => {
+      const s = ['th', 'st', 'nd', 'rd'];
+      const v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    };
+
+    return {
+      day1: d1.getDate(),
+      ord1: getOrd(d1.getDate()),
+      day2: d2.getDate(),
+      ord2: getOrd(d2.getDate()),
+      month: d1.toLocaleString('default', { month: 'short' })
+    };
+  };
+
+  const handleCheckPincode = async (e) => {
+    if (e) e.preventDefault();
+    const rawInput = pincode || '';
+    const cleanPin = rawInput.trim();
+
+    // 1. Validation Rules (Do not call backend if invalid)
+    if (!cleanPin) {
+      setPincodeResult({
+        status: 'invalid',
+        message: 'Please enter your PIN code.'
+      });
+      return;
+    }
+
+    if (!/^\d+$/.test(cleanPin)) {
+      setPincodeResult({
+        status: 'invalid',
+        message: 'Please enter a valid PIN code.'
+      });
+      return;
+    }
+
+    if (cleanPin.length !== 6) {
+      setPincodeResult({
+        status: 'invalid',
+        message: 'Please enter a valid 6-digit PIN code.'
+      });
+      return;
+    }
+
+    // 2. Call Express REST Backend API via deliveryApi
+    setCheckingPincode(true);
+    setPincodeResult(null);
+
+    try {
+      const data = await deliveryApi.checkPincode(cleanPin);
+
+      if (data.available) {
+        setPincodeResult({
+          status: 'success',
+          pincode: cleanPin,
+          zone: data.zone,
+          city: data.city,
+          dateObj: data.estimatedDelivery || {
+            day1: 8,
+            ord1: 'th',
+            day2: 9,
+            ord2: 'th',
+            month: 'Oct'
+          }
+        });
+      } else {
+        setPincodeResult({
+          status: 'unserviceable',
+          pincode: cleanPin,
+          message: data.message || 'Sorry, delivery is currently unavailable for this PIN code.'
+        });
+      }
+    } catch (err) {
+      console.error('[ProductDetail] Pincode check error:', err);
+      setPincodeResult({
+        status: 'error',
+        message: 'Unable to check delivery availability. Please try again.'
+      });
+    } finally {
+      setCheckingPincode(false);
+    }
   };
 
   const toggleAccordion = (index) => {
@@ -265,23 +369,13 @@ export const ProductDetail = () => {
             <ArrowLeft className="w-4 h-4" />
             <span>BACK</span>
           </button>
-
-          <nav className="hidden sm:flex items-center gap-2 text-[11px] font-sans tracking-widest uppercase text-neutral-400">
-            <Link to="/" className="hover:text-black transition-colors">
-              HOME
-            </Link>
-            <ChevronRight className="w-3 h-3 text-neutral-300" />
-            <span>COLLECTION</span>
-            <ChevronRight className="w-3 h-3 text-neutral-300" />
-            <span className="text-black font-medium line-clamp-1">{product.name}</span>
-          </nav>
         </div>
 
-        {/* Main Product Layout Container (Left Gallery + Right Product Details) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-10 items-start">
+        {/* Main Product Layout Container (Left Gallery 55% + Right Product Details 45%, 30px Gap) */}
+        <div className="flex flex-col lg:flex-row items-start gap-6 lg:gap-[30px]">
           
-          {/* LEFT SIDE: Image Gallery (Mobile Stacked Uncropped Gallery + Desktop Side-by-Side Viewer) */}
-          <div className="lg:col-span-7 flex flex-col items-start w-full">
+          {/* LEFT SIDE: Image Gallery (~55% Desktop Width) */}
+          <div className="w-full lg:w-[55%] flex flex-col items-start shrink-0">
             {/* MOBILE VIEW (< md): Single-column stacked gallery with 100% full uncropped photos */}
             <div className="flex md:hidden flex-col gap-4 w-full">
               {gallery.map((imgUrl, idx) => (
@@ -363,18 +457,18 @@ export const ProductDetail = () => {
             </div>
           </div>
 
-          {/* RIGHT SIDE: Product Info & Actions Panel (Compact & Proportionate) */}
-          <div className="lg:col-span-5 flex flex-col text-left space-y-2.5 sm:space-y-3 max-w-md pt-[70px]">
-            {/* Title & Brand */}
+          {/* RIGHT SIDE: Product Info & Actions Panel (~45% Desktop Width) */}
+          <div className="w-full lg:flex-1 flex flex-col text-left space-y-4 sm:space-y-5 pt-0 min-w-0">
+            {/* 1. PRODUCT TITLE & BRAND */}
             <div>
-              <span className="text-[9px] sm:text-[9.5px] font-serif tracking-[0.25em] uppercase text-neutral-400 block mb-0.5">
+              <span className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-400 block mb-1 font-medium">
                 HOUSE OF URVAAH
               </span>
-              <h1 className="text-base sm:text-lg font-semibold tracking-[0.08em] uppercase text-brand-dark leading-tight">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-normal tracking-[0.06em] uppercase text-brand-dark leading-tight">
                 {product.name}
               </h1>
               {product.shortDescription && (
-                <p className="text-[11px] text-neutral-500 font-sans mt-0.5 leading-snug">
+                <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1.5 leading-relaxed">
                   {product.shortDescription}
                 </p>
               )}
@@ -382,16 +476,16 @@ export const ProductDetail = () => {
               {/* NAME OPTIONS (Rendered dynamically if available) */}
               {Array.isArray(product.nameOptions || product.name_options) &&
                 (product.nameOptions || product.name_options).filter(Boolean).length > 0 && (
-                  <div className="mt-2 pt-1.5 border-t border-neutral-100/80">
-                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-neutral-800 block mb-0.5 font-serif">
+                  <div className="mt-3 pt-2 border-t border-neutral-100">
+                    <span className="text-xs font-bold tracking-[0.15em] uppercase text-neutral-800 block mb-1 font-serif">
                       NAME OPTIONS
                     </span>
-                    <ul className="space-y-0.5 font-sans text-[11px] text-neutral-600">
+                    <ul className="space-y-1 font-sans text-xs text-neutral-600">
                       {(product.nameOptions || product.name_options)
                         .filter(Boolean)
                         .map((optName, idx) => (
-                          <li key={idx} className="flex items-center gap-1.5">
-                            <span className="w-1 h-1 rounded-full bg-neutral-800 shrink-0" />
+                          <li key={idx} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0" />
                             <span>{optName}</span>
                           </li>
                         ))}
@@ -400,71 +494,68 @@ export const ProductDetail = () => {
                 )}
             </div>
 
-            {/* Price Section */}
-            <div className="border-b border-neutral-200/80 pb-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg sm:text-xl font-bold tracking-wider text-brand-dark font-sans">
+            {/* 2 & 3. PRICE & TAX TEXT */}
+            <div className="border-b border-neutral-200 pb-3.5">
+              <div className="flex items-baseline gap-3">
+                <span className="text-2xl sm:text-3xl font-normal tracking-wider text-brand-dark font-sans">
                   {formatPrice(product.price)}
                 </span>
                 {product.originalPrice && product.originalPrice > product.price && (
                   <>
-                    <span className="text-xs text-neutral-400 line-through font-sans">
+                    <span className="text-sm sm:text-base text-neutral-400 line-through font-sans">
                       {formatPrice(product.originalPrice)}
                     </span>
-                    <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded font-sans tracking-wide">
+                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
                       {product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
                     </span>
                   </>
                 )}
               </div>
-              <span className="text-[10px] text-neutral-400 font-normal tracking-wide block font-sans">
+              <span className="text-xs text-neutral-400 font-normal tracking-wide block font-sans mt-1">
                 Inclusive of All Taxes
               </span>
             </div>
 
-            {/* COLORS Selection */}
+            {/* COLORS Selection (if present) */}
             {product.colors && product.colors.length > 0 && (
               <div>
-                <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark block mb-1">
+                <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block mb-2 font-sans">
                   COLOR: <span className="font-normal text-neutral-600">{product.colors.join(', ')}</span>
                 </span>
-                <div className="flex flex-wrap gap-1 font-sans">
+                <div className="flex flex-wrap gap-2 font-sans">
                   {product.colors.map((col, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 border border-neutral-300 text-[10px] font-medium bg-neutral-50 text-brand-dark rounded-xs"
+                      className="px-3 py-1.5 border border-neutral-300 text-xs font-medium bg-neutral-50 text-brand-dark rounded-xs flex items-center gap-2"
                     >
-                      {col}
+                      {col.startsWith('#') && (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
+                          style={{ backgroundColor: col }}
+                        />
+                      )}
+                      <span>{col}</span>
                     </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* SIZE Selection */}
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark">
-                  SIZE:
-                </span>
-                <button
-                  onClick={() => setIsSizeChartOpen(true)}
-                  className="inline-flex items-center gap-1 text-[10px] text-brand-dark font-medium underline underline-offset-2 hover:opacity-75 transition-opacity cursor-pointer font-sans"
-                >
-                  <Ruler className="w-3 h-3" />
-                  Size Chart
-                </button>
-              </div>
+            {/* 5 & 6. SIZE SECTION & SIZE CHART */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block font-sans">
+                SIZE: <span className="font-semibold text-black">{selectedSize}</span>
+              </span>
 
               {/* Selectable Size Boxes */}
-              <div className="flex flex-wrap gap-1.5 font-sans">
+              <div className="flex flex-wrap gap-2 font-sans">
                 {availableSizes.map((sz) => (
                   <button
                     key={sz}
                     onClick={() => setSelectedSize(sz)}
-                    className={`w-8 h-8 sm:w-8.5 sm:h-8.5 border flex items-center justify-center text-[11px] font-semibold tracking-wider uppercase transition-all cursor-pointer ${
+                    className={`w-11 h-11 sm:w-12 sm:h-12 border flex items-center justify-center text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all cursor-pointer ${
                       selectedSize === sz
-                        ? 'bg-black text-white border-black shadow-xs'
+                        ? 'bg-black text-white border-black shadow-sm scale-105'
                         : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
                     }`}
                   >
@@ -472,20 +563,31 @@ export const ProductDetail = () => {
                   </button>
                 ))}
               </div>
+
+              {/* Size Chart Button (Positioned directly below size buttons) */}
+              <div className="pt-1.5">
+                <button
+                  onClick={() => setIsSizeChartOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs text-brand-dark font-medium underline underline-offset-4 hover:opacity-70 transition-opacity cursor-pointer font-sans"
+                >
+                  <Ruler className="w-3.5 h-3.5" />
+                  <span>Size Chart</span>
+                </button>
+              </div>
             </div>
 
-            {/* CTA Buttons: ADD TO CART + Wishlist + Share */}
-            <div className="flex items-center gap-1.5 pt-0.5">
+            {/* 7. ACTION BUTTON ROW: ADD TO CART + WISHLIST + SHARE */}
+            <div className="flex items-center gap-2.5 pt-1">
               <button
                 onClick={handleAddToCart}
                 disabled={product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)}
-                className={`flex-1 h-9 sm:h-9.5 px-3 text-[10.5px] font-semibold tracking-[0.15em] uppercase transition-colors shadow-xs flex items-center justify-center gap-1.5 font-sans cursor-pointer ${
+                className={`flex-1 h-11 sm:h-12.5 px-5 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer ${
                   product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
                     ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
                     : 'bg-black text-white hover:bg-neutral-800'
                 }`}
               >
-                <ShoppingBag className="w-3.5 h-3.5" />
+                <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
                   ? 'OUT OF STOCK'
                   : (isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG')}
@@ -494,7 +596,7 @@ export const ProductDetail = () => {
               {/* Wishlist Heart Icon Button */}
               <button
                 onClick={() => toggleWishlist(product.id)}
-                className={`w-9 h-9 sm:w-9.5 sm:h-9.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                   isWishlisted
                     ? 'border-red-600 bg-red-50 text-red-600'
                     : 'border-neutral-300 text-brand-dark hover:border-black'
@@ -502,96 +604,178 @@ export const ProductDetail = () => {
                 aria-label="Wishlist toggle"
                 title="Save to Wishlist"
               >
-                <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
               </button>
 
               {/* Share Icon Button */}
               <button
                 onClick={handleShare}
-                className="w-9 h-9 sm:w-9.5 sm:h-9.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black transition-all relative cursor-pointer shrink-0"
+                className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black transition-all relative cursor-pointer shrink-0"
                 aria-label="Share product"
                 title="Share product link"
               >
-                <Share2 className="w-3.5 h-3.5 stroke-[1.5]" />
+                <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
                 {copiedToast && (
-                  <span className="absolute -top-7 bg-black text-white text-[9px] py-0.5 px-1.5 font-mono whitespace-nowrap shadow-lg">
+                  <span className="absolute -top-8 bg-black text-white text-[10px] py-1 px-2 font-mono whitespace-nowrap shadow-lg rounded-xs">
                     Link Copied!
                   </span>
                 )}
               </button>
             </div>
 
-            {/* PINCODE & DELIVERY CHECK */}
-            <div className="pt-2 border-t border-neutral-200">
-              <span className="text-[10px] font-bold tracking-wider uppercase text-brand-dark block mb-1">
+
+            {/* 9. PINCODE & DELIVERY CHECK */}
+            <div className="pt-4 border-t border-neutral-200">
+              <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block mb-2 font-sans">
                 CHECK DELIVERY & SERVICES
               </span>
 
-              <div className="flex gap-1.5 max-w-xs font-sans">
+              <form onSubmit={handleCheckPincode} className="flex gap-2 max-w-sm font-sans">
                 <input
                   type="text"
                   value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setPincode(val);
+                    if (pincodeResult) setPincodeResult(null);
+                  }}
                   placeholder="ENTER PINCODE"
                   maxLength={6}
-                  className="flex-1 border border-neutral-300 px-2.5 py-1 text-[11px] font-mono tracking-wider uppercase focus:outline-none focus:border-black h-8"
+                  className="flex-1 border border-neutral-400 text-brand-dark px-3.5 py-2 text-xs font-mono tracking-wider uppercase focus:outline-none focus:border-black h-10 bg-white"
                 />
                 <button
-                  onClick={handleCheckPincode}
-                  className="bg-black text-white px-3 py-1 text-[10.5px] font-semibold tracking-wider uppercase hover:bg-neutral-800 transition-colors cursor-pointer h-8"
+                  type="submit"
+                  disabled={checkingPincode}
+                  className="bg-black text-white px-5 py-2 text-xs font-semibold tracking-wider uppercase hover:bg-neutral-800 transition-colors cursor-pointer h-10 shrink-0 disabled:opacity-60 flex items-center justify-center min-w-[95px]"
                 >
-                  CHECK
+                  {checkingPincode ? 'Checking...' : 'CHECK'}
                 </button>
-              </div>
+              </form>
 
-              {/* Delivery Estimate Line */}
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 mt-1 font-sans">
-                <Truck className="w-3 h-3 text-brand-dark flex-shrink-0" />
-                <span>
-                  Delivery between <strong className="text-black font-semibold">{deliveryDate}</strong>
-                </span>
-              </div>
+              {/* Validation or Network Error */}
+              {(pincodeResult?.status === 'invalid' || pincodeResult?.status === 'error') && (
+                <div className="flex items-center gap-2 text-xs text-rose-600 mt-2.5 font-sans">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{pincodeResult.message}</span>
+                </div>
+              )}
+
+              {/* Unserviceable PIN Code Notice */}
+              {pincodeResult?.status === 'unserviceable' && (
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-rose-600 mt-2.5 font-sans">
+                  <XCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>✕ {pincodeResult.message}</span>
+                </div>
+              )}
+
+              {/* Serviceable PIN Code Success Result (Matches Reference Screenshot) */}
+              {pincodeResult?.status === 'success' && (() => {
+                const d = pincodeResult.dateObj;
+                return (
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-700 mt-2.5 font-mono">
+                    <Truck className="w-4.5 h-4.5 text-black flex-shrink-0" />
+                    <span>
+                      Delivery between{' '}
+                      <span className="text-[#15803d] font-normal">
+                        {d.day1}<sup>{d.ord1}</sup> and {d.day2}<sup>{d.ord2}</sup> {d.month}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ACCORDION SECTIONS */}
-            <div className="pt-2 border-t border-neutral-200 space-y-0.5">
+            <div className="pt-3 border-t border-neutral-200 space-y-1">
               {/* Product Description */}
               {product.description && (
-                <div className="border-b border-neutral-200/80 pb-1.5 pt-0.5">
+                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('desc')}
-                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>PRODUCT DESCRIPTION</span>
-                    {openAccordion === 'desc' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
+                    {openAccordion === 'desc' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
                   {openAccordion === 'desc' && (
-                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
+                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
                       {product.description}
                     </div>
                   )}
                 </div>
               )}
 
+              {/* Size Details */}
+              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
+                <button
+                  onClick={() => toggleAccordion('sizedetails')}
+                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                >
+                  <span>SIZE DETAILS</span>
+                  {openAccordion === 'sizedetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                </button>
+                {openAccordion === 'sizedetails' && (
+                  <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
+                    {product.sizeDetailsText ? (
+                      <div className="whitespace-pre-line">{product.sizeDetailsText}</div>
+                    ) : (
+                      <>
+                        <div>26: Waist: 66.04 cm, Length: 74.30 cm</div>
+                        <div>28: Waist: 71.12 cm, Length: 74.30 cm</div>
+                        <div>30: Waist: 76.20 cm, Length: 74.30 cm</div>
+                        <div>32: Waist: 81.28 cm, Length: 74.30 cm</div>
+                        <div>34: Waist: 86.36 cm, Length: 74.30 cm</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Information Accordion */}
+              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
+                <button
+                  onClick={() => toggleAccordion('info')}
+                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                >
+                  <span>ADDITIONAL INFORMATION</span>
+                  {openAccordion === 'info' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                </button>
+                {openAccordion === 'info' && (
+                  <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
+                    {product.additionalInfoText || product.additionalInfo ? (
+                      <div className="whitespace-pre-line">{product.additionalInfoText || product.additionalInfo}</div>
+                    ) : (
+                      <>
+                        <div>Fabric: Embroidered fabric with sequin detailing</div>
+                        <div>Skirt hem: Hand-finished potli trim</div>
+                        <div>Closure: Adjustable tie-back (top), side zip on left of skirt</div>
+                        <div>Lining: Fully lined (top and skirt)</div>
+                        <div>Top: Lightly Padded</div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Product Details (Dynamic Bullet Points) */}
               {Array.isArray(product.productDetails || product.product_details) &&
                 (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
-                  <div className="border-b border-neutral-200 pb-1.5 pt-1">
+                  <div className="border-b border-neutral-200 pb-2.5 pt-1">
                     <button
                       onClick={() => toggleAccordion('pdetails')}
-                      className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                      className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                     >
                       <span>PRODUCT DETAILS</span>
-                      {openAccordion === 'pdetails' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
+                      {openAccordion === 'pdetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                     </button>
                     {openAccordion === 'pdetails' && (
-                      <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
-                        <ul className="space-y-1">
+                      <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2">
+                        <ul className="space-y-1.5">
                           {(product.productDetails || product.product_details)
                             .filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim()))
                             .map((detail, idx) => (
-                              <li key={idx} className="flex items-start gap-1.5">
-                                <span className="w-1 h-1 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
                                 <div>
                                   {detail.label && detail.label.trim() && (
                                     <strong className="font-semibold text-neutral-900">{detail.label.trim()}: </strong>
@@ -642,24 +826,6 @@ export const ProductDetail = () => {
                   {openAccordion === 'care' && (
                     <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
                       {product.careInstructions || product.care_instructions}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Additional Information Accordion */}
-              {product.additionalInfo && (
-                <div className="border-b border-neutral-200 pb-1.5 pt-1">
-                  <button
-                    onClick={() => toggleAccordion('info')}
-                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                  >
-                    <span>ADDITIONAL INFORMATION</span>
-                    {openAccordion === 'info' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
-                  </button>
-                  {openAccordion === 'info' && (
-                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
-                      {product.additionalInfo}
                     </div>
                   )}
                 </div>
@@ -748,6 +914,74 @@ export const ProductDetail = () => {
               className="w-full mt-5 bg-black text-white py-2.5 text-xs font-semibold tracking-widest uppercase hover:bg-neutral-800 transition-colors cursor-pointer"
             >
               CLOSE SIZE GUIDE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ALL COUPONS MODAL OVERLAY */}
+      {isCouponsModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full p-6 relative font-serif shadow-2xl border border-neutral-200 max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCouponsModalOpen(false)}
+              className="absolute top-3.5 right-3.5 p-1.5 text-neutral-600 hover:text-black transition-colors cursor-pointer"
+              aria-label="Close coupons modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 block mb-1 font-sans">
+              HOUSE OF URVAAH OFFERS
+            </span>
+            <h2 className="text-base font-bold tracking-[0.2em] uppercase text-brand-dark mb-4 border-b border-neutral-200 pb-2.5 font-sans">
+              AVAILABLE COUPONS & OFFERS
+            </h2>
+
+            <div className="space-y-3 font-sans">
+              {PRODUCT_COUPONS.map((cp) => (
+                <div
+                  key={cp.code}
+                  className="p-3 bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-black text-white text-[10px] font-mono font-bold tracking-widest px-2 py-0.5 uppercase">
+                        {cp.code}
+                      </span>
+                      <span className="text-[10px] font-semibold text-rose-700 tracking-wide uppercase">
+                        {cp.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-brand-dark uppercase">
+                      {cp.title}
+                    </p>
+                    <p className="text-[11px] text-neutral-500 leading-snug">
+                      {cp.description}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(cp.code);
+                        setCopiedCoupon(cp.code);
+                        setTimeout(() => setCopiedCoupon(''), 2000);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-[10px] font-bold font-mono tracking-widest border border-black uppercase hover:bg-black hover:text-white transition-colors cursor-pointer shrink-0"
+                  >
+                    {copiedCoupon === cp.code ? 'COPIED ✓' : 'COPY CODE'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setIsCouponsModalOpen(false)}
+              className="w-full mt-6 bg-black text-white py-2.5 text-xs font-semibold tracking-widest uppercase hover:bg-neutral-800 transition-colors cursor-pointer font-sans"
+            >
+              CLOSE OFFERS
             </button>
           </div>
         </div>
