@@ -186,24 +186,45 @@ export const CartProvider = ({ children }) => {
     apiClient(`/api/cart/${userId}`)
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
-          const mappedBackendCart = res.data.map((item) => ({
-            product: {
-              id: String(item.productId || item.product_id || item.id),
-              name: item.name || item.productname || item.title || 'Product',
-              price: Number(item.price || 0),
-              originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
-              image: item.image || item.image_url || '/assets/Images/Brown01.png',
-              brand: item.brand || 'House of Urvaah',
-              category: item.category || 'CLOTHING',
-              inStock: item.inStock ?? true,
-              stockQuantity: item.stockQuantity ?? 10
-            },
-            selectedSize: item.selectedSize || 'M',
-            quantity: Number(item.quantity || 1)
-          }));
+          if (res.data.length > 0) {
+            const mappedBackendCart = res.data.map((item) => ({
+              product: {
+                id: String(item.productId || item.product_id || item.id),
+                name: item.name || item.productname || item.title || 'Product',
+                price: Number(item.price || 0),
+                originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
+                image: item.image || item.image_url || '/assets/Images/Brown01.png',
+                brand: item.brand || 'House of Urvaah',
+                category: item.category || 'CLOTHING',
+                inStock: item.inStock ?? true,
+                stockQuantity: item.stockQuantity ?? 10
+              },
+              selectedSize: item.selectedSize || 'M',
+              quantity: Number(item.quantity || 1)
+            }));
 
-          setCart(mappedBackendCart);
-          localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
+            setCart(mappedBackendCart);
+            localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
+          } else {
+            // Backend cart is empty. If local cart has items, preserve them and sync to backend DB!
+            setCart((prevCart) => {
+              if (prevCart && prevCart.length > 0) {
+                for (const cItem of prevCart) {
+                  const numericId = parseInt(String(cItem.product.id).replace(/\D/g, ''), 10);
+                  if (numericId && !isNaN(numericId)) {
+                    apiClient('/api/cart/add', {
+                      method: 'POST',
+                      body: JSON.stringify({ userId, productId: numericId, quantity: cItem.quantity })
+                    }).catch(() => {});
+                  }
+                }
+                localStorage.setItem(cachedKey, JSON.stringify(prevCart));
+                return prevCart;
+              }
+              localStorage.setItem(cachedKey, JSON.stringify([]));
+              return [];
+            });
+          }
         }
       })
       .catch((err) => {
@@ -242,6 +263,7 @@ export const CartProvider = ({ children }) => {
       try {
         const guestItems = JSON.parse(guestCartStr);
         if (Array.isArray(guestItems) && guestItems.length > 0) {
+          const userId = formatted.id || 'user';
           setCart((prevUserCart) => {
             const merged = [...prevUserCart];
             for (const gItem of guestItems) {
@@ -257,10 +279,20 @@ export const CartProvider = ({ children }) => {
                 merged.push(gItem);
               }
             }
-            const userId = formatted.id || 'user';
             localStorage.setItem(`urvaah_cart_${userId}`, JSON.stringify(merged));
             return merged;
           });
+
+          // Sync merged guest items to backend API
+          for (const gItem of guestItems) {
+            const numericId = parseInt(String(gItem.product.id).replace(/\D/g, ''), 10);
+            if (numericId && !isNaN(numericId)) {
+              apiClient('/api/cart/add', {
+                method: 'POST',
+                body: JSON.stringify({ userId, productId: numericId, quantity: gItem.quantity })
+              }).catch(() => {});
+            }
+          }
         }
       } catch (e) {}
       localStorage.removeItem('urvaah_guest_cart');
