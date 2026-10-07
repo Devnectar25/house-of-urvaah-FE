@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Lock,
@@ -175,6 +175,110 @@ export const Checkout = () => {
       setIsAddressesLoading(false);
     }
   };
+
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // Helper to format order for confirmation screen
+  const formatOrderDetails = (ord, currentUser) => {
+    if (!ord) return null;
+    const orderNum = ord.order_number || ord.orderNumber || (ord.id ? `HOU-${ord.id}` : 'HOU-340391');
+
+    let addrObj = ord.shipping_address || ord.shippingAddress || {};
+    if (typeof addrObj === 'string') {
+      try { addrObj = JSON.parse(addrObj); } catch (e) { addrObj = { street: addrObj }; }
+    }
+
+    const rawItems = Array.isArray(ord.items) && ord.items.length > 0 
+      ? ord.items 
+      : [
+          {
+            id: ord.product_id || ord.id || '1',
+            name: ord.product_name || ord.title || ord.name || 'PEACH BLOOM CORSET SET',
+            price: Number(ord.price || ord.total || ord.total_amount || 0),
+            quantity: Number(ord.quantity || 1),
+            image: ord.image || ord.image_url || '/assets/Images/Brown01.png',
+            selectedSize: ord.selectedSize || ord.size || 'M'
+          }
+        ];
+
+    const mappedItems = rawItems.map((it) => ({
+      id: String(it.id || it.product_id || '1'),
+      name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
+      price: Number(it.price || 0),
+      quantity: Number(it.quantity || 1),
+      image: it.image || it.image_url || '/assets/Images/Brown01.png',
+      selectedSize: it.selectedSize || it.size || 'M',
+      product: {
+        id: String(it.id || it.product_id || '1'),
+        name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
+        price: Number(it.price || 0),
+        image: it.image || it.image_url || '/assets/Images/Brown01.png'
+      }
+    }));
+
+    const totalPaid = Number(ord.total || ord.total_amount || ord.totalAmount || ord.total_price || 0);
+    const subtotal = Number(ord.subtotal || totalPaid || 0);
+    const discount = Number(ord.discount || 0);
+    const shippingFee = Number(ord.shipping_fee || ord.shippingFee || 0);
+
+    const createdAt = ord.created_at || ord.createddate ? new Date(ord.created_at || ord.createddate) : new Date();
+    const deliveryDate = new Date(createdAt);
+    deliveryDate.setDate(deliveryDate.getDate() + 7);
+    const estDeliveryStr = deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    return {
+      orderNumber: orderNum,
+      trackingNumber: ord.tracking_number || ord.trackingNumber || `TRK-${String(orderNum).replace(/\D/g, '').slice(-6) || 'VHYNGE'}`,
+      estimatedDelivery: estDeliveryStr,
+      items: mappedItems,
+      subtotal: subtotal,
+      discount: discount,
+      shippingFee: shippingFee,
+      totalPaid: totalPaid,
+      shippingAddress: {
+        name: addrObj.name || addrObj.recipient_name || ord.customer_name || currentUser?.name || 'Customer Name',
+        street: addrObj.street || addrObj.full_address || 'Address Details',
+        city: addrObj.city || '',
+        state: addrObj.state || '',
+        pincode: addrObj.pincode || addrObj.postal_code || '',
+        country: addrObj.country || 'INDIA'
+      },
+      paymentMethod: ord.payment_method || ord.paymentMethod || 'Online Payment',
+      customerEmail: ord.customer_email || ord.email || currentUser?.email || '',
+      customerPhone: ord.customer_phone || ord.phone || currentUser?.phone || '',
+      status: ord.status || 'Confirmed'
+    };
+  };
+
+  // Check for viewOrder passed from Account page or URL orderId
+  useEffect(() => {
+    if (location.state?.viewOrder) {
+      const formatted = formatOrderDetails(location.state.viewOrder, user);
+      if (formatted) {
+        setPlacedOrderDetails(formatted);
+        setPlacedOrderNumber(formatted.orderNumber);
+        setConfirmedGrandTotal(formatted.totalPaid);
+        setOrderPlaced(true);
+      }
+    } else {
+      const orderParam = searchParams.get('orderId') || searchParams.get('orderNumber');
+      if (orderParam && user) {
+        apiClient(`/api/orders/${orderParam}`)
+          .then((res) => {
+            const ord = res.data || res.order;
+            if (ord) {
+              const formatted = formatOrderDetails(ord, user);
+              setPlacedOrderDetails(formatted);
+              setPlacedOrderNumber(formatted.orderNumber);
+              setConfirmedGrandTotal(formatted.totalPaid);
+              setOrderPlaced(true);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [location.state, searchParams, user]);
 
   useEffect(() => {
     if (user) {
@@ -473,11 +577,23 @@ export const Checkout = () => {
         activeAddressId = selectedAddr.id || null;
       }
 
+      let sanitizedAddressId = activeAddressId;
+      if (sanitizedAddressId) {
+        const strVal = String(sanitizedAddressId).trim();
+        if (strVal.startsWith('local-') || isNaN(Number(strVal))) {
+          sanitizedAddressId = null;
+        } else {
+          sanitizedAddressId = parseInt(strVal, 10);
+        }
+      } else {
+        sanitizedAddressId = null;
+      }
+
       const randomOrderNum = `HOU-${Math.floor(100000 + Math.random() * 900000)}`;
 
       const orderPayload = {
         orderNumber: randomOrderNum,
-        addressId: activeAddressId,
+        addressId: sanitizedAddressId,
         paymentMethod: paymentMethod,
         paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Pending',
         paymentType: paymentMethod === 'cod' ? 'COD' : paymentMethod === 'card' ? 'Card' : 'UPI',
@@ -505,12 +621,15 @@ export const Checkout = () => {
           if (res && res.success && res.data) {
             finalizeOrderSuccess(res.data.order_number || randomOrderNum, grandTotal);
             return;
+          } else {
+            throw new Error(res?.message || 'Failed to place order in database.');
           }
         } catch (err) {
-          console.warn('COD order API fallback:', err.message);
+          console.error('COD order creation failed:', err.message);
+          setIsPlacingOrder(false);
+          setPaymentErrorMessage(`Order creation failed: ${err.message || 'Please try again.'}`);
+          return;
         }
-        finalizeOrderSuccess(randomOrderNum, grandTotal);
-        return;
       }
 
       // Case 2: Online / Card Payment via Razorpay
@@ -522,9 +641,14 @@ export const Checkout = () => {
         });
         if (createOrderRes && createOrderRes.success && createOrderRes.data) {
           createdOrder = createOrderRes.data;
+        } else {
+          throw new Error(createOrderRes?.message || 'Failed to initialize order on server.');
         }
       } catch (err) {
-        console.warn('Internal order creation warning:', err.message);
+        console.error('Internal order creation failed:', err.message);
+        setIsPlacingOrder(false);
+        setPaymentErrorMessage(`Failed to initiate order: ${err.message || 'Please check your connection and try again.'}`);
+        return;
       }
 
       const internalOrderId = createdOrder?.id || null;
@@ -669,6 +793,11 @@ export const Checkout = () => {
       status: 'Pending'
     };
 
+    const currentStatusStr = (details.status || 'Confirmed').toLowerCase();
+    const isDelivered = currentStatusStr.includes('delivered') || currentStatusStr.includes('completed');
+    const isOutForDelivery = isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery');
+    const isShipped = isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched');
+
     const handleReorder = () => {
       if (details && details.items) {
         details.items.forEach((item) => {
@@ -714,10 +843,10 @@ export const Checkout = () => {
             </motion.div>
 
             <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-500 block mb-1.5 font-mono font-bold">
-              ORDER CONFIRMED & PROCESSING
+              {isDelivered ? 'ORDER DELIVERED & COMPLETED' : 'ORDER CONFIRMED & PROCESSING'}
             </span>
             <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-2">
-              THANK YOU FOR YOUR ORDER
+              {isDelivered ? 'THANK YOU! YOUR ORDER HAS BEEN DELIVERED' : 'THANK YOU FOR YOUR ORDER'}
             </h1>
             <p className="text-xs font-sans text-neutral-500 tracking-wider uppercase">
               We'll send you an order confirmation email shortly to <strong className="text-black font-medium">{details.customerEmail || user?.email}</strong>.
@@ -814,8 +943,18 @@ export const Checkout = () => {
                           </h4>
                           <div className="flex items-center gap-2 mt-1.5 font-sans">
                             <span className="text-[11px] text-neutral-500 font-medium">Qty: {item.quantity}</span>
-                            <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest uppercase ${orderCancelled ? 'bg-red-900 text-white' : 'bg-brand-dark text-white'}`}>
-                              {orderCancelled ? 'CANCELLED' : 'PROCESSING'}
+                            <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest uppercase ${
+                              orderCancelled 
+                                ? 'bg-red-900 text-white' 
+                                : isDelivered 
+                                ? 'bg-emerald-700 text-white' 
+                                : isOutForDelivery 
+                                ? 'bg-blue-700 text-white' 
+                                : isShipped 
+                                ? 'bg-amber-600 text-white' 
+                                : 'bg-brand-dark text-white'
+                            }`}>
+                              {orderCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
                             </span>
                           </div>
                         </div>
@@ -912,41 +1051,47 @@ export const Checkout = () => {
                     <div className="font-sans pt-0.5">
                       <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
                       <span className={`text-[9px] font-mono font-bold tracking-widest uppercase block mt-1 ${orderCancelled ? 'text-red-700' : 'text-yellow-700'}`}>
-                        {orderCancelled ? 'CANCELLED' : 'IN PROGRESS'}
+                        {orderCancelled ? 'CANCELLED' : isShipped ? 'COMPLETED' : 'IN PROGRESS'}
                       </span>
                     </div>
                   </div>
 
                   {/* Step 2: SHIPPED */}
                   <div className="relative flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isShipped ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                       <Package className="w-4 h-4" />
                     </div>
                     <div className="font-sans pt-0.5">
-                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">SHIPPED</h4>
-                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isShipped ? 'text-black font-bold' : 'text-neutral-400'}`}>SHIPPED</h4>
+                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isShipped ? 'text-yellow-700 font-bold' : 'text-neutral-400'}`}>
+                        {isShipped ? 'COMPLETED' : 'PENDING'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Step 3: OUT FOR DELIVERY */}
                   <div className="relative flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isOutForDelivery ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                       <Truck className="w-4 h-4" />
                     </div>
                     <div className="font-sans pt-0.5">
-                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">OUT FOR DELIVERY</h4>
-                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isOutForDelivery ? 'text-black font-bold' : 'text-neutral-400'}`}>OUT FOR DELIVERY</h4>
+                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}`}>
+                        {isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Step 4: DELIVERED */}
                   <div className="relative flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white border-2 border-neutral-300 text-neutral-400 flex items-center justify-center flex-shrink-0 z-10">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isDelivered ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                       <CheckCircle2 className="w-4 h-4" />
                     </div>
                     <div className="font-sans pt-0.5">
-                      <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-400 uppercase">DELIVERED</h4>
-                      <span className="text-[9px] font-mono font-medium text-neutral-400 tracking-widest uppercase block mt-1">PENDING</span>
+                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>DELIVERED</h4>
+                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
+                        {isDelivered ? 'DELIVERED' : 'PENDING'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -970,8 +1115,18 @@ export const Checkout = () => {
 
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-xs font-bold tracking-wider uppercase text-neutral-500">Current Status</span>
-                  <span className={`px-2.5 py-1 font-mono text-[10px] font-bold tracking-widest uppercase ${orderCancelled ? 'bg-red-900 text-white' : 'bg-yellow-400 text-black font-bold'}`}>
-                    {orderCancelled ? 'CANCELLED' : 'PROCESSING'}
+                  <span className={`px-2.5 py-1 font-mono text-[10px] font-bold tracking-widest uppercase ${
+                    orderCancelled 
+                      ? 'bg-red-900 text-white' 
+                      : isDelivered 
+                      ? 'bg-emerald-600 text-white' 
+                      : isOutForDelivery 
+                      ? 'bg-blue-600 text-white' 
+                      : isShipped 
+                      ? 'bg-amber-500 text-black' 
+                      : 'bg-yellow-400 text-black'
+                  }`}>
+                    {orderCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : (details.status || 'PROCESSING').toUpperCase()}
                   </span>
                 </div>
 
@@ -1005,7 +1160,7 @@ export const Checkout = () => {
                     CONTINUE SHOPPING
                   </Link>
 
-                  {!orderCancelled && (
+                  {!orderCancelled && !isDelivered && (
                     <button
                       type="button"
                       onClick={handleCancelOrder}

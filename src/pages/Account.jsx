@@ -800,7 +800,11 @@ export const Account = () => {
                 {orders.map((ord, idx) => {
                   const orderNum = ord.order_number || ord.orderNumber || `ORD-2026-${ord.id || Math.floor(100000 + Math.random() * 900000)}`;
                   const orderStatus = ord.status || 'Pending';
-                  const isCancelled = orderStatus.toLowerCase().includes('cancel');
+                  const statusLower = orderStatus.toLowerCase();
+                  const isCancelled = statusLower.includes('cancel');
+                  const isDelivered = statusLower.includes('delivered') || statusLower.includes('completed');
+                  const isOutForDelivery = isDelivered || statusLower.includes('out') || statusLower.includes('delivery');
+                  const isShipped = isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched');
                   const isPaid = (ord.payment_status || ord.paymentStatus || 'Paid').toLowerCase() === 'paid';
 
                   let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
@@ -842,7 +846,17 @@ export const Account = () => {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${isCancelled ? 'bg-red-50 text-red-700 border-red-200/80' : 'bg-yellow-100 text-yellow-900 border-yellow-300'}`}>
+                          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${
+                            isCancelled 
+                              ? 'bg-red-50 text-red-700 border-red-200/80' 
+                              : isDelivered 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                              : isOutForDelivery 
+                              ? 'bg-blue-50 text-blue-800 border-blue-300' 
+                              : isShipped 
+                              ? 'bg-amber-50 text-amber-900 border-amber-300' 
+                              : 'bg-yellow-100 text-yellow-900 border-yellow-300'
+                          }`}>
                             {orderStatus}
                           </span>
                           <span className="px-3 py-1 text-xs font-semibold rounded-full bg-neutral-100 text-neutral-700 border border-neutral-200/80 font-mono">
@@ -857,9 +871,25 @@ export const Account = () => {
                           ORDER PROGRESS JOURNEY
                         </h4>
 
+                        {/* Progress Journey Steps */}
                         <div className="grid grid-cols-4 gap-2 relative">
-                          {/* Background Line */}
-                          <div className="absolute top-4 left-[12%] right-[12%] h-0.5 bg-neutral-200 z-0" />
+                          {/* Background Line with Dynamic Fill */}
+                          <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200 z-0 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-yellow-400 transition-all duration-500" 
+                              style={{ 
+                                width: isCancelled 
+                                  ? '0%' 
+                                  : isDelivered 
+                                  ? '100%' 
+                                  : isOutForDelivery 
+                                  ? '66%' 
+                                  : isShipped 
+                                  ? '33%' 
+                                  : '0%' 
+                              }} 
+                            />
+                          </div>
 
                           {/* Step 1: ORDER PLACED */}
                           <div className="flex flex-col items-center text-center z-10">
@@ -873,30 +903,30 @@ export const Account = () => {
 
                           {/* Step 2: SHIPPED */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('shipped') || orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isShipped ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                               <Package className="w-4 h-4" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('shipped') || orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isShipped ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
                               SHIPPED
                             </span>
                           </div>
 
                           {/* Step 3: OUT FOR DELIVERY */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isOutForDelivery ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                               <Truck className="w-4 h-4" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('out') || orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isOutForDelivery ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
                               OUT FOR DELIVERY
                             </span>
                           </div>
 
                           {/* Step 4: DELIVERED */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${orderStatus.toLowerCase().includes('delivered') ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isDelivered ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                               <CheckCircle2 className="w-4 h-4" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${orderStatus.toLowerCase().includes('delivered') ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isDelivered ? 'font-bold text-emerald-700' : 'font-medium text-neutral-400'}`}>
                               DELIVERED
                             </span>
                           </div>
@@ -931,8 +961,18 @@ export const Account = () => {
                                 </div>
                               </div>
 
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
-                                {isCancelled ? 'CANCELLED' : 'PENDING'}
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider ${
+                                isCancelled 
+                                  ? 'bg-red-100 text-red-700' 
+                                  : isDelivered 
+                                  ? 'bg-emerald-100 text-emerald-800' 
+                                  : isOutForDelivery 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : isShipped 
+                                  ? 'bg-amber-100 text-amber-800' 
+                                  : 'bg-neutral-100 text-neutral-800'
+                              }`}>
+                                {isCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
                               </span>
                             </div>
                           );
@@ -953,7 +993,7 @@ export const Account = () => {
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <button
                             type="button"
-                            onClick={() => setSelectedOrderModal(ord)}
+                            onClick={() => navigate('/checkout', { state: { viewOrder: ord } })}
                             className="px-4 py-2 rounded-xl border border-neutral-200/90 hover:border-black text-xs font-semibold text-neutral-700 hover:text-black transition-colors bg-white cursor-pointer shadow-2xs"
                           >
                             View Details
@@ -968,7 +1008,7 @@ export const Account = () => {
                             <span>Reorder</span>
                           </button>
 
-                          {!isCancelled && (
+                          {!isCancelled && !isDelivered && (
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}

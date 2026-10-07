@@ -8,6 +8,7 @@ import apiClient from '../../lib/apiClient';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[6-9]\d{9}$/; // 10-digit Indian mobile number format
+const NAME_REGEX = /^[A-Za-z\s'-]{2,}$/; // Letters, spaces, hyphens, apostrophes (at least 2 chars)
 
 export const AuthModal = () => {
   const navigate = useNavigate();
@@ -56,6 +57,9 @@ export const AuthModal = () => {
       setServerError('');
       setFieldErrors({});
       setSuccessMessage('');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
       setOtpDigits(['', '', '', '', '', '']);
       setResendCountdown(60);
       setCanResend(false);
@@ -247,11 +251,37 @@ export const AuthModal = () => {
     setFieldErrors({});
 
     const errors = {};
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
     const cleanPhone = phone.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length !== 10) {
+
+    // 1. First Name Validation
+    if (!trimmedFirstName) {
+      errors.firstName = 'First name is required';
+    } else if (trimmedFirstName.length < 2) {
+      errors.firstName = 'First name must be at least 2 characters';
+    } else if (!NAME_REGEX.test(trimmedFirstName)) {
+      errors.firstName = 'First name should contain letters only';
+    }
+
+    // 2. Last Name Validation
+    if (!trimmedLastName) {
+      errors.lastName = 'Last name is required';
+    } else if (trimmedLastName.length < 2) {
+      errors.lastName = 'Last name must be at least 2 characters';
+    } else if (!NAME_REGEX.test(trimmedLastName)) {
+      errors.lastName = 'Last name should contain letters only';
+    }
+
+    // 3. Phone Number Validation
+    if (!cleanPhone) {
+      errors.phone = 'Phone number is required';
+    } else if (cleanPhone.length !== 10) {
       errors.phone = 'Please enter a valid 10-digit mobile number';
     } else if (!PHONE_REGEX.test(cleanPhone)) {
-      errors.phone = 'Please enter a valid Indian mobile number starting with 6-9';
+      errors.phone = 'Please enter a valid mobile number starting with 6, 7, 8, or 9';
+    } else if (/^(\d)\1{9}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid 10-digit mobile number';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -265,8 +295,8 @@ export const AuthModal = () => {
         method: 'POST',
         body: JSON.stringify({
           email: email.trim(),
-          firstName: 'Customer',
-          lastName: '',
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           phone: cleanPhone,
         }),
       });
@@ -541,6 +571,54 @@ export const AuthModal = () => {
                     </div>
 
                     <form onSubmit={handleCompleteSignup} className="space-y-4" noValidate>
+                      {/* Name Fields Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* First Name */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                            FIRST NAME *
+                          </label>
+                          <input
+                            type="text"
+                            value={firstName}
+                            onChange={(e) => {
+                              setFirstName(e.target.value);
+                              if (fieldErrors.firstName) setFieldErrors(prev => ({ ...prev, firstName: '' }));
+                            }}
+                            placeholder="First name"
+                            className={`w-full bg-white border ${
+                              fieldErrors.firstName ? 'border-red-500' : 'border-neutral-300'
+                            } px-3.5 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium tracking-wider focus:outline-none focus:border-black transition-colors`}
+                            autoFocus
+                          />
+                          {fieldErrors.firstName && (
+                            <p className="text-[11px] text-red-600 mt-1">{fieldErrors.firstName}</p>
+                          )}
+                        </div>
+
+                        {/* Last Name */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
+                            LAST NAME *
+                          </label>
+                          <input
+                            type="text"
+                            value={lastName}
+                            onChange={(e) => {
+                              setLastName(e.target.value);
+                              if (fieldErrors.lastName) setFieldErrors(prev => ({ ...prev, lastName: '' }));
+                            }}
+                            placeholder="Last name"
+                            className={`w-full bg-white border ${
+                              fieldErrors.lastName ? 'border-red-500' : 'border-neutral-300'
+                            } px-3.5 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium tracking-wider focus:outline-none focus:border-black transition-colors`}
+                          />
+                          {fieldErrors.lastName && (
+                            <p className="text-[11px] text-red-600 mt-1">{fieldErrors.lastName}</p>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Phone Number Field */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] sm:text-xs tracking-[0.2em] uppercase text-neutral-900 font-semibold block">
@@ -563,7 +641,6 @@ export const AuthModal = () => {
                             className={`w-full bg-white border ${
                               fieldErrors.phone ? 'border-red-500' : 'border-neutral-300'
                             } pl-16 pr-4 py-2.5 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium tracking-wider focus:outline-none focus:border-black transition-colors`}
-                            autoFocus
                           />
                         </div>
                         {fieldErrors.phone && (
