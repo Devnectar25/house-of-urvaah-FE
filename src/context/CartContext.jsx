@@ -111,16 +111,20 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   // Fetch & persist wishlist for user
+  // Fetch & persist wishlist for user
   useEffect(() => {
-    if (!user) {
-      const cached = localStorage.getItem('urvaah_guest_wishlist');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) setWishlist(parsed.map(String));
-        } catch (e) {}
-      } else {
-        setWishlist([]);
+    const isAdminUser = ['admin', 'super_admin', 'subadmin', 'sub_admin'].includes((user?.role || '').toLowerCase());
+    if (!user || isAdminUser) {
+      if (!user) {
+        const cached = localStorage.getItem('urvaah_guest_wishlist');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) setWishlist(parsed.map(String));
+          } catch (e) {}
+        } else {
+          setWishlist([]);
+        }
       }
       return;
     }
@@ -151,19 +155,22 @@ export const CartProvider = ({ children }) => {
       .catch((err) => {
         console.warn('Could not fetch backend wishlist, using cached:', err.message);
       });
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   // Fetch & persist cart for user
   useEffect(() => {
-    if (!user) {
-      const cached = localStorage.getItem('urvaah_guest_cart');
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) setCart(parsed);
-        } catch (e) {}
-      } else {
-        setCart([]);
+    const isAdminUser = ['admin', 'super_admin', 'subadmin', 'sub_admin'].includes((user?.role || '').toLowerCase());
+    if (!user || isAdminUser) {
+      if (!user) {
+        const cached = localStorage.getItem('urvaah_guest_cart');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) setCart(parsed);
+          } catch (e) {}
+        } else {
+          setCart([]);
+        }
       }
       return;
     }
