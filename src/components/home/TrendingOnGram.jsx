@@ -21,12 +21,13 @@ const GRAM_VIDEOS = [
       category: 'CORSET TOPS',
       subcategory: 'Corsets & Bodices',
       tag: 'AS SEEN ON REELS',
-      image: '/assets/Images/Corset_Blue1.jpg',
-      hoverImage: '/assets/Images/Corset_Blue2.jpg',
+      image: '/assets/Images/Blue01.png',
+      hoverImage: '/assets/Images/Blue02.png',
       gallery: [
-        '/assets/Images/Corset_Blue1.jpg',
-        '/assets/Images/Corset_Blue2.jpg',
-        '/assets/Images/Corset04.png'
+        '/assets/Images/Blue01.png',
+        '/assets/Images/Blue02.png',
+        '/assets/Images/Blue03.png',
+        '/assets/Images/Blue04.png'
       ],
       colors: ['#7BB3CC', '#F5C6D0'],
       sizes: ['XS', 'S', 'M', 'L'],
@@ -71,9 +72,10 @@ const GRAM_VIDEOS = [
       image: '/assets/Images/Brown02.png',
       hoverImage: '/assets/Images/Brown_Floral.jpg',
       gallery: [
+        '/assets/Images/Brown01.png',
         '/assets/Images/Brown02.png',
-        '/assets/Images/Brown_Floral.jpg',
-        '/assets/Images/Brown03.png'
+        '/assets/Images/Brown03.png',
+        '/assets/Images/Brown04.png'
       ],
       colors: ['#4A3B32'],
       sizes: ['XS', 'S', 'M', 'L'],
@@ -117,9 +119,10 @@ const GRAM_VIDEOS = [
       image: '/assets/Images/Peach03.png',
       hoverImage: '/assets/Images/Peach_Floral.jpg',
       gallery: [
+        '/assets/Images/Peach01.png',
+        '/assets/Images/Peach02.png',
         '/assets/Images/Peach03.png',
-        '/assets/Images/Peach_Floral.jpg',
-        '/assets/Images/Peach01.png'
+        '/assets/Images/Peach04.png'
       ],
       colors: ['#F5D6CE', '#D4AF37'],
       sizes: ['XS', 'S', 'M'],
@@ -160,12 +163,13 @@ const GRAM_VIDEOS = [
       category: 'DRESSES',
       subcategory: 'Silk & Satin Midis',
       tag: 'NEW IN',
-      image: '/assets/Images/Corset04.png',
-      hoverImage: '/assets/Images/Peach02.png',
+      image: '/assets/Images/Kurti_2.png',
+      hoverImage: '/assets/Images/Kurti_1.png',
       gallery: [
-        '/assets/Images/Corset04.png',
-        '/assets/Images/Peach02.png',
-        '/assets/Images/Blue04.png'
+        '/assets/Images/Kurti_2.png',
+        '/assets/Images/Kurti_1.png',
+        '/assets/Images/Kurti_3.png',
+        '/assets/Images/Kurti_4.png'
       ],
       colors: ['#EFE8DE', '#111111'],
       sizes: ['S', 'M', 'L'],
@@ -205,12 +209,13 @@ const GRAM_VIDEOS = [
       category: 'SUMMER DRESSES',
       subcategory: 'Printed Ensembles',
       tag: 'VIRAL LOOK',
-      image: '/assets/Images/Blue_Halter.jpg',
+      image: '/assets/Images/Blue01.png',
       hoverImage: '/assets/Images/Blue02.png',
       gallery: [
-        '/assets/Images/Blue_Halter.jpg',
+        '/assets/Images/Blue01.png',
         '/assets/Images/Blue02.png',
-        '/assets/Images/Blue03.png'
+        '/assets/Images/Blue03.png',
+        '/assets/Images/Blue04.png'
       ],
       colors: ['#5B9BD5', '#E8EFF9'],
       sizes: ['XS', 'S', 'M', 'L'],
@@ -527,8 +532,12 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
             {/* Main Product Image Viewer with Carousel Controls */}
             <div className="relative w-full h-[230px] sm:h-[260px] md:h-[280px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
               <img
-                src={selectedImage}
+                src={getSupabaseMediaUrl(selectedImage)}
                 alt={look.product.name}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = selectedImage;
+                }}
                 className="w-full h-full object-contain object-center transition-all duration-300 p-1"
               />
 
@@ -575,7 +584,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               <span className="text-[11px] font-semibold text-neutral-800 uppercase tracking-wider block mb-2 font-sans">
                 Selected Product
               </span>
-              <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 {look.product.gallery.map((img, idx) => {
                   const isSelected = selectedImage === img;
                   return (
@@ -583,18 +592,19 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                       key={idx}
                       type="button"
                       onClick={() => handleThumbnailClick(img, idx)}
-                      className={`relative w-14 h-16 sm:w-16 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-100 transition-all cursor-pointer flex items-center justify-center ${isSelected
-                        ? 'border-2 border-red-500 ring-2 ring-red-500/30'
+                      className={`relative w-12 h-14 sm:w-14 sm:h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-100 transition-all cursor-pointer flex items-center justify-center ${isSelected
+                        ? 'border-2 border-black ring-2 ring-black/10'
                         : 'border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100'
                         }`}
                     >
                       <img
-                        src={img}
+                        src={getSupabaseMediaUrl(img)}
                         alt={look.product.name}
                         onError={(e) => {
-                          e.currentTarget.parentElement.style.display = 'none';
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = img;
                         }}
-                        className="w-full h-full object-contain object-center p-0.5"
+                        className="w-full h-full object-cover object-center"
                       />
                     </button>
                   );
@@ -683,16 +693,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               ) : (
                 <span>Add to cart</span>
               )}
-            </button>
-
-            {/* View Cart Icon button */}
-            <button
-              type="button"
-              onClick={handleOpenCart}
-              className="p-2.5 border border-neutral-300 hover:border-black rounded-lg text-neutral-800 hover:text-black transition-colors flex items-center justify-center cursor-pointer"
-              aria-label="Open Shopping Bag"
-            >
-              <ShoppingCart className="w-4 h-4" />
             </button>
           </div>
         </div>

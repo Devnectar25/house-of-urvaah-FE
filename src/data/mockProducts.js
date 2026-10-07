@@ -227,18 +227,24 @@ const RAW_MOCK_PRODUCTS = [
   },
   {
     id: 'prod-102',
-    name: 'DRAPED ASYMMETRICAL SILK DRESS',
+    name: 'PEACH BLOOM CORSET SET',
     price: 12990,
-    category: 'SUMMER DRESSES',
-    subcategory: 'Silk & Satin Midis',
+    category: 'CORSET TOPS',
+    subcategory: 'Corset Sets',
     tag: 'EDITORIAL',
     isNew: true,
     isBestSeller: true,
     image: '/assets/Images/Corset04.png',
-    hoverImage: '/assets/Images/Peach01.png',
+    hoverImage: '/assets/Images/Corset01.png',
+    gallery: [
+      '/assets/Images/Corset01.png',
+      '/assets/Images/Corset02.png',
+      '/assets/Images/Corset03.png',
+      '/assets/Images/Corset04.png'
+    ],
     colors: ['#FFFFFF', '#111111'],
     sizes: ['S', 'M', 'L'],
-    description: 'Flowing mulberry silk mid-length dress with asymmetric draped neckline and side slit.'
+    description: 'Floral embroidered corset bodice with sweetheart neckline, contour boning, and matching blossom skirt.'
   },
   {
     id: 'prod-103',
