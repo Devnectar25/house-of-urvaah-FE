@@ -125,9 +125,15 @@ export const AdminLogin = () => {
         });
       } catch (adminErr) {
         const errorMsg = adminErr.message || adminErr.data?.message;
+
+        if (errorMsg === 'Failed to fetch' || (errorMsg && errorMsg.toLowerCase().includes('fetch'))) {
+          setServerError('Unable to connect to server. Please check your network connection or API environment settings.');
+          return;
+        }
+
         // Distinguish wrong credentials (401/403) from network/server error (500, timeout, network failure)
         if (adminErr.status === 401 || adminErr.status === 403 || (errorMsg && errorMsg.toLowerCase().includes('invalid'))) {
-          setServerError(errorMsg || 'Invalid username or password');
+          setServerError('Invalid username or password');
           return;
         } else if (adminErr.status === 404) {
           // Fallback to /api/auth/login if admin route is not mounted
@@ -142,7 +148,9 @@ export const AdminLogin = () => {
           } catch (fallbackErr) {
             const fbMsg = fallbackErr.message || fallbackErr.data?.message;
             if (fallbackErr.status === 401 || fallbackErr.status === 403) {
-              setServerError(fbMsg || 'Invalid username or password');
+              setServerError('Invalid username or password');
+            } else if (fbMsg === 'Failed to fetch' || (fbMsg && fbMsg.toLowerCase().includes('fetch'))) {
+              setServerError('Unable to connect to server. Please check your network connection or API environment settings.');
             } else {
               setServerError(fbMsg || 'Something went wrong. Please try again.');
             }
