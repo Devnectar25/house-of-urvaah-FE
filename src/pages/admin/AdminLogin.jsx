@@ -124,9 +124,10 @@ export const AdminLogin = () => {
           }),
         });
       } catch (adminErr) {
+        const errorMsg = adminErr.message || adminErr.data?.message;
         // Distinguish wrong credentials (401/403) from network/server error (500, timeout, network failure)
-        if (adminErr.status === 401 || adminErr.status === 403) {
-          setServerError('Invalid username or password');
+        if (adminErr.status === 401 || adminErr.status === 403 || (errorMsg && errorMsg.toLowerCase().includes('invalid'))) {
+          setServerError(errorMsg || 'Invalid username or password');
           return;
         } else if (adminErr.status === 404) {
           // Fallback to /api/auth/login if admin route is not mounted
@@ -139,15 +140,16 @@ export const AdminLogin = () => {
               }),
             });
           } catch (fallbackErr) {
+            const fbMsg = fallbackErr.message || fallbackErr.data?.message;
             if (fallbackErr.status === 401 || fallbackErr.status === 403) {
-              setServerError('Invalid username or password');
+              setServerError(fbMsg || 'Invalid username or password');
             } else {
-              setServerError('Something went wrong. Please try again.');
+              setServerError(fbMsg || 'Something went wrong. Please try again.');
             }
             return;
           }
         } else {
-          setServerError('Something went wrong. Please try again.');
+          setServerError(errorMsg || 'Something went wrong. Please try again.');
           return;
         }
       }
