@@ -99,16 +99,24 @@ export const ProductDetail = () => {
         .getProductById(id)
         .then((data) => {
           if (isMounted && data && (data.name || data.title)) {
+            const isCorsetSet = String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
+            const corsetGallery = [
+              '/assets/Images/Corset01.png',
+              '/assets/Images/Corset02.png',
+              '/assets/Images/Corset03.png',
+              '/assets/Images/Corset04.png'
+            ];
+
             setProduct((prev) => ({
               ...prev,
               ...data,
               id: String(data.id || id),
-              name: data.name || data.title || prev?.name,
-              price: parseFloat(data.price) || prev?.price || 8990,
+              name: isCorsetSet ? 'PEACH BLOOM CORSET SET' : (data.name || data.title || prev?.name),
+              price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
-              image: data.image || prev?.image,
-              hoverImage: data.hoverImage || prev?.hoverImage || data.image,
-              gallery: data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image]),
+              image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
+              hoverImage: isCorsetSet ? corsetGallery[1] : (data.hoverImage || prev?.hoverImage || data.image),
+              gallery: isCorsetSet ? corsetGallery : (data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image])),
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
               nameOptions: data.nameOptions || data.name_options || prev?.nameOptions || [],
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
@@ -672,7 +680,7 @@ export const ProductDetail = () => {
               {pincodeResult?.status === 'success' && (() => {
                 const d = pincodeResult.dateObj;
                 return (
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-700 mt-2.5 font-mono">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-700 mt-2.5 font-sans">
                     <Truck className="w-4.5 h-4.5 text-black flex-shrink-0" />
                     <span>
                       Delivery between{' '}

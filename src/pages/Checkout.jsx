@@ -646,9 +646,9 @@ export const Checkout = () => {
           name: 'CORSET DETAIL JACQUARD TOP',
           price: confirmedGrandTotal || 4999,
           quantity: 1,
-          image: '/assets/Images/Corset_Blue1.jpg',
+          image: '/assets/Images/Blue01.png',
           selectedSize: 'M',
-          product: { id: 'item-1', name: 'CORSET DETAIL JACQUARD TOP', price: confirmedGrandTotal || 4999, image: '/assets/Images/Corset_Blue1.jpg' }
+          product: { id: 'item-1', name: 'CORSET DETAIL JACQUARD TOP', price: confirmedGrandTotal || 4999, image: '/assets/Images/Blue01.png' }
         }
       ],
       subtotal: confirmedGrandTotal || 4999,

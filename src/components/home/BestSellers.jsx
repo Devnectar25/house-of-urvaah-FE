@@ -48,10 +48,14 @@ export const BestSellers = ({ onQuickView }) => {
     window.addEventListener('urvaah_products_updated', fetchBestSellers);
     window.addEventListener('storage', fetchBestSellers);
 
+    // Auto-polling every 3s for live real-time sync with Admin panel
+    const pollingInterval = setInterval(fetchBestSellers, 3000);
+
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_products_updated', fetchBestSellers);
       window.removeEventListener('storage', fetchBestSellers);
+      clearInterval(pollingInterval);
     };
   }, []);
 
