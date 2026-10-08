@@ -29,10 +29,10 @@ const MENU_SECTIONS = [
     num: '02',
     title: 'BEST SELLERS',
     items: [
-      { label: 'Oversized Tailored Blazer', href: '#best-sellers' },
-      { label: 'Dark Blue Wide Leg Set', href: '#best-sellers' },
-      { label: 'Peach Bloom Corset Set', href: '#best-sellers' },
-      { label: 'Minimalist Ribbed Silk Top', href: '#best-sellers' }
+      { label: 'Chestnut Bloom Set', href: '#best-sellers' },
+      { label: 'Cerulean Garden Set', href: '#best-sellers' },
+      { label: 'Gilded Mist Corset', href: '#best-sellers' },
+      { label: 'Rosewood Bloom Set', href: '#best-sellers' }
     ]
   },
   {
