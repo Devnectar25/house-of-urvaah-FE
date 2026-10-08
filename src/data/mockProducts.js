@@ -214,7 +214,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
 const RAW_MOCK_PRODUCTS = [
   {
     id: 'prod-101',
-    name: 'DOUBLE-BREASTED OVERSIZED BLAZER',
+    name: 'CHESTNUT BLOOM SET',
     price: 8990,
     originalPrice: 11990,
     category: 'PARTY WEAR',
@@ -226,7 +226,7 @@ const RAW_MOCK_PRODUCTS = [
     hoverImage: '/assets/Images/Brown04.png',
     colors: ['#111111', '#F5F5F0', '#4A3B32'],
     sizes: ['XS', 'S', 'M', 'L'],
-    description: 'Structured double-breasted blazer made of premium virgin wool blend with peak lapels, flap pockets, and back vent.'
+    description: 'A spaghetti-strap top and mini skirt set in a rich brown floral embroidered fabric with intricate sequin detailing. A low, backless silhouette with an adjustable tie-back on the top, finished with a potli-trimmed skirt hem for texture.\nFully lined for comfort, with a smooth side-zip closure on the skirt.'
   },
   {
     id: 'prod-102',
