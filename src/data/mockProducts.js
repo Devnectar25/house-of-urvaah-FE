@@ -101,7 +101,7 @@ export const FEATURED_CATEGORIES = [
 const RAW_BEST_SELLERS_PRODUCTS = [
   {
     id: 'bs-101',
-    name: 'OVERSIZED TAILORED BLAZER',
+    name: 'CHESTNUT BLOOM SET',
     price: 8990,
     originalPrice: 11990,
     category: 'PARTY WEAR',
@@ -123,7 +123,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
   },
   {
     id: 'bs-102',
-    name: 'DARK BLUE WIDE LEG TAILORED SET',
+    name: 'CERULEAN GARDEN SET',
     price: 10990,
     category: 'CO-ORD SETS',
     subcategory: 'Printed Ensembles',
@@ -140,11 +140,13 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     ],
     colors: ['#5B9BD5', '#111111'],
     sizes: ['XS', 'S', 'M', 'L'],
-    description: 'Printed two-piece ensemble featuring a halter neck top and matching floral mini skirt.'
+    description: 'A halter-neck top and mini skirt set in a teal floral embroidered fabric, finished with all-over sequin detailing that catches the light with every move. The skirt hem is edged with a hand-finished potli trim for a playful, textured finish.\nFully lined for comfort, with an adjustable tie-back on the top for a customizable fit and a smooth side-zip closure on the skirt.\nStyle it for a beach day, a vacation dinner, or a night out — this one does double duty.',
+    additionalInfo: 'Fabric: Embroidered fabric with sequin detailing\nSkirt hem: Hand-finished potli trim\nClosure: Adjustable tie-back (top), side zip on left of skirt\nLining: Fully lined (top and skirt)\nAvailable sizes: S, M, L\nTop: Lightly Padded',
+    additionalInfoText: 'Fabric: Embroidered fabric with sequin detailing\nSkirt hem: Hand-finished potli trim\nClosure: Adjustable tie-back (top), side zip on left of skirt\nLining: Fully lined (top and skirt)\nAvailable sizes: S, M, L\nTop: Lightly Padded'
   },
   {
     id: 'bs-103',
-    name: 'PEACH BLOOM CORSET SET',
+    name: 'GILDED MIST CORSET',
     price: 12990,
     category: 'CORSET TOPS',
     subcategory: 'Corset Sets',
@@ -161,11 +163,11 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     ],
     colors: ['#FFFFFF', '#111111'],
     sizes: ['S', 'M', 'L'],
-    description: 'Floral embroidered corset bodice with sweetheart neckline and matching blossom skirt.'
+    description: 'A statement corset top in raw tissue silk, hand-embroidered with rich golden zari work and delicate sequin detailing throughout. Boned below the bust for structure, with soft padding for comfort and shape no additional support needed underneath.\nDesigned to be worn endlessly: pair it over a saree for a modern draped look, with a skirt for evening, or dress it down with jeans or palazzos for a statement daytime moment. One corset, however many ways you want to style it.\nClosure: adjustable lace-up back.'
   },
   {
     id: 'bs-104',
-    name: 'MINIMALIST RIBBED SILK TOP',
+    name: 'ROSEWOOD BLOOM SET',
     price: 4990,
     category: 'CORSET TOPS',
     subcategory: 'Tops & Shirts',
@@ -182,11 +184,11 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     ],
     colors: ['#F5F5F0', '#111111'],
     sizes: ['S', 'M', 'L'],
-    description: 'Fine silk rib knit fitted top in dusty rose blush with delicate crew neckline.'
+    description: 'A cap-sleeve top and mini skirt set in a soft peach-pink floral embroidered fabric with delicate sequin work throughout. The skirt hem finishes in a hand-detailed potli trim, and a corset-style lace-up back on the top gives it a fitted, flattering silhouette.\nFully lined, with a side-zip closure on the skirt for easy wear.\nSoft enough for daytime, sharp enough for evening.'
   },
   {
     id: 'bs-105',
-    name: 'EMBROIDERED SILK KURTI SET',
+    name: 'Ivory Corset Kurti',
     price: 8990,
     originalPrice: 11990,
     category: 'CO-ORD SETS',
@@ -204,7 +206,8 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     ],
     colors: ['#8B0000', '#111111', '#F5F5F0'],
     sizes: ['XS', 'S', 'M', 'L', 'XL'],
-    description: 'Architectural embroidered silk kurti ensemble featuring intricate hand-finished detailing and flowing silhouette.'
+    description: 'A everyday-easy piece that works two ways wear it buttoned up as a mini dress, or unbutton the front placket for a more relaxed, styled-open kurti look over jeans. Made in breathable cora cotton, designed for all-day comfort in humid, Indian-summer weather.\nFinished with a square neckline trimmed in delicate floral lace, a corset-style lace-up back for a snatched, tailored fit, and all-over heart-shaped butti embroidery in a soft ivory tone. Fully lined in cotton for added comfort and opacity.\nFrom college to the office to a weekend occasion — one piece, three ways to wear it.',
+    additionalInfo: 'Fabric: Cora cotton (breathable, all-day wear)\nLining: Cotton lining\nNeckline: Square neck with floral lace trim\nClosure: Front button placket, corset-style lace-up back\nEmbroidery: All-over heart-shaped butti embroidery\nStyling: Wear buttoned as a dress, or open-front as a kurti\nAvailable sizes: XS, S, M, L'
   }
 ];
 
@@ -227,7 +230,7 @@ const RAW_MOCK_PRODUCTS = [
   },
   {
     id: 'prod-102',
-    name: 'PEACH BLOOM CORSET SET',
+    name: 'GILDED MIST CORSET',
     price: 12990,
     category: 'CORSET TOPS',
     subcategory: 'Corset Sets',
@@ -244,7 +247,7 @@ const RAW_MOCK_PRODUCTS = [
     ],
     colors: ['#FFFFFF', '#111111'],
     sizes: ['S', 'M', 'L'],
-    description: 'Floral embroidered corset bodice with sweetheart neckline, contour boning, and matching blossom skirt.'
+    description: 'A statement corset top in raw tissue silk, hand-embroidered with rich golden zari work and delicate sequin detailing throughout. Boned below the bust for structure, with soft padding for comfort and shape no additional support needed underneath.\nDesigned to be worn endlessly: pair it over a saree for a modern draped look, with a skirt for evening, or dress it down with jeans or palazzos for a statement daytime moment. One corset, however many ways you want to style it.\nClosure: adjustable lace-up back.'
   },
   {
     id: 'prod-103',

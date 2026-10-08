@@ -82,6 +82,15 @@ export const ProductDetail = () => {
   const [openAccordion, setOpenAccordion] = useState('desc');
 
   useEffect(() => {
+    if (id && (String(id) === '105' || String(id) === 'prod-105' || String(id) === 'bs-105')) {
+      navigate('/product/bs-101', { replace: true });
+      return;
+    }
+    if (id && (String(id) === '106' || String(id) === 'prod-106' || String(id) === 'bs-106')) {
+      navigate('/product/bs-103', { replace: true });
+      return;
+    }
+
     window.scrollTo({ top: 0, behavior: 'instant' });
     let isMounted = true;
     setLoading(true);
@@ -111,7 +120,7 @@ export const ProductDetail = () => {
               ...prev,
               ...data,
               id: String(data.id || id),
-              name: isCorsetSet ? 'PEACH BLOOM CORSET SET' : (data.name || data.title || prev?.name),
+              name: isCorsetSet ? 'GILDED MIST CORSET' : (data.name || data.title || prev?.name),
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
               image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
