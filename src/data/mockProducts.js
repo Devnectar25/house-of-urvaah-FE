@@ -222,8 +222,8 @@ const RAW_MOCK_PRODUCTS = [
     tag: 'NEW IN',
     isNew: true,
     isBestSeller: true,
-    image: '/assets/Images/Brown01.png',
-    hoverImage: '/assets/Images/Brown04.png',
+    image: '/assets/Images/Brown02.png',
+    hoverImage: '/assets/Images/Brown03.png',
     colors: ['#111111', '#F5F5F0', '#4A3B32'],
     sizes: ['XS', 'S', 'M', 'L'],
     description: 'A spaghetti-strap top and mini skirt set in a rich brown floral embroidered fabric with intricate sequin detailing. A low, backless silhouette with an adjustable tie-back on the top, finished with a potli-trimmed skirt hem for texture.\nFully lined for comfort, with a smooth side-zip closure on the skirt.'
