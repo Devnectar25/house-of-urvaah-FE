@@ -14,11 +14,11 @@ const GRAM_VIDEOS = [
     handle: '@houseofurvaah',
     link: '#corsets',
     product: {
-      id: 'gram-prod-1',
-      name: 'CORSET DETAIL JACQUARD TOP',
-      price: 4999,
-      formattedPrice: '₹ 4,999',
-      category: 'CORSET TOPS',
+      id: 'bs-102',
+      name: 'CERULEAN GARDEN SET',
+      price: 10990,
+      formattedPrice: '₹ 10,990',
+      category: 'CO-ORD SETS',
       subcategory: 'Corsets & Bodices',
       tag: 'AS SEEN ON REELS',
       image: '/assets/Images/Blue01.png',
@@ -109,10 +109,10 @@ const GRAM_VIDEOS = [
     handle: '@houseofurvaah',
     link: '#party-wear',
     product: {
-      id: 'gram-prod-4',
-      name: 'PEACH BROCADE CORSET CO-ORD SET',
-      price: 5499,
-      formattedPrice: '₹ 5,499',
+      id: 'bs-104',
+      name: 'ROSEWOOD BLOOM SET',
+      price: 4990,
+      formattedPrice: '₹ 4,990',
       category: 'PARTY WEAR',
       subcategory: 'Evening & Festive',
       tag: 'EXCLUSIVE',
@@ -156,11 +156,11 @@ const GRAM_VIDEOS = [
     handle: '@houseofurvaah',
     link: '#silk-collection',
     product: {
-      id: 'gram-prod-5',
-      name: 'DRAPED MULBERRY SILK MIDI DRESS',
-      price: 8999,
-      formattedPrice: '₹ 8,999',
-      category: 'DRESSES',
+      id: 'bs-105',
+      name: 'Ivory Corset Kurti',
+      price: 8990,
+      formattedPrice: '₹ 8,990',
+      category: 'CO-ORD SETS',
       subcategory: 'Silk & Satin Midis',
       tag: 'NEW IN',
       image: '/assets/Images/Kurti_2.png',
@@ -338,13 +338,11 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   const [selectedImage, setSelectedImage] = useState(look.product.image);
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
   const { addToCart, setPdpProduct, setIsCartOpen } = useCart();
 
   useEffect(() => {
     setSelectedImage(look.product.image);
     setSelectedImgIndex(0);
-    setIsExpanded(true);
     if (modalVideoRef.current) {
       modalVideoRef.current.muted = true;
       modalVideoRef.current.defaultMuted = true;
@@ -612,60 +610,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               </div>
             </div>
 
-            {/* Description & Structured Details Section (Matching Screenshot) */}
-            {look.product.specs && (
-              <div className="pt-3 border-t border-neutral-100 text-[13px] text-neutral-800 space-y-3 font-sans">
-                <h4 className="font-bold text-sm text-neutral-950 tracking-tight">Description</h4>
 
-                <div className="space-y-1 text-neutral-800 leading-relaxed">
-                  <p>
-                    <span className="font-semibold text-neutral-900">Color:</span> {look.product.specs.color}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-neutral-900">Fabric:</span> {look.product.specs.fabric}
-                  </p>
-                </div>
-
-                {/* Collapsible Details */}
-                {isExpanded && (
-                  <div className="space-y-3 pt-1">
-                    {look.product.specs.top && (
-                      <div className="space-y-1">
-                        <p className="font-bold text-neutral-950 text-[13px]">{look.product.specs.topTitle || 'Top:'}</p>
-                        {Object.entries(look.product.specs.top).map(([key, val]) => (
-                          <p key={key} className="text-neutral-700">
-                            <span className="font-medium text-neutral-900">{key}:</span> {val}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {look.product.specs.bottom && (
-                      <div className="space-y-1">
-                        <p className="font-bold text-neutral-950 text-[13px]">{look.product.specs.bottomTitle || 'Skirt:'}</p>
-                        {Object.entries(look.product.specs.bottom).map(([key, val]) => (
-                          <p key={key} className="text-neutral-700">
-                            <span className="font-medium text-neutral-900">{key}:</span> {val}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-[11px] text-neutral-500 leading-relaxed pt-1">
-                  Product color may slightly vary due to photographic lighting sources or your monitor settings.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="font-bold text-neutral-950 text-[12px] hover:underline cursor-pointer block mt-1"
-                >
-                  {isExpanded ? 'Read less' : 'Read more'}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Sticky Action Buttons Bar at the Bottom */}

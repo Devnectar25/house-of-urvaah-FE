@@ -46,6 +46,10 @@ const findLocalProduct = (id) => {
   const strId = String(id).trim();
   const numId = strId.replace(/\D/g, '');
 
+  if (strId === '109' || strId === 'bs-109' || strId === 'prod-109') {
+    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-105') || null;
+  }
+
   return ALL_CATALOG_PRODUCTS.find((p) => {
     const pStrId = String(p.id).trim();
     const pNumId = pStrId.replace(/\D/g, '');
@@ -82,15 +86,6 @@ export const ProductDetail = () => {
   const [openAccordion, setOpenAccordion] = useState('desc');
 
   useEffect(() => {
-    if (id && (String(id) === '105' || String(id) === 'prod-105' || String(id) === 'bs-105')) {
-      navigate('/product/bs-101', { replace: true });
-      return;
-    }
-    if (id && (String(id) === '106' || String(id) === 'prod-106' || String(id) === 'bs-106')) {
-      navigate('/product/bs-103', { replace: true });
-      return;
-    }
-
     window.scrollTo({ top: 0, behavior: 'instant' });
     let isMounted = true;
     setLoading(true);
