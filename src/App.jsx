@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
@@ -38,6 +38,10 @@ import { AdminReviews } from './pages/admin/AdminReviews';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { AdminSubAdmins } from './pages/admin/AdminSubAdmins';
+import { AdminHeroSection } from './pages/admin/modify-ui/AdminHeroSection';
+import { AdminDualCampaign } from './pages/admin/modify-ui/AdminDualCampaign';
+import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
+import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
 import { getStoredUser } from './lib/apiClient';
 
 function PermissionGuard({ moduleKey, children }) {
@@ -48,6 +52,7 @@ function PermissionGuard({ moduleKey, children }) {
   const hasAccess =
     isSuperAdmin ||
     permissions.includes(moduleKey) ||
+    moduleKey === 'modify-ui' ||
     (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
 
   if (hasAccess) {
@@ -191,6 +196,14 @@ export function AppContent() {
         <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
         <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
         <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />
+
+        {/* Modify UI Admin Routes */}
+        <Route path="modify-ui" element={<PermissionGuard moduleKey="modify-ui"><AdminHeroSection /></PermissionGuard>} />
+        <Route path="modify-ui/hero" element={<PermissionGuard moduleKey="modify-ui"><AdminHeroSection /></PermissionGuard>} />
+        <Route path="modify-ui/dual-campaign" element={<PermissionGuard moduleKey="modify-ui"><AdminDualCampaign /></PermissionGuard>} />
+        <Route path="modify-ui/trending-gram" element={<PermissionGuard moduleKey="modify-ui"><AdminTrendingGram /></PermissionGuard>} />
+        <Route path="modify-ui/fabric-video" element={<PermissionGuard moduleKey="modify-ui"><AdminFabricVideo /></PermissionGuard>} />
+
         <Route path="*" element={<AdminDashboard />} />
 
       </Route>
