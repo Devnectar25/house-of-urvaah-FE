@@ -56,6 +56,9 @@ export const AdminHeroSection = () => {
       const res = await apiClient('/api/ui/admin/hero');
       if (res && res.success) {
         setSlides(res.data || []);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah_hero_updated'));
+        }
       } else {
         throw new Error(res?.message || 'Failed to fetch hero slides');
       }
@@ -175,6 +178,19 @@ export const AdminHeroSection = () => {
 
     setSaving(true);
     try {
+      if (formData.is_active) {
+        // Enforce single-active rule: deactivate all other slides
+        const otherActive = slides.filter((s) => s.id !== editingSlide?.id && s.is_active);
+        await Promise.all(
+          otherActive.map((s) =>
+            apiClient(`/api/ui/admin/hero/${s.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ ...s, is_active: false })
+            })
+          )
+        );
+      }
+
       if (editingSlide) {
         const res = await apiClient(`/api/ui/admin/hero/${editingSlide.id}`, {
           method: 'PUT',
@@ -247,26 +263,62 @@ export const AdminHeroSection = () => {
     }
   };
 
-  const handleToggleActive = async (slide) => {
+  const handleToggleActive = async (targetSlide) => {
+    const newIsActive = !targetSlide.is_active;
+
     try {
-      const res = await apiClient(`/api/ui/admin/hero/${slide.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          ...slide,
-          is_active: !slide.is_active
-        })
-      });
-      if (res?.success) {
-        setSlides((prev) =>
-          prev.map((s) => (s.id === slide.id ? { ...s, is_active: !s.is_active } : s))
+      if (newIsActive) {
+        // Single active rule: deactivate all other active slides first
+        const otherActive = slides.filter((s) => s.id !== targetSlide.id && s.is_active);
+        await Promise.all(
+          otherActive.map((s) =>
+            apiClient(`/api/ui/admin/hero/${s.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ ...s, is_active: false })
+            })
+          )
         );
-        showToast('success', `Slide ${!slide.is_active ? 'activated' : 'deactivated'} successfully!`);
+
+        // Activate the target slide
+        const res = await apiClient(`/api/ui/admin/hero/${targetSlide.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...targetSlide, is_active: true })
+        });
+
+        if (res?.success) {
+          setSlides((prev) =>
+            prev.map((s) => ({
+              ...s,
+              is_active: s.id === targetSlide.id
+            }))
+          );
+          showToast('success', 'Hero video activated! (Other videos set to inactive)');
+        }
+      } else {
+        // Deactivate target slide
+        const res = await apiClient(`/api/ui/admin/hero/${targetSlide.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...targetSlide, is_active: false })
+        });
+        if (res?.success) {
+          setSlides((prev) =>
+            prev.map((s) => (s.id === targetSlide.id ? { ...s, is_active: false } : s))
+          );
+          showToast('success', 'Hero video set to inactive.');
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('urvaah_hero_updated'));
       }
     } catch (err) {
       console.error('Toggle error:', err);
       showToast('error', 'Failed to toggle slide status');
+      fetchSlides();
     }
   };
+
+  const firstActiveIdx = slides.findIndex((s) => s.is_active);
 
   return (
     <div className="space-y-6 pb-12 font-sans">
@@ -369,62 +421,72 @@ export const AdminHeroSection = () => {
                 slide.media_type === 'video' ||
                 slide.desktop_image?.endsWith('.mp4') ||
                 slide.desktop_image?.includes('/videos/');
+              const isLiveStorefront = slide.is_active && idx === firstActiveIdx;
 
-              return (
-                <div
-                  key={slide.id}
-                  className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-neutral-50/60 transition-colors"
-                >
-                  {/* Left: Media Thumbnail + Details */}
-                  <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
-                    {/* Media Thumbnail Container with Preview Trigger */}
-                    <div
-                      onClick={() => setPreviewMediaUrl(slide.desktop_image)}
-                      className="relative w-28 sm:w-36 h-20 rounded-xl bg-neutral-900 overflow-hidden shrink-0 border border-neutral-200 group cursor-pointer shadow-2xs"
-                      title="Click to preview media"
-                    >
-                      {isVideo ? (
-                        <video
-                          src={slide.desktop_image}
-                          className="w-full h-full object-cover opacity-80"
-                          muted
-                          loop
-                        />
-                      ) : (
-                        <img
-                          src={slide.desktop_image}
-                          alt={slide.heading || 'Hero'}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                return (
+                  <div
+                    key={slide.id}
+                    className={`p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-colors ${
+                      isLiveStorefront ? 'bg-emerald-50/40 hover:bg-emerald-50/60' : 'hover:bg-neutral-50/60'
+                    }`}
+                  >
+                    {/* Left: Media Thumbnail + Details */}
+                    <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
+                      {/* Media Thumbnail Container with Preview Trigger */}
+                      <div
+                        onClick={() => setPreviewMediaUrl(slide.desktop_image)}
+                        className={`relative w-28 sm:w-36 h-20 rounded-xl bg-neutral-900 overflow-hidden shrink-0 border group cursor-pointer shadow-2xs ${
+                          isLiveStorefront ? 'border-emerald-400 ring-2 ring-emerald-400/20' : 'border-neutral-200'
+                        }`}
+                        title="Click to preview media"
+                      >
                         {isVideo ? (
-                          <Play className="w-5 h-5 text-white fill-white/80 group-hover:scale-110 transition-transform" />
+                          <video
+                            src={slide.desktop_image}
+                            className="w-full h-full object-cover opacity-80"
+                            muted
+                            loop
+                          />
                         ) : (
-                          <Eye className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                          <img
+                            src={slide.desktop_image}
+                            alt={slide.heading || 'Hero'}
+                            className="w-full h-full object-cover"
+                          />
                         )}
+                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                          {isVideo ? (
+                            <Play className="w-5 h-5 text-white fill-white/80 group-hover:scale-110 transition-transform" />
+                          ) : (
+                            <Eye className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                          )}
+                        </div>
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white backdrop-blur-xs">
+                          {isVideo ? 'VIDEO' : 'IMAGE'}
+                        </span>
                       </div>
-                      <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white backdrop-blur-xs">
-                        {isVideo ? 'VIDEO' : 'IMAGE'}
-                      </span>
-                    </div>
 
-                    {/* Metadata text */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold font-admin tracking-wider uppercase bg-neutral-100 text-neutral-700">
-                          Order #{idx + 1}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-admin tracking-wider uppercase ${
-                            slide.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-neutral-100 text-neutral-500'
-                          }`}
-                        >
-                          {slide.is_active ? 'ACTIVE' : 'INACTIVE'}
-                        </span>
-                      </div>
+                      {/* Metadata text */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-admin tracking-wider uppercase bg-neutral-100 text-neutral-700">
+                            Order #{idx + 1}
+                          </span>
+                          {isLiveStorefront ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-emerald-600 text-white shadow-xs flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                              CURRENTLY LIVE ON HERO
+                            </span>
+                          ) : slide.is_active ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold font-admin tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ACTIVE (STANDBY)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold font-admin tracking-wider uppercase bg-rose-50 text-rose-700 border border-rose-200">
+                              INACTIVE
+                            </span>
+                          )}
+                        </div>
 
                       <h3 className="text-sm sm:text-base font-bold text-neutral-950 font-admin truncate mt-1">
                         {slide.heading || `Hero Looping Background Slide #${idx + 1}`}
@@ -440,41 +502,31 @@ export const AdminHeroSection = () => {
 
                   {/* Right Actions: Reorder + Toggle + Edit + Delete */}
                   <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
-                    {/* Reorder Buttons */}
-                    <div className="flex items-center border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveSlide(idx, -1)}
-                        disabled={idx === 0}
-                        className="p-2 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-                        title="Move slide up"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5 text-neutral-700" />
-                      </button>
-                      <div className="w-[1px] h-4 bg-neutral-200" />
-                      <button
-                        type="button"
-                        onClick={() => handleMoveSlide(idx, 1)}
-                        disabled={idx === slides.length - 1}
-                        className="p-2 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-                        title="Move slide down"
-                      >
-                        <ArrowDown className="w-3.5 h-3.5 text-neutral-700" />
-                      </button>
-                    </div>
 
-                    {/* Active Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(slide)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                        slide.is_active
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                          : 'bg-neutral-100 text-neutral-600 border-neutral-200 hover:bg-neutral-200'
-                      }`}
-                    >
-                      {slide.is_active ? 'Active' : 'Draft'}
-                    </button>
+
+                    {/* Toggle Switch */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 border border-neutral-200/90 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(slide)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          slide.is_active ? 'bg-emerald-500' : 'bg-neutral-300 hover:bg-neutral-400'
+                        }`}
+                        role="switch"
+                        aria-checked={slide.is_active}
+                        title={slide.is_active ? 'Active on Storefront' : 'Click to activate as sole hero video'}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            slide.is_active ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-xs font-bold tracking-tight ${slide.is_active ? 'text-emerald-700' : 'text-neutral-500'}`}>
+                        {slide.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
 
                     {/* Edit Button */}
                     <button
@@ -629,18 +681,37 @@ export const AdminHeroSection = () => {
                 )}
               </div>
 
-              {/* Status active toggle */}
-              <div className="flex items-center gap-3 pt-1">
-                <input
-                  type="checkbox"
-                  id="slide_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded text-neutral-950 focus:ring-neutral-900 border-neutral-300"
-                />
-                <label htmlFor="slide_active" className="text-xs font-bold text-neutral-900 cursor-pointer">
-                  Publish Slide as Active on Storefront
+              {/* Status Option: Active or Inactive */}
+              <div className="pt-2">
+                <label className="text-xs font-bold text-neutral-900 block mb-2">
+                  Status Option:
                 </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, is_active: true })}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      formData.is_active
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-400 ring-2 ring-emerald-400/20'
+                        : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Active</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, is_active: false })}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      !formData.is_active
+                        ? 'bg-rose-50 text-rose-800 border-rose-400 ring-2 ring-rose-400/20'
+                        : 'bg-neutral-50 text-neutral-600 border-neutral-200 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    <span>Inactive</span>
+                  </button>
+                </div>
               </div>
 
               {/* Modal Footer Actions */}

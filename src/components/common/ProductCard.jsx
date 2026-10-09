@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
-export const ProductCard = ({ product, onQuickView, hideColorDots = false, hideOriginalPrice = false }) => {
+export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOriginalPrice = false }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const navigate = useNavigate();

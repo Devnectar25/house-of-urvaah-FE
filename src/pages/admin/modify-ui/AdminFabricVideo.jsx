@@ -185,6 +185,10 @@ export const AdminFabricVideo = () => {
 
       if (!res?.success) throw new Error(res?.message || 'Update failed');
       showToast('success', 'Fabric Video configuration updated successfully!');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('urvaah_fabric_video_updated'));
+        localStorage.setItem('urvaah_fabric_video_last_update', Date.now().toString());
+      }
     } catch (err) {
       console.error('Save fabric video error:', err);
       showToast('error', err.message || 'Failed to update fabric video');

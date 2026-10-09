@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 
 const GRAM_VIDEOS = [
   {
@@ -648,6 +649,50 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
 
 export const TrendingOnGram = () => {
   const [activeModalIndex, setActiveModalIndex] = useState(null);
+  const [gramPosts, setGramPosts] = useState(GRAM_VIDEOS);
+
+  const fetchTrendingGram = () => {
+    apiClient('/api/ui/trending-gram')
+      .then((res) => {
+        if (!res?.success || !Array.isArray(res.data) || res.data.length === 0) return;
+
+        const mapped = res.data.map((item, idx) => {
+          const fallback = GRAM_VIDEOS[idx % GRAM_VIDEOS.length];
+          const rawImage = item.image || fallback.src;
+          const finalSrc = rawImage.startsWith('http') || rawImage.startsWith('/') ? rawImage : getSupabaseMediaUrl(rawImage);
+
+          return {
+            id: item.id ? `gram-${item.id}` : fallback.id,
+            src: finalSrc,
+            title: (item.title || fallback.title).toUpperCase(),
+            category: item.caption ? item.caption.split('•')[0].trim() : fallback.category,
+            handle: '@houseofurvaah',
+            link: item.post_link || fallback.link,
+            product: fallback.product
+          };
+        });
+
+        setGramPosts(mapped);
+      })
+      .catch((err) => {
+        console.warn('[TrendingOnGram] Could not load dynamic gram posts:', err);
+      });
+  };
+
+  useEffect(() => {
+    fetchTrendingGram();
+
+    const handleUpdate = () => fetchTrendingGram();
+    window.addEventListener('urvaah_trending_gram_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    const interval = setInterval(fetchTrendingGram, 3000);
+
+    return () => {
+      window.removeEventListener('urvaah_trending_gram_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleOpenModal = (index) => {
     setActiveModalIndex(index);
@@ -658,11 +703,11 @@ export const TrendingOnGram = () => {
   };
 
   const handlePrevLook = () => {
-    setActiveModalIndex((prev) => (prev - 1 + GRAM_VIDEOS.length) % GRAM_VIDEOS.length);
+    setActiveModalIndex((prev) => (prev - 1 + gramPosts.length) % gramPosts.length);
   };
 
   const handleNextLook = () => {
-    setActiveModalIndex((prev) => (prev + 1) % GRAM_VIDEOS.length);
+    setActiveModalIndex((prev) => (prev + 1) % gramPosts.length);
   };
 
   return (
@@ -683,7 +728,7 @@ export const TrendingOnGram = () => {
           - Mobile / Tablet (< lg): Smooth horizontal scroll carousel showing 1-2 cards at a time
       */}
       <div className="flex lg:grid lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none">
-        {GRAM_VIDEOS.map((item, idx) => (
+        {gramPosts.map((item, idx) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
@@ -702,11 +747,11 @@ export const TrendingOnGram = () => {
 
       {/* Shop The Look Modal */}
       <AnimatePresence>
-        {activeModalIndex !== null && (
+        {activeModalIndex !== null && gramPosts[activeModalIndex] && (
           <ShopTheLookModal
-            look={GRAM_VIDEOS[activeModalIndex]}
+            look={gramPosts[activeModalIndex]}
             currentIndex={activeModalIndex}
-            totalLooks={GRAM_VIDEOS.length}
+            totalLooks={gramPosts.length}
             onClose={handleCloseModal}
             onPrev={handlePrevLook}
             onNext={handleNextLook}

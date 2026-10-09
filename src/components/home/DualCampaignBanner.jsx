@@ -53,25 +53,38 @@ export const DualCampaignBanner = () => {
 
   useEffect(() => {
     let isMounted = true;
-    apiClient('/api/ui/dual-campaign')
-      .then((res) => {
-        if (!isMounted || !res?.success || !Array.isArray(res.data)) return;
-        const topLeft = res.data.find((b) => (b.position === 'top_left' || b.position === 'left') && b.is_active);
-        const bottomLeft = res.data.find((b) => b.position === 'bottom_left' && b.is_active);
-        const topRight = res.data.find((b) => (b.position === 'top_right' || b.position === 'right') && b.is_active);
-        const bottomRight = res.data.find((b) => b.position === 'bottom_right' && b.is_active);
 
-        if (topLeft) setTopLeftData(topLeft);
-        if (bottomLeft) setBottomLeftData(bottomLeft);
-        if (topRight) setTopRightData(topRight);
-        if (bottomRight) setBottomRightData(bottomRight);
-      })
-      .catch((err) => {
-        console.warn('Could not load dynamic dual campaign banners, using defaults:', err);
-      });
+    const fetchBanners = () => {
+      apiClient('/api/ui/dual-campaign')
+        .then((res) => {
+          if (!isMounted || !res?.success || !Array.isArray(res.data)) return;
+          const topLeft = res.data.find((b) => (b.position === 'top_left' || b.position === 'left') && b.is_active);
+          const bottomLeft = res.data.find((b) => b.position === 'bottom_left' && b.is_active);
+          const topRight = res.data.find((b) => (b.position === 'top_right' || b.position === 'right') && b.is_active);
+          const bottomRight = res.data.find((b) => b.position === 'bottom_right' && b.is_active);
+
+          if (topLeft) setTopLeftData(topLeft);
+          if (bottomLeft) setBottomLeftData(bottomLeft);
+          if (topRight) setTopRightData(topRight);
+          if (bottomRight) setBottomRightData(bottomRight);
+        })
+        .catch((err) => {
+          console.warn('Could not load dynamic dual campaign banners, using defaults:', err);
+        });
+    };
+
+    fetchBanners();
+
+    const handleUpdate = () => fetchBanners();
+    window.addEventListener('urvaah_dual_campaign_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    const interval = setInterval(fetchBanners, 3000);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('urvaah_dual_campaign_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      clearInterval(interval);
     };
   }, []);
 

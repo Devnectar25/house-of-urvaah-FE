@@ -10,6 +10,8 @@ import {
   Minus,
   X,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Tag,
   Percent,
   Check,
@@ -170,6 +172,38 @@ export const ProductDetail = () => {
   ).slice(0, 4);
 
   const availableSizes = product?.sizes || ['XS', 'S', 'M', 'L', 'XL'];
+
+  const mobileScrollRef = useRef(null);
+  const [mobileSlideIndex, setMobileSlideIndex] = useState(0);
+
+  const handleMobileScroll = () => {
+    if (!mobileScrollRef.current) return;
+    const { scrollLeft, clientWidth } = mobileScrollRef.current;
+    if (clientWidth > 0) {
+      const idx = Math.round(scrollLeft / clientWidth);
+      setMobileSlideIndex(idx);
+    }
+  };
+
+  const scrollToMobileSlide = (index) => {
+    if (!mobileScrollRef.current) return;
+    const clientWidth = mobileScrollRef.current.clientWidth;
+    mobileScrollRef.current.scrollTo({
+      left: index * clientWidth,
+      behavior: 'smooth'
+    });
+    setMobileSlideIndex(index);
+  };
+
+  const handlePrevMobileSlide = () => {
+    const nextIdx = Math.max(0, mobileSlideIndex - 1);
+    scrollToMobileSlide(nextIdx);
+  };
+
+  const handleNextMobileSlide = () => {
+    const nextIdx = Math.min(gallery.length - 1, mobileSlideIndex + 1);
+    scrollToMobileSlide(nextIdx);
+  };
 
   useEffect(() => {
     if (product) {
@@ -388,28 +422,62 @@ export const ProductDetail = () => {
           
           {/* LEFT SIDE: Image Gallery (~55% Desktop Width) */}
           <div className="w-full lg:w-[55%] flex flex-col items-start shrink-0">
-            {/* MOBILE VIEW (< md): Single-column stacked gallery with 100% full uncropped photos */}
-            <div className="flex md:hidden flex-col gap-4 w-full">
-              {gallery.map((imgUrl, idx) => (
-                <div
-                  key={idx}
-                  className="w-full relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden shadow-xs p-2 flex items-center justify-center"
-                >
-                  <img
-                    src={imgUrl}
-                    alt={`${product.name} view ${idx + 1}`}
-                    className="w-full h-auto max-h-[85vh] object-contain object-center"
-                    onError={(e) => {
-                      e.currentTarget.parentElement.style.display = 'none';
-                    }}
-                  />
-                  {idx === 0 && product.tag && (
-                    <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5">
-                      {product.tag}
-                    </div>
+            {/* MOBILE VIEW (< md): Horizontal side-scrolling carousel slider matching reference */}
+            <div className="relative md:hidden w-full group">
+              <div
+                ref={mobileScrollRef}
+                onScroll={handleMobileScroll}
+                className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none w-full touch-pan-x"
+              >
+                {gallery.map((imgUrl, idx) => (
+                  <div
+                    key={idx}
+                    className="w-full flex-shrink-0 snap-center relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden p-2 flex items-center justify-center aspect-[3/4]"
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`${product.name} view ${idx + 1}`}
+                      className="w-full h-full object-contain object-center"
+                      onError={(e) => {
+                        e.currentTarget.parentElement.style.display = 'none';
+                      }}
+                    />
+                    {idx === 0 && product.tag && (
+                      <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5">
+                        {product.tag}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Side Navigation Arrows (Matching second reference screenshot) */}
+              {gallery.length > 1 && (
+                <>
+                  {mobileSlideIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={handlePrevMobileSlide}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-black flex items-center justify-center shadow-md border border-neutral-200/80 cursor-pointer"
+                      aria-label="Previous image"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
                   )}
-                </div>
-              ))}
+                  {mobileSlideIndex < gallery.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={handleNextMobileSlide}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-black flex items-center justify-center shadow-md border border-neutral-200/80 cursor-pointer"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Indicator Dots at Bottom - REMOVED per user request */}
+                </>
+              )}
             </div>
 
             {/* DESKTOP VIEW (>= md): Side-by-Side Vertical Thumbnails + Main Product Viewer */}
@@ -528,30 +596,7 @@ export const ProductDetail = () => {
               </span>
             </div>
 
-            {/* COLORS Selection (if present) */}
-            {product.colors && product.colors.length > 0 && (
-              <div>
-                <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block mb-2 font-sans">
-                  COLOR: <span className="font-normal text-neutral-600">{product.colors.join(', ')}</span>
-                </span>
-                <div className="flex flex-wrap gap-2 font-sans">
-                  {product.colors.map((col, idx) => (
-                    <span
-                      key={idx}
-                      className="px-3 py-1.5 border border-neutral-300 text-xs font-medium bg-neutral-50 text-brand-dark rounded-xs flex items-center gap-2"
-                    >
-                      {col.startsWith('#') && (
-                        <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0"
-                          style={{ backgroundColor: col }}
-                        />
-                      )}
-                      <span>{col}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* 5 & 6. SIZE SECTION & SIZE CHART */}
             <div className="space-y-2">
