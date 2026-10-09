@@ -100,26 +100,48 @@ export const FEATURED_CATEGORIES = [
 
 const RAW_BEST_SELLERS_PRODUCTS = [
   {
-    id: 'bs-101',
-    name: 'CHESTNUT BLOOM SET',
+    id: 'bs-105',
+    name: 'Ivory Corset Kurti',
     price: 8990,
     originalPrice: 11990,
-    category: 'PARTY WEAR',
-    subcategory: 'Blazers & Tailoring',
-    tag: 'BEST SELLER',
+    category: 'CO-ORD SETS',
+    subcategory: 'Kurti Ensembles',
+    tag: 'NEW IN',
+    isNew: true,
+    isBestSeller: true,
+    image: '/assets/Images/Kurti_2.png',
+    hoverImage: '/assets/Images/Kurti_4.png',
+    gallery: [
+      '/assets/Images/Kurti_2.png',
+      '/assets/Images/Kurti_4.png',
+      '/assets/Images/Kurti_3.png',
+      '/assets/Images/Kurti_1.png'
+    ],
+    colors: ['#8B0000', '#111111', '#F5F5F0'],
+    sizes: ['XS', 'S', 'M', 'L', 'XL'],
+    description: 'A everyday-easy piece that works two ways wear it buttoned up as a mini dress, or unbutton the front placket for a more relaxed, styled-open kurti look over jeans. Made in breathable cora cotton, designed for all-day comfort in humid, Indian-summer weather.\nFinished with a square neckline trimmed in delicate floral lace, a corset-style lace-up back for a snatched, tailored fit, and all-over heart-shaped butti embroidery in a soft ivory tone. Fully lined in cotton for added comfort and opacity.\nFrom college to the office to a weekend occasion — one piece, three ways to wear it.',
+    additionalInfo: 'Fabric: Cora cotton (breathable, all-day wear)\nLining: Cotton lining\nNeckline: Square neck with floral lace trim\nClosure: Front button placket, corset-style lace-up back\nEmbroidery: All-over heart-shaped butti embroidery\nStyling: Wear buttoned as a dress, or open-front as a kurti\nAvailable sizes: XS, S, M, L'
+  },
+  {
+    id: 'bs-104',
+    name: 'ROSEWOOD BLOOM SET',
+    price: 4990,
+    category: 'CORSET TOPS',
+    subcategory: 'Tops & Shirts',
+    tag: 'ESSENTIAL',
     isNew: false,
     isBestSeller: true,
-    image: '/assets/Images/Brown02.png',
-    hoverImage: '/assets/Images/Brown03.png',
+    image: '/assets/Images/Peach02.png',
+    hoverImage: '/assets/Images/Peach04.png',
     gallery: [
-      '/assets/Images/Brown02.png',
-      '/assets/Images/Brown03.png',
-      '/assets/Images/Brown04.png',
-      '/assets/Images/Brown01.png'
+      '/assets/Images/Peach02.png',
+      '/assets/Images/Peach04.png',
+      '/assets/Images/Peach03.png',
+      '/assets/Images/Peach01.png'
     ],
-    colors: ['#4A3B32', '#111111', '#F5F5F0'],
-    sizes: ['XS', 'S', 'M', 'L'],
-    description: 'A spaghetti-strap top and mini skirt set in a rich brown floral embroidered fabric with intricate sequin detailing. A low, backless silhouette with an adjustable tie-back on the top, finished with a potli-trimmed skirt hem for texture.\nFully lined for comfort, with a smooth side-zip closure on the skirt.'
+    colors: ['#F5F5F0', '#111111'],
+    sizes: ['S', 'M', 'L'],
+    description: 'A cap-sleeve top and mini skirt set in a soft peach-pink floral embroidered fabric with delicate sequin work throughout. The skirt hem finishes in a hand-detailed potli trim, and a corset-style lace-up back on the top gives it a fitted, flattering silhouette.\nFully lined, with a side-zip closure on the skirt for easy wear.\nSoft enough for daytime, sharp enough for evening.'
   },
   {
     id: 'bs-102',
@@ -145,6 +167,28 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     additionalInfoText: 'Fabric: Embroidered fabric with sequin detailing\nSkirt hem: Hand-finished potli trim\nClosure: Adjustable tie-back (top), side zip on left of skirt\nLining: Fully lined (top and skirt)\nAvailable sizes: S, M, L\nTop: Lightly Padded'
   },
   {
+    id: 'bs-101',
+    name: 'CHESTNUT BLOOM SET',
+    price: 8990,
+    originalPrice: 11990,
+    category: 'PARTY WEAR',
+    subcategory: 'Blazers & Tailoring',
+    tag: 'BEST SELLER',
+    isNew: false,
+    isBestSeller: true,
+    image: '/assets/Images/Brown02.png',
+    hoverImage: '/assets/Images/Brown03.png',
+    gallery: [
+      '/assets/Images/Brown02.png',
+      '/assets/Images/Brown03.png',
+      '/assets/Images/Brown04.png',
+      '/assets/Images/Brown01.png'
+    ],
+    colors: ['#4A3B32', '#111111', '#F5F5F0'],
+    sizes: ['XS', 'S', 'M', 'L'],
+    description: 'A spaghetti-strap top and mini skirt set in a rich brown floral embroidered fabric with intricate sequin detailing. A low, backless silhouette with an adjustable tie-back on the top, finished with a potli-trimmed skirt hem for texture.\nFully lined for comfort, with a smooth side-zip closure on the skirt.'
+  },
+  {
     id: 'bs-103',
     name: 'GILDED MIST CORSET',
     price: 12990,
@@ -164,50 +208,6 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     colors: ['#FFFFFF', '#111111'],
     sizes: ['S', 'M', 'L'],
     description: 'A statement corset top in raw tissue silk, hand-embroidered with rich golden zari work and delicate sequin detailing throughout. Boned below the bust for structure, with soft padding for comfort and shape no additional support needed underneath.\nDesigned to be worn endlessly: pair it over a saree for a modern draped look, with a skirt for evening, or dress it down with jeans or palazzos for a statement daytime moment. One corset, however many ways you want to style it.\nClosure: adjustable lace-up back.'
-  },
-  {
-    id: 'bs-104',
-    name: 'ROSEWOOD BLOOM SET',
-    price: 4990,
-    category: 'CORSET TOPS',
-    subcategory: 'Tops & Shirts',
-    tag: 'ESSENTIAL',
-    isNew: false,
-    isBestSeller: true,
-    image: '/assets/Images/Peach02.png',
-    hoverImage: '/assets/Images/Peach04.png',
-    gallery: [
-      '/assets/Images/Peach02.png',
-      '/assets/Images/Peach04.png',
-      '/assets/Images/Peach03.png',
-      '/assets/Images/Peach01.png'
-    ],
-    colors: ['#F5F5F0', '#111111'],
-    sizes: ['S', 'M', 'L'],
-    description: 'A cap-sleeve top and mini skirt set in a soft peach-pink floral embroidered fabric with delicate sequin work throughout. The skirt hem finishes in a hand-detailed potli trim, and a corset-style lace-up back on the top gives it a fitted, flattering silhouette.\nFully lined, with a side-zip closure on the skirt for easy wear.\nSoft enough for daytime, sharp enough for evening.'
-  },
-  {
-    id: 'bs-105',
-    name: 'Ivory Corset Kurti',
-    price: 8990,
-    originalPrice: 11990,
-    category: 'CO-ORD SETS',
-    subcategory: 'Kurti Ensembles',
-    tag: 'NEW IN',
-    isNew: true,
-    isBestSeller: true,
-    image: '/assets/Images/Kurti_2.png',
-    hoverImage: '/assets/Images/Kurti_4.png',
-    gallery: [
-      '/assets/Images/Kurti_2.png',
-      '/assets/Images/Kurti_4.png',
-      '/assets/Images/Kurti_3.png',
-      '/assets/Images/Kurti_1.png'
-    ],
-    colors: ['#8B0000', '#111111', '#F5F5F0'],
-    sizes: ['XS', 'S', 'M', 'L', 'XL'],
-    description: 'A everyday-easy piece that works two ways wear it buttoned up as a mini dress, or unbutton the front placket for a more relaxed, styled-open kurti look over jeans. Made in breathable cora cotton, designed for all-day comfort in humid, Indian-summer weather.\nFinished with a square neckline trimmed in delicate floral lace, a corset-style lace-up back for a snatched, tailored fit, and all-over heart-shaped butti embroidery in a soft ivory tone. Fully lined in cotton for added comfort and opacity.\nFrom college to the office to a weekend occasion — one piece, three ways to wear it.',
-    additionalInfo: 'Fabric: Cora cotton (breathable, all-day wear)\nLining: Cotton lining\nNeckline: Square neck with floral lace trim\nClosure: Front button placket, corset-style lace-up back\nEmbroidery: All-over heart-shaped butti embroidery\nStyling: Wear buttoned as a dress, or open-front as a kurti\nAvailable sizes: XS, S, M, L'
   }
 ];
 
