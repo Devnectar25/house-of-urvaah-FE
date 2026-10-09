@@ -44,18 +44,6 @@ const SECTION_CONFIGS = [
     ]
   },
   {
-    key: 'bottom_left',
-    col: 'Left Column',
-    posLabel: 'Bottom Left Card',
-    badge: 'L2',
-    productHint: 'Product: bs-104 (Peach Silk Ensemble)',
-    defaultImages: [
-      `${SUPABASE_CDN}/Images/Peach02.png`,
-      `${SUPABASE_CDN}/Images/Peach01.png`,
-      `${SUPABASE_CDN}/Images/Peach03.png`
-    ]
-  },
-  {
     key: 'top_right',
     col: 'Right Column',
     posLabel: 'Top Right Card',
@@ -65,6 +53,18 @@ const SECTION_CONFIGS = [
       `${SUPABASE_CDN}/Images/Brown_Floral.jpg`,
       `${SUPABASE_CDN}/Images/Brown02.png`,
       `${SUPABASE_CDN}/Images/Brown03.png`
+    ]
+  },
+  {
+    key: 'bottom_left',
+    col: 'Left Column',
+    posLabel: 'Bottom Left Card',
+    badge: 'L2',
+    productHint: 'Product: bs-104 (Peach Silk Ensemble)',
+    defaultImages: [
+      `${SUPABASE_CDN}/Images/Peach02.png`,
+      `${SUPABASE_CDN}/Images/Peach01.png`,
+      `${SUPABASE_CDN}/Images/Peach03.png`
     ]
   },
   {
@@ -105,11 +105,11 @@ export const AdminDualCampaign = () => {
       images: SECTION_CONFIGS[0].defaultImages,
       is_active: true
     },
-    bottom_left: {
+    top_right: {
       images: SECTION_CONFIGS[1].defaultImages,
       is_active: true
     },
-    top_right: {
+    bottom_left: {
       images: SECTION_CONFIGS[2].defaultImages,
       is_active: true
     },
@@ -325,6 +325,10 @@ export const AdminDualCampaign = () => {
 
       if (!res?.success) throw new Error(res?.message || 'Update failed');
       showToast('success', `${sectionKey.replace('_', ' ').toUpperCase()} images saved to Supabase!`);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('urvaah_dual_campaign_updated'));
+        localStorage.setItem('urvaah_dual_campaign_last_update', Date.now().toString());
+      }
     } catch (err) {
       console.error(`Error saving ${sectionKey}:`, err);
       showToast('error', err.message || `Failed to save ${sectionKey}`);
@@ -358,6 +362,10 @@ export const AdminDualCampaign = () => {
         if (res?.success) successCount++;
       }
       showToast('success', `Saved ${successCount} of 4 campaign sections to Supabase!`);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('urvaah_dual_campaign_updated'));
+        localStorage.setItem('urvaah_dual_campaign_last_update', Date.now().toString());
+      }
     } catch (err) {
       console.error('Error saving all sections:', err);
       showToast('error', err.message || 'Failed to save all sections');
@@ -431,20 +439,20 @@ export const AdminDualCampaign = () => {
             type="button"
             onClick={handleSaveAll}
             disabled={loading || savingAll}
-            className="px-4 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold tracking-tight transition-all shadow-sm cursor-pointer flex items-center gap-2"
+            className="px-4 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold tracking-tight transition-all shadow-sm cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
           >
-            {savingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savingAll ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
             <span>Save All 4 Sections</span>
           </button>
         </div>
       </div>
 
       {/* Column Filter Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-neutral-100/80 rounded-xl w-fit border border-neutral-200/60">
+      <div className="flex flex-wrap items-center gap-2 p-1 bg-neutral-100/80 rounded-xl w-fit border border-neutral-200/60">
         <button
           type="button"
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'all'
               ? 'bg-white text-neutral-950 shadow-2xs'
               : 'text-neutral-600 hover:text-neutral-950'
@@ -455,7 +463,7 @@ export const AdminDualCampaign = () => {
         <button
           type="button"
           onClick={() => setActiveTab('left')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'left'
               ? 'bg-white text-neutral-950 shadow-2xs'
               : 'text-neutral-600 hover:text-neutral-950'
@@ -466,7 +474,7 @@ export const AdminDualCampaign = () => {
         <button
           type="button"
           onClick={() => setActiveTab('right')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'right'
               ? 'bg-white text-neutral-950 shadow-2xs'
               : 'text-neutral-600 hover:text-neutral-950'
@@ -665,17 +673,9 @@ export const AdminDualCampaign = () => {
                               </div>
 
                               {/* Controls */}
-                              <div className="flex-1 space-y-1.5">
-                                <input
-                                  type="text"
-                                  value={imgUrl}
-                                  onChange={(e) => handleImageUrlChange(cfg.key, slotIdx, e.target.value)}
-                                  placeholder="https://fhbdceauisvlcpmuzpmf.supabase.co/..."
-                                  className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900 font-mono truncate"
-                                />
-
-                                <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-[11px] font-semibold cursor-pointer transition-colors">
-                                  <Upload className="w-3 h-3" />
+                              <div className="flex-1 flex items-center">
+                                <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold cursor-pointer transition-colors border border-neutral-200 shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5" />
                                   <span>{isUploading ? 'Uploading to Supabase...' : 'Upload Image File'}</span>
                                   <input
                                     type="file"

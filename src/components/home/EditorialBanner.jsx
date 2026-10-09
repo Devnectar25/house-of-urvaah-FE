@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../common/Button';
 import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 
 const EDITORIAL_VIDEOS = [
   {
@@ -58,11 +59,42 @@ export const EditorialBanner = () => {
       url: getInitialVideoUrl(item.defaultPath)
     }))
   );
+  const [fabricConfig, setFabricConfig] = useState(null);
 
   const containerRef = useRef(null);
   const videoRefs = useRef([]);
   const [videoLoaded, setVideoLoaded] = useState({});
   const [videoErrors, setVideoErrors] = useState({});
+
+  // Dynamically resolve fabric video config from backend API
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFabricConfig = () => {
+      apiClient('/api/ui/fabric-video')
+        .then((res) => {
+          if (isMounted && res?.success && res.data) {
+            setFabricConfig(res.data);
+          }
+        })
+        .catch((err) => {
+          console.warn('[EditorialBanner] Error fetching fabric video config:', err);
+        });
+    };
+
+    fetchFabricConfig();
+
+    const handleUpdate = () => fetchFabricConfig();
+    window.addEventListener('urvaah_fabric_video_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    const interval = setInterval(fetchFabricConfig, 3000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('urvaah_fabric_video_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Dynamically resolve video URLs from the Supabase houseofurvaah-media bucket by matching names
   useEffect(() => {
@@ -278,19 +310,17 @@ export const EditorialBanner = () => {
             <span className="text-[11px] md:text-xs tracking-[0.25em] uppercase text-neutral-500 font-serif mb-2">
               EDITORIAL VISION
             </span>
-            <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6">
-              THE ART OF<br />
-              REFINED<br />
-              TAILORING
+            <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6 uppercase">
+              {fabricConfig?.heading || 'THE ART OF REFINED TAILORING'}
             </h2>
             <p className="text-xs md:text-sm text-neutral-600 tracking-wider leading-relaxed mb-6 font-light max-w-sm">
-              Defined by oversized silhouettes, fluid draping, and uncompromised material integrity. Designed for timeless elegance across seasonal transitions.
+              {fabricConfig?.description || 'Defined by oversized silhouettes, fluid draping, and uncompromised material integrity. Designed for timeless elegance across seasonal transitions.'}
             </p>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
-              <a href="#lookbook" className="w-full sm:w-auto">
-                <Button variant="primary" className="w-full justify-center">
-                  DISCOVER THE COLLECTION
+              <a href={fabricConfig?.button_link || '#lookbook'} className="w-full sm:w-auto">
+                <Button variant="primary" className="w-full justify-center uppercase">
+                  {fabricConfig?.button_text || 'DISCOVER THE COLLECTION'}
                 </Button>
               </a>
               <a href="#campaign" className="inline-block w-full sm:w-auto">

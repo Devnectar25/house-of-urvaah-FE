@@ -62,6 +62,10 @@ export const AdminTrendingGram = () => {
       const res = await apiClient('/api/ui/admin/trending-gram');
       if (res && res.success) {
         setPosts(res.data || []);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('urvaah_trending_gram_updated'));
+          localStorage.setItem('urvaah_trending_gram_last_update', Date.now().toString());
+        }
       } else {
         throw new Error(res?.message || 'Failed to fetch Trending on Gram posts');
       }
