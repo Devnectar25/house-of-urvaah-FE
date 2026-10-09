@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 const ORDER_STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -469,15 +470,11 @@ export const AdminOrders = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Header Row */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-          Order Management
-        </h1>
-        <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-          Track, filter, and manage store orders, dispatch status, and customer payments.
-        </p>
-      </div>
+      {/* Page Header Banner */}
+      <AdminPageHeader
+        title="Order Management"
+        subtitle="Track, filter, and manage store orders, dispatch status, and customer payments."
+      />
 
       {/* Stat Cards Grid Section */}
       <div>

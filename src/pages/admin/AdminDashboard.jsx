@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 // Module-level in-memory cache for Stale-While-Revalidate behavior
 let dashboardCache = null;
@@ -298,36 +299,31 @@ export const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200/80 pb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-            Dashboard
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Welcome to House of Urvaah. Manage your products, collections, and store content effortlessly.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          {isRevalidating && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-sans text-neutral-400 mr-1">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              <span className="hidden sm:inline">Syncing...</span>
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => fetchDashboardData(false)}
-            disabled={loading || isRevalidating}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-lg text-xs font-medium font-sans hover:bg-neutral-50 hover:border-neutral-300 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-            title="Refresh statistics"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRevalidating ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
-        </div>
-      </div>
+      {/* Page Header Banner */}
+      <AdminPageHeader
+        title="Dashboard"
+        subtitle="Welcome to House of Urvaah. Manage your products, collections, and store content effortlessly."
+        actions={
+          <div className="flex items-center gap-2.5">
+            {isRevalidating && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-sans text-neutral-500 mr-1">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span className="hidden sm:inline">Syncing...</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchDashboardData(false)}
+              disabled={loading || isRevalidating}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-neutral-200/90 text-neutral-800 rounded-xl text-xs font-semibold font-sans hover:bg-neutral-50 hover:border-neutral-300 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Refresh statistics"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRevalidating ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* ========================================================================= */}
       {/* STAT CARDS SECTION                                                        */}

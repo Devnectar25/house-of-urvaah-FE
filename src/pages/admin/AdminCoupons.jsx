@@ -27,6 +27,7 @@ import { apiClient } from '../../lib/apiClient';
 import couponService from '../../services/couponService';
 import { CouponModal } from '../../components/admin/CouponModal';
 import { AssignCustomersModal } from '../../components/admin/AssignCustomersModal';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 export const AdminCoupons = () => {
   const [coupons, setCoupons] = useState([]);
@@ -598,7 +599,7 @@ export const AdminCoupons = () => {
       {/* Toast Notification Banner */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
             toast.type === 'success'
               ? 'bg-brand-dark text-white border-neutral-800'
               : 'bg-brand-dark text-rose-100 border-rose-950'
@@ -694,27 +695,22 @@ export const AdminCoupons = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. PAGE HEADER                                                            */}
+      {/* 1. PAGE HEADER BANNER                                                     */}
       {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-brand-dark tracking-tight">
-            Coupons Management
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 mt-1 font-sans">
-            Manage discount codes, promotional campaigns and targeted customer access.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white hover:bg-black text-xs font-semibold px-7 sm:px-8 py-2.5 min-w-[170px] rounded-xl transition-colors shadow-sm shrink-0 cursor-pointer text-center"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create Coupon</span>
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Coupons Management"
+        subtitle="Manage discount codes, promotional campaigns and targeted customer access."
+        actions={
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white hover:bg-black text-xs font-semibold px-6 py-2.5 rounded-xl transition-colors shadow-sm shrink-0 cursor-pointer text-center"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create Coupon</span>
+          </button>
+        }
+      />
 
       {/* ========================================================================= */}
       {/* 2. SUMMARY STRIP (COMPACT STAT CARDS)                                     */}

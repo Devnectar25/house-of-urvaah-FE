@@ -30,6 +30,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
 import { ActiveCustomersModal } from '../../components/admin/ActiveCustomersModal';
 import { RevenueBreakdownModal } from '../../components/admin/RevenueBreakdownModal';
@@ -245,67 +246,62 @@ export const AdminAnalytics = () => {
       {/* ========================================================================= */}
       {/* 1. PAGE HEADER & DATE-RANGE SELECTOR                                      */}
       {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 pb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-            Analytics
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Customer activity and product performance overview.
-          </p>
-        </div>
+      <AdminPageHeader
+        title="Analytics"
+        subtitle="Customer activity and product performance overview."
+        actions={
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            {/* Date-Range Toggle Pill */}
+            <div className="inline-flex bg-white/80 p-1 rounded-xl border border-[#E5E0D5] text-xs font-semibold select-none shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setPeriod('today')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  period === 'today'
+                    ? 'bg-neutral-950 text-white font-bold shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-950'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriod('7d')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  period === '7d'
+                    ? 'bg-neutral-950 text-white font-bold shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-950'
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriod('30d')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  period === '30d'
+                    ? 'bg-neutral-950 text-white font-bold shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-950'
+                }`}
+              >
+                30 Days
+              </button>
+            </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto">
-          {/* Date-Range Toggle Pill */}
-          <div className="inline-flex bg-neutral-100 p-1 rounded-xl border border-neutral-200/90 text-xs font-semibold select-none shadow-2xs">
+            {/* Sync / Refresh Button */}
             <button
               type="button"
-              onClick={() => setPeriod('today')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                period === 'today'
-                  ? 'bg-white text-neutral-950 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-950'
-              }`}
+              onClick={() => fetchAnalyticsData(false)}
+              disabled={loading || isRevalidating}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-[#E5E0D5] text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 hover:border-neutral-300 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Refresh analytics data"
             >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('7d')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                period === '7d'
-                  ? 'bg-white text-neutral-950 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-950'
-              }`}
-            >
-              7 Days
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('30d')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                period === '30d'
-                  ? 'bg-white text-neutral-950 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-950'
-              }`}
-            >
-              30 Days
+              <RefreshCw className={`w-3.5 h-3.5 ${isRevalidating ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
-
-          {/* Sync / Refresh Button */}
-          <button
-            type="button"
-            onClick={() => fetchAnalyticsData(false)}
-            disabled={loading || isRevalidating}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-neutral-200 text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 hover:border-neutral-300 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Refresh analytics data"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRevalidating ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Global Error Banner if API Fails */}
       {error && !loading && (
