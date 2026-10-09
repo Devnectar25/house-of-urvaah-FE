@@ -9,6 +9,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 
 export const AdminFabricVideo = () => {
   const [loading, setLoading] = useState(true);
@@ -215,35 +216,32 @@ export const AdminFabricVideo = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-[#F4F1EA] text-neutral-800">
+      {/* Header Banner */}
+      <AdminPageHeader
+        badge={
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white/90 border border-[#E5E0D5] text-neutral-800 shadow-2xs">
               Modify UI
             </span>
             <span className="text-xs text-neutral-400">•</span>
-            <span className="text-xs font-semibold text-neutral-500">Storefront Section</span>
+            <span className="text-xs font-semibold text-neutral-600">Storefront Section</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight mt-1 flex items-center gap-2.5">
-            <span>Fabric Video Section</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Manage the editorial fabric & tailored craft video showcase, poster image, title, and copy.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={fetchFabricVideo}
-          disabled={loading}
-          className="p-2.5 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl transition-all cursor-pointer shadow-2xs self-start sm:self-auto flex items-center gap-2 text-xs font-semibold"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900' : ''}`} />
-          <span>Refresh</span>
-        </button>
-      </div>
+        }
+        title="Fabric Video Section"
+        subtitle="Manage the editorial fabric & tailored craft video showcase, poster image, title, and copy."
+        actions={
+          <button
+            type="button"
+            onClick={fetchFabricVideo}
+            disabled={loading}
+            className="p-2.5 bg-white border border-[#E5E0D5] hover:bg-neutral-50 text-neutral-700 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-2 text-xs font-semibold"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        }
+      />
 
       {loading ? (
         <div className="bg-white border border-neutral-200/90 rounded-2xl p-16 flex flex-col items-center justify-center text-neutral-400 space-y-3">

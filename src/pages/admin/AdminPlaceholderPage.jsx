@@ -13,6 +13,7 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 const PAGE_CONFIGS = {
   '/admin/products': {
@@ -85,23 +86,23 @@ export const AdminPlaceholderPage = ({ title: overrideTitle, subtitle: overrideS
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200/80 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-400 font-sans mb-1.5">
+      <AdminPageHeader
+        badge={
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-400 font-sans">
             <span>Admin</span>
             <span>/</span>
-            <span className="text-neutral-700 font-medium">{config.module}</span>
+            <span className="text-neutral-700 font-semibold">{config.module}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-            {config.title}
-          </h1>
-        </div>
-
-        <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3.5 py-1.5 bg-neutral-100 border border-neutral-200 rounded-full text-xs font-sans text-neutral-600">
-          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          <span>Scheduled for Next Phase</span>
-        </div>
-      </div>
+        }
+        title={config.title}
+        subtitle={config.subtitle}
+        actions={
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/90 border border-[#E5E0D5] rounded-full text-xs font-sans text-neutral-600 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>Scheduled for Next Phase</span>
+          </div>
+        }
+      />
 
       {/* Main Placeholder Container */}
       <div className="bg-white border border-neutral-200 rounded-2xl p-8 sm:p-12 shadow-editorial flex flex-col items-center justify-center text-center">

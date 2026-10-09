@@ -19,6 +19,7 @@ import {
   updateSubAdmin,
   deleteSubAdmin
 } from '../../services/subAdminService';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 // Available permission modules in House of Urvaah Admin Panel
 const PERMISSION_OPTIONS = [
@@ -251,38 +252,33 @@ export const AdminSubAdmins = () => {
       )}
 
       {/* Page Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-neutral-200/90 shadow-2xs">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-950 flex items-center gap-3 font-admin">
-            <UserCheck className="w-8 h-8 text-neutral-900 stroke-[2]" />
-            Sub-Admin Management
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 mt-1 font-sans">
-            Manage sub-admins and their permissions
-          </p>
-        </div>
+      <AdminPageHeader
+        title="Sub-Admin Management"
+        icon={UserCheck}
+        subtitle="Manage sub-admins and their permissions"
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={loadSubAdmins}
+              disabled={loading}
+              className="p-2.5 rounded-xl border border-[#E5E0D5] bg-white hover:bg-neutral-50 text-neutral-700 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+              title="Refresh Sub-Admin Accounts"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={loadSubAdmins}
-            disabled={loading}
-            className="p-2.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh Sub-Admin Accounts"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openModal()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#111111] hover:bg-neutral-800 active:bg-black text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer"
-          >
-            <UserPlus className="w-4.5 h-4.5 stroke-[2.2]" />
-            <span>Add Sub-Admin</span>
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={() => openModal()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#111111] hover:bg-neutral-800 active:bg-black text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer"
+            >
+              <UserPlus className="w-4.5 h-4.5 stroke-[2.2]" />
+              <span>Add Sub-Admin</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Main Sub-Admins Card */}
       <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-2xs overflow-hidden">

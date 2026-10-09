@@ -18,6 +18,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { EditProductModal } from '../../components/admin/EditProductModal';
 import { AddProductModal } from '../../components/admin/AddProductModal';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 
 const DEFAULT_CATEGORIES = [
@@ -243,25 +244,21 @@ export const AdminProducts = () => {
         onProductCreated={handleProductCreated}
       />
 
-      {/* Page Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-            Product Management
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Manage your store products, catalog taxonomy, pricing, and stock status.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white hover:bg-neutral-800 text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm flex-shrink-0 cursor-pointer"
-        >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span>Add Product</span>
-        </button>
-      </div>
+      {/* Page Header Banner */}
+      <AdminPageHeader
+        title="Product Management"
+        subtitle="Manage your store products, catalog taxonomy, pricing, and stock status."
+        actions={
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 active:bg-black text-white rounded-xl text-xs sm:text-sm font-semibold tracking-tight shadow-sm transition-all duration-200 shrink-0 cursor-pointer whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5] shrink-0" />
+            <span>Add Product</span>
+          </button>
+        }
+      />
 
       {/* Search & Filter Row */}
       <div className="bg-white border border-neutral-200/80 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">

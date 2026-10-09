@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -82,11 +82,17 @@ export const AdminLayout = () => {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [modifyUiOpen, setModifyUiOpen] = useState(() => location.pathname.startsWith('/admin/modify-ui'));
 
+  const contentScrollRef = useRef(null);
+
   // Close mobile drawer on route change & ensure modify-ui is expanded if on its subroutes
   useEffect(() => {
     setMobileMenuOpen(false);
     if (location.pathname.startsWith('/admin/modify-ui')) {
       setModifyUiOpen(true);
+    }
+    // Dynamic scroll reset to top on route change
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [location.pathname]);
 
@@ -155,7 +161,7 @@ export const AdminLayout = () => {
   });
 
   return (
-    <div className="h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
+    <div className="admin-panel-container h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
       {/* ========================================================================= */}
       {/* TOP HEADER: Crisp high-contrast top bar with House of Urvaah branding     */}
       {/* ========================================================================= */}
@@ -259,7 +265,7 @@ export const AdminLayout = () => {
           </div>
 
           {/* Navigation Links List */}
-          <div className="flex-1 overflow-y-auto px-4 py-5 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-4 py-5 no-scrollbar scroll-smooth">
             <nav className="space-y-1.5" aria-label="Admin Navigation">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -389,11 +395,16 @@ export const AdminLayout = () => {
         </aside>
 
         {/* ========================================================================= */}
-        {/* SCROLLABLE RIGHT CONTENT AREA                                             */}
+        {/* SCROLLABLE RIGHT CONTENT AREA (Full-width dynamic scroll, hidden scrollbar) */}
         {/* ========================================================================= */}
-        <main className="flex-1 overflow-y-auto h-full p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto scroll-smooth">
-          <Outlet />
-        </main>
+        <div
+          ref={contentScrollRef}
+          className="flex-1 overflow-y-auto h-full min-h-0 w-full no-scrollbar scroll-smooth overscroll-contain"
+        >
+          <main className="p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto">
+            <Outlet />
+          </main>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -426,7 +437,7 @@ export const AdminLayout = () => {
               <button
                 type="button"
                 onClick={() => setShowLogoutModal(false)}
-                className="px-4.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
               >
                 Cancel
               </button>

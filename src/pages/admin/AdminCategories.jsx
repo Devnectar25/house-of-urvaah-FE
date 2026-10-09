@@ -15,6 +15,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { CategoryModal } from '../../components/admin/CategoryModal';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 export const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -183,7 +184,7 @@ export const AdminCategories = () => {
       {/* Toast Banner */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4.5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-xs font-admin border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
             toast.type === 'success'
               ? 'bg-brand-dark text-white border-neutral-800'
               : 'bg-brand-dark text-rose-100 border-rose-950'
@@ -262,25 +263,21 @@ export const AdminCategories = () => {
         </div>
       )}
 
-      {/* Page Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-brand-dark tracking-tight">
-            Category Management
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Manage your product categories here.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleOpenAddModal}
-          className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white hover:bg-neutral-800 text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm flex-shrink-0 cursor-pointer"
-        >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span>Add Category</span>
-        </button>
-      </div>
+      {/* Page Header Banner */}
+      <AdminPageHeader
+        title="Category Management"
+        subtitle="Manage your product collections, catalog taxonomies, and featured status."
+        actions={
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-neutral-950 hover:bg-neutral-800 active:bg-black text-white rounded-xl text-xs sm:text-sm font-semibold tracking-tight shadow-sm transition-all duration-200 shrink-0 cursor-pointer whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5] shrink-0" />
+            <span>Add Category</span>
+          </button>
+        }
+      />
 
       {/* Search & Filter Row */}
       <div className="bg-white border border-neutral-200/80 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">

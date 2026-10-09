@@ -14,6 +14,7 @@ import {
   Database
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { getSupabaseMediaUrl, CDN_BASE_URL } from '../../../lib/supabase';
 
 const SUPABASE_CDN = CDN_BASE_URL || 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media';
@@ -400,52 +401,49 @@ export const AdminDualCampaign = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-[#F4F1EA] text-neutral-800">
+      {/* Header Banner */}
+      <AdminPageHeader
+        badge={
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white/90 border border-[#E5E0D5] text-neutral-800 shadow-2xs">
               Modify UI
             </span>
             <span className="text-xs text-neutral-400">•</span>
-            <span className="text-xs font-semibold text-neutral-500">Storefront Section</span>
+            <span className="text-xs font-semibold text-neutral-600">Storefront Section</span>
             <span className="text-xs text-neutral-400">•</span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-              <Database className="w-3 h-3" />
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50/90 border border-emerald-200 px-2 py-0.5 rounded-md">
+              <Database className="w-3 h-3 text-emerald-600" />
               <span>Supabase Storage CDN</span>
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight mt-1">
-            Dual Campaign Banner
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1">
-            Manage the 4 campaign banner cards (Left Column Top & Bottom, Right Column Top & Bottom). All images are loaded directly from Supabase Storage with up to 3 crossfading slides per section.
-          </p>
-        </div>
+        }
+        title="Dual Campaign Banner"
+        subtitle="Manage the 4 campaign banner cards (Left Column Top & Bottom, Right Column Top & Bottom). All images are loaded directly from Supabase Storage with up to 3 crossfading slides per section."
+        actions={
+          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={fetchBanners}
+              disabled={loading || savingAll}
+              className="p-2.5 bg-white border border-[#E5E0D5] hover:bg-neutral-50 text-neutral-700 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-2 text-xs font-semibold"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={fetchBanners}
-            disabled={loading || savingAll}
-            className="p-2.5 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-2 text-xs font-semibold"
-            title="Refresh Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-900' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSaveAll}
-            disabled={loading || savingAll}
-            className="px-4 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold tracking-tight transition-all shadow-sm cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
-          >
-            {savingAll ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
-            <span>Save All 4 Sections</span>
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={handleSaveAll}
+              disabled={loading || savingAll}
+              className="px-4 py-2.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold tracking-tight transition-all shadow-sm cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
+            >
+              {savingAll ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
+              <span>Save All 4 Sections</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* Column Filter Tabs */}
       <div className="flex flex-wrap items-center gap-2 p-1 bg-neutral-100/80 rounded-xl w-fit border border-neutral-200/60">
