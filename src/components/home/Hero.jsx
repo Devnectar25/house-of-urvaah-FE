@@ -9,6 +9,7 @@ export const Hero = () => {
 
   const [heroSlides, setHeroSlides] = useState([]);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
 
   const fetchHeroSlides = async () => {
     try {
@@ -48,6 +49,7 @@ export const Hero = () => {
     : true;
 
   useEffect(() => {
+    setIsVideoLoading(true);
     if (videoRef.current) {
       videoRef.current.muted = true;
       videoRef.current.play().catch(() => {});
@@ -66,6 +68,13 @@ export const Hero = () => {
             muted
             loop
             playsInline
+            preload="auto"
+            onLoadStart={() => setIsVideoLoading(true)}
+            onLoadedData={() => setIsVideoLoading(false)}
+            onCanPlay={() => setIsVideoLoading(false)}
+            onPlaying={() => setIsVideoLoading(false)}
+            onWaiting={() => setIsVideoLoading(true)}
+            onError={() => setIsVideoLoading(false)}
             className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
           >
             <source src={currentMediaUrl} type="video/mp4" />
@@ -77,6 +86,19 @@ export const Hero = () => {
             alt={activeSlide?.heading || 'Hero Banner'}
             className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
           />
+        )}
+
+        {/* Luxury Video Loader while video buffers/loads */}
+        {isVideo && isVideoLoading && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-xs transition-opacity duration-300 pointer-events-none">
+            <div className="relative flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+              <div className="absolute w-6 h-6 rounded-full border border-white/40 border-b-transparent animate-spin [animation-direction:reverse]" />
+            </div>
+            <span className="mt-4 text-[11px] tracking-[0.25em] text-white/90 uppercase font-serif">
+              Loading Video...
+            </span>
+          </div>
         )}
 
         {/* Subtle Scrim Gradient at top for header icon legibility */}
