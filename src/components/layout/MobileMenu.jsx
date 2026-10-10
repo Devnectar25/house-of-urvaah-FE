@@ -30,7 +30,7 @@ const MENU_SECTIONS = [
     title: 'BEST SELLERS',
     items: [
       { label: 'Chestnut Bloom Set', href: '#best-sellers' },
-      { label: 'Cerulean Garden Set', href: '#best-sellers' },
+      { label: 'Teal Embroidered Floral Co-Ord Set', href: '#best-sellers' },
       { label: 'Gilded Mist Corset', href: '#best-sellers' },
       { label: 'Rosewood Bloom Set', href: '#best-sellers' }
     ]

@@ -16,7 +16,7 @@ const GRAM_VIDEOS = [
     link: '#corsets',
     product: {
       id: 'bs-102',
-      name: 'CERULEAN GARDEN SET',
+      name: 'Teal Embroidered Floral Co-Ord Set',
       price: 10990,
       formattedPrice: '₹ 10,990',
       category: 'CO-ORD SETS',
