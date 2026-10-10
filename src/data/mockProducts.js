@@ -145,7 +145,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
   },
   {
     id: 'bs-102',
-    name: 'CERULEAN GARDEN SET',
+    name: 'Teal Embroidered Floral Co-Ord Set',
     price: 10990,
     category: 'CO-ORD SETS',
     subcategory: 'Printed Ensembles',
