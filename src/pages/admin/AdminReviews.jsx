@@ -18,8 +18,35 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
-import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+
+// Subcomponent for product review thumbnail with fallback handling
+const ReviewProductThumbnail = ({ src, name }) => {
+  const [error, setError] = useState(false);
+  const resolvedSrc = src?.startsWith('http')
+    ? src
+    : (src ? `https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/${src.replace(/^\/+/, '')}` : '');
+
+  if (!resolvedSrc || error) {
+    return (
+      <div className="w-12 h-14 bg-neutral-100 rounded-md overflow-hidden flex-shrink-0 border border-neutral-200/80 flex items-center justify-center">
+        <Package className="w-5 h-5 text-neutral-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-12 h-14 bg-neutral-100 rounded-md overflow-hidden flex-shrink-0 border border-neutral-200/80 flex items-center justify-center shadow-2xs">
+      <img
+        src={resolvedSrc}
+        alt={name || 'Product'}
+        className="w-full h-full object-cover object-center transition-transform hover:scale-105"
+        onError={() => setError(true)}
+        loading="lazy"
+      />
+    </div>
+  );
+};
 
 export const AdminReviews = () => {
   const [searchParams] = useSearchParams();
@@ -325,19 +352,19 @@ export const AdminReviews = () => {
                       {/* Product Thumbnail & Direct Storefront Link */}
                       <td className="py-3.5 px-4 font-semibold text-brand-dark">
                         <div className="flex items-center gap-3">
-                          <ReviewProductThumbnail image={rev.product_image} name={rev.product_name} />
+                          <ReviewProductThumbnail src={rev.product_image} name={rev.product_name} />
                           <div className="min-w-0">
                             <a
                               href={`/product/${rev.productid}#customer-reviews`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-medium text-neutral-900 hover:text-black hover:underline flex items-center gap-1 group text-xs leading-snug"
+                              className="font-medium text-neutral-900 hover:text-black hover:underline flex items-center gap-1 group text-xs"
                               title="View Customer Reviews for this garment on storefront"
                             >
-                              <span className="truncate max-w-[200px]">{rev.product_name}</span>
+                              <span className="truncate max-w-[190px]">{rev.product_name}</span>
                               <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                             </a>
-                            <span className="text-[11px] text-neutral-400 block font-mono mt-0.5">
+                            <span className="text-[10px] text-neutral-400 block font-mono mt-0.5">
                               Product #{rev.productid}
                             </span>
                           </div>
@@ -460,27 +487,6 @@ export const AdminReviews = () => {
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-const ReviewProductThumbnail = ({ image, name }) => {
-  const [hasError, setHasError] = useState(false);
-  const src = image ? getSupabaseMediaUrl(image) : null;
-
-  return (
-    <div className="w-12 h-14 bg-neutral-100 rounded-md overflow-hidden flex-shrink-0 border border-neutral-200/80 flex items-center justify-center">
-      {src && !hasError ? (
-        <img
-          src={src}
-          alt={name || 'Product'}
-          className="w-full h-full object-cover object-center"
-          onError={() => setHasError(true)}
-          loading="lazy"
-        />
-      ) : (
-        <Package className="w-5 h-5 text-neutral-400" />
-      )}
     </div>
   );
 };
