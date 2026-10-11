@@ -601,14 +601,24 @@ export const Checkout = () => {
         shipping: shippingFee,
         total: grandTotal,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
-        items: cart.map((item) => ({
-          id: item.product.id,
-          productId: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-          image: item.product.image
-        }))
+        items: cart.map((item) => {
+          let cleanId = item.product?.id || item.id || item.productId;
+          if (typeof cleanId === 'string') {
+            const digits = cleanId.replace(/\D/g, '');
+            if (digits) {
+              const num = parseInt(digits, 10);
+              cleanId = num === 103 ? 106 : num;
+            }
+          }
+          return {
+            id: cleanId,
+            productId: cleanId,
+            name: item.product?.name || item.name || 'Garment',
+            price: Number(item.product?.price || item.price || 0),
+            quantity: item.quantity || 1,
+            image: item.product?.image || item.image || ''
+          };
+        })
       };
 
       // Case 1: Cash on Delivery (COD) -> directly create order & skip Razorpay
