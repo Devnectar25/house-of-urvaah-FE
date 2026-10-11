@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { SEOHead } from '../components/common/SEOHead';
 
 export const ContactUs = () => {
@@ -293,34 +292,6 @@ export const ContactUs = () => {
               </div>
             </div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* 3. PRIVATE BOUTIQUE STYLING BANNER */}
-      <section className="w-full bg-[#FAF6EE] py-14 md:py-20 border-y border-neutral-200/80 overflow-hidden">
-        <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            <div className="lg:col-span-8 flex flex-col space-y-3 text-left">
-              <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500">
-                PRIVATE CONSULTATION
-              </span>
-              <h3 className="text-2xl sm:text-3xl font-serif font-normal tracking-[0.18em] uppercase text-[#111111]">
-                BESPOKE BOUTIQUE STYLING APPOINTMENTS
-              </h3>
-              <p className="text-xs sm:text-sm font-serif text-neutral-600 max-w-2xl font-light leading-relaxed">
-                Experience private 1-on-1 wardrobe consultations with our senior atelier stylists in Mumbai or New Delhi. Select your pieces prior to arrival for a tailored luxury session.
-              </p>
-            </div>
-
-            <div className="lg:col-span-4 flex items-center lg:justify-end">
-              <Link
-                to="/#best-sellers"
-                className="bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase px-8 py-4 hover:bg-neutral-800 transition-colors inline-flex items-center gap-3"
-              >
-                BOOK APPOINTMENT <ArrowRight className="w-4 h-4 stroke-[1.5]" />
-              </Link>
-            </div>
-          </div>
         </div>
       </section>
     </div>

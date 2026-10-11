@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { getSupabaseMediaUrl } from '../lib/supabase';
+import { ProductCard } from '../components/common/ProductCard';
+import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
+import { productApi } from '../services/productApi';
+
+const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
+
+const findLocalProduct = (id) => {
+  if (!id) return null;
+  const strId = String(id).trim();
+  const numId = strId.replace(/\D/g, '');
+
+  return ALL_CATALOG_PRODUCTS.find((p) => {
+    const pStrId = String(p.id).trim();
+    const pNumId = pStrId.replace(/\D/g, '');
+
+    if (pStrId === strId) return true;
+    if (numId && pNumId && numId === pNumId) return true;
+    return false;
+  });
+};
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -33,18 +53,97 @@ export const Account = () => {
     }
   };
 
-  const handleCancelOrderInAccount = async (ord) => {
-    if (window.confirm('Are you sure you want to cancel this order?')) {
-      const orderNum = ord.order_number || ord.orderNumber || ord.id;
-      try {
-        await apiClient(`/api/orders/${orderNum}/cancel`, { method: 'POST' });
-      } catch (e) {
-        console.warn('Cancel order fallback:', e.message);
-      }
-      setOrders((prev) =>
-        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: 'Cancelled' } : o))
-      );
+  // Cancel Order Modal State
+  const [cancelModalOrder, setCancelModalOrder] = useState(null);
+  const [selectedCancelItems, setSelectedCancelItems] = useState([]);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelComments, setCancelComments] = useState('');
+  const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+  const [toastMsg, setToastMsg] = useState(null);
+
+  const handleCancelOrderInAccount = (ord) => {
+    setCancelModalOrder(ord);
+    setSelectedCancelItems([]);
+    setCancelReason('');
+    setCancelComments('');
+  };
+
+  const handleCloseCancelModal = () => {
+    if (isSubmittingCancellation) return;
+    setCancelModalOrder(null);
+    setSelectedCancelItems([]);
+    setCancelReason('');
+    setCancelComments('');
+  };
+
+  const handleToggleCancelItem = (itemId) => {
+    setSelectedCancelItems((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
+    );
+  };
+
+  const cancelModalItems = cancelModalOrder
+    ? (cancelModalOrder.items && Array.isArray(cancelModalOrder.items) && cancelModalOrder.items.length > 0)
+      ? cancelModalOrder.items
+      : [
+          {
+            id: 'item-1',
+            name: cancelModalOrder.product_name || 'DARK BLUE WIDE LEG TAILORED SET',
+            quantity: cancelModalOrder.quantity || 1,
+            price: Number(cancelModalOrder.total || cancelModalOrder.total_amount || 0),
+            image: cancelModalOrder.image || cancelModalOrder.product_image || '/assets/Images/Blue02.png'
+          }
+        ]
+    : [];
+
+  const estimatedRefund = cancelModalOrder
+    ? selectedCancelItems.reduce((acc, selectedId) => {
+        const itm = cancelModalItems.find((x, idx) => (x.id || x._id || x.productId || `item-${idx}`) === selectedId);
+        if (!itm) return acc;
+        const p = Number(itm.price || itm.unit_price || (cancelModalOrder.total ? cancelModalOrder.total / cancelModalItems.length : 0));
+        const q = Number(itm.quantity || 1);
+        return acc + p * q;
+      }, 0)
+    : 0;
+
+  const isCODOrder = Boolean(
+    cancelModalOrder && (
+      (cancelModalOrder.payment_method || '').toLowerCase().includes('cod') ||
+      (cancelModalOrder.payment_method || '').toLowerCase().includes('cash') ||
+      (cancelModalOrder.paymentMethod || '').toLowerCase().includes('cod') ||
+      (cancelModalOrder.paymentMethod || '').toLowerCase().includes('cash')
+    )
+  );
+
+  const isFormFilled = selectedCancelItems.length > 0 && cancelReason.trim().length > 0;
+
+  const handleSubmitCancellation = async () => {
+    if (!cancelModalOrder || !isFormFilled) return;
+    setIsSubmittingCancellation(true);
+    const ord = cancelModalOrder;
+    const orderNum = ord.order_number || ord.orderNumber || ord.id;
+    try {
+      await apiClient(`/api/orders/${orderNum}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({
+          cancelReason,
+          comments: cancelComments,
+          itemIds: selectedCancelItems
+        })
+      });
+    } catch (e) {
+      console.warn('Cancel order fallback:', e.message);
     }
+    setOrders((prev) =>
+      prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: 'Cancelled' } : o))
+    );
+    setIsSubmittingCancellation(false);
+    setCancelModalOrder(null);
+    setSelectedCancelItems([]);
+    setCancelReason('');
+    setCancelComments('');
+    setToastMsg({ text: 'Order cancelled successfully.', type: 'success' });
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
   const getInitialTab = () => {
@@ -174,22 +273,83 @@ export const Account = () => {
 
   const firstName = user?.firstName || user?.name?.split(' ')[0] || 'ATELIER MEMBER';
 
-  const tabs = [
-    'VIEW ORDERS',
-    'INVOICES',
-    'VIEW WISHLIST',
-    'ACCOUNT DETAILS',
-    'MY COUPONS',
-    'SIGN OUT'
+  const tabConfig = [
+    { name: 'VIEW ORDERS', icon: Package, badge: orders.length > 0 ? orders.length : null },
+    { name: 'INVOICES', icon: FileText },
+    { name: 'VIEW WISHLIST', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
+    { name: 'MY COUPONS', icon: Ticket },
+    { name: 'ACCOUNT DETAILS', icon: User },
+    { name: 'SIGN OUT', icon: LogOut, isDanger: true }
   ];
+
+  const tabs = tabConfig.map(t => t.name);
+
+  // Resolve product objects for wishlist IDs directly on the Account page
+  const [resolvedWishlist, setResolvedWishlist] = useState([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function resolveWishlistItems() {
+      if (!wishlist || wishlist.length === 0) {
+        if (isMounted) {
+          setResolvedWishlist([]);
+          setWishlistLoading(false);
+        }
+        return;
+      }
+
+      setWishlistLoading(true);
+
+      const items = await Promise.all(
+        wishlist.map(async (id) => {
+          const local = findLocalProduct(id);
+          if (local) return local;
+
+          try {
+            const apiProd = await productApi.getProductById(id);
+            if (apiProd && (apiProd.name || apiProd.title)) {
+              return {
+                ...apiProd,
+                id: String(apiProd.id || id),
+                name: apiProd.name || apiProd.title,
+                price: parseFloat(apiProd.price) || 8990,
+                image: getSupabaseMediaUrl(apiProd.image),
+                hoverImage: apiProd.hoverImage
+                  ? getSupabaseMediaUrl(apiProd.hoverImage)
+                  : getSupabaseMediaUrl(apiProd.image),
+                gallery: apiProd.gallery
+                  ? apiProd.gallery.map(getSupabaseMediaUrl)
+                  : [getSupabaseMediaUrl(apiProd.image)],
+                colors: apiProd.colors || ['#111111'],
+                sizes: apiProd.sizes || ['S', 'M', 'L']
+              };
+            }
+          } catch (e) {
+            console.warn('API lookup failed for wishlist product ID:', id, e);
+          }
+
+          return null;
+        })
+      );
+
+      if (isMounted) {
+        setResolvedWishlist(items.filter(Boolean));
+        setWishlistLoading(false);
+      }
+    }
+
+    resolveWishlistItems();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [wishlist]);
 
   const handleTabClick = (tab) => {
     if (tab === 'SIGN OUT') {
       setShowSignOutModal(true);
-      return;
-    }
-    if (tab === 'VIEW WISHLIST') {
-      navigate('/wishlist');
       return;
     }
     setActiveTab(tab);
@@ -456,6 +616,258 @@ export const Account = () => {
         keywords="House of Urvaah account, user profile, orders, addresses"
         noindex={true}
       />
+
+      {/* Cancel Order Popup Modal */}
+      <AnimatePresence>
+        {cancelModalOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-red-500 font-sans">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseCancelModal}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative z-10 w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-9 border border-neutral-100 max-h-[90vh] overflow-y-auto text-left"
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={handleCloseCancelModal}
+                className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4 stroke-[2]" />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-7 h-7 rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-600 shrink-0 shadow-2xs">
+                  <X className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
+                <h3 className="text-xl font-serif tracking-[0.1em] uppercase text-black font-semibold">
+                  Cancel Order
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
+                We're sorry to see you cancel. Please tell us why you're cancelling your order.
+              </p>
+
+              <div className="space-y-4">
+                {/* Select Products to Cancel */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-serif tracking-[0.12em] uppercase text-black font-semibold">
+                      Select Products to Cancel
+                    </span>
+                    <div className="text-right">
+                      <span className="text-[10px] font-sans font-bold text-neutral-400 uppercase tracking-widest block">
+                        ESTIMATED REFUND
+                      </span>
+                      <span className="text-base sm:text-lg font-serif font-semibold text-black tracking-wide">
+                        ₹{estimatedRefund.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Products List */}
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {cancelModalItems.map((item, idx) => {
+                      const itemId = item.id || item._id || item.productId || `item-${idx}`;
+                      const isSelected = selectedCancelItems.includes(itemId);
+                      const itemImg = getSupabaseMediaUrl(item.image || (item.product && item.product.image) || item.image_url);
+                      const itemPrice = Number(item.price || item.unit_price || 0);
+                      const itemQty = Number(item.quantity || 1);
+
+                      return (
+                        <div
+                          key={itemId}
+                          onClick={() => handleToggleCancelItem(itemId)}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-neutral-300 bg-neutral-50/70'
+                              : 'border-neutral-200/80 bg-white hover:border-neutral-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Circular Selection Checkbox */}
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                                isSelected
+                                  ? 'bg-red-600 text-white'
+                                  : 'border-2 border-neutral-300 bg-white'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+
+                            {/* Product Thumbnail */}
+                            <div className="w-12 h-12 bg-white rounded-lg border border-neutral-100 p-1 shrink-0 overflow-hidden flex items-center justify-center">
+                              <img
+                                src={itemImg}
+                                alt={item.name || item.title || 'Product'}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                                }}
+                              />
+                            </div>
+
+                            {/* Product Info */}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-neutral-800 truncate">
+                                {item.name || item.title || 'Atelier Item'}
+                              </p>
+                              <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
+                                Purchased: {itemQty} • ₹{itemPrice.toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Cancelling Badge when selected */}
+                          {isSelected && (
+                            <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-red-500 border border-red-200 bg-red-50">
+                              Cancelling
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Reason for Cancellation */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                    Reason for Cancellation <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      className="w-full appearance-none px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 focus:outline-none focus:border-neutral-400 cursor-pointer pr-10"
+                    >
+                      <option value="" disabled>Select a reason</option>
+                      <option value="Ordered by mistake">Ordered by mistake</option>
+                      <option value="Found better price elsewhere">Found better price elsewhere</option>
+                      <option value="Delivery taking too long">Delivery taking too long</option>
+                      <option value="Changed my mind">Changed my mind</option>
+                      <option value="Item not needed anymore">Item not needed anymore</option>
+                      <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Additional Comments (Optional) */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                    Additional Comments (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={cancelComments}
+                    onChange={(e) => setCancelComments(e.target.value)}
+                    placeholder="Any additional details?"
+                    className="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-none"
+                  />
+                </div>
+
+                {/* Cancellation Note */}
+                <div className="bg-red-50/60 border border-red-100 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">
+                      CANCELLATION NOTE
+                    </span>
+                    <p className="text-[11px] sm:text-xs text-red-600/90 leading-relaxed font-normal">
+                      {isCODOrder
+                        ? 'Since this is a Cash on Delivery (COD) order, no refund is required for the cancelled items. You will only need to pay for the remaining items in your order upon delivery.'
+                        : 'Since this is a prepaid order, the estimated refund will be processed and credited to your original payment method within 5-7 business days.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseCancelModal}
+                    className="px-5 py-3 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-xl transition-colors cursor-pointer"
+                  >
+                    No, keep order
+                  </button>
+
+                  {isFormFilled ? (
+                    <button
+                      type="button"
+                      onClick={handleSubmitCancellation}
+                      disabled={isSubmittingCancellation}
+                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmittingCancellation ? 'Cancelling...' : 'Submit Cancellation'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="px-6 py-3 bg-neutral-200 text-neutral-400 text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl cursor-not-allowed transition-all"
+                    >
+                      Cancel {selectedCancelItems.length} Item(s)
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Status / Success Toaster */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.96 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+              toastMsg.type === 'error'
+                ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
+                : 'bg-neutral-950/95 border-emerald-900/60 shadow-emerald-950/30'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {toastMsg.type === 'error' ? (
+                <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              )}
+              <span className="text-xs sm:text-sm font-light tracking-wide text-neutral-200">
+                {toastMsg.text}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastMsg(null)}
+              className="text-neutral-400 hover:text-white p-1 cursor-pointer ml-2"
+              aria-label="Dismiss notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12">
         {/* Profile Header Card with Cream/Off-White Palette (#FAF8F3) matching modal */}
         <div className="mb-8 p-6 sm:p-8 bg-[#FAF8F3] border border-neutral-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
@@ -491,30 +903,45 @@ export const Account = () => {
           </div>
         </div>
 
-        {/* 1. Horizontal Top Navigation Tabs Bar */}
-        <div className="mb-10 border-b border-neutral-200 overflow-x-auto scrollbar-none">
-          <div className="flex items-center justify-between min-w-max md:min-w-full w-full gap-4 sm:gap-6 md:gap-8 pb-0.5">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab;
+        {/* 1. Premium Luxury Atelier Navigation Bar */}
+        <div className="mb-10 p-1.5 sm:p-2 bg-[#FAF8F3] border border-neutral-200/80 rounded-2xl shadow-xs overflow-x-auto scrollbar-none">
+          <div className="flex items-center min-w-max md:min-w-full w-full justify-between gap-1 sm:gap-2">
+            {tabConfig.map((item) => {
+              const isActive = activeTab === item.name;
+              const Icon = item.icon;
               return (
                 <button
-                  key={tab}
+                  key={item.name}
                   type="button"
-                  onClick={() => handleTabClick(tab)}
-                  className={`relative py-3 text-xs sm:text-sm tracking-[0.2em] font-sans uppercase transition-colors cursor-pointer whitespace-nowrap ${
+                  onClick={() => handleTabClick(item.name)}
+                  className={`relative flex-1 flex items-center justify-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 py-3 rounded-xl text-xs tracking-[0.18em] font-sans uppercase transition-all duration-200 cursor-pointer whitespace-nowrap select-none ${
                     isActive
-                      ? 'text-black font-semibold'
-                      : 'text-neutral-500 hover:text-black font-medium'
+                      ? 'text-white font-semibold'
+                      : item.isDanger
+                      ? 'text-neutral-500 hover:text-red-700 hover:bg-red-50/60 font-medium'
+                      : 'text-neutral-600 hover:text-black hover:bg-white/80 font-medium'
                   }`}
                 >
-                  {tab}
                   {isActive && (
                     <motion.div
-                      layoutId="activeTabUnderline"
-                      className="absolute bottom-0 inset-x-0 h-[2px] bg-brand-dark"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      layoutId="activeTabPill"
+                      className="absolute inset-0 bg-brand-dark rounded-xl shadow-xs"
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
                   )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    <Icon className={`w-3.5 h-3.5 stroke-[1.6] shrink-0 transition-colors ${
+                      isActive ? 'text-white' : item.isDanger ? 'text-neutral-400 group-hover:text-red-600' : 'text-neutral-500'
+                    }`} />
+                    <span>{item.name}</span>
+                    {typeof item.badge === 'number' && item.badge > 0 && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-sans font-semibold leading-none tabular-nums ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-neutral-200/80 text-neutral-800'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -540,9 +967,9 @@ export const Account = () => {
 
         {/* 2. TAB CONTENT PANELS */}
         {activeTab === 'ACCOUNT DETAILS' && (
-          <div className="space-y-12 max-w-4xl">
+          <div className="space-y-8 w-full">
             {/* ACCOUNT DETAILS SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 md:p-10 border border-neutral-200/80">
+            <section className="bg-[#FAF8F3] p-6 sm:p-8 md:p-10 border border-[#E7E2D8] rounded-2xl shadow-xs">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-200">
                 <div>
                   <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-normal">
@@ -663,7 +1090,7 @@ export const Account = () => {
             </section>
 
             {/* ADDRESSES SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 md:p-10 border border-neutral-200/80">
+            <section className="bg-[#FAF8F3] p-6 sm:p-8 md:p-10 border border-[#E7E2D8] rounded-2xl shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-neutral-200">
                 <div>
                   <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-normal">
@@ -743,7 +1170,7 @@ export const Account = () => {
                         <br />
                         {addr.city}, {addr.state} - {addr.pincode}
                       </p>
-                      <p className="text-xs text-neutral-500 mt-2 font-mono">Ph: {addr.phone}</p>
+                      <p className="text-xs text-neutral-500 mt-2 font-sans font-medium">Ph: {addr.phone}</p>
 
                       {!addr.isDefault && (
                         <button
@@ -764,12 +1191,12 @@ export const Account = () => {
 
         {/* OTHER TAB PANELS */}
         {activeTab === 'VIEW ORDERS' && (
-          <div className="max-w-4xl space-y-6 font-sans text-left">
+          <div className="w-full space-y-6 font-sans text-left">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 font-sans tracking-tight">
-                Order History
+              <h2 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
+                ORDER HISTORY
               </h2>
-              <p className="text-xs sm:text-sm text-neutral-500 font-medium font-sans mt-0.5">
+              <p className="text-xs text-neutral-500 tracking-wider font-sans mt-0.5">
                 View and manage your orders
               </p>
             </div>
@@ -835,48 +1262,74 @@ export const Account = () => {
                   const totalItemsCount = itemsList.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
 
                   return (
-                    <div key={ord.id || idx} className="bg-white border border-neutral-200/90 rounded-2xl p-6 sm:p-7 shadow-2xs font-sans text-left space-y-5">
+                    <div key={ord.id || idx} className="bg-white border border-[#E7E2D8] rounded-2xl p-6 sm:p-7 shadow-[0_4px_25px_rgba(0,0,0,0.03)] font-sans text-left space-y-6 hover:border-neutral-300 transition-all duration-300">
                       {/* Header Row */}
-                      <div className="flex flex-wrap items-start justify-between gap-3 pb-1">
+                      <div className="flex flex-wrap items-start justify-between gap-4 pb-2 border-b border-neutral-100">
                         <div>
-                          <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight font-sans">
-                            Order #{orderNum}
+                          <span className="text-[10px] font-sans font-bold tracking-[0.25em] uppercase text-neutral-400 block mb-0.5">
+                            ORDER REFERENCE
+                          </span>
+                          <h3 className="text-base sm:text-lg font-serif tracking-[0.06em] text-black font-semibold">
+                            #{orderNum}
                           </h3>
-                          <p className="text-xs text-neutral-400 font-medium mt-0.5">{orderDateStr}</p>
+                          <p className="text-xs text-neutral-500 font-sans tracking-wide mt-0.5">{orderDateStr}</p>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          {/* Status Badge */}
+                          <span className={`px-3.5 py-1 text-[11px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 ${
                             isCancelled 
-                              ? 'bg-red-50 text-red-700 border-red-200/80' 
+                              ? 'bg-red-50 text-red-800 border-red-200' 
                               : isDelivered 
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
                               : isOutForDelivery 
-                              ? 'bg-blue-50 text-blue-800 border-blue-300' 
+                              ? 'bg-blue-50 text-blue-900 border-blue-200' 
                               : isShipped 
-                              ? 'bg-amber-50 text-amber-900 border-amber-300' 
-                              : 'bg-yellow-100 text-yellow-900 border-yellow-300'
+                              ? 'bg-amber-50 text-amber-900 border-amber-200' 
+                              : 'bg-[#FAF8F3] text-neutral-800 border-[#E5E0D8]'
                           }`}>
-                            {orderStatus}
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              isCancelled 
+                                ? 'bg-red-600' 
+                                : isDelivered 
+                                ? 'bg-emerald-600' 
+                                : isOutForDelivery 
+                                ? 'bg-blue-600' 
+                                : isShipped 
+                                ? 'bg-amber-600' 
+                                : 'bg-amber-500 animate-pulse'
+                            }`} />
+                            <span>{orderStatus}</span>
                           </span>
-                          <span className="px-3 py-1 text-xs font-semibold rounded-full bg-neutral-100 text-neutral-700 border border-neutral-200/80 font-mono">
+
+                          {/* Payment Status Badge */}
+                          <span className={`px-3 py-1 text-[10px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border ${
+                            isPaid 
+                              ? 'bg-neutral-900 text-white border-neutral-900' 
+                              : 'bg-neutral-100 text-neutral-700 border-neutral-200'
+                          }`}>
                             {isPaid ? 'PAID' : 'PENDING'}
                           </span>
                         </div>
                       </div>
 
                       {/* Horizontal ORDER PROGRESS JOURNEY Card */}
-                      <div className="bg-neutral-50/70 border border-neutral-200/60 rounded-xl p-5 sm:p-6">
-                        <h4 className="text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase font-sans mb-5">
-                          ORDER PROGRESS JOURNEY
-                        </h4>
+                      <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs">
+                        <div className="flex items-center justify-between mb-5">
+                          <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-500 uppercase font-semibold">
+                            ORDER PROGRESS JOURNEY
+                          </h4>
+                          <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-neutral-400 font-medium">
+                            STEP {isDelivered ? '4 OF 4' : isOutForDelivery ? '3 OF 4' : isShipped ? '2 OF 4' : '1 OF 4'}
+                          </span>
+                        </div>
 
                         {/* Progress Journey Steps */}
                         <div className="grid grid-cols-4 gap-2 relative">
                           {/* Background Line with Dynamic Fill */}
-                          <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200 z-0 rounded-full overflow-hidden">
+                          <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-yellow-400 transition-all duration-500" 
+                              className="h-full bg-brand-dark transition-all duration-500" 
                               style={{ 
                                 width: isCancelled 
                                   ? '0%' 
@@ -893,40 +1346,64 @@ export const Account = () => {
 
                           {/* Step 1: ORDER PLACED */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs ${isCancelled ? 'bg-red-500 text-white' : 'bg-yellow-400 text-black'}`}>
-                              <Check className="w-4 h-4 stroke-[3]" />
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs transition-all ${
+                              isCancelled 
+                                ? 'bg-red-700 text-white ring-4 ring-red-100' 
+                                : 'bg-brand-dark text-white ring-4 ring-[#E8E2D8]'
+                            }`}>
+                              <Check className="w-4 h-4 stroke-[2.5]" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] font-bold tracking-wider uppercase mt-2.5 ${isCancelled ? 'text-red-600' : 'text-yellow-700'}`}>
+                            <span className={`text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                              isCancelled ? 'text-red-700' : 'text-black'
+                            }`}>
                               ORDER PLACED
                             </span>
                           </div>
 
                           {/* Step 2: SHIPPED */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isShipped ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                              <Package className="w-4 h-4" />
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                              isShipped 
+                                ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                            }`}>
+                              <Package className="w-4 h-4 stroke-[1.8]" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isShipped ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                              isShipped ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                            }`}>
                               SHIPPED
                             </span>
                           </div>
 
                           {/* Step 3: OUT FOR DELIVERY */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isOutForDelivery ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                              <Truck className="w-4 h-4" />
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                              isOutForDelivery 
+                                ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                            }`}>
+                              <Truck className="w-4 h-4 stroke-[1.8]" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isOutForDelivery ? 'font-bold text-yellow-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                              isOutForDelivery ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                            }`}>
                               OUT FOR DELIVERY
                             </span>
                           </div>
 
                           {/* Step 4: DELIVERED */}
                           <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isDelivered ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                              <CheckCircle2 className="w-4 h-4" />
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                              isDelivered 
+                                ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs' 
+                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                            }`}>
+                              <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-wider uppercase mt-2.5 ${isDelivered ? 'font-bold text-emerald-700' : 'font-medium text-neutral-400'}`}>
+                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                              isDelivered ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
+                            }`}>
                               DELIVERED
                             </span>
                           </div>
@@ -934,43 +1411,50 @@ export const Account = () => {
                       </div>
 
                       {/* Sub-card Products List */}
-                      <div className="bg-white border border-neutral-200/60 rounded-xl p-4 sm:p-5 divide-y divide-neutral-100 space-y-4">
+                      <div className="bg-white border border-neutral-200/80 rounded-2xl p-4 sm:p-5 divide-y divide-neutral-100 space-y-4 shadow-2xs">
                         {itemsList.map((item, itemIdx) => {
                           const itemImg = getSupabaseMediaUrl(item.image || (item.product && item.product.image) || item.image_url);
+                          const itemPrice = Number(item.price || item.unit_price || 0);
                           return (
                             <div key={itemIdx} className="flex items-center justify-between gap-4 pt-4 first:pt-0">
-                              <div className="flex items-center gap-3.5">
-                                <div className="w-12 h-14 bg-neutral-100 rounded-lg overflow-hidden border border-neutral-200/60 p-0.5 flex-shrink-0">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-14 h-18 sm:w-16 sm:h-20 bg-[#FAF8F3] rounded-xl overflow-hidden border border-neutral-200/80 p-0.5 flex-shrink-0 shadow-2xs">
                                   <img
                                     src={itemImg}
                                     alt={item.name || item.title || 'Product'}
-                                    className="w-full h-full object-contain object-center rounded-md"
+                                    className="w-full h-full object-cover object-top rounded-lg"
                                     onError={(e) => {
                                       e.target.onerror = null;
                                       e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
                                     }}
                                   />
                                 </div>
-                                <div>
-                                  <h5 className="text-xs sm:text-sm font-bold text-neutral-900 font-sans leading-snug">
+                                <div className="min-w-0">
+                                  <h5 className="text-xs sm:text-sm font-serif tracking-[0.06em] uppercase text-black font-semibold truncate leading-snug">
                                     {item.name || item.title || 'Atelier Item'}
                                   </h5>
-                                  <span className="text-[11px] text-neutral-400 font-medium block mt-0.5">
-                                    Quantity: {item.quantity || 1}
-                                  </span>
+                                  <div className="flex items-center gap-3 text-xs text-neutral-500 font-sans tracking-wide mt-1">
+                                    <span>Qty: {item.quantity || 1}</span>
+                                    {itemPrice > 0 && (
+                                      <>
+                                        <span className="text-neutral-300">•</span>
+                                        <span className="font-medium text-neutral-700">₹{itemPrice.toLocaleString('en-IN')}</span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider ${
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
                                 isCancelled 
-                                  ? 'bg-red-100 text-red-700' 
+                                  ? 'bg-red-50 text-red-800 border-red-200' 
                                   : isDelivered 
-                                  ? 'bg-emerald-100 text-emerald-800' 
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                                   : isOutForDelivery 
-                                  ? 'bg-blue-100 text-blue-800' 
+                                  ? 'bg-blue-50 text-blue-800 border-blue-200' 
                                   : isShipped 
-                                  ? 'bg-amber-100 text-amber-800' 
-                                  : 'bg-neutral-100 text-neutral-800'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                  : 'bg-neutral-100 text-neutral-800 border-neutral-200'
                               }`}>
                                 {isCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
                               </span>
@@ -980,12 +1464,12 @@ export const Account = () => {
                       </div>
 
                       {/* Footer Row */}
-                      <div className="pt-3 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="pt-4 border-t border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                          <span className="text-xs text-neutral-400 font-medium block">
-                            {totalItemsCount} {totalItemsCount === 1 ? 'item' : 'items'}
+                          <span className="text-[10px] uppercase tracking-[0.2em] font-sans font-semibold text-neutral-400 block">
+                            {totalItemsCount} {totalItemsCount === 1 ? 'ITEM' : 'ITEMS'} TOTAL
                           </span>
-                          <span className="text-xl font-bold text-neutral-900 font-sans">
+                          <span className="text-xl sm:text-2xl font-serif tracking-[0.04em] text-black font-semibold mt-0.5 block">
                             ₹{Number(orderTotal).toLocaleString('en-IN')}
                           </span>
                         </div>
@@ -994,7 +1478,7 @@ export const Account = () => {
                           <button
                             type="button"
                             onClick={() => navigate('/checkout', { state: { viewOrder: ord } })}
-                            className="px-4 py-2 rounded-xl border border-neutral-200/90 hover:border-black text-xs font-semibold text-neutral-700 hover:text-black transition-colors bg-white cursor-pointer shadow-2xs"
+                            className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer"
                           >
                             View Details
                           </button>
@@ -1002,7 +1486,7 @@ export const Account = () => {
                           <button
                             type="button"
                             onClick={() => handleReorderOrder(ord)}
-                            className="px-4 py-2 rounded-xl border border-neutral-200/90 hover:border-black text-xs font-semibold text-neutral-700 hover:text-black transition-colors bg-white cursor-pointer shadow-2xs flex items-center gap-1.5"
+                            className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             <span>Reorder</span>
@@ -1012,7 +1496,7 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}
-                              className="px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors bg-white cursor-pointer shadow-2xs"
+                              className="px-5 py-2.5 rounded-xl border border-red-200 hover:border-red-500 bg-white hover:bg-red-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-red-600 hover:text-red-700 transition-all shadow-2xs cursor-pointer"
                             >
                               Cancel Order
                             </button>
@@ -1028,9 +1512,9 @@ export const Account = () => {
         )}
 
         {activeTab === 'INVOICES' && (
-          <div className="max-w-4xl bg-neutral-50/70 p-8 md:p-12 border border-neutral-200 text-center font-sans">
+          <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
             <FileText className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2">
+            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
               TAX INVOICES & STATEMENTS
             </h3>
             <p className="text-xs text-neutral-500 tracking-wider uppercase max-w-md mx-auto">
@@ -1040,32 +1524,84 @@ export const Account = () => {
         )}
 
         {activeTab === 'VIEW WISHLIST' && (
-          <div className="max-w-4xl bg-neutral-50/70 p-8 md:p-12 border border-neutral-200 text-center font-sans">
-            <Heart className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2">
-              SAVED WISHLIST ITEMS ({wishlist.length})
-            </h3>
-            <p className="text-xs text-neutral-500 tracking-wider uppercase mb-6 max-w-md mx-auto">
-              Manage your saved luxury pieces and curated looks.
-            </p>
-            <button
-              onClick={() => navigate('/wishlist')}
-              className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
-            >
-              GO TO WISHLIST
-            </button>
+          <div className="space-y-6">
+            {/* Wishlist Header Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-neutral-200">
+              <div>
+                <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-400 font-serif block mb-1">
+                  CURATED ATELIER SELECTION
+                </span>
+                <h2 className="text-xl sm:text-2xl font-serif tracking-[0.12em] uppercase text-black font-semibold">
+                  SAVED WISHLIST PIECES ({resolvedWishlist.length})
+                </h2>
+                <p className="text-xs text-neutral-500 font-sans tracking-wide mt-1">
+                  Manage and shop your saved luxury runway looks and curated favorites.
+                </p>
+              </div>
+
+              {resolvedWishlist.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="inline-flex items-center gap-2 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-500 hover:text-black transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  <span>CONTINUE SHOPPING</span>
+                </button>
+              )}
+            </div>
+
+            {/* Wishlist Products Grid / Loading / Empty State */}
+            {wishlistLoading && resolvedWishlist.length === 0 ? (
+              <div className="py-16 text-center font-serif text-neutral-400 bg-white border border-[#E7E2D8] rounded-2xl">
+                <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-xs uppercase tracking-widest font-sans">Loading your saved luxury pieces...</p>
+              </div>
+            ) : resolvedWishlist.length === 0 ? (
+              <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-8 sm:p-12 md:p-16 text-center font-sans">
+                <Heart className="w-10 h-10 text-neutral-300 mx-auto mb-4 stroke-[1.25]" />
+                <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
+                  YOUR WISHLIST IS EMPTY
+                </h3>
+                <p className="text-xs text-neutral-500 tracking-wider uppercase mb-8 max-w-md mx-auto leading-relaxed">
+                  Explore our luxury collection and click the heart icon on any piece to save it for later.
+                </p>
+                <button
+                  onClick={() => navigate('/')}
+                  className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer shadow-xs"
+                >
+                  EXPLORE COLLECTION
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+                <AnimatePresence>
+                  {resolvedWishlist.map((product) => (
+                    <motion.div
+                      key={product.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      <ProductCard product={product} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'MY COUPONS' && (
-          <div className="max-w-4xl bg-neutral-50/70 p-8 md:p-12 border border-neutral-200 text-center font-sans">
+          <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
             <Ticket className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2">
+            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
               ATELIER VOUCHERS & COUPONS
             </h3>
-            <div className="max-w-md mx-auto p-4 bg-white border border-dashed border-neutral-300 text-left my-4">
+            <div className="max-w-md mx-auto p-4 bg-white border border-dashed border-neutral-300 text-left my-4 rounded-xl">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold tracking-widest uppercase text-brand-dark font-mono">
+                <span className="text-xs font-bold tracking-[0.2em] uppercase text-brand-dark font-sans">
                   WELCOME10
                 </span>
                 <span className="px-2 py-0.5 bg-neutral-900 text-white text-[10px] font-bold tracking-widest uppercase">
@@ -1351,7 +1887,7 @@ export const Account = () => {
               <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Order Reference</span>
-                  <h3 className="text-lg font-bold text-neutral-900 font-mono">
+                  <h3 className="text-lg font-serif font-semibold text-neutral-900 tracking-[0.06em]">
                     #{selectedOrderModal.order_number || selectedOrderModal.orderNumber || `ORD-2026-${selectedOrderModal.id}`}
                   </h3>
                 </div>

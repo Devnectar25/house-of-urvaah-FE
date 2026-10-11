@@ -146,17 +146,17 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
       {/* Details */}
       <div className="flex flex-col flex-1 px-1">
         <div className="flex justify-between items-start mb-1 gap-2">
-          <h3 className="text-xs font-medium tracking-wider text-brand-dark uppercase line-clamp-1 group-hover:text-neutral-600 transition-colors">
+          <h3 className="text-xs font-medium tracking-[0.12em] text-brand-dark uppercase line-clamp-1 group-hover:text-neutral-600 transition-colors font-serif">
             {product.name}
           </h3>
         </div>
 
-        <div className="flex items-center gap-2 text-xs tracking-wider">
-          <span className="font-normal text-brand-dark">
+        <div className="flex items-center gap-2 text-xs tracking-wide">
+          <span className="font-medium text-brand-dark font-sans tabular-nums">
             {formatPrice(product.price)}
           </span>
           {!hideOriginalPrice && product.originalPrice && (
-            <span className="text-neutral-400 line-through text-[11px]">
+            <span className="text-neutral-400 line-through text-[11px] font-sans tabular-nums">
               {formatPrice(product.originalPrice)}
             </span>
           )}
