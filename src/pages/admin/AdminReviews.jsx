@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Star,
   Search,
@@ -13,19 +14,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 export const AdminReviews = () => {
+  const [searchParams] = useSearchParams();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [ratingFilter, setRatingFilter] = useState('all'); // all, 5, 4, 3, 2, 1
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || searchParams.get('q') || '');
+  const [ratingFilter, setRatingFilter] = useState(() => searchParams.get('rating') || 'all'); // all, 5, 4, 3, 2, 1
 
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
@@ -318,20 +321,47 @@ export const AdminReviews = () => {
 
                   return (
                     <tr key={rev.id} className="hover:bg-neutral-50/80 transition-colors">
+                      {/* Product Thumbnail & Direct Storefront Link */}
                       <td className="py-3.5 px-4 font-semibold text-brand-dark">
-                        <div className="flex items-center gap-1.5">
-                          <Package className="w-4 h-4 text-neutral-400 shrink-0" />
-                          <span>{rev.product_name}</span>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-12 bg-neutral-100 rounded overflow-hidden flex-shrink-0 border border-neutral-200/80 flex items-center justify-center">
+                            {rev.product_image ? (
+                              <img
+                                src={rev.product_image}
+                                alt={rev.product_name}
+                                className="w-full h-full object-cover object-center"
+                              />
+                            ) : (
+                              <Package className="w-4 h-4 text-neutral-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <a
+                              href={`/product/${rev.productid}#customer-reviews`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-neutral-900 hover:text-black hover:underline flex items-center gap-1 group text-xs"
+                              title="View Customer Reviews for this garment on storefront"
+                            >
+                              <span className="truncate max-w-[190px]">{rev.product_name}</span>
+                              <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </a>
+                            <span className="text-[10px] text-neutral-400 block font-mono mt-0.5">
+                              Product #{rev.productid}
+                            </span>
+                          </div>
                         </div>
                       </td>
 
+                      {/* Reviewer / Patron */}
                       <td className="py-3.5 px-4 font-medium text-neutral-700">
                         <div className="flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                          <span>{rev.username || 'Anonymous'}</span>
+                          <span className="truncate max-w-[140px]">{rev.username || 'Verified Patron'}</span>
                         </div>
                       </td>
 
+                      {/* Rating Stars */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-0.5 text-amber-500">
                           {Array.from({ length: 5 }).map((_, i) => (
@@ -345,26 +375,61 @@ export const AdminReviews = () => {
                         </div>
                       </td>
 
+                      {/* Review Comment with Fit Badge Parsing */}
                       <td className="py-3.5 px-4 max-w-md">
-                        <p className="text-neutral-700 leading-relaxed line-clamp-2">
-                          "{rev.comment}"
-                        </p>
+                        {rev.comment?.startsWith('[Fit:') ? (() => {
+                          const match = rev.comment.match(/^\[Fit:\s*([^\]]+)\]\s*(.*)$/);
+                          if (match) {
+                            return (
+                              <div className="space-y-1">
+                                <span className="inline-block px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 text-neutral-700 text-[10px] font-sans font-semibold uppercase tracking-wider rounded">
+                                  Fit: {match[1]}
+                                </span>
+                                <p className="text-neutral-700 leading-relaxed line-clamp-2">
+                                  "{match[2]}"
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <p className="text-neutral-700 leading-relaxed line-clamp-2">
+                              "{rev.comment}"
+                            </p>
+                          );
+                        })() : (
+                          <p className="text-neutral-700 leading-relaxed line-clamp-2">
+                            "{rev.comment}"
+                          </p>
+                        )}
                       </td>
 
+                      {/* Date */}
                       <td className="py-3.5 px-4 text-neutral-500 whitespace-nowrap">
                         {dateStr}
                       </td>
 
+                      {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReview(rev.id)}
-                          disabled={deletingId === rev.id}
-                          className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete this review"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={`/product/${rev.productid}#customer-reviews`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                            title="Open Customer Reviews on product page"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReview(rev.id)}
+                            disabled={deletingId === rev.id}
+                            className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete this review"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

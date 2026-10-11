@@ -118,10 +118,34 @@ export const Checkout = () => {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [placedOrderNumber, setPlacedOrderNumber] = useState('');
-  const [paymentErrorMessage, setPaymentErrorMessage] = useState('');
+  const [toast, setToast] = useState(null); // { message: string, type: 'info' | 'error' | 'success' }
+  const [paymentErrorMessage, _setPaymentErrorMessage] = useState('');
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
+
+  const setPaymentErrorMessage = (msg, type = 'error') => {
+    _setPaymentErrorMessage(msg || '');
+    if (!msg) {
+      setToast(null);
+    } else {
+      showToast(msg, type);
+    }
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(0);
   const [placedOrderDetails, setPlacedOrderDetails] = useState(null);
   const [orderCancelled, setOrderCancelled] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -727,7 +751,7 @@ export const Checkout = () => {
           ondismiss: function () {
             console.log('Razorpay modal dismissed by user.');
             setIsPlacingOrder(false);
-            setPaymentErrorMessage('Payment window was closed. Your items remain saved in your bag so you can try again.');
+            showToast('Payment window was closed. Your bag is saved - please try again.', 'info');
           }
         }
       };
@@ -823,22 +847,113 @@ export const Checkout = () => {
       window.print();
     };
 
-    const handleCancelOrder = async () => {
-      if (window.confirm('Are you sure you want to cancel this order?')) {
-        setOrderCancelled(true);
-        if (details?.orderNumber) {
-          try {
-            await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
-          } catch (e) {
-            console.warn('Cancel order API fallback:', e.message);
-          }
+    const handleCancelOrder = () => {
+      setShowCancelConfirm(true);
+    };
+
+    const handleConfirmCancelOrderSuccess = async () => {
+      setIsCancellingOrder(true);
+      setOrderCancelled(true);
+      setShowCancelConfirm(false);
+      if (details?.orderNumber) {
+        try {
+          await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
+        } catch (e) {
+          console.warn('Cancel order API fallback:', e.message);
         }
       }
+      setIsCancellingOrder(false);
+      showToast('Order cancelled successfully.', 'success');
     };
 
     return (
       <div className="min-h-screen bg-white text-brand-dark pt-28 sm:pt-32 pb-20 font-serif selection:bg-brand-dark selection:text-white">
         <SEOHead title="Order Confirmed | House of Urvaah" noindex={true} />
+
+        {/* Order Cancellation Confirmation Toaster */}
+        <AnimatePresence>
+          {showCancelConfirm && (
+            <motion.div
+              initial={{ opacity: 0, y: -24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24, scale: 0.96 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-4 bg-neutral-950/95 backdrop-blur-md text-white border border-neutral-800 shadow-2xl rounded-none flex flex-col sm:flex-row items-center justify-between gap-4 font-sans"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-light tracking-wide text-neutral-200">
+                  Are you sure you want to cancel this order?
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleConfirmCancelOrderSuccess}
+                  disabled={isCancellingOrder}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium tracking-wider uppercase transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isCancellingOrder ? 'Cancelling...' : 'Yes, Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="text-neutral-400 hover:text-white p-1 ml-1 cursor-pointer"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating Toast Notification */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24, scale: 0.96 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+                toast.type === 'error'
+                  ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
+                  : toast.type === 'success'
+                  ? 'bg-neutral-950/95 border-emerald-900/60 shadow-emerald-950/30'
+                  : 'bg-neutral-950/95 border-neutral-800 shadow-black/40'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {toast.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : toast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <span className="text-xs sm:text-sm font-light tracking-wide text-neutral-200 leading-snug">
+                  {toast.message}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="text-neutral-400 hover:text-white transition-colors p-1 cursor-pointer shrink-0 ml-2"
+                aria-label="Close notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="max-w-[1340px] mx-auto px-4 sm:px-6 md:px-8">
           {/* Top Order Confirmed Header */}
@@ -852,7 +967,7 @@ export const Checkout = () => {
               <Check className="w-8 h-8 stroke-[2.5]" />
             </motion.div>
 
-            <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-500 block mb-1.5 font-mono font-bold">
+            <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-500 block mb-1.5 font-serif font-semibold">
               {isDelivered ? 'ORDER DELIVERED & COMPLETED' : 'ORDER CONFIRMED & PROCESSING'}
             </span>
             <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-2">
@@ -874,7 +989,7 @@ export const Checkout = () => {
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
                   Order Number
                 </span>
-                <span className="text-sm sm:text-base font-bold text-black font-mono tracking-tight">
+                <span className="text-sm sm:text-base font-semibold text-black font-serif tracking-[0.06em]">
                   {details.orderNumber}
                 </span>
               </div>
@@ -889,7 +1004,7 @@ export const Checkout = () => {
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
                   Tracking Number
                 </span>
-                <span className="text-sm sm:text-base font-bold text-black font-mono tracking-tight">
+                <span className="text-sm sm:text-base font-semibold text-black font-serif tracking-[0.06em]">
                   {details.trackingNumber}
                 </span>
               </div>
@@ -953,7 +1068,7 @@ export const Checkout = () => {
                           </h4>
                           <div className="flex items-center gap-2 mt-1.5 font-sans">
                             <span className="text-[11px] text-neutral-500 font-medium">Qty: {item.quantity}</span>
-                            <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest uppercase ${
+                            <span className={`px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase ${
                               orderCancelled 
                                 ? 'bg-red-900 text-white' 
                                 : isDelivered 
@@ -1030,7 +1145,7 @@ export const Checkout = () => {
                   <div className="pt-4 border-t border-neutral-200/80 flex flex-wrap items-center gap-x-12 gap-y-2 text-[11px] font-sans">
                     <div>
                       <span className="text-neutral-400 block text-[9px] uppercase font-bold tracking-[0.2em] mb-0.5">PHONE</span>
-                      <span className="font-bold text-black font-mono">{details.customerPhone}</span>
+                      <span className="font-semibold text-black font-sans">{details.customerPhone}</span>
                     </div>
                     <div>
                       <span className="text-neutral-400 block text-[9px] uppercase font-bold tracking-[0.2em] mb-0.5">EMAIL</span>
@@ -1060,7 +1175,7 @@ export const Checkout = () => {
                     </div>
                     <div className="font-sans pt-0.5">
                       <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
-                      <span className={`text-[9px] font-mono font-bold tracking-widest uppercase block mt-1 ${orderCancelled ? 'text-red-700' : 'text-yellow-700'}`}>
+                      <span className={`text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 ${orderCancelled ? 'text-red-700' : 'text-yellow-700'}`}>
                         {orderCancelled ? 'CANCELLED' : isShipped ? 'COMPLETED' : 'IN PROGRESS'}
                       </span>
                     </div>
@@ -1073,7 +1188,7 @@ export const Checkout = () => {
                     </div>
                     <div className="font-sans pt-0.5">
                       <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isShipped ? 'text-black font-bold' : 'text-neutral-400'}`}>SHIPPED</h4>
-                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isShipped ? 'text-yellow-700 font-bold' : 'text-neutral-400'}`}>
+                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isShipped ? 'text-yellow-700 font-bold' : 'text-neutral-400'}`}>
                         {isShipped ? 'COMPLETED' : 'PENDING'}
                       </span>
                     </div>
@@ -1086,7 +1201,7 @@ export const Checkout = () => {
                     </div>
                     <div className="font-sans pt-0.5">
                       <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isOutForDelivery ? 'text-black font-bold' : 'text-neutral-400'}`}>OUT FOR DELIVERY</h4>
-                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}`}>
+                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}`}>
                         {isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}
                       </span>
                     </div>
@@ -1099,7 +1214,7 @@ export const Checkout = () => {
                     </div>
                     <div className="font-sans pt-0.5">
                       <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>DELIVERED</h4>
-                      <span className={`text-[9px] font-mono font-medium tracking-widest uppercase block mt-1 ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
+                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
                         {isDelivered ? 'DELIVERED' : 'PENDING'}
                       </span>
                     </div>
@@ -1125,7 +1240,7 @@ export const Checkout = () => {
 
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-xs font-bold tracking-wider uppercase text-neutral-500">Current Status</span>
-                  <span className={`px-2.5 py-1 font-mono text-[10px] font-bold tracking-widest uppercase ${
+                  <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase ${
                     orderCancelled 
                       ? 'bg-red-900 text-white' 
                       : isDelivered 
@@ -1243,21 +1358,45 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {paymentErrorMessage && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 text-xs font-sans flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-              <span>{paymentErrorMessage}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPaymentErrorMessage('')}
-              className="text-red-500 hover:text-red-900 font-bold p-1 cursor-pointer"
+        {/* Floating Toast Notification */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -24, scale: 0.96 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+                toast.type === 'error'
+                  ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
+                  : toast.type === 'success'
+                  ? 'bg-neutral-950/95 border-emerald-900/60 shadow-emerald-950/30'
+                  : 'bg-neutral-950/95 border-neutral-800 shadow-black/40'
+              }`}
             >
-              ✕
-            </button>
-          </div>
-        )}
+              <div className="flex items-center gap-3">
+                {toast.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : toast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <span className="text-xs sm:text-sm font-light tracking-wide text-neutral-200 leading-snug">
+                  {toast.message}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="text-neutral-400 hover:text-white transition-colors p-1 cursor-pointer shrink-0 ml-2"
+                aria-label="Close notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* TWO-COLUMN CHECKOUT LAYOUT */}
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
@@ -1273,7 +1412,7 @@ export const Checkout = () => {
                   </span>
                   CONTACT INFORMATION
                 </h2>
-                <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5">
+                <span className="text-[10px] font-sans font-semibold tracking-[0.16em] uppercase text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">
                   AUTHENTICATED
                 </span>
               </div>
@@ -1386,7 +1525,7 @@ export const Checkout = () => {
                             <br />
                             {addr.city}, {addr.state} - {addr.pincode}
                           </p>
-                          <p className="text-[11px] text-neutral-500 font-mono mt-2">
+                          <p className="text-[11px] text-neutral-500 font-sans font-medium mt-2">
                             Ph: {addr.phone}
                           </p>
                         </div>
@@ -1559,7 +1698,7 @@ export const Checkout = () => {
                     </span>
                   </div>
                 </div>
-                <span className="font-mono font-bold text-emerald-800 uppercase tracking-widest text-xs">
+                <span className="font-sans font-semibold text-emerald-800 uppercase tracking-[0.16em] text-xs">
                   FREE
                 </span>
               </div>
@@ -1733,7 +1872,7 @@ export const Checkout = () => {
                           e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
                         }}
                       />
-                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-mono font-bold rounded-full flex items-center justify-center">
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums">
                         {item.quantity}
                       </span>
                     </div>
@@ -1767,7 +1906,7 @@ export const Checkout = () => {
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value)}
                       placeholder="e.g. WELCOME10"
-                      className="flex-1 px-3 py-2 text-xs bg-white border border-neutral-300 focus:border-brand-dark outline-none font-mono uppercase"
+                      className="flex-1 px-3 py-2 text-xs bg-white border border-neutral-300 focus:border-brand-dark outline-none font-sans font-medium tracking-[0.15em] uppercase placeholder:font-normal placeholder:tracking-normal"
                     />
                     <button
                       type="button"
@@ -1780,7 +1919,7 @@ export const Checkout = () => {
                 ) : (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-mono font-bold text-emerald-900 uppercase tracking-widest block">
+                      <span className="font-sans font-bold text-emerald-900 uppercase tracking-[0.16em] block">
                         {appliedCoupon.code}
                       </span>
                       <span className="text-[10px] text-emerald-700">{appliedCoupon.label}</span>
@@ -1810,7 +1949,7 @@ export const Checkout = () => {
               <div className="pt-4 border-t border-neutral-200 space-y-2.5 text-xs">
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">Subtotal</span>
-                  <span className="font-bold text-neutral-900 font-mono">
+                  <span className="font-semibold text-neutral-900 font-sans tabular-nums">
                     {formatPrice(cartSubtotal)}
                   </span>
                 </div>
@@ -1820,13 +1959,13 @@ export const Checkout = () => {
                     <span className="uppercase tracking-wider">
                       Discount ({appliedCoupon.code})
                     </span>
-                    <span className="font-mono">-{formatPrice(discountAmount)}</span>
+                    <span className="font-sans font-medium tabular-nums">-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
 
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">Shipping</span>
-                  <span className="font-mono font-bold text-emerald-800 uppercase tracking-widest">
+                  <span className="font-sans font-semibold text-emerald-800 uppercase tracking-[0.16em]">
                     FREE
                   </span>
                 </div>

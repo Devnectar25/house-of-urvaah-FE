@@ -18,13 +18,16 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  Star
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
 import { productApi } from '../services/productApi';
 import { deliveryApi } from '../services/deliveryApi';
 import { SEOHead } from '../components/common/SEOHead';
+import { ProductReviews } from '../components/common/ProductReviews';
+import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWidget';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -547,6 +550,27 @@ export const ProductDetail = () => {
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-normal tracking-[0.06em] uppercase text-brand-dark leading-tight">
                 {product.name}
               </h1>
+
+              {/* Star Rating & Customer Review Shortcut */}
+              <div className="flex items-center gap-2 mt-[10px] font-sans">
+                <a
+                  href="#customer-reviews"
+                  className="inline-flex items-center gap-1.5 text-xs text-neutral-600 hover:text-black transition-colors"
+                  title="Jump to Customer Reviews"
+                >
+                  <div className="flex items-center text-amber-500">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-500" />
+                  </div>
+                  <span className="font-semibold text-neutral-900 font-sans">
+                    {parseFloat(product.rating || 5).toFixed(1)}
+                  </span>
+                  <span className="text-neutral-300">·</span>
+                  <span className="underline underline-offset-2 text-neutral-500 hover:text-neutral-900">
+                    {product.reviews || product.reviews_count || 1} {(product.reviews || product.reviews_count) === 1 ? 'Customer Review' : 'Customer Reviews'}
+                  </span>
+                </a>
+              </div>
+
               {product.shortDescription && (
                 <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1.5 leading-relaxed">
                   {product.shortDescription}
@@ -673,74 +697,22 @@ export const ProductDetail = () => {
               >
                 <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
                 {copiedToast && (
-                  <span className="absolute -top-8 bg-black text-white text-[10px] py-1 px-2 font-mono whitespace-nowrap shadow-lg rounded-xs">
+                  <span className="absolute -top-8 bg-black text-white text-[10px] py-1 px-2 font-sans font-medium tracking-wider uppercase whitespace-nowrap shadow-lg rounded-xs">
                     Link Copied!
                   </span>
                 )}
               </button>
             </div>
 
-
-            {/* 9. PINCODE & DELIVERY CHECK */}
-            <div className="pt-4 border-t border-neutral-200">
-              <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block mb-2 font-sans">
-                CHECK DELIVERY & SERVICES
-              </span>
-
-              <form onSubmit={handleCheckPincode} className="flex gap-2 max-w-sm font-sans">
-                <input
-                  type="text"
-                  value={pincode}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setPincode(val);
-                    if (pincodeResult) setPincodeResult(null);
-                  }}
-                  placeholder="ENTER PINCODE"
-                  maxLength={6}
-                  className="flex-1 border border-neutral-400 text-brand-dark px-3.5 py-2 text-xs font-mono tracking-wider uppercase focus:outline-none focus:border-black h-10 bg-white"
-                />
-                <button
-                  type="submit"
-                  disabled={checkingPincode}
-                  className="bg-black text-white px-5 py-2 text-xs font-semibold tracking-wider uppercase hover:bg-neutral-800 transition-colors cursor-pointer h-10 shrink-0 disabled:opacity-60 flex items-center justify-center min-w-[95px]"
-                >
-                  {checkingPincode ? 'Checking...' : 'CHECK'}
-                </button>
-              </form>
-
-              {/* Validation or Network Error */}
-              {(pincodeResult?.status === 'invalid' || pincodeResult?.status === 'error') && (
-                <div className="flex items-center gap-2 text-xs text-rose-600 mt-2.5 font-sans">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{pincodeResult.message}</span>
-                </div>
-              )}
-
-              {/* Unserviceable PIN Code Notice */}
-              {pincodeResult?.status === 'unserviceable' && (
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-rose-600 mt-2.5 font-sans">
-                  <XCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                  <span>✕ {pincodeResult.message}</span>
-                </div>
-              )}
-
-              {/* Serviceable PIN Code Success Result (Matches Reference Screenshot) */}
-              {pincodeResult?.status === 'success' && (() => {
-                const d = pincodeResult.dateObj;
-                return (
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-700 mt-2.5 font-sans">
-                    <Truck className="w-4.5 h-4.5 text-black flex-shrink-0" />
-                    <span>
-                      Delivery between{' '}
-                      <span className="text-[#15803d] font-normal">
-                        {d.day1}<sup>{d.ord1}</sup> and {d.day2}<sup>{d.ord2}</sup> {d.month}
-                      </span>
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
+            {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD */}
+            <DeliveryReminderWidget
+              pincode={pincode}
+              setPincode={setPincode}
+              handleCheckPincode={handleCheckPincode}
+              checkingPincode={checkingPincode}
+              pincodeResult={pincodeResult}
+              setPincodeResult={setPincodeResult}
+            />
 
             {/* ACCORDION SECTIONS */}
             <div className="pt-3 border-t border-neutral-200 space-y-1">
@@ -849,16 +821,16 @@ export const ProductDetail = () => {
 
               {/* Specifications Accordion */}
               {Array.isArray(product.specifications) && product.specifications.length > 0 && (
-                <div className="border-b border-neutral-200 pb-1.5 pt-1">
+                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('specs')}
-                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>SPECIFICATIONS</span>
-                    {openAccordion === 'specs' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
+                    {openAccordion === 'specs' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
                   {openAccordion === 'specs' && (
-                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2 space-y-1">
+                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
                       {product.specifications.map((sp, idx) => (
                         <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-0.5">
                           <span className="font-semibold text-neutral-700">{sp.label}:</span>
@@ -872,16 +844,16 @@ export const ProductDetail = () => {
 
               {/* Care Instructions Accordion */}
               {(product.careInstructions || product.care_instructions) && (
-                <div className="border-b border-neutral-200 pb-1.5 pt-1">
+                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                   <button
                     onClick={() => toggleAccordion('care')}
-                    className="w-full flex justify-between items-center text-[10px] font-bold tracking-wider uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   >
                     <span>CARE INSTRUCTIONS</span>
-                    {openAccordion === 'care' ? <Minus className="w-3 h-3 stroke-[2]" /> : <Plus className="w-3 h-3 stroke-[2]" />}
+                    {openAccordion === 'care' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
                   {openAccordion === 'care' && (
-                    <div className="mt-1 text-[11px] text-neutral-600 font-sans leading-relaxed pr-2">
+                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
                       {product.careInstructions || product.care_instructions}
                     </div>
                   )}
@@ -890,6 +862,9 @@ export const ProductDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* CUSTOMER REVIEWS & RATINGS SECTION */}
+        <ProductReviews productId={product.id} productName={product.name} />
       </div>
 
       {/* SIZE CHART MODAL OVERLAY */}
@@ -1003,7 +978,7 @@ export const ProductDetail = () => {
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="bg-black text-white text-[10px] font-mono font-bold tracking-widest px-2 py-0.5 uppercase">
+                      <span className="bg-black text-white text-[10px] font-sans font-semibold tracking-[0.16em] px-2 py-0.5 uppercase">
                         {cp.code}
                       </span>
                       <span className="text-[10px] font-semibold text-rose-700 tracking-wide uppercase">
@@ -1026,7 +1001,7 @@ export const ProductDetail = () => {
                         setTimeout(() => setCopiedCoupon(''), 2000);
                       }
                     }}
-                    className="px-3 py-1.5 text-[10px] font-bold font-mono tracking-widest border border-black uppercase hover:bg-black hover:text-white transition-colors cursor-pointer shrink-0"
+                    className="px-3 py-1.5 text-[10px] font-bold font-sans tracking-[0.16em] border border-black uppercase hover:bg-black hover:text-white transition-colors cursor-pointer shrink-0"
                   >
                     {copiedCoupon === cp.code ? 'COPIED ✓' : 'COPY CODE'}
                   </button>

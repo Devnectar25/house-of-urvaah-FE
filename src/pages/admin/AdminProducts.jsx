@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   XCircle,
   FolderTree,
-  Edit3
+  Edit3,
+  Star
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { EditProductModal } from '../../components/admin/EditProductModal';
@@ -530,6 +531,17 @@ const ProductTableRow = ({
             <span className="text-[11px] text-neutral-400 font-mono">
               | SKU: {product.styleCode}
             </span>
+          )}
+          {product.reviews > 0 && (
+            <Link
+              to={`/admin/reviews?search=${encodeURIComponent(product.name)}`}
+              className="text-amber-700 hover:text-amber-800 inline-flex items-center gap-1 text-[11px] font-semibold ml-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+              title="View product reviews in Admin Panel"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Star className="w-3 h-3 fill-amber-400 stroke-amber-500" />
+              <span>{parseFloat(product.rating || 5).toFixed(1)} ({product.reviews})</span>
+            </Link>
           )}
           <a
             href={`/product/${product.id}`}
