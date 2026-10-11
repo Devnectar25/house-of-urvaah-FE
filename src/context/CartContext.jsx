@@ -405,7 +405,8 @@ export const CartProvider = ({ children }) => {
     setIsCartOpen(true);
 
     if (!isGuest) {
-      const numericId = parseInt(String(product.id).replace(/\D/g, ''), 10);
+      const rawNum = parseInt(String(product.id).replace(/\D/g, ''), 10);
+      const numericId = rawNum === 103 ? 106 : rawNum;
       if (numericId && !isNaN(numericId)) {
         try {
           await apiClient('/api/cart/add', {
