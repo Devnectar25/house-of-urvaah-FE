@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { apiFetch } from '../../services/api';
-import { WomanAiIcon } from '../common/WomanAiIcon';
 
 const QUICK_SUGGESTIONS = [
   'Show trending corsets',
@@ -352,11 +351,11 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed bottom-0 right-0 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-[#C9A66B]/30 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
+          className="fixed bottom-0 right-0 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
           style={{
             bottom: '30px',
             right: '0px',
-            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 25px rgba(201, 166, 107, 0.12)',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25)',
             overscrollBehavior: 'contain',
             overscrollBehaviorY: 'contain'
           }}
@@ -378,16 +377,16 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
           `}</style>
 
           {/* Header */}
-          <div className="bg-[#111111] text-white px-4 py-3.5 flex items-center justify-between border-b border-[#C9A66B]/30 shrink-0">
+          <div className="bg-white text-black px-4 py-3.5 flex items-center justify-between border-b border-neutral-200 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#1A1A1A] border border-[#C9A66B]/40 text-[#C9A66B] shadow-inner">
-                <WomanAiIcon className="w-5 h-5 text-[#C9A66B]" />
+              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-neutral-100 border border-neutral-300/80 text-black shadow-inner">
+                <Bot className="w-5 h-5 text-black stroke-[1.8]" />
               </div>
               <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-semibold tracking-wider uppercase text-white font-serif">
+                <h3 className="text-sm font-semibold tracking-wider uppercase text-black font-serif">
                   Urvaah bot
                 </h3>
-                <span className="bg-[#C9A66B]/15 text-[#C9A66B] text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-[#C9A66B]/40 uppercase">
+                <span className="bg-neutral-100 text-black text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-300 uppercase">
                   AI
                 </span>
               </div>
@@ -397,7 +396,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               <button
                 onClick={handleReset}
                 title="Restart Conversation"
-                className="p-1.5 rounded-full text-stone-300 hover:text-[#C9A66B] hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-full text-neutral-500 hover:text-black hover:bg-neutral-100 transition-colors"
                 aria-label="Restart conversation"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -405,7 +404,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               <button
                 onClick={onClose}
                 title="Close Urvaah bot"
-                className="p-1.5 rounded-full text-stone-300 hover:text-[#C9A66B] hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded-full text-neutral-500 hover:text-black hover:bg-neutral-100 transition-colors"
                 aria-label="Close chat window"
               >
                 <X className="w-4 h-4" />
@@ -433,16 +432,16 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                 >
                   <div className={`flex gap-2 max-w-[90%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
                     {isBot && (
-                      <div className="w-7 h-7 rounded-full bg-[#111111] border border-[#C9A66B]/40 text-[#C9A66B] flex items-center justify-center shrink-0 mt-1 shadow-xs">
-                        <WomanAiIcon className="w-4 h-4 text-[#C9A66B]" />
+                      <div className="w-7 h-7 rounded-full bg-neutral-100 border border-neutral-300/80 text-black flex items-center justify-center shrink-0 mt-1 shadow-xs">
+                        <Bot className="w-4 h-4 text-black stroke-[1.8]" />
                       </div>
                     )}
 
                     <div
                       className={`rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
                         isBot
-                          ? 'bg-white text-stone-800 border border-[#E7E2D8] rounded-tl-sm shadow-xs'
-                          : 'bg-[#111111] border border-[#C9A66B]/40 text-white rounded-br-sm shadow-xs'
+                          ? 'bg-white text-stone-800 border border-neutral-200 rounded-tl-sm shadow-xs'
+                          : 'bg-black border border-black text-white rounded-br-sm shadow-xs'
                       }`}
                     >
                       <div className="whitespace-pre-wrap font-normal">
@@ -515,7 +514,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                                 <div className="mt-2 flex gap-1">
                                   <button
                                     onClick={() => handleProductClick(prod)}
-                                    className="flex-1 bg-[#111111] hover:bg-[#C9A66B] hover:text-[#111111] hover:border-[#C9A66B] border border-[#C9A66B]/30 text-[#C9A66B] text-[9px] font-semibold tracking-wider uppercase py-1 px-1.5 rounded flex items-center justify-center gap-0.5 transition-colors"
+                                    className="flex-1 bg-black hover:bg-neutral-800 text-white border border-black text-[9px] font-semibold tracking-wider uppercase py-1 px-1.5 rounded flex items-center justify-center gap-0.5 transition-colors cursor-pointer"
                                   >
                                     <span>Details</span>
                                     <ChevronRight className="w-2.5 h-2.5" />
@@ -583,15 +582,15 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
             {/* Typing Indicator */}
             {isLoading && (
               <div className="flex items-start gap-2 max-w-[90%]">
-                <div className="w-7 h-7 rounded-full bg-[#111111] border border-[#C9A66B]/40 text-[#C9A66B] flex items-center justify-center shrink-0 mt-1 shadow-xs">
-                  <WomanAiIcon className="w-4 h-4 text-[#C9A66B] animate-bounce" />
+                <div className="w-7 h-7 rounded-full bg-neutral-100 border border-neutral-300/80 text-black flex items-center justify-center shrink-0 mt-1 shadow-xs">
+                  <Bot className="w-4 h-4 text-black animate-bounce stroke-[1.8]" />
                 </div>
-                <div className="bg-white text-stone-600 border border-stone-200/80 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-1.5">
-                  <span className="text-xs text-stone-500 font-medium">Urvaah bot is crafting style advice</span>
+                <div className="bg-white text-neutral-600 border border-neutral-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-xs flex items-center gap-1.5">
+                  <span className="text-xs text-neutral-600 font-medium">Urvaah bot is crafting style advice</span>
                   <span className="flex items-center gap-1 ml-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse delay-150" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse delay-300" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse delay-150" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse delay-300" />
                   </span>
                 </div>
               </div>
@@ -606,14 +605,14 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               scrollbarWidth: 'none',
               msOverflowStyle: 'none'
             }}
-            className="px-3 py-2 bg-[#FAF8F3] border-t border-[#E7E2D8] overflow-x-auto flex gap-1.5 shrink-0 no-scrollbar scrollbar-none"
+            className="px-3 py-2 bg-neutral-50 border-t border-neutral-200 overflow-x-auto flex gap-1.5 shrink-0 no-scrollbar scrollbar-none"
           >
             {QUICK_SUGGESTIONS.map((sugg, i) => (
               <button
                 key={i}
                 onClick={() => handleSendMessage(sugg)}
                 disabled={isLoading}
-                className="whitespace-nowrap bg-white hover:bg-[#F5F1E8] border border-[#E7E2D8] hover:border-[#C9A66B] text-stone-700 hover:text-[#A78243] text-[11px] px-2.5 py-1 rounded-full transition-all shrink-0 font-medium disabled:opacity-50"
+                className="whitespace-nowrap bg-white hover:bg-black hover:text-white border border-neutral-300 hover:border-black text-neutral-800 text-[11px] px-2.5 py-1 rounded-full transition-all shrink-0 font-medium disabled:opacity-50 cursor-pointer"
               >
                 {sugg}
               </button>
@@ -622,7 +621,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
 
           {/* Voice Input Active / Error Notice */}
           {voiceNotice && (
-            <div className="px-3.5 py-1.5 bg-stone-900 text-white text-[11px] flex items-center justify-between border-t border-white/10 shrink-0 font-sans">
+            <div className="px-3.5 py-1.5 bg-neutral-900 text-white text-[11px] flex items-center justify-between border-t border-white/10 shrink-0 font-sans">
               <span className="flex items-center gap-1.5">
                 {isListening ? (
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
@@ -634,7 +633,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => setVoiceNotice(null)}
-                className="text-stone-400 hover:text-white ml-2 text-xs"
+                className="text-neutral-400 hover:text-white ml-2 text-xs cursor-pointer"
               >
                 ✕
               </button>
@@ -651,9 +650,13 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                 } catch {}
                 setIsListening(false);
               }
+              if (!inputValue.trim()) {
+                inputRef.current?.focus();
+                return;
+              }
               handleSendMessage();
             }}
-            className="p-3 bg-white border-t border-[#E7E2D8] shrink-0 flex items-center gap-2"
+            className="p-3 bg-white border-t border-neutral-200 shrink-0 flex items-center gap-2"
           >
             <div className="relative flex-1">
               <input
@@ -662,10 +665,10 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder={isListening ? "Listening... Speak your question 🎙️" : "Ask Urvaah bot about dresses, fits, orders..."}
-                className={`w-full px-3.5 py-2 text-xs sm:text-sm bg-[#FAF8F3] border rounded-full focus:outline-none transition-all text-stone-900 placeholder:text-stone-400 ${
+                className={`w-full px-3.5 py-2 text-xs sm:text-sm bg-neutral-50 border rounded-full focus:outline-none transition-all text-neutral-900 placeholder:text-neutral-400 ${
                   isListening
                     ? 'border-rose-500 ring-2 ring-rose-200 bg-rose-50/40 text-rose-950 font-medium'
-                    : 'border-[#E7E2D8] focus:border-[#C9A66B] focus:ring-1 focus:ring-[#C9A66B]/50 focus:bg-white'
+                    : 'border-neutral-200 focus:border-black focus:ring-1 focus:ring-black focus:bg-white'
                 }`}
                 disabled={isLoading}
               />
@@ -676,10 +679,11 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               type="button"
               onClick={toggleVoiceInput}
               disabled={isLoading}
-              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all border shadow-xs cursor-pointer ${
+              data-no-hover="true"
+              className={`no-global-hover group w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 border cursor-pointer hover:scale-105 active:scale-95 ${
                 isListening
                   ? 'bg-rose-600 border-rose-600 text-white animate-pulse shadow-md ring-2 ring-rose-300'
-                  : 'bg-[#FAF8F3] hover:bg-[#F5F1E8] border-[#E7E2D8] hover:border-[#C9A66B]/50 text-stone-700 hover:text-[#A78243]'
+                  : 'bg-neutral-100 hover:bg-black border-neutral-300 hover:border-black text-neutral-800 hover:text-white shadow-2xs hover:shadow-md'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input (Speak to Urvaah bot)'}
               aria-label={isListening ? 'Stop listening' : 'Voice input'}
@@ -687,28 +691,30 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               {isListening ? (
                 <Mic className="w-4 h-4 text-white animate-bounce" />
               ) : (
-                <Mic className="w-4 h-4 text-stone-700" />
+                <Mic className="w-4 h-4 text-neutral-800 group-hover:text-white transition-colors duration-200" />
               )}
             </button>
 
             {/* Send Message Button */}
             <button
               type="submit"
-              disabled={!inputValue.trim() || isLoading}
-              className="w-9 h-9 rounded-full bg-[#111111] border border-[#C9A66B]/50 hover:bg-[#C9A66B] hover:text-[#111111] hover:border-[#C9A66B] text-[#C9A66B] disabled:opacity-40 flex items-center justify-center shrink-0 transition-all shadow-sm cursor-pointer"
+              disabled={isLoading}
+              data-no-hover="true"
+              className="no-global-hover group w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 border cursor-pointer hover:scale-105 active:scale-95 bg-neutral-100 hover:bg-black border-neutral-300 hover:border-black text-neutral-800 hover:text-white shadow-2xs hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Send message"
               aria-label="Send message"
             >
-              <Send className="w-4 h-4 ml-0.5" />
+              <Send className="w-4 h-4 ml-0.5 text-neutral-800 group-hover:text-white transition-colors duration-200" />
             </button>
           </form>
 
           {/* Footer note */}
-          <div className="py-1.5 bg-[#FAF8F3] border-t border-[#E7E2D8]/60 text-center">
+          <div className="py-1.5 bg-neutral-50 border-t border-neutral-200/60 text-center">
             <a
               href="https://devnectar.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[9px] tracking-widest text-stone-400 hover:text-[#C9A66B] transition-colors uppercase font-medium inline-block hover:underline"
+              className="text-[9px] tracking-widest text-neutral-400 hover:text-black transition-colors uppercase font-medium inline-block hover:underline"
             >
               Powered by devnectar
             </a>

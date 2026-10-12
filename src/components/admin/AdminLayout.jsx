@@ -24,7 +24,8 @@ import {
   Columns,
   Video,
   HelpCircle,
-  Inbox
+  Inbox,
+  Bell
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -47,13 +48,14 @@ const ALL_NAV_ITEMS = [
   { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw, key: 'refunds' },
+  { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
   { name: 'Leads', path: '/admin/leads', icon: Inbox, key: 'leads' },
   { name: 'Reviews', path: '/admin/reviews', icon: Star, key: 'reviews' },
   { name: 'FAQs', path: '/admin/faqs', icon: HelpCircle, key: 'faqs' },
   {
-    name: 'Modify UI',
+    name: 'Edit Home page',
     path: '/admin/modify-ui',
     icon: Sliders,
     key: 'modify-ui',

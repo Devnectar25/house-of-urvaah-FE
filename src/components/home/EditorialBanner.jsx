@@ -66,6 +66,8 @@ export const EditorialBanner = () => {
   const [videoLoaded, setVideoLoaded] = useState({});
   const [videoErrors, setVideoErrors] = useState({});
 
+  const hasAdminConfiguredRef = useRef(false);
+
   // Dynamically resolve fabric video config from backend API
   useEffect(() => {
     let isMounted = true;
@@ -74,6 +76,17 @@ export const EditorialBanner = () => {
         .then((res) => {
           if (isMounted && res?.success && res.data) {
             setFabricConfig(res.data);
+            if (Array.isArray(res.data.videos) && res.data.videos.length > 0) {
+              hasAdminConfiguredRef.current = true;
+              setVideos(
+                res.data.videos.map((v, idx) => ({
+                  id: v.id || EDITORIAL_VIDEOS[idx]?.id || `video-${idx + 1}`,
+                  name: v.title || v.name || EDITORIAL_VIDEOS[idx]?.name || '',
+                  tag: v.tag || EDITORIAL_VIDEOS[idx]?.tag || '',
+                  url: appendVersion(v.video_url || v.url || getInitialVideoUrl(EDITORIAL_VIDEOS[idx]?.defaultPath))
+                }))
+              );
+            }
           }
         })
         .catch((err) => {
@@ -96,14 +109,14 @@ export const EditorialBanner = () => {
     };
   }, []);
 
-  // Dynamically resolve video URLs from the Supabase houseofurvaah-media bucket by matching names
+  // Dynamically resolve video URLs from the Supabase houseofurvaah-media bucket by matching names as fallback
   useEffect(() => {
     let isMounted = true;
 
     const resolveVideosFromBucket = async () => {
       try {
         const { data, error } = await supabase.storage.from(BUCKET_NAME).list('videos');
-        if (data && !error && data.length > 0) {
+        if (data && !error && data.length > 0 && !hasAdminConfiguredRef.current) {
           const updated = EDITORIAL_VIDEOS.map((item) => {
             const matchedFile = data.find((f) => item.matcher(f.name));
             const path = matchedFile ? `videos/${matchedFile.name}` : item.defaultPath;
@@ -114,7 +127,7 @@ export const EditorialBanner = () => {
               url: appendVersion(resolvedUrl)
             };
           });
-          if (isMounted) {
+          if (isMounted && !hasAdminConfiguredRef.current) {
             setVideos(updated);
           }
         }
@@ -308,22 +321,22 @@ export const EditorialBanner = () => {
             className="lg:col-span-5 flex flex-col justify-center px-4 md:px-8 py-4"
           >
             <span className="text-[11px] md:text-xs tracking-[0.25em] uppercase text-neutral-500 font-serif mb-2">
-              EDITORIAL VISION
+              {fabricConfig?.subheading || 'EDITORIAL VISION'}
             </span>
             <h2 className="section-heading-lg font-serif tracking-[0.1em] text-brand-dark mb-5 md:mb-6 uppercase">
-              {fabricConfig?.heading || 'THE ART OF REFINED TAILORING'}
+              {fabricConfig?.heading || 'LUXURY TEXTILE ARTISTRY'}
             </h2>
             <p className="text-xs md:text-sm text-neutral-600 tracking-wider leading-relaxed mb-6 font-light max-w-sm">
-              {fabricConfig?.description || 'Defined by oversized silhouettes, fluid draping, and uncompromised material integrity. Designed for timeless elegance across seasonal transitions.'}
+              {fabricConfig?.description || 'Discover the sensory elegance of our mastercrafted fabrics: mulberry silk, structured linens, and couture jacquards.'}
             </p>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
-              <a href={fabricConfig?.button_link || '#lookbook'} className="w-full sm:w-auto">
+              <a href={fabricConfig?.button_link || '/clothing'} className="w-full sm:w-auto">
                 <Button variant="primary" className="w-full justify-center uppercase">
-                  {fabricConfig?.button_text || 'DISCOVER THE COLLECTION'}
+                  {fabricConfig?.button_text || 'EXPLORE FABRICS'}
                 </Button>
               </a>
-              <a href="#campaign" className="inline-block w-full sm:w-auto">
+              <a href={fabricConfig?.secondary_button_link || '#campaign'} className="inline-block w-full sm:w-auto">
                 <button
                   type="button"
                   data-no-hover="true"
@@ -346,7 +359,7 @@ export const EditorialBanner = () => {
 
                   {/* Button Text Label */}
                   <span className="relative z-10 text-brand-dark group-hover:text-white transition-colors duration-400 ease-in-out">
-                    VIEW CAMPAIGN FILM
+                    {fabricConfig?.secondary_button_text || 'VIEW CAMPAIGN FILM'}
                   </span>
                 </button>
               </a>

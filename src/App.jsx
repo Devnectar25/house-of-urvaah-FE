@@ -25,6 +25,7 @@ import { ReturnRefundPolicy } from './pages/ReturnRefundPolicy';
 import { CookiePolicy } from './pages/CookiePolicy';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 import { Sitemap } from './pages/Sitemap';
+import { CategoryPage } from './pages/CategoryPage';
 
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -46,6 +47,8 @@ import { AdminHeroSection } from './pages/admin/modify-ui/AdminHeroSection';
 import { AdminDualCampaign } from './pages/admin/modify-ui/AdminDualCampaign';
 import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
 import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
+import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
+import { StockUnsubscribe } from './pages/StockUnsubscribe';
 import { getStoredUser } from './lib/apiClient';
 
 function PermissionGuard({ moduleKey, children }) {
@@ -58,6 +61,7 @@ function PermissionGuard({ moduleKey, children }) {
     permissions.includes(moduleKey) ||
     moduleKey === 'modify-ui' ||
     moduleKey === 'faqs' ||
+    moduleKey === 'stock-notifications' ||
     (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
 
   if (hasAccess) {
@@ -127,13 +131,18 @@ export function StorefrontLayout() {
           <Route path="/return-refund-policy" element={<ReturnRefundPolicy />} />
           <Route path="/returns" element={<ReturnRefundPolicy />} />
           <Route path="/returns-exchanges" element={<ReturnRefundPolicy />} />
+          <Route path="/stock-notifications/unsubscribe" element={<StockUnsubscribe />} />
           <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/category/:slug" element={<CategoryPage />} />
+          <Route path="/category" element={<CategoryPage defaultCategory="all" />} />
+          <Route path="/collection/:slug" element={<CategoryPage />} />
+          <Route path="/collections" element={<CategoryPage defaultCategory="all" />} />
           <Route path="/new-in" element={<Home />} />
-          <Route path="/clothing" element={<Home />} />
-          <Route path="/dresses" element={<Home />} />
-          <Route path="/tops" element={<Home />} />
+          <Route path="/clothing" element={<CategoryPage defaultCategory="clothing" />} />
+          <Route path="/dresses" element={<CategoryPage defaultCategory="party-wear" />} />
+          <Route path="/tops" element={<CategoryPage defaultCategory="corset" />} />
           <Route path="/knitwear" element={<Home />} />
-          <Route path="/outerwear" element={<Home />} />
+          <Route path="/outerwear" element={<CategoryPage defaultCategory="party-wear" />} />
           <Route path="/trousers" element={<Home />} />
           <Route path="/shoes" element={<Home />} />
           <Route path="/accessories" element={<Home />} />
@@ -199,13 +208,14 @@ export function AppContent() {
         <Route path="leads" element={<PermissionGuard moduleKey="leads"><AdminLeads /></PermissionGuard>} />
         <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
+        <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
         <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />
         <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
         <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
         <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />
 
-        {/* Modify UI Admin Routes */}
+        {/* Edit Home page Admin Routes */}
         <Route path="modify-ui" element={<PermissionGuard moduleKey="modify-ui"><AdminHeroSection /></PermissionGuard>} />
         <Route path="modify-ui/hero" element={<PermissionGuard moduleKey="modify-ui"><AdminHeroSection /></PermissionGuard>} />
         <Route path="modify-ui/dual-campaign" element={<PermissionGuard moduleKey="modify-ui"><AdminDualCampaign /></PermissionGuard>} />
