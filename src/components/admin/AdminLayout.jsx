@@ -25,7 +25,8 @@ import {
   Video,
   HelpCircle,
   Inbox,
-  Bell
+  Bell,
+  ShieldAlert
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -51,6 +52,8 @@ const ALL_NAV_ITEMS = [
   { name: 'Leads', path: '/admin/leads', icon: Inbox, key: 'leads' },
   { name: 'Reviews', path: '/admin/reviews', icon: Star, key: 'reviews' },
   { name: 'FAQs', path: '/admin/faqs', icon: HelpCircle, key: 'faqs' },
+  { name: 'Error Monitoring', path: '/admin/error-monitoring', icon: ShieldAlert, key: 'error-monitoring' },
+  { name: 'Sub-Admins', path: '/admin/subadmins', icon: UserCheck, key: 'subadmins', superAdminOnly: true },
   {
     name: 'Edit Home page',
     path: '/admin/modify-ui',
@@ -64,7 +67,6 @@ const ALL_NAV_ITEMS = [
     ]
   },
   { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },
-  { name: 'Sub-Admins', path: '/admin/subadmins', icon: UserCheck, key: 'subadmins', superAdminOnly: true },
 ];
 
 function formatRoleName(role) {
@@ -193,7 +195,7 @@ export const AdminLayout = () => {
             title="House of Urvaah Admin Dashboard"
           >
             <Logo className="h-11 sm:h-13 md:h-14 shrink-0" />
-            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors ml-[30px]">
+            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors ml-[60px]">
               Admin Panel
             </span>
           </Link>

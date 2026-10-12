@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
   Clock,
+  CheckCheck,
   PackageCheck,
   Truck,
   MapPin,
@@ -27,9 +28,54 @@ import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
+const checkStatusMatches = (orderStatus, filterStatus) => {
+  if (!filterStatus || filterStatus === 'all') return true;
+  const o = (orderStatus || '').toLowerCase();
+  const f = filterStatus.toLowerCase();
+  if (f === 'confirmed') {
+    return o === 'confirmed';
+  }
+  if (f === 'processing' || f === 'packed') {
+    return o === 'processing' || o === 'packed';
+  }
+  if (f === 'pending' || f === 'placed') {
+    return o === 'pending' || o === 'placed';
+  }
+  if (f === 'shipped' || f === 'dispatched') {
+    return o === 'shipped' || o === 'dispatched';
+  }
+  if (f === 'out for delivery') {
+    return o === 'out for delivery';
+  }
+  if (f === 'delivered') {
+    return o === 'delivered';
+  }
+  if (f === 'cancelled' || f === 'canceled') {
+    return o === 'cancelled' || o === 'canceled' || o === 'cancellation requested' || o === 'refunded';
+  }
+  if (f === 'returned' || f === 'return' || f === 'returns') {
+    return o.startsWith('return');
+  }
+  if (f === 'exchanged' || f === 'exchange' || f === 'exchanges') {
+    return o.startsWith('exchange');
+  }
+  return o === f;
+};
+
+const checkPaymentStatusMatches = (orderPaymentStatus, filterPaymentStatus) => {
+  if (!filterPaymentStatus || filterPaymentStatus === 'all') return true;
+  const o = (orderPaymentStatus || '').toLowerCase();
+  const f = filterPaymentStatus.toLowerCase();
+  if (f === 'pending') {
+    return o === 'pending' || o === 'failed';
+  }
+  return o === f;
+};
+
 const ORDER_STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'Pending', label: 'Pending' },
+  { value: 'Confirmed', label: 'Confirmed' },
   { value: 'Processing', label: 'Processing' },
   { value: 'Shipped', label: 'Shipped' },
   { value: 'Out for Delivery', label: 'Out for Delivery' },
@@ -57,6 +103,7 @@ const PAYMENT_TYPE_OPTIONS = [
 
 export const AdminOrders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Stat Cards State
   const [stats, setStats] = useState(null);
@@ -128,6 +175,36 @@ export const AdminOrders = () => {
     );
   }, [selectedStatus, selectedPaymentStatus, selectedPaymentType, orderIdInput, customerInput, fromDate, toDate]);
 
+  // Sync state with URL search parameters on mount or navigation change
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const statusParam = searchParams.get('status');
+    const paymentStatusParam = searchParams.get('paymentStatus') || searchParams.get('payment_status');
+
+    if (statusParam) {
+      const match = ORDER_STATUS_OPTIONS.find(
+        (opt) => opt.value.toLowerCase() === statusParam.toLowerCase()
+      );
+      if (match) {
+        setSelectedStatus(match.value);
+      }
+    } else {
+      setSelectedStatus('all');
+    }
+
+    if (paymentStatusParam) {
+      const match = PAYMENT_STATUS_OPTIONS.find(
+        (opt) => opt.value.toLowerCase() === paymentStatusParam.toLowerCase()
+      );
+      if (match) {
+        setSelectedPaymentStatus(match.value);
+      }
+    } else {
+      setSelectedPaymentStatus('all');
+    }
+    setCurrentPage(1);
+  }, [location.search]);
+
   // Fetch Stat Cards Counts
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -178,13 +255,9 @@ export const AdminOrders = () => {
       const mergedOrder = { ...existingOrder, ...updatedOrder, isPreview: false };
 
       // Check if merged order still matches active filters
-      const matchesStatus =
-        selectedStatus === 'all' ||
-        (mergedOrder.status || '').toLowerCase() === selectedStatus.toLowerCase();
+      const matchesStatus = checkStatusMatches(mergedOrder.status, selectedStatus);
 
-      const matchesPaymentStatus =
-        selectedPaymentStatus === 'all' ||
-        (mergedOrder.payment_status || '').toLowerCase() === selectedPaymentStatus.toLowerCase();
+      const matchesPaymentStatus = checkPaymentStatusMatches(mergedOrder.payment_status, selectedPaymentStatus);
 
       const matchesPaymentType =
         selectedPaymentType === 'all' ||
@@ -297,7 +370,7 @@ export const AdminOrders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Reset all filters in a single action
+  // Reset all filters in a single action and clear URL
   const handleClearFilters = () => {
     if (ordersLoading || !isFilterActive) return;
     setSelectedStatus('all');
@@ -310,13 +383,28 @@ export const AdminOrders = () => {
     setFromDate('');
     setToDate('');
     setCurrentPage(1);
+    navigate('/admin/orders', { replace: true });
   };
 
-  // Click Stat Card to pre-filter
+  // Click Stat Card to pre-filter and update URL
   const handleStatCardClick = (statusValue, paymentStatusValue = null) => {
-    if (statusValue) setSelectedStatus(statusValue);
-    if (paymentStatusValue) setSelectedPaymentStatus(paymentStatusValue);
+    const params = new URLSearchParams();
+    const newStatus = statusValue || 'all';
+    const newPaymentStatus = paymentStatusValue || 'all';
+
+    setSelectedStatus(newStatus);
+    setSelectedPaymentStatus(newPaymentStatus);
+
+    if (newStatus !== 'all') {
+      params.set('status', newStatus);
+    }
+    if (newPaymentStatus !== 'all') {
+      params.set('paymentStatus', newPaymentStatus);
+    }
+
     setCurrentPage(1);
+    const searchStr = params.toString();
+    navigate(searchStr ? `/admin/orders?${searchStr}` : '/admin/orders', { replace: true });
 
     // Scroll smoothly down to filters/table section
     const element = document.getElementById('orders-results-section');
@@ -337,7 +425,10 @@ export const AdminOrders = () => {
     if (s.includes('out for delivery')) {
       return 'bg-purple-50 text-purple-700 border-purple-200';
     }
-    if (s.includes('processing') || s.includes('confirmed') || s.includes('packed')) {
+    if (s.includes('confirmed')) {
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    }
+    if (s.includes('processing') || s.includes('packed')) {
       return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     }
     if (s.includes('pending') || s.includes('placed')) {
@@ -392,6 +483,15 @@ export const AdminOrders = () => {
       colorClass: 'bg-amber-50 text-amber-600 border-amber-200',
       badgeBg: 'bg-amber-100 text-amber-800',
       statusFilter: 'Pending'
+    },
+    {
+      key: 'confirmed',
+      label: 'Confirmed',
+      count: stats?.confirmed ?? 0,
+      icon: CheckCheck,
+      colorClass: 'bg-blue-50 text-blue-600 border-blue-200',
+      badgeBg: 'bg-blue-100 text-blue-800',
+      statusFilter: 'Confirmed'
     },
     {
       key: 'processing',
@@ -492,13 +592,25 @@ export const AdminOrders = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
             {STAT_CARDS_DEF.map((card) => {
               const IconComp = card.icon;
+              const isActive =
+                card.key === 'total'
+                  ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
+                  : card.key === 'pendingPayment'
+                  ? selectedPaymentStatus === 'Pending'
+                  : selectedStatus === card.statusFilter;
+
               return (
                 <div
                   key={card.key}
-                  className="bg-white border border-neutral-200/80 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3 group"
+                  onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
+                  className={`bg-white border rounded-xl p-4 shadow-sm transition-all flex flex-col justify-between space-y-3 group cursor-pointer select-none ${
+                    isActive
+                      ? 'ring-2 ring-brand-dark/90 border-brand-dark shadow-md bg-neutral-50/40'
+                      : 'border-neutral-200/80 hover:shadow-md hover:border-neutral-300'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className={`p-2 rounded-lg border ${card.colorClass}`}>
@@ -526,14 +638,16 @@ export const AdminOrders = () => {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
-                    className="text-[11px] font-medium text-neutral-400 group-hover:text-brand-dark flex items-center gap-1 transition-colors cursor-pointer pt-1 border-t border-neutral-100"
+                  <div
+                    className={`text-[11px] font-medium flex items-center gap-1 transition-colors pt-1 border-t ${
+                      isActive
+                        ? 'text-brand-dark font-semibold border-brand-dark/20'
+                        : 'text-neutral-400 group-hover:text-brand-dark border-neutral-100'
+                    }`}
                   >
-                    <span>Click to manage</span>
+                    <span>{isActive ? 'Filtered view' : 'Click to manage'}</span>
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
+                  </div>
                 </div>
               );
             })}
@@ -573,8 +687,17 @@ export const AdminOrders = () => {
             <select
               value={selectedStatus}
               onChange={(e) => {
-                setSelectedStatus(e.target.value);
+                const val = e.target.value;
+                setSelectedStatus(val);
                 setCurrentPage(1);
+                const params = new URLSearchParams(location.search);
+                if (val && val !== 'all') {
+                  params.set('status', val);
+                } else {
+                  params.delete('status');
+                }
+                const searchStr = params.toString();
+                navigate(searchStr ? `/admin/orders?${searchStr}` : '/admin/orders', { replace: true });
               }}
               className="w-full bg-neutral-50 border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-medium"
             >
@@ -594,8 +717,17 @@ export const AdminOrders = () => {
             <select
               value={selectedPaymentStatus}
               onChange={(e) => {
-                setSelectedPaymentStatus(e.target.value);
+                const val = e.target.value;
+                setSelectedPaymentStatus(val);
                 setCurrentPage(1);
+                const params = new URLSearchParams(location.search);
+                if (val && val !== 'all') {
+                  params.set('paymentStatus', val);
+                } else {
+                  params.delete('paymentStatus');
+                }
+                const searchStr = params.toString();
+                navigate(searchStr ? `/admin/orders?${searchStr}` : '/admin/orders', { replace: true });
               }}
               className="w-full bg-neutral-50 border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-medium"
             >

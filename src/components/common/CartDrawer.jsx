@@ -130,8 +130,8 @@ export const CartDrawer = () => {
 
             {/* Cart Items List */}
             <div
-              style={{ overscrollBehavior: 'contain' }}
-              className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 divide-y divide-neutral-100"
+              style={{ overscrollBehavior: 'contain', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 divide-y divide-neutral-100 no-scrollbar scrollbar-none"
             >
               {cart.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center text-neutral-400">

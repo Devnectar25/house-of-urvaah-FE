@@ -48,6 +48,7 @@ import { AdminDualCampaign } from './pages/admin/modify-ui/AdminDualCampaign';
 import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
 import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
+import { AdminErrorMonitoring } from './pages/admin/AdminErrorMonitoring';
 import { StockUnsubscribe } from './pages/StockUnsubscribe';
 import { getAdminStoredUser, getStoredUser } from './lib/apiClient';
 
@@ -62,6 +63,7 @@ function PermissionGuard({ moduleKey, children }) {
     moduleKey === 'modify-ui' ||
     moduleKey === 'faqs' ||
     moduleKey === 'stock-notifications' ||
+    moduleKey === 'error-monitoring' ||
     (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
 
   if (hasAccess) {
@@ -211,6 +213,7 @@ export function AppContent() {
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
         <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />
+        <Route path="error-monitoring" element={<PermissionGuard moduleKey="error-monitoring"><AdminErrorMonitoring /></PermissionGuard>} />
         <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
         <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
         <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />

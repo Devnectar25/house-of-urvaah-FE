@@ -32,6 +32,7 @@ import { getSupabaseMediaUrl } from '../lib/supabase';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
+import Swal from 'sweetalert2';
 
 export const Checkout = () => {
   const navigate = useNavigate();
@@ -144,7 +145,6 @@ export const Checkout = () => {
   const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(0);
   const [placedOrderDetails, setPlacedOrderDetails] = useState(null);
   const [orderCancelled, setOrderCancelled] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
 
   // Fetch saved addresses for user (Single source of truth)
@@ -848,73 +848,66 @@ export const Checkout = () => {
       window.print();
     };
 
-    const handleCancelOrder = () => {
-      setShowCancelConfirm(true);
-    };
+    const handleCancelOrder = async () => {
+      if (isCancellingOrder) return;
 
-    const handleConfirmCancelOrderSuccess = async () => {
-      setIsCancellingOrder(true);
-      setOrderCancelled(true);
-      setShowCancelConfirm(false);
-      if (details?.orderNumber) {
-        try {
-          await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
-        } catch (e) {
-          console.warn('Cancel order API fallback:', e.message);
+      const result = await Swal.fire({
+        title: 'Cancel Order?',
+        text: 'Are you sure you want to cancel this order? This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#171717',
+        confirmButtonText: 'Yes, Cancel Order',
+        cancelButtonText: 'Keep Order',
+        reverseButtons: true,
+        focusCancel: true,
+        background: '#ffffff',
+        color: '#171717',
+        customClass: {
+          popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
+          title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
+          htmlContainer: 'text-sm text-neutral-600',
+          confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer',
+          cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
         }
+      });
+
+      if (result.isConfirmed) {
+        setIsCancellingOrder(true);
+        setOrderCancelled(true);
+        if (details?.orderNumber) {
+          try {
+            await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
+          } catch (e) {
+            console.warn('Cancel order API fallback:', e.message);
+          }
+        }
+        setIsCancellingOrder(false);
+
+        await Swal.fire({
+          title: 'Order Cancelled',
+          text: 'Your order has been cancelled successfully.',
+          icon: 'success',
+          confirmButtonColor: '#171717',
+          confirmButtonText: 'OK',
+          background: '#ffffff',
+          color: '#171717',
+          customClass: {
+            popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
+            title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
+            htmlContainer: 'text-sm text-neutral-600',
+            confirmButton: 'rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+          }
+        });
       }
-      setIsCancellingOrder(false);
-      showToast('Order cancelled successfully.', 'success');
     };
 
     return (
       <div className="w-full bg-white text-brand-dark pt-24 sm:pt-28 pb-4 sm:pb-6 font-serif selection:bg-brand-dark selection:text-white">
         <SEOHead title="Order Confirmed | House of Urvaah" noindex={true} />
 
-        {/* Order Cancellation Confirmation Toaster */}
-        <AnimatePresence>
-          {showCancelConfirm && (
-            <motion.div
-              initial={{ opacity: 0, y: -24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -24, scale: 0.96 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-4 bg-neutral-950/95 backdrop-blur-md text-white border border-neutral-800 shadow-2xl rounded-none flex flex-col sm:flex-row items-center justify-between gap-4 font-sans"
-            >
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                <span className="text-xs sm:text-sm font-light tracking-wide text-neutral-200">
-                  Are you sure you want to cancel this order?
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={handleConfirmCancelOrderSuccess}
-                  disabled={isCancellingOrder}
-                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium tracking-wider uppercase transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {isCancellingOrder ? 'Cancelling...' : 'Yes, Cancel'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCancelConfirm(false)}
-                  className="px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer"
-                >
-                  Keep Order
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCancelConfirm(false)}
-                  className="text-neutral-400 hover:text-white p-1 ml-1 cursor-pointer"
-                  aria-label="Dismiss"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
 
         {/* Floating Toast Notification */}
         <AnimatePresence>
@@ -1860,7 +1853,10 @@ export const Checkout = () => {
               </div>
 
               {/* CART ITEMS LIST */}
-              <div className="divide-y divide-neutral-200/80 max-h-[360px] overflow-y-auto pr-1">
+              <div
+                className="divide-y divide-neutral-200/80 max-h-[360px] overflow-y-auto no-scrollbar scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {cart.map((item, idx) => (
                   <div key={`${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-0 last:pb-0 flex gap-3.5 items-center">
                     <div className="relative flex-shrink-0">
