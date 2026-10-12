@@ -24,7 +24,8 @@ import {
   Maximize2,
   RotateCcw,
   Mail,
-  Copy
+  Copy,
+  Bell
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
@@ -34,6 +35,7 @@ import { SEOHead } from '../components/common/SEOHead';
 import { ProductReviews } from '../components/common/ProductReviews';
 import { RelatedProducts } from '../components/product/RelatedProducts';
 import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWidget';
+import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
@@ -100,6 +102,7 @@ export const ProductDetail = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [pincode, setPincode] = useState('');
   const [pincodeResult, setPincodeResult] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
@@ -342,12 +345,13 @@ export const ProductDetail = () => {
     };
   }, [isLightboxOpen, currentLightboxIndex, gallery, lightboxZoom]);
 
-  // Lock background scrolling and enable ESC key close for Size Chart, Coupons, and Share modals
-  const isAnyDetailModalOpen = isSizeChartOpen || isCouponsModalOpen || isShareModalOpen;
+  // Lock background scrolling and enable ESC key close for Size Chart, Coupons, Share, and Stock Notification modals
+  const isAnyDetailModalOpen = isSizeChartOpen || isCouponsModalOpen || isShareModalOpen || isStockModalOpen;
   useModalScrollLock(isAnyDetailModalOpen, () => {
     setIsSizeChartOpen(false);
     setIsCouponsModalOpen(false);
     setIsShareModalOpen(false);
+    setIsStockModalOpen(false);
   });
 
   useEffect(() => {
@@ -919,47 +923,77 @@ export const ProductDetail = () => {
               </div>
             </div>
 
-            {/* 7. ACTION BUTTON ROW: ADD TO CART + WISHLIST + SHARE */}
-            <div className="flex items-center gap-2.5 pt-1">
-              <button
-                onClick={handleAddToCart}
-                disabled={product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)}
-                className={`flex-1 h-11 sm:h-12.5 px-5 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer ${
-                  product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
-                    ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                    : 'bg-black text-white hover:bg-neutral-800'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0)
-                  ? 'OUT OF STOCK'
-                  : (isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG')}
-              </button>
+            {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
+            {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0) ? (
+              <div className="flex items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
+                >
+                  <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                  <span>NOTIFY ME WHEN AVAILABLE</span>
+                </button>
 
-              {/* Wishlist Heart Icon Button */}
-              <button
-                onClick={() => toggleWishlist(product.id)}
-                className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                  isWishlisted
-                    ? 'border-red-600 bg-red-50 text-red-600'
-                    : 'border-neutral-300 text-brand-dark hover:border-black'
-                }`}
-                aria-label="Wishlist toggle"
-                title="Save to Wishlist"
-              >
-                <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
-              </button>
+                {/* Wishlist Heart Icon Button */}
+                <button
+                  onClick={() => toggleWishlist(product.id)}
+                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    isWishlisted
+                      ? 'border-red-600 bg-red-50 text-red-600'
+                      : 'border-neutral-300 text-brand-dark hover:border-black'
+                  }`}
+                  aria-label="Wishlist toggle"
+                  title="Save to Wishlist"
+                >
+                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                </button>
 
-              {/* Share Icon Button */}
-              <button
-                onClick={handleOpenShare}
-                className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
-                aria-label="Share product"
-                title="Share product with friends"
-              >
-                <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-              </button>
-            </div>
+                {/* Share Icon Button */}
+                <button
+                  onClick={handleOpenShare}
+                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                  aria-label="Share product"
+                  title="Share product with friends"
+                >
+                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 pt-1">
+                <button
+                  onClick={handleAddToCart}
+                  className="flex-1 h-11 sm:h-12.5 px-5 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer bg-black text-white hover:bg-neutral-800"
+                >
+                  <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                  {isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG'}
+                </button>
+
+                {/* Wishlist Heart Icon Button */}
+                <button
+                  onClick={() => toggleWishlist(product.id)}
+                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    isWishlisted
+                      ? 'border-red-600 bg-red-50 text-red-600'
+                      : 'border-neutral-300 text-brand-dark hover:border-black'
+                  }`}
+                  aria-label="Wishlist toggle"
+                  title="Save to Wishlist"
+                >
+                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                </button>
+
+                {/* Share Icon Button */}
+                <button
+                  onClick={handleOpenShare}
+                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                  aria-label="Share product"
+                  title="Share product with friends"
+                >
+                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                </button>
+              </div>
+            )}
 
             {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD */}
             <DeliveryReminderWidget
@@ -1566,6 +1600,16 @@ export const ProductDetail = () => {
           </div>
         </div>
       )}
+
+      {/* Stock Notification / Notify Me Modal */}
+      <StockNotificationModal
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        product={product}
+        selectedSize={selectedSize}
+        selectedColor="Default"
+        user={user}
+      />
     </div>
   );
 };

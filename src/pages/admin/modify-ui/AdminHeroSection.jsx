@@ -344,7 +344,7 @@ export const AdminHeroSection = () => {
         badge={
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase bg-white/90 border border-[#E5E0D5] text-neutral-800 shadow-2xs">
-              Modify UI
+              Edit Home page
             </span>
             <span className="text-xs text-neutral-400">•</span>
             <span className="text-xs font-semibold text-neutral-600">Storefront Section</span>

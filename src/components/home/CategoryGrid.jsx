@@ -11,23 +11,39 @@ export const CategoryGrid = () => {
   const navigate = useNavigate();
   const [productsList, setProductsList] = useState([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const { addToCart, toggleWishlist, isInWishlist, setQuickViewProduct } = useCart();
+  const { addToCart, toggleWishlist, isInWishlist } = useCart();
+
+  const lastUserInteractionRef = useRef(0);
+  const targetScrollLeftRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadRecommendedProducts = async () => {
       try {
-        const res = await productApi.getRecommendations({ limit: 5 });
+        const res = await productApi.getRecommendations({ limit: 10 });
         const data = Array.isArray(res) ? res : (res?.data || []);
         if (isMounted) {
           const dbProductsMapped = data.map((p) => ({
             ...p,
             formattedPrice: p.formattedPrice || `₹ ${Number(p.price).toLocaleString('en-IN')}`,
           }));
-          setProductsList(dbProductsMapped);
+          setProductsList((prev) => {
+            if (
+              prev.length === dbProductsMapped.length &&
+              prev.every(
+                (p, i) =>
+                  p.id === dbProductsMapped[i]?.id &&
+                  p.price === dbProductsMapped[i]?.price &&
+                  p.name === dbProductsMapped[i]?.name
+              )
+            ) {
+              return prev;
+            }
+            return dbProductsMapped;
+          });
         }
       } catch (err) {
         console.warn('[Recommended Section]: Failed to load recommended products', err);
@@ -44,8 +60,8 @@ export const CategoryGrid = () => {
     window.addEventListener('urvaah_products_updated', handleProductUpdate);
     window.addEventListener('storage', handleProductUpdate);
 
-    // Auto-polling every 3s for live real-time sync with Admin panel
-    const pollingInterval = setInterval(loadRecommendedProducts, 3000);
+    // Sync periodically with Admin panel updates
+    const pollingInterval = setInterval(loadRecommendedProducts, 10000);
 
     return () => {
       isMounted = false;
@@ -58,50 +74,120 @@ export const CategoryGrid = () => {
   const checkScrollPosition = () => {
     if (!scrollRef.current) return;
     const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-    setCanScrollLeft(scrollLeft > 10);
-    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 5) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    setCanScrollLeft(scrollLeft > 8);
+    setCanScrollRight(scrollLeft < maxScroll - 8);
   };
 
+  // Re-check scroll position on mount, resize, and when products load
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     checkScrollPosition();
-    el.addEventListener('scroll', checkScrollPosition, { passive: true });
+    const handleScrollEvent = () => {
+      checkScrollPosition();
+      if (Date.now() - lastUserInteractionRef.current > 500) {
+        targetScrollLeftRef.current = null;
+      }
+    };
+
+    el.addEventListener('scroll', handleScrollEvent, { passive: true });
     window.addEventListener('resize', checkScrollPosition, { passive: true });
 
     return () => {
-      el.removeEventListener('scroll', checkScrollPosition);
+      el.removeEventListener('scroll', handleScrollEvent);
       window.removeEventListener('resize', checkScrollPosition);
     };
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      checkScrollPosition();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [productsList]);
+
+  const getCardStep = () => {
+    if (!scrollRef.current) return 320;
+    const cards = scrollRef.current.children;
+    if (!cards || cards.length === 0) return 320;
+    const firstCard = cards[0];
+    const secondCard = cards[1];
+    if (firstCard && secondCard) {
+      const firstRect = firstCard.getBoundingClientRect();
+      const secondRect = secondCard.getBoundingClientRect();
+      const step = Math.round(secondRect.left - firstRect.left);
+      if (step > 50) return step;
+    }
+    return Math.round(firstCard.getBoundingClientRect().width) + 16;
+  };
+
+  const handleScroll = (direction) => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    lastUserInteractionRef.current = Date.now();
+
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    if (maxScroll <= 5) return;
+
+    const step = getCardStep();
+    const currentScroll = el.scrollLeft;
+
+    // Accumulate successive rapid clicks smoothly without dropping
+    let baseScroll = targetScrollLeftRef.current !== null ? targetScrollLeftRef.current : currentScroll;
+
+    if (Math.abs(baseScroll - currentScroll) > step * 2) {
+      baseScroll = currentScroll;
+    }
+
+    let nextScroll;
+    if (direction === 'right') {
+      nextScroll = Math.min(maxScroll, baseScroll + step);
+    } else {
+      nextScroll = Math.max(0, baseScroll - step);
+    }
+
+    targetScrollLeftRef.current = nextScroll;
+    el.scrollTo({ left: nextScroll, behavior: 'smooth' });
+
+    setTimeout(checkScrollPosition, 80);
+    setTimeout(checkScrollPosition, 350);
+  };
+
+  // Auto-scroll effect: calm 4.5s interval, pauses 6s on user interaction or hover
+  useEffect(() => {
     let intervalId;
-    if (!isHovered && scrollRef.current) {
+    if (!isHovered) {
       intervalId = setInterval(() => {
         if (!scrollRef.current) return;
-        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-        if (scrollLeft + clientWidth >= scrollWidth - 10) {
-          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        if (Date.now() - lastUserInteractionRef.current < 6000) return;
+
+        const el = scrollRef.current;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        const maxScroll = scrollWidth - clientWidth;
+        if (maxScroll <= 10) return;
+
+        if (scrollLeft >= maxScroll - 15) {
+          targetScrollLeftRef.current = 0;
+          el.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          const firstCard = scrollRef.current.children[0];
-          const cardWidth = firstCard ? firstCard.clientWidth : 300;
-          scrollRef.current.scrollBy({ left: cardWidth + 16, behavior: 'smooth' });
+          const step = getCardStep();
+          const nextScroll = Math.min(maxScroll, scrollLeft + step);
+          targetScrollLeftRef.current = nextScroll;
+          el.scrollTo({ left: nextScroll, behavior: 'smooth' });
         }
-      }, 2400);
+      }, 4500);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isHovered]);
-
-  const handleScroll = (direction) => {
-    if (!scrollRef.current) return;
-    const clientWidth = scrollRef.current.clientWidth;
-    const scrollAmount = direction === 'left' ? -clientWidth : clientWidth;
-    scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-  };
 
   return (
     <section id="recommended-for-you" className="pt-[100px] pb-12 md:pb-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white">
@@ -118,24 +204,36 @@ export const CategoryGrid = () => {
         className="relative group"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onTouchStart={() => setIsHovered(true)}
-        onTouchEnd={() => setIsHovered(false)}
+        onTouchStart={() => {
+          setIsHovered(true);
+          lastUserInteractionRef.current = Date.now();
+        }}
+        onTouchEnd={() => {
+          setIsHovered(false);
+          lastUserInteractionRef.current = Date.now();
+        }}
       >
         {/* Left Floating Arrow Button */}
-        {canScrollLeft && (
-          <button
-            onClick={() => handleScroll('left')}
-            className="absolute left-1 sm:left-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/90 shadow-lg text-brand-dark hover:bg-white hover:scale-105 transition-all border border-neutral-200/80 items-center justify-center"
-            aria-label="Scroll left for previous products"
-          >
-            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleScroll('left');
+          }}
+          className={`absolute left-1 sm:left-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollLeft
+              ? 'opacity-100 hover:bg-white hover:scale-105 cursor-pointer pointer-events-auto'
+              : 'opacity-0 pointer-events-none'
+            }`}
+          aria-label="Scroll left for previous products"
+        >
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
+        </button>
 
         {/* Single Horizontal Track (1 Row, 4 Visible at once on Desktop) */}
         <div
           ref={scrollRef}
-          className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-2 -mx-4 px-4 sm:mx-0 sm:px-0"
+          className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-2 -mx-4 px-4 sm:mx-0 sm:px-0"
         >
           {productsList.map((product, idx) => (
             <motion.div
@@ -144,7 +242,7 @@ export const CategoryGrid = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: idx * 0.08 }}
-              className="group/card relative flex flex-col min-w-[70vw] sm:min-w-[45vw] md:min-w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] w-[calc(25%-0.75rem)] flex-shrink-0 snap-center"
+              className="group/card relative flex flex-col min-w-[70vw] sm:min-w-[45vw] md:min-w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] w-[calc(25%-0.75rem)] flex-shrink-0 snap-start"
             >
               {/* Product Photo Container */}
               <div
@@ -225,15 +323,21 @@ export const CategoryGrid = () => {
         </div>
 
         {/* Right Floating Arrow Button */}
-        {canScrollRight && (
-          <button
-            onClick={() => handleScroll('right')}
-            className="absolute right-1 sm:right-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/90 shadow-lg text-brand-dark hover:bg-white hover:scale-105 transition-all border border-neutral-200/80 items-center justify-center"
-            aria-label="Scroll right for next products"
-          >
-            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleScroll('right');
+          }}
+          className={`absolute right-1 sm:right-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollRight
+              ? 'opacity-100 hover:bg-white hover:scale-105 cursor-pointer pointer-events-auto'
+              : 'opacity-0 pointer-events-none'
+            }`}
+          aria-label="Scroll right for next products"
+        >
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
+        </button>
       </div>
     </section>
   );

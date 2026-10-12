@@ -1,69 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Search, Heart, ShoppingBag, ChevronDown, ArrowRight } from 'lucide-react';
+import { X, User, Search, Heart, ShoppingBag, ArrowRight, ChevronDown } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { productApi } from '../../services/productApi';
+import { Logo } from '../common/Logo';
 
 const TABS = ['WOMAN'];
 
-const FEATURED_PREVIEWS = [
-  { label: 'CORSET TOPS', href: '#corset-tops' },
-  { label: 'CO-ORD SETS', href: '#co-ord-sets' },
-  { label: 'KURTI', href: '#kurti' },
-  { label: 'PARTY WEAR', href: '#party-wear' }
-];
-
-const MENU_SECTIONS = [
+const WEBSITE_SECTIONS = [
   {
-    num: '01',
-    title: 'NEW IN & WEEKLY DROPS',
+    id: 'discover',
+    title: 'DISCOVER THE ATELIER',
     items: [
-      { label: 'Weekly Drop #34 / W26', href: '#recommended' },
-      { label: 'Studio Capsule Edit', href: '#whats-hot' },
-      { label: 'Monochrome Outerwear', href: '#editorial' },
-      { label: 'Silk & Satin Collection', href: '#recommended' }
+      { label: 'BEST SELLERS', target: 'best-sellers' },
+      { label: 'TRENDING ON THE GRAM', target: 'trending' },
+      { label: 'WHAT’S HOT RN', target: 'whats-hot' },
+      { label: 'RECOMMENDED FOR YOU', target: 'recommended' },
+      { label: 'EDITORIAL & LOOKBOOK', target: 'editorial' }
     ]
   },
   {
-    num: '02',
-    title: 'BEST SELLERS',
+    id: 'concierge',
+    title: 'CLIENT CONCIERGE & CARE',
     items: [
-      { label: 'Chestnut Bloom Set', href: '#best-sellers' },
-      { label: 'Teal Embroidered Floral Co-Ord Set', href: '#best-sellers' },
-      { label: 'Gilded Mist Corset', href: '#best-sellers' },
-      { label: 'Rosewood Bloom Set', href: '#best-sellers' }
-    ]
-  },
-  {
-    num: '03',
-    title: 'COLLECTION & CATEGORIES',
-    items: [
-      { label: 'Dresses & Jumpsuits', href: '#whats-hot' },
-      { label: 'Outerwear & Coats', href: '#editorial' },
-      { label: 'Co-ord Sets & Tailoring', href: '#steal-deals' },
-      { label: 'Tops & Shirts', href: '#recommended' },
-      { label: 'Knitwear & Sweaters', href: '#trending' },
-      { label: 'Trousers & Skirts', href: '#best-sellers' }
-    ]
-  },
-  {
-    num: '04',
-    title: 'EDITORIAL & STORIES',
-    items: [
-      { label: 'Autumn / Winter 2026 Runway', href: '#editorial' },
-      { label: 'Trending on the Gram', href: '#trending' },
-      { label: 'Steal Deals Edit', href: '#steal-deals' },
-      { label: 'House of Urvaah Journal', isRoute: true, to: '/about' }
-    ]
-  },
-  {
-    num: '05',
-    title: 'HELP & CONCIERGE',
-    items: [
-      { label: 'About Us / Our Story', isRoute: true, to: '/about' },
-      { label: 'Contact Us / Customer Concierge', isRoute: true, to: '/contact' },
-      { label: 'Boutique Locator & Stores', href: '#footer' }
+      { label: 'ABOUT US / ATELIER STORY', isRoute: true, to: '/about' },
+      { label: 'CONTACT US / CONCIERGE', isRoute: true, to: '/contact' },
+      { label: 'FREQUENTLY ASKED QUESTIONS', isRoute: true, to: '/faqs' },
+      { label: 'MY WISHLIST', isRoute: true, to: '/wishlist' },
+      { label: 'ACCOUNT & ORDERS', isRoute: true, to: '/account' }
     ]
   }
 ];
@@ -79,49 +44,124 @@ export const MobileMenu = () => {
     wishlistCount,
     setIsCartOpen,
     setIsSearchOpen,
-    openAuthModal
+    openAuthModal,
+    setPdpProduct
   } = useCart();
 
   const [activeTab, setActiveTab] = useState('WOMAN');
-  const [expandedSection, setExpandedSection] = useState('01');
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedSection, setExpandedSection] = useState(null);
 
-  const toggleSection = (num) => {
-    setExpandedSection(expandedSection === num ? null : num);
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchMenuData = async () => {
+      try {
+        const [catsRes, prodsRes] = await Promise.all([
+          productApi.getCategories().catch(() => []),
+          productApi.getProducts({ active: true }).catch(() => [])
+        ]);
+
+        if (!isMounted) return;
+
+        const rawCats = Array.isArray(catsRes) ? catsRes : (catsRes?.data || []);
+        const activeCats = rawCats.filter(
+          (c) => c && c.is_active !== false && c.active !== false
+        );
+
+        const rawProds = Array.isArray(prodsRes) ? prodsRes : (prodsRes?.data || []);
+        setCategories(activeCats);
+        setProducts(rawProds);
+      } catch (err) {
+        console.warn('[MobileMenu] Error loading categories/products:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchMenuData();
+
+    const handleUpdate = () => fetchMenuData();
+    window.addEventListener('urvaah_products_updated', handleUpdate);
+    window.addEventListener('urvaah_categories_updated', handleUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('urvaah_products_updated', handleUpdate);
+      window.removeEventListener('urvaah_categories_updated', handleUpdate);
+    };
+  }, []);
+
+  const toggleSection = (key) => {
+    setExpandedSection((prev) => (prev === key ? null : key));
   };
 
-  const handleItemClick = (e, item) => {
+  const getCategoryProducts = (cat) => {
+    if (!cat || !products.length) return [];
+    const catNameLower = (cat.name || '').toLowerCase().trim();
+    const catId = String(cat.id || cat.category_id || '');
+
+    return products.filter((p) => {
+      const pCatId = String(p.category_id || '');
+      const pCatName = (p.category || '').toLowerCase().trim();
+      if (catId && pCatId && pCatId === catId) return true;
+      if (catNameLower && pCatName && pCatName === catNameLower) return true;
+      if (catNameLower.includes('corset') && (p.name || '').toLowerCase().includes('corset')) return true;
+      return false;
+    });
+  };
+
+  const handleProductClick = (product) => {
+    setIsMobileMenuOpen(false);
+    if (product) {
+      setPdpProduct(product);
+    }
+  };
+
+  const scrollToTarget = (targetId) => {
+    let element = document.getElementById(targetId);
+
+    // Fallback for hidden or aliased sections (e.g. steal-deals -> whats-hot / recommended)
+    if (!element) {
+      if (targetId === 'steal-deals') {
+        element = document.getElementById('whats-hot') || document.getElementById('recommended');
+      } else if (
+        targetId === 'corset-tops' ||
+        targetId === 'co-ord-sets' ||
+        targetId === 'kurti' ||
+        targetId === 'kurtis' ||
+        targetId === 'summer-dresses' ||
+        targetId === 'party-wear'
+      ) {
+        element = document.getElementById(targetId) || document.getElementById('whats-hot') || document.getElementById('recommended');
+      }
+    }
+
+    if (element) {
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+  };
+
+  const handleItemClick = (item) => {
     setIsMobileMenuOpen(false);
     if (item.isRoute) return;
 
-    if (item.href) {
-      e.preventDefault();
-      const href = item.href;
+    const targetId = (item.target || item.href || '').replace('#', '');
+    if (!targetId) return;
 
-      if (window.location.pathname !== '/' && window.location.pathname !== '') {
-        window.location.href = `/${href}`;
-        return;
-      }
-
-      const targetId = href.replace('#', '');
-      let element = document.getElementById(targetId);
-
-      // Fallback for hidden or aliased sections (e.g. steal-deals -> whats-hot / recommended)
-      if (!element) {
-        if (targetId === 'steal-deals') {
-          element = document.getElementById('whats-hot') || document.getElementById('recommended');
-        } else if (targetId === 'corset-tops' || targetId === 'co-ord-sets' || targetId === 'kurti' || targetId === 'kurtis' || targetId === 'summer-dresses' || targetId === 'party-wear') {
-          element = document.getElementById('whats-hot') || document.getElementById('recommended');
-        }
-      }
-
-      if (element) {
-        setTimeout(() => {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }, 150);
-      } else {
-        window.location.hash = href;
-      }
+    if (window.location.pathname !== '/' && window.location.pathname !== '') {
+      navigate('/');
+      setTimeout(() => {
+        scrollToTarget(targetId);
+      }, 200);
+      return;
     }
+
+    scrollToTarget(targetId);
   };
 
   return (
@@ -226,7 +266,7 @@ export const MobileMenu = () => {
               </div>
             </div>
 
-            {/* 2. CATEGORY TABS ROW: Horizontal Tabs (WOMAN, MAN, KIDS, PERFUMES & BEAUTY) */}
+            {/* 2. CATEGORY TABS ROW: Horizontal Tabs (WOMAN) */}
             <div className="border-b border-neutral-200 bg-white overflow-x-auto no-scrollbar">
               <div className="flex items-center px-4 gap-6 min-w-max text-xs font-serif tracking-[0.2em] uppercase">
                 {TABS.map((tab) => {
@@ -254,49 +294,129 @@ export const MobileMenu = () => {
                 })}
               </div>
             </div>
-
             {/* SCROLLABLE MENU BODY */}
             <div
               style={{ overscrollBehavior: 'contain' }}
-              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar p-5 space-y-6"
+              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar p-5 space-y-4"
             >
-              {/* 3. FEATURED CATEGORIES: Text-Only 2-Column Grid */}
-              <div>
-                <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block mb-3">
-                  FEATURED CATEGORIES
-                </span>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {FEATURED_PREVIEWS.map((cat, idx) => (
-                    <a
-                      key={idx}
-                      href={cat.href}
-                      onClick={(e) => handleItemClick(e, cat)}
-                      className="group flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/70 transition-all cursor-pointer"
-                    >
-                      <span className="text-xs sm:text-sm font-semibold tracking-[0.16em] text-neutral-900 group-hover:text-black uppercase">
-                        {cat.label}
-                      </span>
-                      <ArrowRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                    </a>
-                  ))}
+              {/* ACCORDION: DATABASE CATEGORIES & WEBSITE SECTIONS */}
+              <div className="divide-y divide-neutral-100">
+                <div className="pb-2">
+                  <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block">
+                    ATELIER COLLECTIONS
+                  </span>
                 </div>
-              </div>
 
-              {/* 4. EXPANDABLE NUMBERED MENU LIST (01 | NEW IN, 02 | BEST SELLERS, ETC.) */}
-              <div className="pt-2 border-t border-neutral-100 divide-y divide-neutral-100">
-                {MENU_SECTIONS.map((sec) => {
-                  const isExpanded = expandedSection === sec.num;
+                {/* DYNAMIC CATEGORIES ACCORDION FROM DATABASE */}
+                {categories.map((cat, idx) => {
+                  const sectionKey = `cat-${cat.id || idx}`;
+                  const isExpanded = expandedSection === sectionKey;
+                  const catProducts = getCategoryProducts(cat);
+
                   return (
-                    <div key={sec.num} className="py-1">
-                      {/* Section Header */}
+                    <div key={sectionKey} className="py-1">
+                      {/* Category Header */}
                       <button
-                        onClick={() => toggleSection(sec.num)}
+                        type="button"
+                        onClick={() => toggleSection(sectionKey)}
                         className="w-full py-3.5 flex items-center justify-between text-left group cursor-pointer"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-mono font-bold text-neutral-400 group-hover:text-black transition-colors">
-                            {sec.num}
+                        <div className="flex items-center min-w-0 pr-2">
+                          <span className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-neutral-900 group-hover:text-black transition-colors truncate">
+                            {cat.name}
                           </span>
+                        </div>
+                        <ChevronDown
+                          className={`w-4 h-4 text-neutral-500 transition-transform duration-300 flex-shrink-0 ${
+                            isExpanded ? 'rotate-180 text-black' : ''
+                          }`}
+                        />
+                      </button>
+
+                      {/* Expandable Accordion Products */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeInOut' }}
+                            className="overflow-hidden pl-3 pr-1 pb-3 space-y-2"
+                          >
+                            {catProducts.length > 0 ? (
+                              catProducts.map((p) => {
+                                const priceStr = p.formattedPrice || (p.price ? `₹ ${Number(p.price).toLocaleString('en-IN')}` : '');
+                                const img = p.image_url || (Array.isArray(p.images) ? p.images[0] : null);
+
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => handleProductClick(p)}
+                                    className="group/prod flex items-center justify-between w-full py-1.5 px-2 rounded-xs hover:bg-neutral-50 text-left transition-colors cursor-pointer"
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                      {img && (
+                                        <img
+                                          src={img}
+                                          alt={p.name}
+                                          className="w-7 h-9 object-cover rounded-xs border border-neutral-200/60 flex-shrink-0"
+                                        />
+                                      )}
+                                      <div className="min-w-0">
+                                        <p className="text-xs text-neutral-800 group-hover/prod:text-black font-medium tracking-wide uppercase truncate">
+                                          {p.name}
+                                        </p>
+                                        {priceStr && (
+                                          <p className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                                            {priceStr}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/prod:opacity-100 group-hover/prod:translate-x-0 transition-all text-black flex-shrink-0" />
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <p className="text-[11px] text-neutral-400 font-serif italic py-1">
+                                {cat.description || 'Curated Atelier collection.'}
+                              </p>
+                            )}
+
+                            {/* View All in this Category */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                const catSlug = (cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+                                navigate(`/category/${catSlug}`);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              }}
+                              className="w-full pt-2.5 mt-1 border-t border-neutral-100 flex items-center justify-between text-[11px] font-mono tracking-widest text-neutral-500 hover:text-black uppercase cursor-pointer"
+                            >
+                              <span>Explore All {cat.name}</span>
+                              <ArrowRight className="w-3 h-3 text-neutral-400 group-hover:text-black" />
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+
+                {/* WEBSITE SECTIONS ACCORDION (DISCOVER & CONCIERGE) */}
+                {WEBSITE_SECTIONS.map((sec) => {
+                  const isExpanded = expandedSection === sec.id;
+                  return (
+                    <div key={sec.id} className="py-1">
+                      {/* Section Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sec.id)}
+                        className="w-full py-3.5 flex items-center justify-between text-left group cursor-pointer"
+                      >
+                        <div className="flex items-center">
                           <span className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-neutral-900 group-hover:text-black transition-colors">
                             {sec.title}
                           </span>
@@ -316,11 +436,11 @@ export const MobileMenu = () => {
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.25, ease: 'easeInOut' }}
-                            className="overflow-hidden pl-7 pr-2 pb-3 space-y-2.5"
+                            className="overflow-hidden pl-3 pr-2 pb-3 space-y-2.5"
                           >
                             {sec.items.map((sub, sIdx) => {
                               const linkContent = (
-                                <span className="text-xs text-neutral-600 hover:text-black tracking-wider uppercase font-medium transition-colors flex items-center justify-between group/sub py-1 cursor-pointer">
+                                <span className="text-xs text-neutral-600 hover:text-black tracking-wider uppercase font-medium transition-colors flex items-center justify-between group/sub py-1 cursor-pointer w-full text-left">
                                   {sub.label}
                                   <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover/sub:opacity-100 group-hover/sub:translate-x-0 transition-all text-black" />
                                 </span>
@@ -334,17 +454,19 @@ export const MobileMenu = () => {
                                     setIsMobileMenuOpen(false);
                                     window.scrollTo({ top: 0, behavior: 'instant' });
                                   }}
+                                  className="block w-full"
                                 >
                                   {linkContent}
                                 </Link>
                               ) : (
-                                <a
+                                <button
                                   key={sIdx}
-                                  href={sub.href}
-                                  onClick={(e) => handleItemClick(e, sub)}
+                                  type="button"
+                                  onClick={() => handleItemClick(sub)}
+                                  className="block w-full text-left"
                                 >
                                   {linkContent}
-                                </a>
+                                </button>
                               );
                             })}
                           </motion.div>
@@ -357,8 +479,18 @@ export const MobileMenu = () => {
             </div>
 
             {/* BOTTOM FOOTER INFO */}
-            <div className="p-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] text-[10px] text-neutral-500 tracking-widest flex items-center justify-between font-mono">
-              <span className="text-brand-dark font-semibold">HOUSE OF URVAAH</span>
+            <div className="py-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] text-[11px] text-neutral-500 tracking-widest flex items-center justify-between font-mono">
+              <Link
+                to="/"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }}
+                className="flex items-center hover:opacity-80 transition-opacity"
+                aria-label="House of Urvaah Home"
+              >
+                <Logo className="h-14 sm:h-16" />
+              </Link>
               <span>INDIA (INR ₹)</span>
             </div>
           </motion.div>
@@ -369,3 +501,4 @@ export const MobileMenu = () => {
 };
 
 export default MobileMenu;
+
