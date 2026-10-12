@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { forceUnlockScroll } from '../../hooks/useModalScrollLock';
 
 /**
  * ScrollToTop
@@ -23,6 +24,9 @@ export const ScrollToTop = () => {
     }
 
     prevPathname.current = pathname;
+
+    // Reset any lingering scroll locks when navigating between views
+    forceUnlockScroll();
 
     // Do not scroll to top if target is the FAQs anchor or route
     if (pathname === '/faqs' || pathname === '/faq' || hash === '#faqs') {

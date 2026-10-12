@@ -5,7 +5,7 @@ import {
   RefreshCw,
   AlertCircle,
   FolderTree,
-  Edit3,
+  Pencil,
   Trash2,
   Loader2,
   CheckCircle2,
@@ -383,7 +383,7 @@ export const AdminCategories = () => {
                 <th className="py-3 px-4 w-1/4">Name</th>
                 <th className="py-3 px-4 max-w-sm w-1/3">Description</th>
                 <th className="py-3 px-4 text-center w-28">Active</th>
-                <th className="py-3 px-4 text-center w-32">Actions</th>
+                <th className="py-3 px-4 text-center w-36">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200/60 text-xs text-brand-dark">
@@ -517,16 +517,18 @@ export const AdminCategories = () => {
                         </button>
                       </td>
 
-                      {/* Actions (Edit pencil & Delete trash) */}
+                      {/* Actions (Edit button & Delete trash) */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-6">
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(cat)}
-                            className="p-1.5 text-neutral-500 hover:text-brand-dark hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold tracking-tight transition-all cursor-pointer shadow-2xs hover:border-neutral-300 no-underline hover:no-underline"
+                            style={{ textDecoration: 'none' }}
                             title="Edit Category"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Pencil className="w-3.5 h-3.5 stroke-[2]" />
+                            <span className="no-underline" style={{ textDecoration: 'none' }}>Edit</span>
                           </button>
                           <button
                             type="button"
@@ -534,7 +536,7 @@ export const AdminCategories = () => {
                             className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete Category"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 stroke-[1.8]" />
                           </button>
                         </div>
                       </td>

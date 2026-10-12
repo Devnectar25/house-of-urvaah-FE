@@ -49,10 +49,10 @@ import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
 import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
 import { StockUnsubscribe } from './pages/StockUnsubscribe';
-import { getStoredUser } from './lib/apiClient';
+import { getAdminStoredUser, getStoredUser } from './lib/apiClient';
 
 function PermissionGuard({ moduleKey, children }) {
-  const user = getStoredUser();
+  const user = getAdminStoredUser() || getStoredUser();
   const isSuperAdmin = !user?.role || user?.role === 'super_admin' || user?.username === 'Admin';
   const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
 
@@ -103,13 +103,13 @@ const PlaceholderPage = ({ title }) => (
 
 export function StorefrontLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-white text-brand-dark antialiased font-serif selection:bg-brand-dark selection:text-white relative w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-white text-brand-dark antialiased font-serif selection:bg-brand-dark selection:text-white relative w-full max-w-full">
       <ScrollToTop />
       {/* 4.2 Header / Nav */}
       <Header />
 
       {/* Dynamic Route View */}
-      <div className="flex-1 w-full max-w-full overflow-x-hidden">
+      <div className="flex-1 w-full max-w-full">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />

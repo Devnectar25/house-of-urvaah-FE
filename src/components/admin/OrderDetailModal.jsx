@@ -388,13 +388,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                   <div className="space-y-1.5 text-xs text-brand-dark">
                     <p className="font-semibold text-brand-dark">
-                      {order.fullname || order.customer_name || order.user_id || 'Customer'}
+                      {order.recipient_name || order.fullname || order.customer_name || order.user_id || 'Customer'}
                     </p>
                     {order.customer_email && (
                       <p className="text-neutral-500 text-[11px]">{order.customer_email}</p>
                     )}
-                    {order.customer_phone && (
-                      <p className="text-neutral-500 text-[11px]">Ph: {order.customer_phone}</p>
+                    {(order.recipient_phone || order.phone || order.customer_phone) && (
+                      <p className="text-neutral-500 text-[11px]">Ph: {order.recipient_phone || order.phone || order.customer_phone}</p>
                     )}
                     <div className="pt-1.5 text-neutral-600 leading-relaxed border-t border-neutral-200/50">
                       <p className="font-medium text-brand-dark text-[11px]">

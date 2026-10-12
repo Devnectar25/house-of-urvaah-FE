@@ -40,14 +40,18 @@ export const Footer = () => {
       <div className="max-w-[1320px] mx-auto">
         {/* 4-Column Grid Layout: Logo Block (Left) + 3 Link Columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-8 xl:gap-10 mb-5 sm:mb-6">
-          {/* Column 1: LOGO & BRAND TAGLINE */}
+          {/* Column 1: LOGO & ATELIER ADDRESS */}
           <div className="lg:col-span-4 flex flex-col items-start pr-0 lg:pr-6 pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200" data-allow-guest="true">
             <Link to="/" data-allow-guest="true">
               <Logo className="h-12 sm:h-18 md:h-20 lg:h-24" />
             </Link>
-            <p className="text-[10px] sm:text-[11px] md:text-xs tracking-[0.25em] text-neutral-400 uppercase mt-3 sm:mt-5 font-serif leading-relaxed">
-              PARIS — NEW YORK — MUMBAI — TOKYO
-            </p>
+            <div className="mt-3.5 sm:mt-5 text-neutral-500 text-xs font-sans leading-relaxed tracking-wide text-left">
+              <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-1">
+                FLAGSHIP ATELIER
+              </p>
+              <p>House of Urvaah, Kala Ghoda Arts District,</p>
+              <p>Colaba Causeway, Mumbai 400001, India</p>
+            </div>
           </div>
 
           {/* Column 2: QUICK LINKS */}

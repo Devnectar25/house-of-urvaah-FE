@@ -7,7 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Trash2,
-  Edit3,
+  Pencil,
   Eye,
   EyeOff,
   Layers,
@@ -596,20 +596,22 @@ export const AdminFaqs = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenEditModal(faq)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-800 bg-neutral-100 border border-neutral-200 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-800 bg-neutral-100 border border-neutral-200 hover:bg-neutral-900 hover:text-white hover:border-neutral-900 transition-all cursor-pointer shadow-2xs no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title="Edit FAQ"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Edit</span>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span className="no-underline" style={{ textDecoration: 'none' }}>Edit</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(faq)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all cursor-pointer shadow-2xs no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title="Delete FAQ"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
+                          <span className="no-underline" style={{ textDecoration: 'none' }}>Delete</span>
                         </button>
                       </div>
                     </td>

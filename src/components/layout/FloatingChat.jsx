@@ -16,7 +16,7 @@ export const FloatingChat = () => {
       {!isOpen && (
         <div
           className="fixed bottom-0 right-0 p-2 z-40 font-serif select-none transition-all duration-300"
-          style={{ bottom: '30px', right: '0px' }}
+          style={{ bottom: '0px', right: '0px' }}
         >
           <button
             onClick={() => setIsOpen(true)}

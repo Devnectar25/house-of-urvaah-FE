@@ -5,6 +5,7 @@ import { X, Mail, Shield, AlertCircle, RefreshCw, ArrowRight, CheckCircle2, User
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
 import apiClient from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[6-9]\d{9}$/; // 10-digit Indian mobile number format
@@ -19,6 +20,12 @@ export const AuthModal = () => {
     loginUser,
     logoutUser,
   } = useCart();
+
+  // Lock background screen scroll while Auth Modal is open and handle ESC key close
+  useModalScrollLock(isAuthModalOpen, () => setIsAuthModalOpen(false));
+
+  // Ref to lock wheel events preventing background scrolling in all browsers
+  const modalOverlayRef = useRef(null);
 
   // State Machine: 'email' | 'otp' | 'details'
   const [step, setStep] = useState('email');
@@ -42,6 +49,40 @@ export const AuthModal = () => {
 
   // Refs for OTP input auto-focus
   const otpInputRefs = useRef([]);
+
+  // Prevent background scrolling while modal is open, intercepting mouse wheel and touch gestures
+  useEffect(() => {
+    const el = modalOverlayRef.current;
+    if (!el || !isAuthModalOpen) return;
+
+    const handleWheel = (e) => {
+      // If modal overlay does not overflow vertically, prevent wheel bubbling to the background page
+      if (el.scrollHeight <= el.clientHeight) {
+        e.preventDefault();
+        return;
+      }
+      // If modal content is taller than viewport (e.g. mobile keyboard), prevent scroll chaining at top/bottom
+      const isAtTop = el.scrollTop <= 0 && e.deltaY < 0;
+      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+      if (isAtTop || isAtBottom) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (el.scrollHeight <= el.clientHeight) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [isAuthModalOpen]);
 
   // Auto-close modal if user is already authenticated
   useEffect(() => {
@@ -325,8 +366,9 @@ export const AuthModal = () => {
   return (
     <AnimatePresence>
       <div
+        ref={modalOverlayRef}
         data-auth-modal="true"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-serif selection:bg-brand-dark selection:text-white select-none"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto overscroll-contain font-serif selection:bg-brand-dark selection:text-white select-none"
       >
         {/* Backdrop */}
         <motion.div
@@ -343,14 +385,15 @@ export const AuthModal = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          onWheel={(e) => e.stopPropagation()}
           className="relative z-10 w-full max-w-md bg-white border border-neutral-200 shadow-2xl overflow-hidden my-auto transition-all duration-300"
         >
           {/* Header Bar */}
-          <div className="p-5 md:p-6 border-b border-neutral-100 flex items-center justify-between bg-[#FAF8F3]">
-            <Logo className="h-9 sm:h-10" />
+          <div className="relative py-7 px-6 sm:py-8 border-b border-neutral-100 flex items-center justify-center bg-[#FAF8F3]">
+            <Logo className="h-20 sm:h-24 w-auto" />
             <button
               onClick={() => setIsAuthModalOpen(false)}
-              className="p-2 text-neutral-500 hover:text-black transition-colors cursor-pointer"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-neutral-400 hover:text-black transition-colors cursor-pointer z-10"
               aria-label="Close modal"
             >
               <X className="w-5 h-5 stroke-[1.5]" />

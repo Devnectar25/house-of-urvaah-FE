@@ -1,17 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/common/Logo';
-import { getStoredUser, clearAuthSession } from '../../lib/apiClient';
+import { getAdminStoredUser, clearAdminAuthSession } from '../../lib/apiClient';
 import { useCart } from '../../context/CartContext';
 import { ShieldCheck, LogOut } from 'lucide-react';
 
 export const AdminDashboardPlaceholder = () => {
   const navigate = useNavigate();
   const { logoutUser } = useCart();
-  const user = getStoredUser();
+  const user = getAdminStoredUser();
 
   const handleLogout = () => {
-    clearAuthSession();
+    clearAdminAuthSession();
     if (typeof logoutUser === 'function') {
       logoutUser();
     }

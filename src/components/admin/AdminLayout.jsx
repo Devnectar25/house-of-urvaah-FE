@@ -7,7 +7,7 @@ import {
   ShoppingCart,
   Ticket,
   Users,
-  RotateCcw,
+  Banknote,
   Star,
   BarChart3,
   Settings,
@@ -36,10 +36,7 @@ const InstagramIcon = ({ className = "w-4 h-4" }) => (
   </svg>
 );
 import { Logo } from '../common/Logo';
-import { getStoredUser, setStoredUser, clearAuthSession, apiClient } from '../../lib/apiClient';
-
-import { useCart } from '../../context/CartContext';
-
+import { getAdminStoredUser, setAdminStoredUser, clearAdminAuthSession, apiClient } from '../../lib/apiClient';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, exact: true, key: 'dashboard' },
@@ -47,7 +44,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Products', path: '/admin/products', icon: Package, key: 'products' },
   { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
-  { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw, key: 'refunds' },
+  { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
@@ -81,11 +78,10 @@ function formatRoleName(role) {
 export const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logoutUser } = useCart();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+  const [currentUser, setCurrentUser] = useState(() => getAdminStoredUser());
   const [modifyUiOpen, setModifyUiOpen] = useState(() => location.pathname.startsWith('/admin/modify-ui'));
 
   const contentScrollRef = useRef(null);
@@ -105,20 +101,22 @@ export const AdminLayout = () => {
   // Keep user profile in sync and re-fetch fresh permissions from backend on mount/navigation
   useEffect(() => {
     let isMounted = true;
-    const user = getStoredUser();
+    const user = getAdminStoredUser();
     if (user) {
       setCurrentUser(user);
     }
-    apiClient('/api/auth/me')
+    apiClient('/api/auth/me', { isAdmin: true })
       .then((res) => {
         if (!isMounted) return;
         const freshUser = res?.admin || res?.user;
         if (freshUser) {
-          setStoredUser(freshUser);
+          setAdminStoredUser(freshUser);
           setCurrentUser(freshUser);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('[AdminLayout] Failed to refresh profile:', err.message);
+      });
 
     return () => {
       isMounted = false;
@@ -151,10 +149,7 @@ export const AdminLayout = () => {
   // Confirmed logout handler
   const handleConfirmLogout = () => {
     setShowLogoutModal(false);
-    clearAuthSession();
-    if (typeof logoutUser === 'function') {
-      logoutUser();
-    }
+    clearAdminAuthSession();
     navigate('/admin/login', { replace: true });
   };
 
@@ -198,7 +193,7 @@ export const AdminLayout = () => {
             title="House of Urvaah Admin Dashboard"
           >
             <Logo className="h-11 sm:h-13 md:h-14 shrink-0" />
-            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors">
+            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors ml-[30px]">
               Admin Panel
             </span>
           </Link>

@@ -271,6 +271,9 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 font-admin overscroll-contain"
+      role="dialog"
+      aria-modal="true"
+      data-admin-modal="true"
       onClick={(e) => {
         if (e.target === e.currentTarget && !submitting) {
           onClose();

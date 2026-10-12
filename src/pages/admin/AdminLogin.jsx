@@ -2,14 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { Logo } from '../../components/common/Logo';
-import { setAuthToken, setStoredUser, apiClient } from '../../lib/apiClient';
-import { useCart } from '../../context/CartContext';
+import { setAdminAuthToken, setAdminStoredUser, apiClient } from '../../lib/apiClient';
 
 export const AdminLogin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const { loginUser } = useCart();
 
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
@@ -172,13 +170,9 @@ export const AdminLogin = () => {
         return;
       }
 
-      // Store JWT and admin profile using project's auth pattern
-      setAuthToken(token);
-      setStoredUser(adminData);
-
-      if (typeof loginUser === 'function') {
-        loginUser(adminData, token);
-      }
+      // Store JWT and admin profile in isolated admin auth storage
+      setAdminAuthToken(token);
+      setAdminStoredUser(adminData);
 
       navigate('/admin/dashboard');
     } catch (err) {

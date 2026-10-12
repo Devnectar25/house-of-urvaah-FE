@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, clearAuthSession } from '../lib/apiClient';
+import { useModalScrollLock } from '../hooks/useModalScrollLock';
 
 const CartContext = createContext();
 
@@ -38,6 +39,9 @@ export const CartProvider = ({ children }) => {
 
   const formatUserData = (userData) => {
     if (!userData) return null;
+    if (userData.id === '1' || userData.username === '1' || String(userData.email || userData.emailid || '').includes('@urvaah.local')) {
+      return null;
+    }
     const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Atelier Member';
     const firstName = fullName.trim().split(' ')[0] || fullName;
     return {
@@ -60,11 +64,20 @@ export const CartProvider = ({ children }) => {
           ...res.user,
           addresses: res.addresses || []
         });
-        setUser(formatted);
-        setStoredUser(formatted);
+        if (formatted) {
+          setUser(formatted);
+          setStoredUser(formatted);
+        } else {
+          clearAuthSession();
+          setUser(null);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch profile with stored JWT:', err.message);
+      if (err.status === 401 || err.status === 403 || err.status === 404) {
+        clearAuthSession();
+        setUser(null);
+      }
     }
   };
 
@@ -128,35 +141,15 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   // Lock background body scroll whenever any drawer or modal overlay is open
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const isOverlayActive = Boolean(
-      isCartOpen ||
-      isSearchOpen ||
-      isMobileMenuOpen ||
-      isAuthModalOpen ||
-      quickViewProduct ||
-      pdpProduct
-    );
-
-    if (isOverlayActive) {
-      const prevHtmlOverflow = document.documentElement.style.overflow;
-      const prevBodyOverflow = document.body.style.overflow;
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.documentElement.style.overflow = prevHtmlOverflow || '';
-        document.body.style.overflow = prevBodyOverflow || '';
-      };
-    }
-  }, [
-    isCartOpen,
-    isSearchOpen,
-    isMobileMenuOpen,
-    isAuthModalOpen,
-    quickViewProduct,
+  const isOverlayActive = Boolean(
+    isCartOpen ||
+    isSearchOpen ||
+    isMobileMenuOpen ||
+    isAuthModalOpen ||
+    quickViewProduct ||
     pdpProduct
-  ]);
+  );
+  useModalScrollLock(isOverlayActive);
 
   // Fetch & persist wishlist for user
   useEffect(() => {

@@ -3,11 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, ShoppingBag, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const QuickViewModal = () => {
   const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist } = useCart();
   const [selectedSize, setSelectedSize] = useState('M');
   const [addedSuccess, setAddedSuccess] = useState(false);
+
+  // Lock background screen scroll while QuickView is active
+  useModalScrollLock(Boolean(quickViewProduct), () => setQuickViewProduct(null));
 
   if (!quickViewProduct) return null;
 
@@ -32,7 +36,7 @@ export const QuickViewModal = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto overscroll-contain">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}

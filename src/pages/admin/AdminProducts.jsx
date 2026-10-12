@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -13,8 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   FolderTree,
-  Edit3,
-  Star
+  Pencil
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { EditProductModal } from '../../components/admin/EditProductModal';
@@ -353,8 +351,9 @@ export const AdminProducts = () => {
                 <th className="py-3 px-4">Product Info</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Price</th>
-                <th className="py-3 px-4">Stock Status</th>
+                <th className="py-3 px-4 text-center">Stock Status</th>
                 <th className="py-3 px-4 text-center w-24">Active</th>
+                <th className="py-3 px-4 text-center w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200/60 text-xs text-brand-dark">
@@ -376,19 +375,24 @@ export const AdminProducts = () => {
                     <td className="py-3.5 px-4 space-y-1">
                       <div className="h-4 bg-neutral-200 rounded w-20" />
                     </td>
-                    <td className="py-3.5 px-4 space-y-1">
-                      <div className="h-5 bg-neutral-200 rounded-full w-24" />
-                      <div className="h-3 bg-neutral-200 rounded w-12" />
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="inline-flex flex-col items-center space-y-1">
+                        <div className="h-5 bg-neutral-200 rounded-full w-20" />
+                        <div className="h-3 bg-neutral-200 rounded w-12" />
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <div className="h-6 w-11 bg-neutral-200 rounded-full mx-auto" />
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="h-7 w-16 bg-neutral-200 rounded-lg mx-auto" />
                     </td>
                   </tr>
                 ))
               ) : products.length === 0 && !error ? (
                 /* Empty State */
                 <tr>
-                  <td colSpan={6} className="py-16 text-center">
+                  <td colSpan={7} className="py-16 text-center">
                     <Package className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
                     <h3 className="text-sm font-semibold text-brand-dark mb-1">No products found</h3>
                     <p className="text-xs text-neutral-500 max-w-xs mx-auto mb-4">
@@ -517,10 +521,9 @@ const ProductTableRow = ({
         <button
           type="button"
           onClick={() => onOpenEditModal(product)}
-          className="text-left font-semibold text-brand-dark hover:underline text-xs leading-snug line-clamp-2 cursor-pointer flex items-center gap-1 group-hover:text-black"
+          className="text-left font-semibold text-brand-dark text-xs leading-snug line-clamp-2 cursor-pointer block group-hover:text-black"
         >
           <span>{product.name}</span>
-          <Edit3 className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
         <div className="flex items-center gap-2 mt-1">
@@ -531,17 +534,6 @@ const ProductTableRow = ({
             <span className="text-[11px] text-neutral-400 font-mono">
               | SKU: {product.styleCode}
             </span>
-          )}
-          {product.reviews > 0 && (
-            <Link
-              to={`/admin/reviews?search=${encodeURIComponent(product.name)}`}
-              className="text-amber-700 hover:text-amber-800 inline-flex items-center gap-1 text-[11px] font-semibold ml-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
-              title="View product reviews in Admin Panel"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Star className="w-3 h-3 fill-amber-400 stroke-amber-500" />
-              <span>{parseFloat(product.rating || 5).toFixed(1)} ({product.reviews})</span>
-            </Link>
           )}
           <a
             href={`/product/${product.id}`}
@@ -568,7 +560,7 @@ const ProductTableRow = ({
         ) : null}
       </td>
 
-      {/* Price & Promo */}
+      {/* Price */}
       <td className="py-3.5 px-4 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-bold text-brand-dark">
@@ -580,31 +572,22 @@ const ProductTableRow = ({
             </span>
           )}
         </div>
-        {product.promoted ? (
-          <span className="inline-block mt-1 text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded">
-            Promoted
-          </span>
-        ) : null}
-        {product.is_recommended ? (
-          <span className="inline-block mt-1 ml-1 text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200/80 rounded">
-            Recommended
-          </span>
-        ) : null}
       </td>
 
       {/* Stock Status */}
-      <td className="py-3.5 px-4 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusStyle}`}>
-          {statusLabel}
-        </span>
-        <div className="text-[11px] text-neutral-400 font-mono mt-0.5">
-          Qty: {qty}
+      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+        <div className="inline-flex flex-col items-center justify-center">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${statusStyle}`}>
+            {statusLabel}
+          </span>
+          <div className="text-[11px] text-neutral-400 font-mono mt-0.5 text-center">
+            Qty: {qty}
+          </div>
         </div>
       </td>
 
       {/* Active Toggle Switch */}
       <td className="py-3.5 px-4 text-center">
-
         <button
           type="button"
           onClick={(e) => {
@@ -631,6 +614,19 @@ const ProductTableRow = ({
               }`}
             />
           )}
+        </button>
+      </td>
+
+      {/* Actions: Proper Edit Button */}
+      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => onOpenEditModal(product)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 active:bg-black text-white rounded-lg text-xs font-semibold tracking-tight transition-all duration-150 shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer no-underline hover:no-underline"
+          title="Edit product"
+        >
+          <Pencil className="w-3.5 h-3.5 stroke-[2]" />
+          <span className="no-underline">Edit</span>
         </button>
       </td>
     </tr>

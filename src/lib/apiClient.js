@@ -15,7 +15,13 @@ export const setAuthToken = (token) => {
 export const getStoredUser = () => {
   try {
     const raw = localStorage.getItem('urvaah_user');
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.id === '1' || parsed?.username === '1' || String(parsed?.email || '').includes('@urvaah.local')) {
+      clearAuthSession();
+      return null;
+    }
+    return parsed;
   } catch (e) {
     return null;
   }
@@ -23,6 +29,11 @@ export const getStoredUser = () => {
 
 export const setStoredUser = (user) => {
   if (user) {
+    if (user.id === '1' || user.username === '1' || String(user.email || '').includes('@urvaah.local')) {
+      console.warn('[apiClient] Blocked storing mock/invalid default user:', user);
+      clearAuthSession();
+      return;
+    }
     localStorage.setItem('urvaah_user', JSON.stringify(user));
   } else {
     localStorage.removeItem('urvaah_user');
@@ -32,10 +43,116 @@ export const setStoredUser = (user) => {
 export const clearAuthSession = () => {
   localStorage.removeItem('urvaah_token');
   localStorage.removeItem('urvaah_user');
+  if (typeof document !== 'undefined') {
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+  }
+};
+
+// Helper to safely decode JWT payload with base64 padding support
+export function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    let base64Url = parts[1];
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    try {
+      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) {
+        b64 += '=';
+      }
+      return JSON.parse(atob(b64));
+    } catch {
+      return null;
+    }
+  }
+}
+
+// --- Dedicated Admin Auth Storage (Completely isolated from customer session) ---
+export const getAdminAuthToken = () => {
+  const directToken = localStorage.getItem('urvaah_admin_token');
+  if (directToken) return directToken;
+
+  // Seamless legacy migration: check if customer token was actually an admin token
+  const legacyToken = localStorage.getItem('urvaah_token');
+  if (legacyToken) {
+    const payload = decodeJwtPayload(legacyToken);
+    const role = String(payload?.role || '').toLowerCase();
+    if (['admin', 'super_admin', 'sub_admin', 'subadmin'].includes(role)) {
+      localStorage.setItem('urvaah_admin_token', legacyToken);
+      const legacyUser = localStorage.getItem('urvaah_user');
+      if (legacyUser) {
+        localStorage.setItem('urvaah_admin_user', legacyUser);
+      }
+      return legacyToken;
+    }
+  }
+  return null;
+};
+
+export const setAdminAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem('urvaah_admin_token', token);
+  } else {
+    localStorage.removeItem('urvaah_admin_token');
+  }
+};
+
+export const getAdminStoredUser = () => {
+  try {
+    const raw = localStorage.getItem('urvaah_admin_user');
+    if (raw) return JSON.parse(raw);
+
+    const legacyRaw = localStorage.getItem('urvaah_user');
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      const role = String(parsed?.role || '').toLowerCase();
+      if (['admin', 'super_admin', 'sub_admin', 'subadmin'].includes(role) || parsed?.username === 'Admin') {
+        localStorage.setItem('urvaah_admin_user', legacyRaw);
+        return parsed;
+      }
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const setAdminStoredUser = (user) => {
+  if (user) {
+    localStorage.setItem('urvaah_admin_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('urvaah_admin_user');
+  }
+};
+
+export const clearAdminAuthSession = () => {
+  localStorage.removeItem('urvaah_admin_token');
+  localStorage.removeItem('urvaah_admin_user');
 };
 
 export async function apiClient(endpoint, options = {}) {
-  const token = getAuthToken();
+  // Context-aware admin detection: URL path starting with /admin, endpoint with /admin, or options.isAdmin
+  const isAdminContext =
+    Boolean(options.isAdmin) ||
+    endpoint.includes('/admin') ||
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+
+  const adminToken = getAdminAuthToken();
+  const customerToken = getAuthToken();
+  const token = isAdminContext ? (adminToken || customerToken) : (customerToken || adminToken);
+
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${cleanEndpoint}`;
 
@@ -57,16 +174,28 @@ export async function apiClient(endpoint, options = {}) {
   try {
     const response = await fetch(url, config);
 
-    // Handle 401 Unauthorized / 403 Forbidden globally if token expired or invalid
-    if ((response.status === 401 || response.status === 403) && token) {
-      console.warn(`[apiClient] Session invalid (${response.status}). Clearing session and invalidating.`);
-      clearAuthSession();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('urvaah:auth:unauthorized', {
-            detail: { status: response.status }
-          })
-        );
+    // Handle 401 Unauthorized globally if token expired or invalid
+    // Note: 403 Forbidden indicates permission restriction for a resource, not session expiration.
+    // Never clear session on 403 or on /login endpoints (wrong credentials return 401).
+    if (response.status === 401 && token) {
+      const isLoginEndpoint = endpoint.includes('/login');
+      if (!isLoginEndpoint) {
+        console.warn(`[apiClient] Session expired (401) on ${isAdminContext ? 'admin' : 'customer'} endpoint: ${endpoint}`);
+        if (isAdminContext) {
+          clearAdminAuthSession();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('urvaah:admin:unauthorized', { detail: { status: response.status } })
+            );
+          }
+        } else {
+          clearAuthSession();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('urvaah:auth:unauthorized', { detail: { status: response.status } })
+            );
+          }
+        }
       }
     }
 

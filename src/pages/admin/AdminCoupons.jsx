@@ -9,7 +9,7 @@ import {
   List,
   CheckCircle2,
   XCircle,
-  Edit3,
+  Pencil,
   Trash2,
   UserCheck,
   Calendar,
@@ -1069,7 +1069,7 @@ export const AdminCoupons = () => {
                       className="p-1 rounded-lg text-neutral-400 hover:text-brand-dark transition-colors cursor-pointer"
                       title="Edit coupon"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Pencil className="w-4 h-4" />
                     </button>
 
                     <button
@@ -1306,7 +1306,7 @@ export const AdminCoupons = () => {
                             title="Edit coupon"
                             className="p-1 rounded-lg text-neutral-400 hover:text-brand-dark transition-colors cursor-pointer"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Pencil className="w-4 h-4" />
                           </button>
 
                           <button

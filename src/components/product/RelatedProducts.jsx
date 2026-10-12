@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 
 const ALL_FALLBACK_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
+const TARGET_POOL_SIZE = 16;
+const ITEMS_PER_BATCH = 4;
+const REFRESH_INTERVAL_MS = 15000; // 15 seconds
 
 export const RelatedProducts = ({ currentProduct, onQuickView }) => {
-  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [batchIndex, setBatchIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
+    setBatchIndex(0);
 
     const fetchRelated = async () => {
       if (!currentProduct) {
@@ -24,7 +31,7 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
       const currentCategory = currentProduct.category || currentProduct.category_id || currentProduct.categoryId || '';
 
       try {
-        const res = await productApi.getRelatedProducts(currentIdStr, currentCategory);
+        const res = await productApi.getRelatedProducts(currentIdStr, currentCategory, TARGET_POOL_SIZE);
         let fetchedList = Array.isArray(res) ? res : res?.data || [];
 
         // Normalize fetched products
@@ -52,11 +59,11 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
         // Filter out the current product itself
         normalizedList = normalizedList.filter((p) => String(p.id) !== currentIdStr);
 
-        // If fewer than 4 items, backfill from catalog
-        if (normalizedList.length < 4) {
+        // Backfill up to target pool size from catalog for rich multi-batch rotation
+        if (normalizedList.length < TARGET_POOL_SIZE) {
           const existingIds = new Set([currentIdStr, ...normalizedList.map((p) => String(p.id))]);
 
-          // First priority: same category in catalog
+          // Priority 1: same category in catalog
           const sameCat = ALL_FALLBACK_PRODUCTS.filter(
             (p) =>
               !existingIds.has(String(p.id)) &&
@@ -65,14 +72,14 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
               p.category.toLowerCase().includes(String(currentCategory).toLowerCase())
           );
 
-          // Second priority: general catalog
+          // Priority 2: other catalog products
           const otherItems = ALL_FALLBACK_PRODUCTS.filter(
             (p) => !existingIds.has(String(p.id))
           );
 
           const backfills = [...sameCat, ...otherItems];
           for (const item of backfills) {
-            if (normalizedList.length >= 4) break;
+            if (normalizedList.length >= TARGET_POOL_SIZE) break;
             if (!existingIds.has(String(item.id))) {
               existingIds.add(String(item.id));
               normalizedList.push(item);
@@ -81,16 +88,15 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
         }
 
         if (isMounted) {
-          setProducts(normalizedList.slice(0, 4));
+          setAllProducts(normalizedList);
           setLoading(false);
         }
       } catch (err) {
         console.error('Error fetching related products:', err);
-        // Fallback gracefully to catalog
         const currentId = String(currentProduct?.id || '');
-        const fallbackList = ALL_FALLBACK_PRODUCTS.filter((p) => String(p.id) !== currentId).slice(0, 4);
+        const fallbackList = ALL_FALLBACK_PRODUCTS.filter((p) => String(p.id) !== currentId);
         if (isMounted) {
-          setProducts(fallbackList);
+          setAllProducts(fallbackList);
           setLoading(false);
         }
       }
@@ -114,14 +120,38 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
     currentProduct?.categoryId
   ]);
 
-  if (!loading && (!products || products.length === 0)) {
+  const totalBatches = Math.max(1, Math.ceil(allProducts.length / ITEMS_PER_BATCH));
+
+  // Automatically refresh every 15 seconds to display the next batch of related pieces
+  useEffect(() => {
+    if (allProducts.length <= ITEMS_PER_BATCH || isPaused) return;
+
+    const timer = setInterval(() => {
+      setBatchIndex((prev) => (prev + 1) % totalBatches);
+    }, REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [allProducts.length, totalBatches, isPaused]);
+
+  if (!loading && (!allProducts || allProducts.length === 0)) {
     return null;
   }
 
+  // Slice or wrap 4 items for the active batch
+  const startIdx = (batchIndex * ITEMS_PER_BATCH) % Math.max(1, allProducts.length);
+  const currentBatch = [];
+  for (let i = 0; i < ITEMS_PER_BATCH && i < allProducts.length; i++) {
+    currentBatch.push(allProducts[(startIdx + i) % allProducts.length]);
+  }
+
   return (
-    <section className="w-full mt-16 sm:mt-24 pt-12 sm:pt-16 border-t border-neutral-200/80 font-serif text-brand-dark">
+    <section
+      className="w-full mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-neutral-200/80 font-serif text-brand-dark"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12 border-b border-neutral-200/80 pb-5 text-left">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8 border-b border-neutral-200/80 pb-4 text-left">
         <div>
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.25em] uppercase text-neutral-400 font-semibold block mb-1.5">
             CURATED ATELIER SELECTIONS
@@ -130,9 +160,38 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
             RELATED PIECES
           </h2>
         </div>
-        <p className="text-xs font-sans tracking-wide text-neutral-500 uppercase hidden sm:block">
-          Complementary silhouettes & styles
-        </p>
+
+        <div className="flex items-center gap-4">
+          <p className="text-xs font-sans tracking-wide text-neutral-500 uppercase hidden sm:block">
+            Complementary silhouettes & styles
+          </p>
+
+          {totalBatches > 1 && (
+            <div className="flex items-center gap-2 font-sans text-xs">
+              <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-400 font-medium tabular-nums">
+                {String(batchIndex + 1).padStart(2, '0')} / {String(totalBatches).padStart(2, '0')}
+              </span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => setBatchIndex((prev) => (prev - 1 + totalBatches) % totalBatches)}
+                  className="p-1 rounded-full text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer"
+                  aria-label="Previous related pieces"
+                  title="Previous pieces"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[1.5]" />
+                </button>
+                <button
+                  onClick={() => setBatchIndex((prev) => (prev + 1) % totalBatches)}
+                  className="p-1 rounded-full text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer"
+                  aria-label="Next related pieces"
+                  title="Next pieces"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[1.5]" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Product Grid / Skeleton */}
@@ -147,24 +206,26 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
-          {products.map((item, idx) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: idx * 0.08 }}
-            >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={batchIndex}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -14 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8"
+          >
+            {currentBatch.map((item) => (
               <ProductCard
+                key={item.id}
                 product={item}
                 onQuickView={onQuickView}
                 hideColorDots={true}
                 hideOriginalPrice={false}
               />
-            </motion.div>
-          ))}
-        </div>
+            ))}
+          </motion.div>
+        </AnimatePresence>
       )}
     </section>
   );

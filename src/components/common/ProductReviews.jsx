@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, CheckCircle2, MessageSquare, Plus, X, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
-import { apiClient, getStoredUser } from '../../lib/apiClient';
+import { Star, CheckCircle2, MessageSquare, Plus, X, Sparkles } from 'lucide-react';
+import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const ProductReviews = ({ productId, productName }) => {
   const [reviews, setReviews] = useState([]);
@@ -12,29 +13,28 @@ export const ProductReviews = ({ productId, productName }) => {
   });
   const [loading, setLoading] = useState(true);
   const [filterRating, setFilterRating] = useState('all');
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   // Modal / Form state
   const [isFormOpen, setIsFormOpen] = useState(false);
+  useModalScrollLock(isFormOpen, () => setIsFormOpen(false));
   const [submitting, setSubmitting] = useState(false);
-  const [formRating, setFormRating] = useState(5);
+  const [formRating, setFormRating] = useState(0); // All stars empty by default
   const [formHoverRating, setFormHoverRating] = useState(0);
-  const [formName, setFormName] = useState(() => {
-    const u = getStoredUser();
-    return u?.fullname || u?.name || '';
-  });
+  const [formName, setFormName] = useState(''); // Empty by default
   const [formComment, setFormComment] = useState('');
   const [formFit, setFormFit] = useState('True to Size');
   const [formError, setFormError] = useState('');
   const [successToast, setSuccessToast] = useState(false);
 
-  // Extract clean numeric product ID
-  const cleanId = String(productId || '').replace(/\D/g, '') || productId;
+  // Product identifier (supports numeric ID or style alias)
+  const cleanId = String(productId || '').trim();
 
   const fetchReviews = async () => {
     if (!cleanId) return;
     try {
       setLoading(true);
-      const res = await apiClient(`/api/reviews/${cleanId}`);
+      const res = await apiClient(`/api/reviews/${encodeURIComponent(cleanId)}`);
       if (res && res.success && res.data) {
         setReviews(res.data.reviews || []);
         if (res.data.summary) {
@@ -50,10 +50,19 @@ export const ProductReviews = ({ productId, productName }) => {
 
   useEffect(() => {
     fetchReviews();
+    setShowAllReviews(false);
   }, [cleanId]);
+
+  useEffect(() => {
+    setShowAllReviews(false);
+  }, [filterRating]);
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
+    if (!formRating || formRating === 0) {
+      setFormError('Please select a star rating (1 to 5 stars).');
+      return;
+    }
     if (!formComment.trim()) {
       setFormError('Please write your review feedback.');
       return;
@@ -78,7 +87,9 @@ export const ProductReviews = ({ productId, productName }) => {
       if (res && res.success) {
         setIsFormOpen(false);
         setFormComment('');
-        setFormRating(5);
+        setFormName('');
+        setFormRating(0);
+        setFormHoverRating(0);
         setSuccessToast(true);
         setTimeout(() => setSuccessToast(false), 4500);
         // Refresh reviews list
@@ -98,6 +109,8 @@ export const ProductReviews = ({ productId, productName }) => {
     return Number(r.rating) === Number(filterRating);
   });
 
+  const displayedReviews = showAllReviews ? filteredReviews : filteredReviews.slice(0, 3);
+
   const ratingLabels = {
     1: 'Needs Improvement',
     2: 'Fair',
@@ -107,13 +120,13 @@ export const ProductReviews = ({ productId, productName }) => {
   };
 
   const avgNum = parseFloat(summary.average) || 0;
-  const currentUser = getStoredUser();
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.username === 'Admin';
+
+  // Calculate average rating
 
   return (
-    <section id="customer-reviews" className="w-full mt-16 sm:mt-24 pt-12 sm:pt-16 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
+    <section id="customer-reviews" className="w-full mt-12 sm:mt-16 pt-10 sm:pt-12 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
       {/* Header Row */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-6 border-b border-neutral-200/80">
+      <div className={`flex flex-col md:flex-row md:items-end justify-between gap-6 ${reviews.length === 0 ? 'mb-6 pb-2 border-b-0' : 'mb-10 pb-6 border-b border-neutral-200/80'}`}>
         <div>
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.25em] uppercase text-neutral-400 font-semibold block mb-1.5">
             VERIFIED RATINGS & FEEDBACK
@@ -126,34 +139,21 @@ export const ProductReviews = ({ productId, productName }) => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 self-start md:self-end">
-          {isAdmin && (
-            <a
-              href={`/admin/reviews?search=${encodeURIComponent(productName || '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs font-sans font-semibold tracking-[0.16em] uppercase rounded-none transition-colors flex items-center gap-2 border border-neutral-300"
-              title="Open Admin Review Desk for this product"
-            >
-              <ShieldCheck className="w-4 h-4 text-neutral-700" />
-              <span>ADMIN REVIEWS</span>
-              <ExternalLink className="w-3.5 h-3.5 text-neutral-500" />
-            </a>
-          )}
-
+        <div className="self-start md:self-end">
           <button
             type="button"
             onClick={() => {
-              const u = getStoredUser();
-              if (u && !formName) {
-                setFormName(u.fullname || u.name || '');
-              }
+              setFormRating(0); // All stars empty initially
+              setFormHoverRating(0);
+              setFormName(''); // Name empty initially, not default 1
+              setFormComment('');
+              setFormError('');
               setIsFormOpen(true);
             }}
             className="px-7 py-3.5 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-none transition-colors flex items-center gap-2.5 shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2]" />
-            WRITE A REVIEW
+            ADD REVIEW
           </button>
         </div>
       </div>
@@ -178,10 +178,18 @@ export const ProductReviews = ({ productId, productName }) => {
         )}
       </AnimatePresence>
 
-      {/* Overview Cards (Rating Metric Card & Distribution) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-        {/* Card 1: Score & Star Rating */}
-        <div className="lg:col-span-5 bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-2xs">
+      {/* Reviews Content: Loading, Empty (only header shown), or Populated */}
+      {loading ? (
+        <div className="py-12 text-center bg-white border border-neutral-200/80 rounded-2xl">
+          <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase">Loading patron reviews...</p>
+        </div>
+      ) : reviews.length === 0 ? null : (
+        <>
+          {/* Overview Cards (Rating Metric Card & Distribution) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+            {/* Card 1: Score & Star Rating */}
+            <div className="lg:col-span-5 bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-2xs">
           <div>
             <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-neutral-500 block mb-3">
               OVERALL RATING
@@ -264,119 +272,130 @@ export const ProductReviews = ({ productId, productName }) => {
       </div>
 
 
-      {/* Reviews List / Empty State */}
-      {loading ? (
-        <div className="py-16 text-center bg-white border border-neutral-200/80 rounded-2xl">
-          <div className="w-6 h-6 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-neutral-400 font-sans tracking-widest uppercase">Loading patron reviews...</p>
-        </div>
-      ) : filteredReviews.length === 0 ? (
-        <div className="py-16 sm:py-20 text-center bg-[#FAF8F3] border border-dashed border-[#E7E2D8] rounded-2xl p-8 font-sans">
-          <MessageSquare className="w-10 h-10 text-neutral-300 mx-auto mb-4 stroke-[1.5]" />
-          <h3 className="text-base sm:text-lg font-serif tracking-[0.15em] uppercase text-black font-semibold mb-2">
-            NO REVIEWS YET
-          </h3>
-          <p className="text-xs sm:text-sm text-neutral-500 font-sans max-w-md mx-auto mb-6 leading-relaxed">
-            Be the first patron to share your styling notes, silhouette impressions, and tailoring feedback for {productName || 'this piece'}.
+      {/* Reviews List / Filter Notice */}
+      {filteredReviews.length === 0 ? (
+        <div className="py-10 text-center bg-[#FAF8F3] border border-neutral-200/80 rounded-xl p-6 font-sans">
+          <p className="text-xs sm:text-sm text-neutral-600 font-sans">
+            No reviews match the selected {filterRating}-star filter.
           </p>
           <button
             type="button"
-            onClick={() => setIsFormOpen(true)}
-            className="px-6 py-3 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-sans font-semibold tracking-[0.2em] uppercase transition-colors cursor-pointer"
+            onClick={() => setFilterRating('all')}
+            className="mt-3 text-xs underline font-semibold text-black hover:opacity-70 cursor-pointer"
           >
-            WRITE THE INAUGURAL REVIEW
+            Clear Filter
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredReviews.map((rev) => {
-            const dateStr = rev.date
-              ? new Date(rev.date).toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
-                })
-              : 'Recent Purchase';
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {displayedReviews.map((rev) => {
+              const dateStr = rev.date
+                ? new Date(rev.date).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })
+                : 'Recent Purchase';
 
-            const userInitials = (rev.user || 'A')
-              .split(' ')
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase();
+              const userInitials = (rev.user || 'A')
+                .split(' ')
+                .map((w) => w[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
 
-            return (
-              <div
-                key={rev.id}
-                className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-7 shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col justify-between space-y-4 hover:border-neutral-300 transition-all text-left"
-              >
-                <div>
-                  {/* Top user row */}
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#FAF8F3] border border-[#E7E2D8] flex items-center justify-center font-serif text-xs font-semibold text-black shrink-0">
-                        {userInitials}
+              return (
+                <div
+                  key={rev.id}
+                  className="bg-white border border-neutral-200/80 rounded-2xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col justify-between space-y-4 hover:border-neutral-300 transition-all text-left"
+                >
+                  <div>
+                    {/* Top user row */}
+                    <div className="flex items-center justify-between gap-2.5 mb-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8.5 h-8.5 rounded-full bg-[#FAF8F3] border border-[#E7E2D8] flex items-center justify-center font-serif text-xs font-semibold text-black shrink-0">
+                          {userInitials}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-serif font-semibold text-black uppercase tracking-wider truncate">
+                            {rev.user}
+                          </h4>
+                          <span className="text-[10px] text-emerald-800 font-sans font-semibold tracking-wider uppercase block">
+                            VERIFIED PATRON ✓
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-serif font-semibold text-black uppercase tracking-wider">
-                          {rev.user}
-                        </h4>
-                        <span className="text-[10px] text-emerald-800 font-sans font-semibold tracking-wider uppercase block">
-                          VERIFIED PATRON ✓
-                        </span>
-                      </div>
+
+                      <span className="text-[10px] sm:text-[11px] text-neutral-400 font-sans tracking-wide shrink-0">
+                        {dateStr}
+                      </span>
                     </div>
 
-                    <span className="text-[11px] text-neutral-400 font-sans tracking-wide">
-                      {dateStr}
-                    </span>
-                  </div>
+                    {/* Stars */}
+                    <div className="flex items-center gap-1 mb-2.5">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          className={`w-3.5 h-3.5 ${
+                            s <= Number(rev.rating)
+                              ? 'fill-black text-black'
+                              : 'text-neutral-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Stars */}
-                  <div className="flex items-center gap-1 mb-3">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        className={`w-3.5 h-3.5 ${
-                          s <= Number(rev.rating)
-                            ? 'fill-black text-black'
-                            : 'text-neutral-200'
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Comment with Fit Badge */}
-                  {rev.comment?.startsWith('[Fit:') ? (() => {
-                    const match = rev.comment.match(/^\[Fit:\s*([^\]]+)\]\s*(.*)$/);
-                    if (match) {
+                    {/* Comment with Fit Badge */}
+                    {rev.comment?.startsWith('[Fit:') ? (() => {
+                      const match = rev.comment.match(/^\[Fit:\s*([^\]]+)\]\s*(.*)$/);
+                      if (match) {
+                        return (
+                          <div className="space-y-1.5">
+                            <span className="inline-block px-2 py-0.5 bg-neutral-100 border border-neutral-200 text-neutral-800 text-[10px] font-sans font-semibold uppercase tracking-wider rounded">
+                              FIT: {match[1]}
+                            </span>
+                            <p className="text-xs sm:text-sm text-neutral-700 font-sans leading-relaxed">
+                              {match[2]}
+                            </p>
+                          </div>
+                        );
+                      }
                       return (
-                        <div className="space-y-1.5">
-                          <span className="inline-block px-2.5 py-0.5 bg-neutral-100 border border-neutral-200 text-neutral-800 text-[10px] font-sans font-semibold uppercase tracking-wider rounded">
-                            FIT: {match[1]}
-                          </span>
-                          <p className="text-xs sm:text-sm text-neutral-700 font-sans leading-relaxed">
-                            {match[2]}
-                          </p>
-                        </div>
+                        <p className="text-xs sm:text-sm text-neutral-700 font-sans leading-relaxed">
+                          {rev.comment}
+                        </p>
                       );
-                    }
-                    return (
+                    })() : (
                       <p className="text-xs sm:text-sm text-neutral-700 font-sans leading-relaxed">
                         {rev.comment}
                       </p>
-                    );
-                  })() : (
-                    <p className="text-xs sm:text-sm text-neutral-700 font-sans leading-relaxed">
-                      {rev.comment}
-                    </p>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* READ MORE / SHOW LESS BUTTON */}
+          {filteredReviews.length > 3 && (
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAllReviews((prev) => !prev)}
+                className="px-8 py-3.5 border border-black bg-white hover:bg-black hover:text-white text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase transition-all duration-200 cursor-pointer shadow-2xs inline-flex items-center gap-2"
+              >
+                <span>{showAllReviews ? 'SHOW LESS' : 'READ MORE'}</span>
+                <span className="text-[10px] text-neutral-500 font-mono">
+                  {showAllReviews ? '▲' : `(${filteredReviews.length - 3} MORE)`}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
+    </>
+  )}
 
       {/* WRITE A REVIEW MODAL */}
       <AnimatePresence>
@@ -428,7 +447,8 @@ export const ProductReviews = ({ productId, productName }) => {
                   </label>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((star) => {
-                      const isFilled = star <= (formHoverRating || formRating);
+                      const activeRating = formHoverRating || formRating;
+                      const isFilled = activeRating > 0 && star <= activeRating;
                       return (
                         <button
                           key={star}
@@ -437,6 +457,7 @@ export const ProductReviews = ({ productId, productName }) => {
                           onMouseLeave={() => setFormHoverRating(0)}
                           onClick={() => setFormRating(star)}
                           className="p-1 cursor-pointer transition-transform hover:scale-110"
+                          aria-label={`${star} star rating`}
                         >
                           <Star
                             className={`w-6 h-6 transition-colors ${
@@ -446,9 +467,11 @@ export const ProductReviews = ({ productId, productName }) => {
                         </button>
                       );
                     })}
-                    <span className="text-xs font-medium text-neutral-600 ml-2">
-                      {ratingLabels[formHoverRating || formRating]}
-                    </span>
+                    {(formHoverRating || formRating) > 0 && (
+                      <span className="text-xs font-medium text-neutral-600 ml-2">
+                        {ratingLabels[formHoverRating || formRating]}
+                      </span>
+                    )}
                   </div>
                 </div>
 

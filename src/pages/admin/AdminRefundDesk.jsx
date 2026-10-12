@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  RotateCcw,
+  Banknote,
   RefreshCw,
   Search,
   Filter,
@@ -588,11 +588,11 @@ export const AdminRefundDesk = () => {
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
   return (
-    <div className="space-y-6 pb-12 font-admin text-brand-dark">
+    <div className="space-y-3 pb-2 font-admin text-brand-dark">
       {/* Toast Notification Banner */}
       {toastMsg && (
         <div
-          className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-semibold animate-fadeIn ${
+          className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold animate-fadeIn ${
             toastMsg.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -618,7 +618,7 @@ export const AdminRefundDesk = () => {
 
       {/* Export Error Banner */}
       {exportError && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
+        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>Export Error: {exportError}</span>
@@ -634,19 +634,20 @@ export const AdminRefundDesk = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. PAGE HEADER BANNER                                                     */}
+      {/* 1. PAGE HEADER BANNER (Compact)                                           */}
       {/* ========================================================================= */}
       <AdminPageHeader
         title="Refund Desk"
         subtitle="Track and process customer refunds, cancellations, and return payouts."
+        className="py-2.5 px-4 sm:py-3 sm:px-5 rounded-xl"
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Export Excel Button */}
             <button
               type="button"
               onClick={handleExportExcel}
               disabled={isExporting || loading || refunds.length === 0}
-              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-neutral-200/90 rounded-xl text-xs font-semibold text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200/90 rounded-lg text-xs font-semibold text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               title="Export filtered refund cases to Excel"
             >
               {isExporting ? (
@@ -667,76 +668,52 @@ export const AdminRefundDesk = () => {
               type="button"
               onClick={() => fetchRefunds()}
               disabled={loading}
-              className="p-2 bg-white border border-neutral-200/90 rounded-xl text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50"
+              className="p-1.5 bg-white border border-neutral-200/90 rounded-lg text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50"
               title="Refresh refund list"
               aria-label="Refresh list"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-neutral-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-neutral-400' : ''}`} />
             </button>
           </div>
         }
       />
 
       {/* ========================================================================= */}
-      {/* 2. FILTER ROW: Search + Status Dropdown + Clear Filters                   */}
+      {/* 2. COMPACT SEARCH & FILTERS ROW                                           */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-neutral-200/80 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-brand-dark uppercase tracking-wider">
-            <Filter className="w-3.5 h-3.5 text-neutral-500" />
-            <span>Search &amp; Filters</span>
-          </div>
-
-          {/* Clear Filters Button (Always visible, icon turns red when active) */}
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-              isFilterActive
-                ? 'text-brand-dark bg-neutral-100 hover:bg-neutral-200 border border-neutral-300'
-                : 'text-neutral-400 hover:text-neutral-600 bg-transparent'
-            }`}
-            title="Reset search and filters"
-          >
-            <X
-              className={`w-3.5 h-3.5 ${
-                isFilterActive ? 'text-brand-dark' : 'text-neutral-400'
-              }`}
-            />
-            <span>Clear Filters</span>
-          </button>
+      <div className="bg-white border border-neutral-200/80 rounded-xl px-3.5 py-2.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        {/* Search Input */}
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Order ID (e.g. HOU-ORD-1008), customer name or email..."
+            className="w-full pl-8.5 pr-8 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-brand-dark text-xs p-0.5 cursor-pointer"
+              title="Clear search query"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-          {/* Search Input (Debounced 300ms) */}
-          <div className="sm:col-span-2">
-            <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-              Search by Order ID, Name or Email
-            </label>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by Order ID (e.g. HOU-ORD-1008), customer name or email..."
-                className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter Dropdown */}
-          <div>
-            <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-              Refund Status
-            </label>
+        {/* Status Dropdown & Clear Filters */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative min-w-[150px] sm:min-w-[170px]">
             <select
               value={selectedStatus}
               onChange={(e) => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans font-medium cursor-pointer"
+              className="w-full appearance-none px-3 py-1.5 pr-8 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans font-medium cursor-pointer"
             >
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -744,27 +721,40 @@ export const AdminRefundDesk = () => {
                 </option>
               ))}
             </select>
+            <Filter className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
           </div>
+
+          {isFilterActive && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg text-neutral-600 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 transition-colors cursor-pointer shrink-0"
+              title="Reset search and filters"
+            >
+              <X className="w-3 h-3 text-neutral-500" />
+              <span>Clear</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. TABLE SHELL: Refund Cases Table                                        */}
+      {/* 3. TABLE SHELL: Refund Cases Table (Compact & Scrollbar Removed)          */}
       {/* ========================================================================= */}
       <div className="bg-white border border-neutral-200/80 rounded-xl shadow-xs overflow-hidden">
         {/* Table Subheader Count */}
-        <div className="px-6 py-4 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
+        <div className="px-4 py-2 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold tracking-wider text-brand-dark uppercase">
+            <h2 className="text-xs font-bold tracking-wider text-brand-dark uppercase">
               Refund Cases
             </h2>
-            <span className="px-2.5 py-0.5 bg-neutral-200/80 rounded-full text-neutral-800 text-xs font-semibold">
+            <span className="px-2 py-0.5 bg-neutral-200/80 rounded-full text-neutral-800 text-[11px] font-bold">
               {totalCount}
             </span>
           </div>
 
           {isFilterActive && (
-            <span className="text-xs text-neutral-500 font-medium">
+            <span className="text-[11px] text-neutral-500 font-medium">
               Filtered View
             </span>
           )}
@@ -772,84 +762,84 @@ export const AdminRefundDesk = () => {
 
         {/* Error State with Retry Button */}
         {error && !loading && (
-          <div className="p-8 bg-neutral-50/70 border-b border-neutral-200 text-center space-y-2">
-            <AlertCircle className="w-8 h-8 text-neutral-500 mx-auto" />
-            <h4 className="text-sm font-semibold text-brand-dark">Failed to Load Refund Cases</h4>
+          <div className="p-6 bg-neutral-50/70 border-b border-neutral-200 text-center space-y-2">
+            <AlertCircle className="w-6 h-6 text-neutral-500 mx-auto" />
+            <h4 className="text-xs font-semibold text-brand-dark">Failed to Load Refund Cases</h4>
             <p className="text-xs text-neutral-600 max-w-sm mx-auto">{error}</p>
             <button
               type="button"
               onClick={() => fetchRefunds()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-dark text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors cursor-pointer shadow-xs mt-2"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-dark text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors cursor-pointer shadow-xs mt-1"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Retry Loading</span>
+              <RefreshCw className="w-3 h-3" />
+              <span>Retry</span>
             </button>
           </div>
         )}
 
-        {/* Table Container */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1050px]">
+        {/* Table Container - no-scrollbar removes ugly horizontal scrollbar */}
+        <div className="overflow-x-auto no-scrollbar scrollbar-none">
+          <table className="w-full text-left border-collapse min-w-[940px]">
             <thead>
               <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
-                <th className="py-3 px-4 w-44">Order Details</th>
-                <th className="py-3 px-4 w-32">Source</th>
-                <th className="py-3 px-4 w-56">Customer Info</th>
-                <th className="py-3 px-4 w-32 text-center">Transaction Method</th>
-                <th className="py-3 px-4 w-56">Payout Details</th>
-                <th className="py-3 px-4 w-32">Amount</th>
-                <th className="py-3 px-4 w-32">Request Date</th>
-                <th className="py-3 px-4 text-center w-32">Current Status</th>
-                <th className="py-3 px-4 text-right w-36">Actions</th>
+                <th className="py-2 px-3 w-40">Order Details</th>
+                <th className="py-2 px-3 w-28">Source</th>
+                <th className="py-2 px-3 w-48">Customer Info</th>
+                <th className="py-2 px-3 w-28 text-center">Transaction Method</th>
+                <th className="py-2 px-3 w-48">Payout Details</th>
+                <th className="py-2 px-3 w-24">Amount</th>
+                <th className="py-2 px-3 w-28">Request Date</th>
+                <th className="py-2 px-3 text-center w-28">Current Status</th>
+                <th className="py-2 px-3 text-right w-28">Actions</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-neutral-200/60 text-xs text-brand-dark">
               {/* SKELETON LOADER STATE */}
               {loading ? (
-                Array.from({ length: 5 }).map((_, idx) => (
+                Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="py-3.5 px-4 space-y-1.5">
-                      <div className="h-4 bg-neutral-200 rounded w-24" />
-                      <div className="h-3 bg-neutral-200 rounded w-32" />
+                    <td className="py-2 px-3 space-y-1">
+                      <div className="h-3.5 bg-neutral-200 rounded w-20" />
+                      <div className="h-2.5 bg-neutral-200 rounded w-28" />
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-6 w-24 bg-neutral-200 rounded-full" />
+                    <td className="py-2 px-3">
+                      <div className="h-5 w-20 bg-neutral-200 rounded-full" />
                     </td>
-                    <td className="py-3.5 px-4 space-y-1">
-                      <div className="h-4 bg-neutral-200 rounded w-28" />
-                      <div className="h-3 bg-neutral-200 rounded w-36" />
+                    <td className="py-2 px-3 space-y-1">
+                      <div className="h-3.5 bg-neutral-200 rounded w-24" />
+                      <div className="h-2.5 bg-neutral-200 rounded w-32" />
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="h-6 w-16 bg-neutral-200 rounded-full mx-auto" />
+                    <td className="py-2 px-3 text-center">
+                      <div className="h-5 w-16 bg-neutral-200 rounded-full mx-auto" />
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-4 bg-neutral-200 rounded w-40" />
+                    <td className="py-2 px-3">
+                      <div className="h-4 bg-neutral-200 rounded w-36" />
                     </td>
-                    <td className="py-3.5 px-4 space-y-1">
-                      <div className="h-4 bg-neutral-200 rounded w-20" />
-                      <div className="h-3 bg-neutral-200 rounded w-16" />
+                    <td className="py-2 px-3 space-y-1">
+                      <div className="h-3.5 bg-neutral-200 rounded w-16" />
+                      <div className="h-2.5 bg-neutral-200 rounded w-12" />
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-4 bg-neutral-200 rounded w-20" />
+                    <td className="py-2 px-3">
+                      <div className="h-3.5 bg-neutral-200 rounded w-16" />
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="h-6 w-24 bg-neutral-200 rounded-full mx-auto" />
+                    <td className="py-2 px-3 text-center">
+                      <div className="h-5 w-20 bg-neutral-200 rounded-full mx-auto" />
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="h-8 w-24 bg-neutral-200 rounded-lg ml-auto" />
+                    <td className="py-2 px-3 text-right">
+                      <div className="h-6 w-18 bg-neutral-200 rounded-lg ml-auto" />
                     </td>
                   </tr>
                 ))
               ) : refunds.length === 0 && !error ? (
                 /* EMPTY STATE & FILTERED-EMPTY STATE */
                 <tr>
-                  <td colSpan={9} className="py-16 text-center">
-                    <RotateCcw className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-                    <h3 className="text-sm font-semibold text-brand-dark mb-1">
+                  <td colSpan={9} className="py-8 text-center">
+                    <Banknote className="w-9 h-9 text-neutral-300 mx-auto mb-2" />
+                    <h3 className="text-xs font-semibold text-brand-dark mb-0.5">
                       {isFilterActive ? 'No refunds match your filters' : 'No refunds to process'}
                     </h3>
-                    <p className="text-xs text-neutral-500 max-w-sm mx-auto mb-4 font-sans">
+                    <p className="text-[11px] text-neutral-500 max-w-sm mx-auto mb-3 font-sans">
                       {isFilterActive
                         ? 'Try modifying your search criteria or resetting status filters to view all cases.'
                         : 'New refund cases will appear here automatically when customer returns or cancellations are initiated.'}
@@ -858,9 +848,9 @@ export const AdminRefundDesk = () => {
                       <button
                         type="button"
                         onClick={handleClearFilters}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-dark bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-dark bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3 h-3" />
                         <span>Clear Filters</span>
                       </button>
                     )}
@@ -900,7 +890,7 @@ export const AdminRefundDesk = () => {
                       className="hover:bg-neutral-50/70 transition-colors group"
                     >
                       {/* 1. ORDER DETAILS (Clickable to open Order Details Modal) */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-2 px-3">
                         <button
                           type="button"
                           onClick={() => handleOpenOrderDetail(row.id)}
@@ -924,7 +914,7 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 2. SOURCE PILL (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-2 px-3">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
@@ -932,7 +922,7 @@ export const AdminRefundDesk = () => {
                           title="Review & Update Refund"
                         >
                           <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border transition-all duration-150 group-hover/src:shadow-xs group-hover/src:brightness-95 ${source.badgeClass}`}
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all duration-150 group-hover/src:shadow-xs group-hover/src:brightness-95 ${source.badgeClass}`}
                           >
                             {source.label}
                           </span>
@@ -940,11 +930,11 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 3. CUSTOMER INFO (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-3.5 px-4 w-56">
+                      <td className="py-2 px-3 w-48">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1.5 -m-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors group/cust focus:outline-none"
+                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/cust focus:outline-none"
                           title="Review & Update Refund"
                         >
                           <div className="font-semibold text-brand-dark truncate max-w-[180px] group-hover/cust:underline transition-colors">
@@ -964,11 +954,11 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 4. TRANSACTION METHOD (Clickable -> Opens Transaction / Refund Details Modal) */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-2 px-3 text-center">
                         <button
                           type="button"
                           onClick={() => handleOpenTransactionDetails(row)}
-                          className="inline-block px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 hover:text-brand-dark rounded-md text-[11px] font-semibold border border-neutral-200 hover:border-neutral-300 uppercase transition-all duration-150 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                          className="inline-block px-2.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 hover:text-brand-dark rounded-md text-[11px] font-semibold border border-neutral-200 hover:border-neutral-300 uppercase transition-all duration-150 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
                           title={`View transaction details for Order #${row.order_number || row.id?.slice(0, 8)}`}
                           aria-label={`View transaction details for Order #${row.order_number || row.id?.slice(0, 8)}`}
                         >
@@ -977,8 +967,8 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 5. PAYOUT DETAILS (Clicking text opens Update Refund Modal; clicking Eye toggles whole number in this space with NO popup) */}
-                      <td className="py-3.5 px-4 w-56">
-                        <div className="flex items-center justify-between gap-2 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors group/payout">
+                      <td className="py-2 px-3 w-48">
+                        <div className="flex items-center justify-between gap-1.5 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded-lg px-2 py-1 text-[11px] transition-colors group/payout">
                           <button
                             type="button"
                             onClick={() => handleOpenReviewModal(row)}
@@ -993,7 +983,7 @@ export const AdminRefundDesk = () => {
                           <button
                             type="button"
                             onClick={(e) => handleToggleRevealPayout(row.id, e)}
-                            className="p-1 text-neutral-400 hover:text-brand-dark hover:bg-neutral-200/60 rounded transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                            className="p-0.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-200/60 rounded transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
                             title={isRevealed ? 'Hide full number' : 'Show full number'}
                             aria-label={isRevealed ? 'Hide full number' : 'Show full number'}
                           >
@@ -1007,11 +997,11 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 6. AMOUNT (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-2 px-3">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1.5 -m-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors group/amt focus:outline-none"
+                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/amt focus:outline-none"
                           title="Review & Update Refund"
                         >
                           <div className="font-admin font-bold text-xs text-brand-dark group-hover/amt:underline transition-colors">
@@ -1032,11 +1022,11 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 7. REQUEST DATE (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-3.5 px-4 text-neutral-600 whitespace-nowrap">
+                      <td className="py-2 px-3 text-neutral-600 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1.5 -m-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors group/date focus:outline-none"
+                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/date focus:outline-none"
                           title={`Review & Update Refund (Requested: ${dateFormatted})`}
                         >
                           <div className="font-medium text-brand-dark group-hover/date:underline transition-colors">
@@ -1052,7 +1042,7 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 8. CURRENT STATUS PILL (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-2 px-3 text-center">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
@@ -1060,7 +1050,7 @@ export const AdminRefundDesk = () => {
                           title="Review & Update Refund"
                         >
                           <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-150 group-hover/stat:shadow-xs group-hover/stat:brightness-95 ${
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all duration-150 group-hover/stat:shadow-xs group-hover/stat:brightness-95 ${
                               status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : status === 'Processing'
@@ -1078,13 +1068,13 @@ export const AdminRefundDesk = () => {
                       </td>
 
                       {/* 9. ADMIN ACTIONS (Opens Update Refund Modal with target status) */}
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-2 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {status === 'Requested' && (
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-3 py-1.5 bg-brand-dark text-white hover:bg-black rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                              className="px-2.5 py-1 bg-brand-dark text-white hover:bg-black rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                               title="Begin processing refund"
                             >
                               Process
@@ -1096,7 +1086,7 @@ export const AdminRefundDesk = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenReviewModal(row, 'Completed')}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                                 title="Mark as Paid and complete refund"
                               >
                                 Mark Paid
@@ -1104,7 +1094,7 @@ export const AdminRefundDesk = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenReviewModal(row, 'Failed')}
-                                className="p-1.5 text-neutral-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                                className="p-1 text-neutral-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                                 title="Mark as Failed / Dispute"
                                 aria-label="Mark failed"
                               >
@@ -1117,7 +1107,7 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 rounded-lg text-xs font-semibold border border-emerald-200 cursor-pointer transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 rounded-lg text-xs font-semibold border border-emerald-200 cursor-pointer transition-colors"
                               title="Review completed refund"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -1129,7 +1119,7 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-brand-dark rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-brand-dark rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                               title="Retry processing refund"
                             >
                               Retry
@@ -1140,7 +1130,7 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                               title="Resume processing refund"
                             >
                               Resume
@@ -1157,7 +1147,7 @@ export const AdminRefundDesk = () => {
         </div>
 
         {/* Table Pagination Footer */}
-        <div className="px-6 py-4 border-t border-neutral-200/80 bg-neutral-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
+        <div className="px-4 py-2 border-t border-neutral-200/80 bg-neutral-50/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-neutral-500">
           <div>
             Showing{' '}
             <span className="font-semibold text-brand-dark">
