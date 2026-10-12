@@ -25,7 +25,7 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 const DEFAULT_CATEGORIES = [
   { id: 1, category_id: 1, name: 'CORSET TOPS' },
   { id: 2, category_id: 2, name: 'CO-ORD SETS' },
-  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 3, category_id: 3, name: 'KURTI' },
   { id: 4, category_id: 4, name: 'PARTY WEAR' }
 ];
 

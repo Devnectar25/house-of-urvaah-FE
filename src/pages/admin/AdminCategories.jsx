@@ -16,6 +16,7 @@ import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { CategoryModal } from '../../components/admin/CategoryModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -36,6 +37,9 @@ export const AdminCategories = () => {
   const [deleteTargetCategory, setDeleteTargetCategory] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+
+  // Lock background scrolling when delete modal is open
+  useModalScrollLock(Boolean(deleteTargetCategory), () => setDeleteTargetCategory(null));
 
   // Debounce search input (300ms)
   useEffect(() => {
@@ -108,6 +112,8 @@ export const AdminCategories = () => {
         'success',
         `Category "${category.name}" ${nextState ? 'activated' : 'deactivated'} successfully.`
       );
+      window.dispatchEvent(new Event('urvaah_categories_updated'));
+      localStorage.setItem('urvaah_categories_updated', Date.now().toString());
     } catch (err) {
       // Rollback on failure
       setCategories((prev) =>
@@ -143,6 +149,8 @@ export const AdminCategories = () => {
       'success',
       `Category "${savedCat.name || 'item'}" ${actionType === 'created' ? 'created' : 'updated'} successfully!`
     );
+    window.dispatchEvent(new Event('urvaah_categories_updated'));
+    localStorage.setItem('urvaah_categories_updated', Date.now().toString());
     fetchCategories();
   };
 
@@ -158,6 +166,9 @@ export const AdminCategories = () => {
       await apiClient(`/api/categories/${id}`, {
         method: 'DELETE'
       });
+
+      window.dispatchEvent(new Event('urvaah_categories_updated'));
+      localStorage.setItem('urvaah_categories_updated', Date.now().toString());
 
       showToast('success', `Category "${deleteTargetCategory.name}" deleted successfully.`);
       setDeleteTargetCategory(null);
@@ -209,8 +220,24 @@ export const AdminCategories = () => {
 
       {/* Delete Category Confirmation Dialog */}
       {deleteTargetCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-neutral-200 p-6 text-center space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 font-admin overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeleting) {
+              setDeleteTargetCategory(null);
+              setDeleteError(null);
+            }
+          }}
+          onWheel={(e) => {
+            if (e.target === e.currentTarget) {
+              e.stopPropagation();
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-neutral-200 p-6 text-center space-y-4 overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>

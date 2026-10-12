@@ -11,7 +11,9 @@ import {
   Search,
   RefreshCw,
   Lock,
-  UserCheck
+  UserCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   fetchSubAdmins,
@@ -30,6 +32,7 @@ const PERMISSION_OPTIONS = [
   { id: 'refunds', label: 'Refund Desk' },
   { id: 'coupons', label: 'Coupons' },
   { id: 'customers', label: 'Customers' },
+  { id: 'leads', label: 'Leads' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'settings', label: 'Settings' }
 ];
@@ -221,6 +224,24 @@ export const AdminSubAdmins = () => {
     (sa.username || '').toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, limit]);
+
+  const totalFiltered = filteredSubAdmins.length;
+  const totalPages = Math.ceil(totalFiltered / limit) || 1;
+  const paginatedSubAdmins = filteredSubAdmins.slice((currentPage - 1) * limit, currentPage * limit);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -347,7 +368,7 @@ export const AdminSubAdmins = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-sm font-sans">
-                {filteredSubAdmins.map((subAdmin) => (
+                {paginatedSubAdmins.map((subAdmin) => (
                   <tr key={subAdmin.id} className="hover:bg-neutral-50/70 transition-colors">
                     {/* Username Column */}
                     <td className="py-4 px-6 font-semibold text-neutral-950 font-admin">
@@ -439,6 +460,92 @@ export const AdminSubAdmins = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Footer Controls */}
+        {!loading && totalFiltered > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between border-t border-neutral-200/80 px-6 py-3.5 bg-neutral-50/50 gap-3">
+            <div className="flex items-center gap-3 text-xs text-neutral-500 font-sans">
+              <span>
+                Showing <span className="font-semibold text-neutral-800">{(currentPage - 1) * limit + 1}</span> to{' '}
+                <span className="font-semibold text-neutral-800">
+                  {Math.min(currentPage * limit, totalFiltered)}
+                </span>{' '}
+                of <span className="font-semibold text-neutral-800">{totalFiltered}</span> sub-admins
+              </span>
+              <div className="flex items-center gap-1.5 ml-2 border-l border-neutral-200 pl-3">
+                <span className="text-neutral-400">Rows:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white border border-neutral-200 rounded px-1.5 py-0.5 text-xs text-neutral-700 outline-none focus:border-black cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 font-sans">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-600 bg-white hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                  .filter((pageNum) => {
+                    if (totalPages <= 7) return true;
+                    if (pageNum === 1 || pageNum === totalPages) return true;
+                    if (Math.abs(pageNum - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .map((pageNum, idx, arr) => {
+                    const prevPage = arr[idx - 1];
+                    const showEllipsis = prevPage && pageNum - prevPage > 1;
+
+                    return (
+                      <React.Fragment key={pageNum}>
+                        {showEllipsis && (
+                          <span className="text-xs text-neutral-400 px-1 select-none">...</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-7 h-7 rounded-lg text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer ${
+                            currentPage === pageNum
+                              ? 'bg-neutral-900 text-white shadow-2xs'
+                              : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs text-neutral-600 bg-white hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium cursor-pointer"
+              >
+                Next
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

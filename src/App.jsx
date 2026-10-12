@@ -10,6 +10,7 @@ import { MobileMenu } from './components/layout/MobileMenu';
 import { QuickViewModal } from './components/common/QuickViewModal';
 import { ProductDetailModal } from './components/common/ProductDetailModal';
 import { AuthModal } from './components/common/AuthModal';
+import { ScrollToTop } from './components/common/ScrollToTop';
 import { Home } from './pages/Home';
 import { AboutUs } from './pages/AboutUs';
 import { ContactUs } from './pages/ContactUs';
@@ -23,6 +24,7 @@ import { ShippingPolicy } from './pages/ShippingPolicy';
 import { ReturnRefundPolicy } from './pages/ReturnRefundPolicy';
 import { CookiePolicy } from './pages/CookiePolicy';
 import { TermsAndConditions } from './pages/TermsAndConditions';
+import { Sitemap } from './pages/Sitemap';
 
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -34,7 +36,9 @@ import { AdminOrders } from './pages/admin/AdminOrders';
 import { AdminCoupons } from './pages/admin/AdminCoupons';
 import { AdminRefundDesk } from './pages/admin/AdminRefundDesk';
 import { AdminCustomers } from './pages/admin/AdminCustomers';
+import { AdminLeads } from './pages/admin/AdminLeads';
 import { AdminReviews } from './pages/admin/AdminReviews';
+import { AdminFaqs } from './pages/admin/AdminFaqs';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { AdminSubAdmins } from './pages/admin/AdminSubAdmins';
@@ -53,6 +57,7 @@ function PermissionGuard({ moduleKey, children }) {
     isSuperAdmin ||
     permissions.includes(moduleKey) ||
     moduleKey === 'modify-ui' ||
+    moduleKey === 'faqs' ||
     (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
 
   if (hasAccess) {
@@ -64,7 +69,6 @@ function PermissionGuard({ moduleKey, children }) {
 
 
 
-import { useCart } from './context/CartContext';
 import { SEOHead } from './components/common/SEOHead';
 
 // Simple placeholder page component for future route stubs
@@ -96,6 +100,7 @@ const PlaceholderPage = ({ title }) => (
 export function StorefrontLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-brand-dark antialiased font-serif selection:bg-brand-dark selection:text-white relative w-full max-w-full overflow-x-hidden">
+      <ScrollToTop />
       {/* 4.2 Header / Nav */}
       <Header />
 
@@ -107,6 +112,10 @@ export function StorefrontLayout() {
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact" element={<ContactUs />} />
           <Route path="/contact-us" element={<ContactUs />} />
+          <Route path="/sitemap" element={<Sitemap />} />
+          <Route path="/sidemap" element={<Sitemap />} />
+          <Route path="/faqs" element={<ContactUs />} />
+          <Route path="/faq" element={<ContactUs />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/shipping-policy" element={<ShippingPolicy />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
@@ -161,9 +170,6 @@ export function AppContent() {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
-
-    // Force page scroll to top on initial mount / page refresh
-    window.scrollTo(0, 0);
   }, []);
 
   return (
@@ -190,9 +196,11 @@ export function AppContent() {
         <Route path="orders" element={<PermissionGuard moduleKey="orders"><AdminOrders /></PermissionGuard>} />
         <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} />
         <Route path="customers" element={<PermissionGuard moduleKey="customers"><AdminCustomers /></PermissionGuard>} />
+        <Route path="leads" element={<PermissionGuard moduleKey="leads"><AdminLeads /></PermissionGuard>} />
         <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
+        <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />
         <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
         <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
         <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />

@@ -22,14 +22,14 @@ import { SEOHead } from '../components/common/SEOHead';
 
 export const ReturnRefundPolicy = () => {
   return (
-    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden">
+    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-20 pb-4 md:pt-28 md:pb-6 overflow-x-hidden">
       <SEOHead
         title="Return & Refund Policy | House of Urvaah"
         description="Understand House of Urvaah return, exchange, and refund policies for online purchases. Enjoy hassle-free returns on eligible luxury garments."
         keywords="House of Urvaah returns, refund policy, exchange policy, garment returns"
       />
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
+      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-6 md:mb-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -39,10 +39,10 @@ export const ReturnRefundPolicy = () => {
           <span className="px-3.5 py-1 bg-neutral-100 text-neutral-800 text-[10px] sm:text-xs font-serif font-semibold rounded-full uppercase tracking-[0.25em] mb-3 inline-block">
             CUSTOMER CARE &amp; POLICIES
           </span>
-          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-6">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-3 md:mb-4">
             Cancellation, Return &amp; Refund Policy
           </h1>
-          <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
+          <div className="w-16 h-[1px] bg-neutral-900/30" />
         </motion.div>
       </section>
 

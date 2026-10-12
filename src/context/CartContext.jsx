@@ -6,7 +6,24 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
+  const [wishlist, setWishlist] = useState(() => {
+    try {
+      const savedUserStr = localStorage.getItem('urvaah_user');
+      let userId = null;
+      if (savedUserStr) {
+        const parsed = JSON.parse(savedUserStr);
+        userId = parsed?.id || parsed?.username;
+      }
+      const token = localStorage.getItem('urvaah_token') || localStorage.getItem('sb-access-token');
+      const cachedKey = (token && userId) ? `urvaah_wishlist_${userId}` : 'urvaah_guest_wishlist';
+      const cached = localStorage.getItem(cachedKey) || localStorage.getItem('urvaah_guest_wishlist');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String);
+      }
+    } catch (e) {}
+    return [];
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -110,7 +127,37 @@ export const CartProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch & persist wishlist for user
+  // Lock background body scroll whenever any drawer or modal overlay is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const isOverlayActive = Boolean(
+      isCartOpen ||
+      isSearchOpen ||
+      isMobileMenuOpen ||
+      isAuthModalOpen ||
+      quickViewProduct ||
+      pdpProduct
+    );
+
+    if (isOverlayActive) {
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      const prevBodyOverflow = document.body.style.overflow;
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.documentElement.style.overflow = prevHtmlOverflow || '';
+        document.body.style.overflow = prevBodyOverflow || '';
+      };
+    }
+  }, [
+    isCartOpen,
+    isSearchOpen,
+    isMobileMenuOpen,
+    isAuthModalOpen,
+    quickViewProduct,
+    pdpProduct
+  ]);
+
   // Fetch & persist wishlist for user
   useEffect(() => {
     const isAdminUser = ['admin', 'super_admin', 'subadmin', 'sub_admin'].includes((user?.role || '').toLowerCase());
@@ -120,10 +167,8 @@ export const CartProvider = ({ children }) => {
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed)) setWishlist(parsed.map(String));
+            if (Array.isArray(parsed) && parsed.length > 0) setWishlist(parsed.map(String));
           } catch (e) {}
-        } else {
-          setWishlist([]);
         }
       }
       return;
@@ -133,11 +178,11 @@ export const CartProvider = ({ children }) => {
     const cachedKey = `urvaah_wishlist_${userId}`;
 
     // 1. Instant load from localStorage cache if available
-    const cached = localStorage.getItem(cachedKey);
+    const cached = localStorage.getItem(cachedKey) || localStorage.getItem('urvaah_guest_wishlist');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setWishlist(parsed.map(String));
         }
       } catch (e) {}
@@ -147,9 +192,27 @@ export const CartProvider = ({ children }) => {
     apiClient(`/api/wishlist/${userId}`)
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
-          const ids = res.data.map((item) => String(item.productId || item.product_id));
-          setWishlist(ids);
-          localStorage.setItem(cachedKey, JSON.stringify(ids));
+          if (res.data.length > 0) {
+            const ids = res.data.map((item) => String(item.productId || item.product_id));
+            setWishlist(ids);
+            localStorage.setItem(cachedKey, JSON.stringify(ids));
+          } else {
+            // Backend wishlist is empty. If local wishlist has items, PRESERVE them and sync to backend!
+            setWishlist((prevWishlist) => {
+              if (prevWishlist && prevWishlist.length > 0) {
+                for (const id of prevWishlist) {
+                  apiClient('/api/wishlist/toggle', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId, productId: id })
+                  }).catch(() => {});
+                }
+                localStorage.setItem(cachedKey, JSON.stringify(prevWishlist));
+                return prevWishlist;
+              }
+              localStorage.setItem(cachedKey, JSON.stringify([]));
+              return [];
+            });
+          }
         }
       })
       .catch((err) => {

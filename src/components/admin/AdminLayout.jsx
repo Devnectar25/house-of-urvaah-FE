@@ -22,7 +22,9 @@ import {
   Sliders,
   Sparkles,
   Columns,
-  Video
+  Video,
+  HelpCircle,
+  Inbox
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -47,7 +49,9 @@ const ALL_NAV_ITEMS = [
   { name: 'Refund Desk', path: '/admin/refunds', icon: RotateCcw, key: 'refunds' },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
+  { name: 'Leads', path: '/admin/leads', icon: Inbox, key: 'leads' },
   { name: 'Reviews', path: '/admin/reviews', icon: Star, key: 'reviews' },
+  { name: 'FAQs', path: '/admin/faqs', icon: HelpCircle, key: 'faqs' },
   {
     name: 'Modify UI',
     path: '/admin/modify-ui',
@@ -121,17 +125,26 @@ export const AdminLayout = () => {
 
 
 
-  // Prevent background scrolling when mobile sidebar is open
+  // Prevent background scrolling when mobile sidebar or logout modal is open
   useEffect(() => {
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || showLogoutModal) {
       document.body.style.overflow = 'hidden';
+      if (contentScrollRef.current) {
+        contentScrollRef.current.style.overflow = 'hidden';
+      }
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      if (contentScrollRef.current) {
+        contentScrollRef.current.style.overflow = '';
+      }
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      if (contentScrollRef.current) {
+        contentScrollRef.current.style.overflow = '';
+      }
     };
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, showLogoutModal]);
 
   // Confirmed logout handler
   const handleConfirmLogout = () => {
@@ -154,7 +167,7 @@ export const AdminLayout = () => {
     if (item.superAdminOnly) {
       return isSuperAdmin;
     }
-    if (isSuperAdmin || item.key === 'dashboard' || item.key === 'modify-ui') {
+    if (isSuperAdmin || item.key === 'dashboard' || item.key === 'modify-ui' || item.key === 'faqs') {
       return true;
     }
     return userPermissions.includes(item.key);
@@ -399,6 +412,8 @@ export const AdminLayout = () => {
         {/* ========================================================================= */}
         <div
           ref={contentScrollRef}
+          id="admin-content-scroll"
+          data-admin-scroll="true"
           className="flex-1 overflow-y-auto h-full min-h-0 w-full no-scrollbar scroll-smooth overscroll-contain"
         >
           <main className="p-5 sm:p-7 lg:p-9 w-full max-w-7xl mx-auto">

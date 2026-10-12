@@ -7,16 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & Build
 node_modules
 dist
 dist-ssr
 *.local
+.eslintcache
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -27,4 +30,15 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Temporary and Cache files
+.cache/
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.patch
+*.diff
+
 

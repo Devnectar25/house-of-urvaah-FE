@@ -34,19 +34,19 @@ export const CATEGORIES = [
     }
   },
   {
-    id: 'summer-dresses',
-    name: 'SUMMER DRESSES',
-    image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000',
-    itemCount: '45 Items',
+    id: 'kurti',
+    name: 'KURTI',
+    image: getSupabaseMediaUrl('Images/Kurti_2.png'),
+    itemCount: '24 Items',
     subcategories: [
-      { name: 'Breezy Linen Midis', featured: true },
-      { name: 'Floral Maxis', featured: true },
-      { name: 'Sundresses', featured: false }
+      { name: 'Cora Cotton Kurtis', featured: true },
+      { name: 'Corset Silhouette Kurtis', featured: true },
+      { name: 'Hand-Embroidered Tunics', featured: false }
     ],
     promo: {
-      title: 'BREEZY ELEGANCE',
-      subtitle: 'SUMMER DRESSES',
-      image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=800'
+      title: 'HERITAGE REFINED',
+      subtitle: 'KURTI ENSEMBLES',
+      image: getSupabaseMediaUrl('Images/Kurti_2.png')
     }
   },
   {
@@ -83,11 +83,11 @@ export const FEATURED_CATEGORIES = [
     link: '#co-ord-sets',
   },
   {
-    id: 'summer-dresses',
-    name: 'SUMMER DRESSES',
-    subtitle: 'BREEZY & FLUID',
-    image: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&q=80&w=1000',
-    link: '#summer-dresses',
+    id: 'kurti',
+    name: 'KURTI',
+    subtitle: 'HANDCRAFTED ENSEMBLES',
+    image: getSupabaseMediaUrl('Images/Kurti_2.png'),
+    link: '#kurti',
   },
   {
     id: 'party-wear',

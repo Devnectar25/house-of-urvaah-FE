@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Search, UserCheck, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 // Number formatting helpers
 function formatNumber(val) {
@@ -42,6 +43,8 @@ function formatDateTime(dateStr, fallbackStr) {
 }
 
 export const ActiveCustomersModal = ({ isOpen, onClose, period = '30d' }) => {
+  useModalScrollLock(isOpen, onClose);
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

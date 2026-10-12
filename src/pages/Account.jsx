@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, FileText, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
@@ -275,11 +275,9 @@ export const Account = () => {
 
   const tabConfig = [
     { name: 'VIEW ORDERS', icon: Package, badge: orders.length > 0 ? orders.length : null },
-    { name: 'INVOICES', icon: FileText },
     { name: 'VIEW WISHLIST', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
     { name: 'MY COUPONS', icon: Ticket },
-    { name: 'ACCOUNT DETAILS', icon: User },
-    { name: 'SIGN OUT', icon: LogOut, isDanger: true }
+    { name: 'ACCOUNT DETAILS', icon: User }
   ];
 
   const tabs = tabConfig.map(t => t.name);
@@ -1511,17 +1509,6 @@ export const Account = () => {
           </div>
         )}
 
-        {activeTab === 'INVOICES' && (
-          <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
-            <FileText className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
-              TAX INVOICES & STATEMENTS
-            </h3>
-            <p className="text-xs text-neutral-500 tracking-wider uppercase max-w-md mx-auto">
-              No tax invoices or downloadable receipts currently available for this account.
-            </p>
-          </div>
-        )}
 
         {activeTab === 'VIEW WISHLIST' && (
           <div className="space-y-6">

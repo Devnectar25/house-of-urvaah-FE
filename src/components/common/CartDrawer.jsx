@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const CartDrawer = () => {
   const navigate = useNavigate();
@@ -21,6 +22,9 @@ export const CartDrawer = () => {
     openAuthModal,
     setPendingAction,
   } = useCart();
+
+  // Lock background screen scroll while Cart Drawer is open
+  useModalScrollLock(isCartOpen, () => setIsCartOpen(false));
 
   const handleProceedToCheckout = () => {
     if (isProceeding) return;
@@ -62,6 +66,14 @@ export const CartDrawer = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             onClick={() => setIsCartOpen(false)}
+            onWheel={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40"
           />
 
@@ -71,7 +83,9 @@ export const CartDrawer = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md h-full bg-white border-l border-neutral-200 shadow-2xl overflow-hidden flex flex-col text-brand-dark"
+            onWheel={(e) => e.stopPropagation()}
+            style={{ overscrollBehavior: 'contain' }}
+            className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md h-full bg-white border-l border-neutral-200 shadow-2xl overflow-hidden flex flex-col text-brand-dark overscroll-contain"
           >
             {/* Header */}
             <div className="p-5 sm:p-6 border-b border-neutral-100 flex items-center justify-between bg-[#FAF8F3]">
@@ -115,7 +129,10 @@ export const CartDrawer = () => {
             </div>
 
             {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto p-5 sm:p-6 divide-y divide-neutral-100">
+            <div
+              style={{ overscrollBehavior: 'contain' }}
+              className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 divide-y divide-neutral-100"
+            >
               {cart.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center text-neutral-400">
                   <ShoppingBag className="w-12 h-12 stroke-[1] mb-4 text-neutral-300" />

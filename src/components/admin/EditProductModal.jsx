@@ -8,15 +8,18 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiClient, clearAuthSession } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 const DEFAULT_CATEGORIES = [
   { id: 1, category_id: 1, name: 'CORSET TOPS' },
   { id: 2, category_id: 2, name: 'CO-ORD SETS' },
-  { id: 3, category_id: 3, name: 'SUMMER DRESSES' },
+  { id: 3, category_id: 3, name: 'KURTI' },
   { id: 4, category_id: 4, name: 'PARTY WEAR' }
 ];
 
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
+  useModalScrollLock(Boolean(isOpen && product), onClose);
+
   // Refs for focusing first invalid field on submit validation
   const nameRef = useRef(null);
   const categoryRef = useRef(null);
@@ -579,8 +582,23 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   if (!isOpen || !product) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
+    <div
+      className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !updating && !deleting) {
+          onClose();
+        }
+      }}
+      onWheel={(e) => {
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
+    >
+      <div
+        className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200 overscroll-contain"
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/90 shrink-0">

@@ -19,7 +19,12 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
-  Star
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  RotateCcw,
+  Mail,
+  Copy
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
@@ -27,7 +32,9 @@ import { productApi } from '../services/productApi';
 import { deliveryApi } from '../services/deliveryApi';
 import { SEOHead } from '../components/common/SEOHead';
 import { ProductReviews } from '../components/common/ProductReviews';
+import { RelatedProducts } from '../components/product/RelatedProducts';
 import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWidget';
+import { useModalScrollLock } from '../hooks/useModalScrollLock';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -72,9 +79,15 @@ export const ProductDetail = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Gallery & Image Viewer States
+  // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
-  const [isMainHovered, setIsMainHovered] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomCoords, setZoomCoords] = useState({ x: 50, y: 50 });
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
+  const [isDraggingLightbox, setIsDraggingLightbox] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
 
   // Size Selection State
   const [selectedSize, setSelectedSize] = useState('M');
@@ -84,6 +97,8 @@ export const ProductDetail = () => {
   const [copiedToast, setCopiedToast] = useState(false);
   const [copiedCoupon, setCopiedCoupon] = useState('');
   const [isCouponsModalOpen, setIsCouponsModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   const [pincode, setPincode] = useState('');
   const [pincodeResult, setPincodeResult] = useState(null);
@@ -208,6 +223,133 @@ export const ProductDetail = () => {
     scrollToMobileSlide(nextIdx);
   };
 
+  const handleMainImageClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
+    setZoomCoords({ x, y });
+    setIsZoomed((prev) => !prev);
+  };
+
+  const handleMainMouseMove = (e) => {
+    if (!isZoomed) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
+    setZoomCoords({ x, y });
+  };
+
+  const handleMainMouseLeave = () => {
+    setIsZoomed(false);
+  };
+
+  const openLightbox = (imgUrl) => {
+    if (imgUrl) setSelectedImage(imgUrl);
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+    setIsLightboxOpen(true);
+  };
+
+  const closeLightbox = () => {
+    setIsLightboxOpen(false);
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+    setIsDraggingLightbox(false);
+  };
+
+  const handleZoomIn = () => {
+    setLightboxZoom((prev) => Math.min(Number((prev + 0.5).toFixed(2)), 3.5));
+  };
+
+  const handleZoomOut = () => {
+    setLightboxZoom((prev) => {
+      const next = Math.max(Number((prev - 0.5).toFixed(2)), 1);
+      if (next === 1) setLightboxPan({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+  };
+
+  const currentLightboxIndex = Math.max(0, gallery.indexOf(selectedImage || gallery[0]));
+
+  const handlePrevLightboxImage = () => {
+    if (gallery.length <= 1) return;
+    const prevIdx = (currentLightboxIndex - 1 + gallery.length) % gallery.length;
+    setSelectedImage(gallery[prevIdx]);
+    setLightboxPan({ x: 0, y: 0 });
+  };
+
+  const handleNextLightboxImage = () => {
+    if (gallery.length <= 1) return;
+    const nextIdx = (currentLightboxIndex + 1) % gallery.length;
+    setSelectedImage(gallery[nextIdx]);
+    setLightboxPan({ x: 0, y: 0 });
+  };
+
+  const handleLightboxMouseDown = (e) => {
+    if (lightboxZoom <= 1) return;
+    setIsDraggingLightbox(true);
+    dragStartRef.current = {
+      x: e.clientX - lightboxPan.x,
+      y: e.clientY - lightboxPan.y
+    };
+  };
+
+  const handleLightboxMouseMove = (e) => {
+    if (!isDraggingLightbox || lightboxZoom <= 1) return;
+    setLightboxPan({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y
+    });
+  };
+
+  const handleLightboxMouseUp = () => {
+    setIsDraggingLightbox(false);
+  };
+
+  const handleLightboxDoubleClick = () => {
+    if (lightboxZoom > 1) {
+      handleResetZoom();
+    } else {
+      setLightboxZoom(2);
+    }
+  };
+
+  // Lock background scrolling on lightbox zoom modal
+  useModalScrollLock(isLightboxOpen, closeLightbox);
+
+  // Keyboard controls for Lightbox
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') {
+        handlePrevLightboxImage();
+      } else if (e.key === 'ArrowRight') {
+        handleNextLightboxImage();
+      } else if (e.key === '+' || e.key === '=') {
+        handleZoomIn();
+      } else if (e.key === '-') {
+        handleZoomOut();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLightboxOpen, currentLightboxIndex, gallery, lightboxZoom]);
+
+  // Lock background scrolling and enable ESC key close for Size Chart, Coupons, and Share modals
+  const isAnyDetailModalOpen = isSizeChartOpen || isCouponsModalOpen || isShareModalOpen;
+  useModalScrollLock(isAnyDetailModalOpen, () => {
+    setIsSizeChartOpen(false);
+    setIsCouponsModalOpen(false);
+    setIsShareModalOpen(false);
+  });
+
   useEffect(() => {
     if (product) {
       if (gallery && gallery.length > 0) {
@@ -263,13 +405,98 @@ export const ProductDetail = () => {
     setTimeout(() => setIsAdded(false), 2000);
   };
 
-  const handleShare = () => {
+  const handleOpenShare = () => {
+    setIsShareModalOpen(true);
+  };
+
+  const handleCopyLink = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
-      setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 2500);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
     }
   };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product?.name || 'House of Urvaah',
+          text: `Discover ${product?.name} at House of Urvaah`,
+          url: window.location.href
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          handleCopyLink();
+        }
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareTitle = product?.name ? `Discover ${product.name} on House of Urvaah` : 'House of Urvaah Luxury Wear';
+  const shareImage = product?.image || '';
+
+  const shareChannels = [
+    {
+      id: 'whatsapp',
+      name: 'WhatsApp',
+      icon: (
+        <svg className="w-5 h-5 fill-current text-[#25D366]" viewBox="0 0 24 24">
+          <path d="M17.472 14.382c-.301-.15-1.78-.879-2.056-.98-.276-.1-.477-.15-.678.15-.2.301-.778.98-.954 1.18-.176.2-.352.226-.653.075-.301-.15-1.272-.469-2.423-1.496-.896-.799-1.501-1.786-1.677-2.087-.176-.301-.019-.464.132-.614.136-.135.301-.352.452-.527.15-.175.2-.301.301-.502.1-.2.05-.376-.025-.526-.075-.15-.678-1.634-.929-2.238-.244-.589-.493-.509-.678-.519-.176-.01-.376-.01-.577-.01-.201 0-.527.075-.803.376s-1.054 1.03-1.054 2.511 1.08 2.912 1.23 3.113c.15.2 2.125 3.245 5.148 4.551.719.311 1.28.497 1.719.636.723.23 1.381.197 1.901.12.579-.087 1.78-.727 2.031-1.43.251-.703.251-1.305.176-1.43-.076-.126-.276-.201-.577-.352zM12 2C6.477 2 2 6.477 2 12c0 1.891.526 3.662 1.442 5.177L2.163 21.84l4.801-1.258A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.2c-1.637 0-3.159-.494-4.428-1.341l-.317-.214-2.85.747.76-2.778-.235-.374A8.167 8.167 0 013.8 12c0-4.522 3.678-8.2 8.2-8.2s8.2 3.678 8.2 8.2-3.678 8.2-8.2 8.2z"/>
+        </svg>
+      ),
+      action: () => {
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareTitle} - ${shareUrl}`)}`, '_blank');
+      }
+    },
+    {
+      id: 'facebook',
+      name: 'Facebook',
+      icon: (
+        <svg className="w-5 h-5 fill-current text-[#1877F2]" viewBox="0 0 24 24">
+          <path d="M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.374 14.5 5 15.5 5H18V0h-3.808C10.592 0 9 1.583 9 4.615V8z"/>
+        </svg>
+      ),
+      action: () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+      }
+    },
+    {
+      id: 'pinterest',
+      name: 'Pinterest',
+      icon: (
+        <svg className="w-5 h-5 fill-current text-[#E60023]" viewBox="0 0 24 24">
+          <path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738.098.119.112.224.083.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.627 0 12-5.373 12-12C24 5.372 18.627 0 12 0z"/>
+        </svg>
+      ),
+      action: () => {
+        window.open(`https://pinterest.com/pin/create/button/?url=${encodeURIComponent(shareUrl)}&media=${encodeURIComponent(shareImage)}&description=${encodeURIComponent(shareTitle)}`, '_blank');
+      }
+    },
+    {
+      id: 'twitter',
+      name: 'X (Twitter)',
+      icon: (
+        <svg className="w-4 h-4 fill-current text-black" viewBox="0 0 24 24">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      ),
+      action: () => {
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareTitle)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+      }
+    },
+    {
+      id: 'email',
+      name: 'Email',
+      icon: <Mail className="w-5 h-5 stroke-[1.75] text-neutral-700" />,
+      action: () => {
+        window.open(`mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodeURIComponent(`${shareTitle}\n\nView piece online:\n${shareUrl}`)}`);
+      }
+    }
+  ];
 
   const getDeliveryDateObject = (offset1 = 5, offset2 = 6) => {
     const today = new Date();
@@ -435,7 +662,8 @@ export const ProductDetail = () => {
                 {gallery.map((imgUrl, idx) => (
                   <div
                     key={idx}
-                    className="w-full flex-shrink-0 snap-center relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden p-2 flex items-center justify-center aspect-[3/4]"
+                    onClick={() => openLightbox(imgUrl)}
+                    className="w-full flex-shrink-0 snap-center relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden p-2 flex items-center justify-center aspect-[3/4] cursor-pointer"
                   >
                     <img
                       src={imgUrl}
@@ -453,6 +681,17 @@ export const ProductDetail = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Mobile Zoom Trigger Badge */}
+              <button
+                type="button"
+                onClick={() => openLightbox(gallery[mobileSlideIndex] || gallery[0])}
+                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/80 hover:bg-black text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
+                aria-label="Zoom image"
+              >
+                <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
+                <span>Zoom</span>
+              </button>
 
               {/* Side Navigation Arrows (Matching second reference screenshot) */}
               {gallery.length > 1 && (
@@ -490,7 +729,10 @@ export const ProductDetail = () => {
                 {gallery.map((imgUrl, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setSelectedImage(imgUrl)}
+                    onClick={() => {
+                      setSelectedImage(imgUrl);
+                      setIsZoomed(false);
+                    }}
                     className={`w-16 h-20 flex-shrink-0 bg-neutral-100 overflow-hidden transition-all relative ${
                       selectedImage === imgUrl
                         ? 'ring-1.5 ring-black ring-offset-1 opacity-100 shadow-sm'
@@ -509,31 +751,70 @@ export const ProductDetail = () => {
                 ))}
               </div>
 
-              {/* Main Product Image Container */}
+              {/* Main Product Image Container with Interactive Click-to-Zoom */}
               <div
-                className="flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group"
-                onMouseEnter={() => setIsMainHovered(true)}
-                onMouseLeave={() => setIsMainHovered(false)}
+                className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-colors ${
+                  isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
+                }`}
+                onMouseMove={handleMainMouseMove}
+                onMouseLeave={handleMainMouseLeave}
+                onClick={handleMainImageClick}
+                title={isZoomed ? 'Click to zoom out' : 'Click image to zoom in'}
               >
                 <img
                   src={selectedImage || gallery[0]}
                   alt={product.name}
-                  className={`w-full h-full object-contain object-center transition-all duration-500 ease-out ${
-                    selectedImage === gallery[0] && product?.hoverImage && isMainHovered ? 'opacity-0' : 'opacity-100'
-                  }`}
+                  className="w-full h-full object-contain object-center select-none pointer-events-none will-change-transform"
+                  style={{
+                    transformOrigin: `${zoomCoords.x}% ${zoomCoords.y}%`,
+                    transform: isZoomed ? 'scale(2.4)' : 'scale(1)',
+                    transition: isZoomed
+                      ? 'transform 0.12s ease-out'
+                      : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                  }}
                 />
-                {selectedImage === gallery[0] && product?.hoverImage && (
-                  <img
-                    src={product.hoverImage}
-                    alt={`${product.name} alternate view`}
-                    className={`absolute inset-0 w-full h-full object-contain object-center p-2 transition-all duration-500 ease-out ${
-                      isMainHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
-                  />
-                )}
+
+                {/* Tag Badge */}
                 {product.tag && (
-                  <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5">
+                  <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 pointer-events-none">
                     {product.tag}
+                  </div>
+                )}
+
+                {/* Fullscreen Expand Action Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openLightbox(selectedImage || gallery[0]);
+                  }}
+                  className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 hover:bg-white text-black text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all hover:scale-105 cursor-pointer border border-black/10"
+                  title="Fullscreen view"
+                  aria-label="Fullscreen view"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-neutral-800" />
+                  <span>Fullscreen</span>
+                </button>
+
+                {/* Floating Zoom Action Badge */}
+                <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/85 text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all pointer-events-none">
+                  {isZoomed ? (
+                    <>
+                      <ZoomOut className="w-3.5 h-3.5 text-[#E6C687]" />
+                      <span>Click to Zoom Out</span>
+                    </>
+                  ) : (
+                    <>
+                      <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
+                      <span>Click to Zoom</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Magnification Level Indicator */}
+                {isZoomed && (
+                  <div className="absolute top-3 right-3 z-10 bg-black/80 text-[#E6C687] text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none tracking-widest border border-white/10">
+                    2.4X ZOOM
                   </div>
                 )}
               </div>
@@ -551,25 +832,6 @@ export const ProductDetail = () => {
                 {product.name}
               </h1>
 
-              {/* Star Rating & Customer Review Shortcut */}
-              <div className="flex items-center gap-2 mt-[10px] font-sans">
-                <a
-                  href="#customer-reviews"
-                  className="inline-flex items-center gap-1.5 text-xs text-neutral-600 hover:text-black transition-colors"
-                  title="Jump to Customer Reviews"
-                >
-                  <div className="flex items-center text-amber-500">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-500" />
-                  </div>
-                  <span className="font-semibold text-neutral-900 font-sans">
-                    {parseFloat(product.rating || 5).toFixed(1)}
-                  </span>
-                  <span className="text-neutral-300">·</span>
-                  <span className="underline underline-offset-2 text-neutral-500 hover:text-neutral-900">
-                    {product.reviews || product.reviews_count || 1} {(product.reviews || product.reviews_count) === 1 ? 'Customer Review' : 'Customer Reviews'}
-                  </span>
-                </a>
-              </div>
 
               {product.shortDescription && (
                 <p className="text-xs sm:text-sm text-neutral-500 font-sans mt-1.5 leading-relaxed">
@@ -690,17 +952,12 @@ export const ProductDetail = () => {
 
               {/* Share Icon Button */}
               <button
-                onClick={handleShare}
-                className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black transition-all relative cursor-pointer shrink-0"
+                onClick={handleOpenShare}
+                className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
                 aria-label="Share product"
-                title="Share product link"
+                title="Share product with friends"
               >
                 <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-                {copiedToast && (
-                  <span className="absolute -top-8 bg-black text-white text-[10px] py-1 px-2 font-sans font-medium tracking-wider uppercase whitespace-nowrap shadow-lg rounded-xs">
-                    Link Copied!
-                  </span>
-                )}
               </button>
             </div>
 
@@ -865,12 +1122,24 @@ export const ProductDetail = () => {
 
         {/* CUSTOMER REVIEWS & RATINGS SECTION */}
         <ProductReviews productId={product.id} productName={product.name} />
+
+        {/* RELATED PRODUCTS SECTION */}
+        <RelatedProducts currentProduct={product} />
       </div>
 
       {/* SIZE CHART MODAL OVERLAY */}
       {isSizeChartOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full p-6 relative font-serif shadow-2xl border border-neutral-200">
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain select-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsSizeChartOpen(false);
+          }}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white max-w-md w-full p-6 relative font-serif shadow-2xl border border-neutral-200 my-auto overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setIsSizeChartOpen(false)}
               className="absolute top-3.5 right-3.5 p-1.5 text-neutral-600 hover:text-black transition-colors cursor-pointer"
@@ -953,8 +1222,17 @@ export const ProductDetail = () => {
 
       {/* ALL COUPONS MODAL OVERLAY */}
       {isCouponsModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full p-6 relative font-serif shadow-2xl border border-neutral-200 max-h-[85vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain select-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsCouponsModalOpen(false);
+          }}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white max-w-lg w-full p-6 relative font-serif shadow-2xl border border-neutral-200 max-h-[85vh] overflow-y-auto my-auto overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setIsCouponsModalOpen(false)}
               className="absolute top-3.5 right-3.5 p-1.5 text-neutral-600 hover:text-black transition-colors cursor-pointer"
@@ -1015,6 +1293,276 @@ export const ProductDetail = () => {
             >
               CLOSE OFFERS
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* FULLSCREEN LIGHTBOX ZOOM MODAL */}
+      {isLightboxOpen && (
+        <div
+          className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-md flex flex-col justify-between select-none animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeLightbox();
+          }}
+        >
+          {/* Top Bar: Title, Zoom Controls, Close Button */}
+          <div className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between border-b border-white/10 bg-black/60 backdrop-blur-sm z-20">
+            {/* Left: Product Title & View Counter */}
+            <div className="flex items-center gap-3">
+              <span className="text-white/90 font-serif text-xs sm:text-sm tracking-widest uppercase truncate max-w-[180px] sm:max-w-xs">
+                {product.name}
+              </span>
+              <span className="text-[11px] font-mono text-[#E6C687] bg-white/10 px-2 py-0.5 rounded tracking-wider">
+                {currentLightboxIndex + 1} / {gallery.length}
+              </span>
+            </div>
+
+            {/* Center: Zoom Controls Toolbar */}
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-900/90 border border-white/15 rounded-full px-2 sm:px-3 py-1">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={lightboxZoom <= 1}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                title="Zoom Out (-)"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+
+              <span className="text-[11px] font-mono text-white/90 min-w-[42px] text-center select-none font-medium">
+                {Math.round(lightboxZoom * 100)}%
+              </span>
+
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={lightboxZoom >= 3.5}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                title="Zoom In (+)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="w-px h-4 bg-white/20 mx-0.5" />
+
+              <button
+                type="button"
+                onClick={handleResetZoom}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Reset Zoom (1:1)"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Right: Close button */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={closeLightbox}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-sans font-medium tracking-wider uppercase rounded-full transition-colors cursor-pointer"
+                aria-label="Close zoom viewer"
+              >
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline text-[10px] text-white/60">ESC</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Center Main Zoom Stage */}
+          <div
+            className={`relative flex-1 w-full overflow-hidden flex items-center justify-center p-4 ${
+              lightboxZoom > 1 ? (isDraggingLightbox ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'
+            }`}
+            onMouseDown={handleLightboxMouseDown}
+            onMouseMove={handleLightboxMouseMove}
+            onMouseUp={handleLightboxMouseUp}
+            onDoubleClick={handleLightboxDoubleClick}
+          >
+            {/* Gallery Left Arrow */}
+            {gallery.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevLightboxImage();
+                }}
+                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 transition-all hover:scale-105 cursor-pointer backdrop-blur-sm"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Zoomable Image Container */}
+            <div
+              className="max-w-[85vw] max-h-[75vh] flex items-center justify-center transition-transform select-none"
+              style={{
+                transform: `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom})`,
+                transition: isDraggingLightbox ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
+              }}
+            >
+              <img
+                src={selectedImage || gallery[0]}
+                alt={product.name}
+                draggable={false}
+                className="max-w-full max-h-[75vh] object-contain drop-shadow-2xl pointer-events-none select-none"
+              />
+            </div>
+
+            {/* Gallery Right Arrow */}
+            {gallery.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNextLightboxImage();
+                }}
+                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 transition-all hover:scale-105 cursor-pointer backdrop-blur-sm"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Drag Hint Pill when Zoomed In */}
+            {lightboxZoom > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/75 border border-white/20 text-[#E6C687] text-[11px] font-sans px-3 py-1 rounded-full backdrop-blur-sm pointer-events-none tracking-wide animate-pulse">
+                Click & drag to explore fabric details
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Thumbnails Strip */}
+          <div className="w-full py-3 px-4 border-t border-white/10 bg-black/60 backdrop-blur-sm flex items-center justify-center gap-2.5 z-20">
+            {gallery.map((imgUrl, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedImage(imgUrl);
+                  setLightboxPan({ x: 0, y: 0 });
+                }}
+                className={`w-12 h-14 sm:w-14 sm:h-16 overflow-hidden rounded border transition-all cursor-pointer ${
+                  (selectedImage || gallery[0]) === imgUrl
+                    ? 'border-[#E6C687] ring-2 ring-[#E6C687]/40 scale-105 opacity-100'
+                    : 'border-white/20 opacity-50 hover:opacity-100 hover:border-white/50'
+                }`}
+              >
+                <img
+                  src={imgUrl}
+                  alt={`Thumbnail ${idx + 1}`}
+                  className="w-full h-full object-cover object-top pointer-events-none"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LUXURY PRODUCT SHARE MODAL */}
+      {isShareModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-in fade-in duration-200 overflow-y-auto overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsShareModalOpen(false);
+          }}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white text-brand-dark w-full max-w-md border border-neutral-200 shadow-2xl p-6 sm:p-7 relative font-serif animate-in zoom-in-95 duration-200 my-auto overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsShareModalOpen(false)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-black transition-colors p-1.5 cursor-pointer"
+              aria-label="Close share dialog"
+            >
+              <X className="w-5 h-5 stroke-[1.75]" />
+            </button>
+
+            {/* Header with Product Preview */}
+            <div className="flex items-center gap-3.5 pb-5 border-b border-neutral-100">
+              <div className="w-14 h-18 bg-[#F5F5F0] overflow-hidden border border-neutral-200/80 shrink-0 flex items-center justify-center">
+                <img
+                  src={selectedImage || product?.image || gallery[0]}
+                  alt={product?.name}
+                  className="w-full h-full object-cover object-top"
+                />
+              </div>
+              <div className="min-w-0 pr-6">
+                <span className="text-[10px] font-sans font-semibold tracking-[0.2em] uppercase text-neutral-400 block mb-0.5">
+                  SHARE THIS PIECE
+                </span>
+                <h3 className="text-sm sm:text-base font-semibold tracking-wide uppercase truncate text-brand-dark">
+                  {product?.name}
+                </h3>
+                <span className="text-xs font-sans text-neutral-600 font-semibold block mt-1">
+                  ₹{Number(product?.price || 10990).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Social Share Channels Grid */}
+            <div className="py-5">
+              <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-neutral-400 block mb-3.5">
+                SHARE VIA
+              </span>
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {shareChannels.map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={ch.action}
+                    className="flex flex-col items-center gap-2 group cursor-pointer"
+                  >
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-neutral-200 bg-neutral-50 group-hover:bg-neutral-100 group-hover:border-neutral-400 flex items-center justify-center group-hover:scale-105 transition-all shadow-2xs">
+                      {ch.icon}
+                    </div>
+                    <span className="text-[10px] font-sans font-medium text-neutral-600 tracking-wider truncate w-full group-hover:text-black">
+                      {ch.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Copy Link Section */}
+            <div className="pt-2 pb-1">
+              <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-neutral-400 block mb-2">
+                OR COPY LINK
+              </span>
+              <div className="flex items-center gap-2 border border-neutral-300 p-1.5 bg-[#FAF8F5]">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  className="w-full text-xs font-mono text-neutral-600 bg-transparent px-2 outline-none select-all truncate"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="px-3.5 py-1.5 bg-black text-white text-[11px] font-sans font-bold tracking-[0.16em] uppercase hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
+                >
+                  {shareCopied ? 'COPIED! ✓' : 'COPY'}
+                </button>
+              </div>
+            </div>
+
+            {/* Native Device Share Sheet */}
+            {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+              <button
+                type="button"
+                onClick={handleNativeShare}
+                className="w-full mt-4 py-2.5 border border-black text-black hover:bg-black hover:text-white transition-colors text-xs font-sans font-semibold tracking-[0.2em] uppercase flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Share2 className="w-4 h-4 stroke-[1.75]" />
+                <span>DEVICE SHARE OPTIONS</span>
+              </button>
+            )}
           </div>
         </div>
       )}
