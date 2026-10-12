@@ -18,9 +18,10 @@ import {
   Mail
 } from 'lucide-react';
 import couponService from '../../services/couponService';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpdated }) => {
-  if (!isOpen || !coupon) return null;
+  useModalScrollLock(Boolean(isOpen && coupon), onClose);
 
   // ── State Declaration ───────────────────────────────────────────────────────
   const [targetingMode, setTargetingMode] = useState('all'); // 'all' | 'top' | 'active'
@@ -224,9 +225,26 @@ export const AssignCustomersModal = ({ isOpen, onClose, coupon, onAssignmentUpda
     }
   };
 
+  if (!isOpen || !coupon) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200">
+    <div
+      className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 font-admin overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !assigning && !revokingUser) {
+          onClose();
+        }
+      }}
+      onWheel={(e) => {
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
+    >
+      <div
+        className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] border border-neutral-200 overscroll-contain"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* ── Modal Header ──────────────────────────────────────────────────── */}
         <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/90 shrink-0">

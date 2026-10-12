@@ -10,9 +10,11 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) => {
-  if (!isOpen) return null;
+  // Lock background scrolling on both window and admin layout content container
+  useModalScrollLock(isOpen, onClose);
 
   const nameInputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -264,10 +266,24 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 font-admin">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 font-admin overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) {
+          onClose();
+        }
+      }}
+      onWheel={(e) => {
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
+    >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 flex flex-col max-h-[85vh] sm:max-h-[88vh] transition-all"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-200 flex flex-col max-h-[85vh] sm:max-h-[88vh] transition-all overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -292,7 +308,7 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+          <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
 
           {/* Submit Error Banner */}
           {submitError && (

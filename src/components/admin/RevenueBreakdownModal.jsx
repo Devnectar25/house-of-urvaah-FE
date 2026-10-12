@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 // Number & Currency formatting helpers
 function formatCurrency(val) {
@@ -58,6 +59,8 @@ function getOrderStatusPill(status) {
 }
 
 export const RevenueBreakdownModal = ({ isOpen, onClose, period = '30d' }) => {
+  useModalScrollLock(isOpen, onClose);
+
   const [ordersData, setOrdersData] = useState({ grandTotal: 0, orders: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

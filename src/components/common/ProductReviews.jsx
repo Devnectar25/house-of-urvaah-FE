@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, CheckCircle2, MessageSquare, Plus, X, Sparkles, Filter, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Star, CheckCircle2, MessageSquare, Plus, X, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import { apiClient, getStoredUser } from '../../lib/apiClient';
 
 export const ProductReviews = ({ productId, productName }) => {
@@ -263,34 +263,6 @@ export const ProductReviews = ({ productId, productName }) => {
         </div>
       </div>
 
-      {/* Filter Tabs if reviews exist */}
-      {reviews.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-4 border-b border-neutral-200/80">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-neutral-500" />
-            <span className="text-xs font-sans font-semibold tracking-wider uppercase text-neutral-700">
-              FILTER BY:
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 font-sans text-xs">
-            {['all', '5', '4', '3', '2', '1'].map((val) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setFilterRating(val)}
-                className={`px-3 py-1.5 uppercase tracking-wider transition-colors cursor-pointer border ${
-                  filterRating === val
-                    ? 'bg-black text-white border-black'
-                    : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
-                }`}
-              >
-                {val === 'all' ? `ALL (${reviews.length})` : `${val} STARS`}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Reviews List / Empty State */}
       {loading ? (

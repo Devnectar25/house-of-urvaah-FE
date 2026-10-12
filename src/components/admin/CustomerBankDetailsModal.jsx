@@ -9,6 +9,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const CustomerBankDetailsModal = ({
   orderId,
@@ -22,17 +23,8 @@ export const CustomerBankDetailsModal = ({
   const [error, setError] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
 
-  // Lock background scrolling when modal is active
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  // Lock background scrolling on both window and admin layout content container
+  useModalScrollLock(isOpen, onClose);
 
   // Copy to clipboard with visual feedback & optional toast
   const handleCopy = (key, text) => {

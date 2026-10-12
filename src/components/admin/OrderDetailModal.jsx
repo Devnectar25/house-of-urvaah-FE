@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 // Status options matching House of Urvaah lifecycle and policy values
 const ORDER_STATUS_OPTIONS = [
@@ -38,6 +39,9 @@ const PAYMENT_STATUS_OPTIONS = [
 ];
 
 export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated }) => {
+  // Lock background scrolling on body and admin container when modal is open
+  useModalScrollLock(isOpen, onClose);
+
   // Order Detail Fetch State (Hooks MUST be called unconditionally at top level!)
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -265,11 +269,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200 font-admin"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200 font-admin overscroll-contain"
       onClick={handleCloseModal}
+      onWheel={(e) => {
+        if (e.target === e.currentTarget) {
+          e.stopPropagation();
+        }
+      }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-neutral-200 my-auto transition-all max-h-[85vh] sm:max-h-[88vh] flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-neutral-200 my-auto transition-all max-h-[85vh] sm:max-h-[88vh] flex flex-col overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

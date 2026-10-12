@@ -13,6 +13,7 @@ import {
   FileText
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const ProcessRefundModal = ({
   isOpen,
@@ -21,6 +22,8 @@ export const ProcessRefundModal = ({
   targetStatus,
   onSuccess
 }) => {
+  useModalScrollLock(isOpen, onClose);
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [adminNote, setAdminNote] = useState('');

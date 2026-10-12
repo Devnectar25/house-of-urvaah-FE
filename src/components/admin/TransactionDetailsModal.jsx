@@ -21,6 +21,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 // Helper: Format date & time
 function formatDateTime(dateStr) {
@@ -89,6 +90,8 @@ export const TransactionDetailsModal = ({
   isOpen,
   onClose
 }) => {
+  useModalScrollLock(isOpen, onClose);
+
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

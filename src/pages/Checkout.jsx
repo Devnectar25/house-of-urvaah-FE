@@ -867,7 +867,7 @@ export const Checkout = () => {
     };
 
     return (
-      <div className="min-h-screen bg-white text-brand-dark pt-28 sm:pt-32 pb-20 font-serif selection:bg-brand-dark selection:text-white">
+      <div className="w-full bg-white text-brand-dark pt-24 sm:pt-28 pb-4 sm:pb-6 font-serif selection:bg-brand-dark selection:text-white">
         <SEOHead title="Order Confirmed | House of Urvaah" noindex={true} />
 
         {/* Order Cancellation Confirmation Toaster */}

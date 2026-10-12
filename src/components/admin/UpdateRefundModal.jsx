@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 // Supported refund stages / statuses matching backend schema
 const REFUND_STATUS_OPTIONS = [
@@ -172,17 +173,8 @@ export const UpdateRefundModal = ({
     reason: ''
   });
 
-  // Lock background scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  // Lock background scroll on window and admin content container
+  useModalScrollLock(isOpen, onClose);
 
   // Copy to clipboard with visual feedback & fallback
   const handleCopy = (key, text) => {

@@ -109,7 +109,7 @@ export const Wishlist = () => {
     );
   }
 
-  if (!user) {
+  if (!user && wishlist.length === 0) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 pt-32 text-center font-serif bg-white">
         <SEOHead
@@ -166,6 +166,20 @@ export const Wishlist = () => {
             </button>
           </div>
         </div>
+
+        {!user && wishlist.length > 0 && (
+          <div className="mb-8 p-4 bg-[#FAF8F3] border border-[#E7E2D8] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-sans">
+            <span className="text-neutral-700">
+              You are viewing your saved pieces as a guest. Sign in to permanently sync your saved wishlist across all devices.
+            </span>
+            <button
+              onClick={() => openAuthModal('login')}
+              className="text-xs font-semibold tracking-widest uppercase text-brand-dark hover:underline shrink-0 cursor-pointer"
+            >
+              SIGN IN / JOIN
+            </button>
+          </div>
+        )}
 
         {/* Wishlist Grid / Loading / Empty State */}
         {loadingProducts && resolvedProducts.length === 0 ? (

@@ -10,7 +10,7 @@ const TABS = ['WOMAN'];
 const FEATURED_PREVIEWS = [
   { label: 'CORSET TOPS', href: '#corset-tops' },
   { label: 'CO-ORD SETS', href: '#co-ord-sets' },
-  { label: 'SUMMER DRESSES', href: '#summer-dresses' },
+  { label: 'KURTI', href: '#kurti' },
   { label: 'PARTY WEAR', href: '#party-wear' }
 ];
 
@@ -109,7 +109,7 @@ export const MobileMenu = () => {
       if (!element) {
         if (targetId === 'steal-deals') {
           element = document.getElementById('whats-hot') || document.getElementById('recommended');
-        } else if (targetId === 'corset-tops' || targetId === 'co-ord-sets' || targetId === 'summer-dresses' || targetId === 'party-wear') {
+        } else if (targetId === 'corset-tops' || targetId === 'co-ord-sets' || targetId === 'kurti' || targetId === 'kurtis' || targetId === 'summer-dresses' || targetId === 'party-wear') {
           element = document.getElementById('whats-hot') || document.getElementById('recommended');
         }
       }
@@ -143,7 +143,8 @@ export const MobileMenu = () => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-            className="fixed top-0 left-0 z-50 h-full w-full max-w-md bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200"
+            style={{ overscrollBehavior: 'contain' }}
+            className="fixed top-0 left-0 z-50 h-full w-full max-w-md bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200 overscroll-contain"
           >
             {/* 1. TOP BAR: Close (X) on Top-Left; Account, Search, Wishlist, Cart on Top-Right */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-neutral-100 bg-white">
@@ -181,11 +182,11 @@ export const MobileMenu = () => {
                     setIsMobileMenuOpen(false);
                     setIsSearchOpen(true);
                   }}
-                  className="p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer flex items-center justify-center gap-1 border-b border-brand-dark/70 pb-0.5 font-serif"
+                  className="p-1.5 text-brand-dark hover:opacity-60 transition-opacity cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
                   aria-label="Search"
-                  title="Search"
+                  title="Search products"
                 >
-                  <span className="text-[10px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+                  <Search className="w-5 h-5 stroke-[1.5]" />
                 </button>
 
                 <Link
@@ -255,7 +256,10 @@ export const MobileMenu = () => {
             </div>
 
             {/* SCROLLABLE MENU BODY */}
-            <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-6">
+            <div
+              style={{ overscrollBehavior: 'contain' }}
+              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar p-5 space-y-6"
+            >
               {/* 3. FEATURED CATEGORIES: Text-Only 2-Column Grid */}
               <div>
                 <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block mb-3">

@@ -13,6 +13,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const PaymentDetailsModal = ({
   orderId,
@@ -20,6 +21,8 @@ export const PaymentDetailsModal = ({
   isOpen,
   onClose
 }) => {
+  useModalScrollLock(isOpen, onClose);
+
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

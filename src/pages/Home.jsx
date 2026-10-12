@@ -9,7 +9,6 @@ import { StealDeals } from '../components/home/StealDeals';
 import { TrendingOnGram } from '../components/home/TrendingOnGram';
 import { WhatsHot } from '../components/home/WhatsHot';
 import { BrandStory } from '../components/home/BrandStory';
-import { Newsletter } from '../components/home/Newsletter';
 import { AuthSection } from '../components/home/AuthSection';
 import { useCart } from '../context/CartContext';
 
@@ -63,9 +62,6 @@ export const Home = () => {
 
       {/* Login & Sign Up Atelier Section */}
       <AuthSection />
-
-      {/* 4.9 Newsletter Signup */}
-      <Newsletter />
     </main>
   );
 };

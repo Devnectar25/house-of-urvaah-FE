@@ -8,9 +8,23 @@ export const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isHomePage =
-    (location.pathname === '/' || location.pathname === '') &&
-    (!location.hash || location.hash === '#' || location.hash === '#/' || location.hash === '');
+  // All paths that render the Home page with the Hero Section
+  const HOME_PATHS = [
+    '/',
+    '',
+    '/new-in',
+    '/clothing',
+    '/dresses',
+    '/tops',
+    '/knitwear',
+    '/outerwear',
+    '/trousers',
+    '/shoes',
+    '/accessories',
+    '/sale',
+    '/login',
+  ];
+  const isHomePage = HOME_PATHS.includes(location.pathname);
   const {
     user,
     session,
@@ -38,26 +52,33 @@ export const Header = () => {
       return;
     }
 
-    const handleScroll = () => {
+    const checkScrollPosition = () => {
       const bestSellersSection = document.getElementById('best-sellers');
       if (bestSellersSection) {
         const rect = bestSellersSection.getBoundingClientRect();
-        // Navbar becomes solid as Best Sellers section reaches top of viewport (threshold 100px)
-        setIsScrolled(rect.top <= 100);
+        // Navbar becomes solid/blurry only when Best Sellers reaches top of viewport (80px header height)
+        setIsScrolled(rect.top <= 80);
       } else {
-        setIsScrolled(window.scrollY > 400);
+        // Fallback: Best sellers is placed after HeroParallaxBlock (~1.5 viewport heights down)
+        setIsScrolled(window.scrollY > (window.innerHeight * 1.5));
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleScroll, { passive: true });
-    handleScroll();
+    window.addEventListener('scroll', checkScrollPosition, { passive: true });
+    window.addEventListener('resize', checkScrollPosition, { passive: true });
+    
+    // Check immediately and on paint/microtask
+    checkScrollPosition();
+    const rafId = requestAnimationFrame(checkScrollPosition);
+    const timer = setTimeout(checkScrollPosition, 100);
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleScroll);
+      window.removeEventListener('scroll', checkScrollPosition);
+      window.removeEventListener('resize', checkScrollPosition);
+      cancelAnimationFrame(rafId);
+      clearTimeout(timer);
     };
-  }, [isHomePage, location.pathname, location.hash]);
+  }, [isHomePage, location.pathname]);
 
   return (
     <header className="fixed top-0 z-40 w-full font-serif select-none transition-all duration-300 ease-in-out">
@@ -70,7 +91,7 @@ export const Header = () => {
         className={`w-full pt-3 sm:pt-5 pb-3 px-3 sm:px-6 md:px-12 text-brand-dark transition-all duration-300 ease-in-out ${
           !isScrolled
             ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0'
+            : 'opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0 invisible'
         }`}
       >
         <div className="max-w-[1800px] mx-auto flex justify-between items-center">
@@ -88,11 +109,11 @@ export const Header = () => {
             {/* Search Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Search"
               title="Search products"
             >
-              <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+              <Search className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>
 
             {/* Wishlist Icon + Refined Badge */}
@@ -145,10 +166,10 @@ export const Header = () => {
         =====================================================
       */}
       <div
-        className={`w-full bg-white/95 backdrop-blur-md border-b border-neutral-200 text-brand-dark shadow-sm py-1 md:py-1.5 transition-all duration-300 ease-in-out ${
+        className={`w-full text-brand-dark py-1 md:py-1.5 transition-all duration-300 ease-in-out ${
           isScrolled
-            ? 'opacity-100 translate-y-0 pointer-events-auto relative'
-            : 'opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0'
+            ? 'bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-sm opacity-100 translate-y-0 pointer-events-auto relative'
+            : 'bg-transparent border-transparent opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0 invisible'
         }`}
       >
         <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-8 grid grid-cols-3 items-center min-h-[52px] sm:min-h-[60px] md:min-h-[68px]">
@@ -175,11 +196,11 @@ export const Header = () => {
             {/* Search Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-1.5 pb-0.5 border-b border-brand-dark/70 hover:opacity-60 transition-opacity text-brand-dark cursor-pointer font-serif mr-1"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Search"
               title="Search products"
             >
-              <span className="text-[11px] font-medium tracking-[0.2em] uppercase">SEARCH</span>
+              <Search className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>
 
             {/* Wishlist Icon + Refined Badge */}
