@@ -5,9 +5,14 @@ import {
   Trash2,
   Upload,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Star,
+  Sparkles,
+  Flame,
+  ExternalLink,
+  MessageSquare
 } from 'lucide-react';
-import { apiClient, clearAuthSession } from '../../lib/apiClient';
+import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 const DEFAULT_CATEGORIES = [
@@ -42,6 +47,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     active: true,
     promoted: false,
     is_recommended: false,
+    rating: 0,
+    reviews: 0,
     sizes: ['XS', 'S', 'M', 'L'],
     colors: ['Default'],
     specifications: [],
@@ -128,6 +135,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         }
         if (!Array.isArray(prodDetails)) prodDetails = [];
 
+        const ratingVal = parseFloat(data.rating ?? product?.rating) || 0;
+        const reviewsCount = parseInt(data.reviews ?? data.reviews_count ?? product?.reviews ?? product?.reviews_count) || 0;
+
         setFormData({
           name: data.name || data.title || '',
           category_id: data.categoryId || data.category_id || '',
@@ -143,6 +153,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           active: data.active !== false && data.is_active !== false,
           promoted: Boolean(data.promoted || data.is_featured),
           is_recommended: Boolean(data.is_recommended || data.isRecommended),
+          rating: ratingVal,
+          reviews: reviewsCount,
           sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['XS', 'S', 'M', 'L'],
           colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
           specifications: specPairs,
@@ -165,6 +177,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         }
         if (!Array.isArray(prodDetails)) prodDetails = [];
 
+        const fallbackRating = parseFloat(product?.rating) || 0;
+        const fallbackReviews = parseInt(product?.reviews ?? product?.reviews_count) || 0;
+
         setFormData({
           name: product.name || '',
           category_id: product.categoryId || product.category_id || '',
@@ -180,6 +195,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           active: product.active !== false,
           promoted: Boolean(product.promoted),
           is_recommended: Boolean(product.is_recommended || product.isRecommended),
+          rating: fallbackRating,
+          reviews: fallbackReviews,
           sizes: Array.isArray(product.sizes) ? product.sizes : ['XS', 'S', 'M', 'L'],
           colors: Array.isArray(product.colors) ? product.colors : ['Default'],
           specifications: [],
@@ -521,11 +538,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       }
     } catch (err) {
       console.error('Failed to update product:', err);
-      if (err.status === 401 || err.status === 403) {
-        clearAuthSession();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
-        }
+      if (err.status === 401) {
+        setSubmitError('Your admin session has expired. Please log in again.');
         return;
       }
 
@@ -560,11 +574,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       }
     } catch (err) {
       console.error('Failed to delete product:', err);
-      if (err.status === 401 || err.status === 403) {
-        clearAuthSession();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('urvaah:auth:unauthorized', { detail: { status: err.status } }));
-        }
+      if (err.status === 401) {
+        setSubmitError('Your admin session has expired. Please log in again.');
         return;
       }
 
@@ -601,21 +612,58 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       >
 
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/90 shrink-0">
+        <div className="px-6 py-4 border-b border-neutral-200 bg-neutral-50/90 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold font-admin text-brand-dark">Edit Product</h2>
+                <span className="text-xs text-neutral-500 font-mono bg-neutral-200/70 px-2 py-0.5 rounded-md font-medium">
+                  ID: #{product.id}
+                </span>
 
-          <div>
-            <h2 className="text-lg font-bold font-admin text-brand-dark">Edit Product</h2>
-            <p className="text-xs text-neutral-500 font-admin">
-              ID: #{product.id} {formData.name ? `• ${formData.name}` : ''}
-            </p>
+                {/* Rating Badge */}
+                {formData.reviews > 0 ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 shadow-2xs">
+                    <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                    <span>{Number(formData.rating || 5.0).toFixed(1)}</span>
+                    <span className="text-neutral-500 font-normal">({formData.reviews} {formData.reviews === 1 ? 'review' : 'reviews'})</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-500 border border-neutral-200">
+                    <Star className="w-2.5 h-2.5 text-neutral-400" />
+                    No reviews yet
+                  </span>
+                )}
+
+                {/* Promoted Badge */}
+                {formData.promoted && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                    <Flame className="w-3 h-3 text-amber-600 fill-amber-500" />
+                    Promoted
+                  </span>
+                )}
+
+                {/* Recommended Badge */}
+                {formData.is_recommended && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                    Recommended
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-neutral-600 font-admin truncate max-w-xl">
+                {formData.name || 'Manage product details, pricing, inventory, and visibility'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-full text-neutral-400 hover:text-brand-dark hover:bg-neutral-200/60 transition-colors shrink-0 cursor-pointer"
+              title="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full text-neutral-400 hover:text-brand-dark hover:bg-neutral-200/60 transition-colors"
-            title="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Modal Scrollable Body */}
@@ -675,6 +723,136 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   </div>
                 </div>
               )}
+
+              {/* Product Status & Merchandising Highlights Overview Banner */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-gradient-to-br from-neutral-50 to-neutral-100/70 rounded-2xl border border-neutral-200/90 shadow-2xs">
+                {/* 1. Customer Rating & Reviews */}
+                <div className="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-2xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                        Customer Rating
+                      </span>
+                      <Star className={`w-4 h-4 ${formData.reviews > 0 ? 'text-amber-500 fill-amber-400' : 'text-neutral-300'}`} />
+                    </div>
+                    {formData.reviews > 0 ? (
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="text-xl font-extrabold text-neutral-900 font-admin">
+                          {Number(formData.rating || 5.0).toFixed(1)}
+                        </span>
+                        <span className="text-xs text-neutral-400 font-medium">/ 5.0</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-semibold text-neutral-700 mt-1">
+                        No reviews yet
+                      </div>
+                    )}
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      {formData.reviews > 0
+                        ? `${formData.reviews} verified ${formData.reviews === 1 ? 'review' : 'reviews'}`
+                        : 'Awaiting customer feedback'}
+                    </p>
+                  </div>
+                  {formData.reviews > 0 ? (
+                    <a
+                      href={`/admin/reviews?search=${encodeURIComponent(formData.name || product.name || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-dark hover:underline pt-2 border-t border-neutral-100"
+                    >
+                      <MessageSquare className="w-3 h-3 text-neutral-500" />
+                      <span>Manage Reviews</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-neutral-400 ml-auto" />
+                    </a>
+                  ) : (
+                    <div className="mt-2.5 pt-2 border-t border-neutral-100 text-[10px] text-neutral-400">
+                      Standard catalog rating
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Promoted Status */}
+                <div className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
+                  formData.promoted
+                    ? 'bg-amber-50/80 border-amber-300 shadow-2xs'
+                    : 'bg-white border-neutral-200/80'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                        Promoted Status
+                      </span>
+                      <Flame className={`w-4 h-4 ${formData.promoted ? 'text-amber-600 fill-amber-500' : 'text-neutral-300'}`} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase ${
+                        formData.promoted
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                      }`}>
+                        {formData.promoted ? 'Promoted' : 'Not Promoted'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-1 leading-snug">
+                      {formData.promoted
+                        ? 'Highlights product with PROMOTED tag on storefront.'
+                        : 'Normal catalog positioning.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, promoted: !prev.promoted }))}
+                    className={`mt-2.5 inline-flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
+                      formData.promoted
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-700'
+                        : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-300'
+                    }`}
+                  >
+                    {formData.promoted ? 'Deactivate Promotion' : 'Set as Promoted'}
+                  </button>
+                </div>
+
+                {/* 3. Recommended Status */}
+                <div className={`p-3.5 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
+                  formData.is_recommended
+                    ? 'bg-indigo-50/80 border-indigo-300 shadow-2xs'
+                    : 'bg-white border-neutral-200/80'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                        Recommendation
+                      </span>
+                      <Sparkles className={`w-4 h-4 ${formData.is_recommended ? 'text-indigo-600' : 'text-neutral-300'}`} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase ${
+                        formData.is_recommended
+                          ? 'bg-indigo-100 text-indigo-900 border border-indigo-300'
+                          : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                      }`}>
+                        {formData.is_recommended ? 'Recommended' : 'Standard'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-1 leading-snug">
+                      {formData.is_recommended
+                        ? "Featured in 'Recommended For You' collections."
+                        : 'Not featured in recommendation lists.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, is_recommended: !prev.is_recommended }))}
+                    className={`mt-2.5 inline-flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer border ${
+                      formData.is_recommended
+                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
+                        : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-300'
+                    }`}
+                  >
+                    {formData.is_recommended ? 'Remove Recommendation' : 'Set as Recommended'}
+                  </button>
+                </div>
+              </div>
 
               {/* 1. Product Name */}
               <div className="space-y-1.5">
@@ -930,53 +1108,110 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 </div>
               </div>
 
-              {/* 6. Status Checkboxes Row */}
-              <div className="flex flex-wrap items-center gap-6 p-4 bg-neutral-50/60 rounded-xl border border-neutral-200/80">
-                {/* Active Toggle Checkbox */}
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.checked }))}
-                    className="w-4 h-4 rounded text-brand-dark focus:ring-brand-dark border-neutral-300"
-                  />
-                  <span className="text-xs font-medium text-brand-dark">Active (Visible on storefront)</span>
-                </label>
+              {/* 6. Product Status & Visibility */}
+              <div className="space-y-4 p-5 bg-neutral-50 rounded-2xl border border-neutral-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin">
+                    Product Visibility, Badges & Merchandising
+                  </h4>
+                  <span className="text-[11px] text-neutral-500 font-medium">Controls storefront badges and placement</span>
+                </div>
 
-                {/* Read-only Auto In-Stock Checkbox */}
-                <label className="inline-flex items-center gap-2 cursor-not-allowed opacity-80" title="Auto-updated based on Stock Quantity">
-                  <input
-                    type="checkbox"
-                    checked={Number(formData.stockQuantity) > 0}
-                    disabled
-                    className="w-4 h-4 rounded text-emerald-600 border-neutral-300 cursor-not-allowed"
-                  />
-                  <span className="text-xs font-medium text-neutral-600">
-                    In Stock <span className="text-[10px] text-neutral-400 font-normal">(Auto-updated)</span>
-                  </span>
-                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  {/* Active Storefront Card */}
+                  <label className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    formData.active
+                      ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                      : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.active}
+                      onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded text-brand-dark focus:ring-brand-dark border-neutral-300 cursor-pointer"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-neutral-900 block">Active on Storefront</span>
+                      <p className="text-[11px] text-neutral-500">
+                        {formData.active ? 'Visible to customers across catalog and search' : 'Hidden from customers (draft mode)'}
+                      </p>
+                    </div>
+                  </label>
 
-                {/* Promoted Checkbox */}
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.promoted}
-                    onChange={(e) => setFormData(prev => ({ ...prev, promoted: e.target.checked }))}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-neutral-300"
-                  />
-                  <span className="text-xs font-medium text-brand-dark">Promoted / Featured</span>
-                </label>
+                  {/* Read-only Auto In-Stock Card */}
+                  <div className={`p-3.5 rounded-xl border flex items-start gap-3 opacity-90 ${
+                    Number(formData.stockQuantity) > 0
+                      ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                      : 'bg-rose-50/60 border-rose-300 text-rose-950'
+                  }`} title="Auto-updated based on Stock Quantity">
+                    <input
+                      type="checkbox"
+                      checked={Number(formData.stockQuantity) > 0}
+                      disabled
+                      className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-neutral-300 cursor-not-allowed"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-neutral-900 block">
+                        In Stock <span className="text-[10px] text-neutral-400 font-normal">(Auto calculated)</span>
+                      </span>
+                      <p className="text-[11px] text-neutral-500">
+                        {Number(formData.stockQuantity) > 0
+                          ? `In stock with ${formData.stockQuantity} units available`
+                          : 'Marked out of stock (Stock quantity is 0)'}
+                      </p>
+                    </div>
+                  </div>
 
-                {/* Recommended for You Checkbox */}
-                <label className="inline-flex items-center gap-2 cursor-pointer" title="Show this product in the Recommended for You section on the storefront.">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_recommended}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_recommended: e.target.checked }))}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-neutral-300"
-                  />
-                  <span className="text-xs font-medium text-brand-dark">Recommended for You</span>
-                </label>
+                  {/* Promoted / Featured Card */}
+                  <label className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    formData.promoted
+                      ? 'bg-amber-50/80 border-amber-300 text-amber-950 shadow-2xs'
+                      : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.promoted}
+                      onChange={(e) => setFormData(prev => ({ ...prev, promoted: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-neutral-300 cursor-pointer"
+                    />
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-neutral-900">Promoted / Featured</span>
+                        {formData.promoted && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-200 text-amber-900 border border-amber-300">PROMOTED</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-neutral-500">
+                        Displays 'PROMOTED' badge on product card and prioritizes in discovery
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Recommended for You Card */}
+                  <label className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                    formData.is_recommended
+                      ? 'bg-indigo-50/80 border-indigo-300 text-indigo-950 shadow-2xs'
+                      : 'bg-white border-neutral-200 text-neutral-600'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_recommended}
+                      onChange={(e) => setFormData(prev => ({ ...prev, is_recommended: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-neutral-300 cursor-pointer"
+                    />
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-neutral-900">Recommended for You</span>
+                        {formData.is_recommended && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-200 text-indigo-900 border border-indigo-300">RECOMMENDED</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-neutral-500">
+                        Shows this item in the 'Recommended for You' section and suggestions
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               {/* 7. Available Sizes (Tag/Chip Input) */}

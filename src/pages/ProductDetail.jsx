@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Heart,
@@ -25,7 +25,8 @@ import {
   RotateCcw,
   Mail,
   Copy,
-  Bell
+  Bell,
+  Star
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
@@ -62,6 +63,18 @@ const findLocalProduct = (id) => {
 
   if (strId === '109' || strId === 'bs-109' || strId === 'prod-109') {
     return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-105') || null;
+  }
+  if (strId === '108' || strId === 'bs-108') {
+    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'prod-105') || null;
+  }
+  if (strId === '107' || strId === 'bs-107') {
+    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'prod-103') || null;
+  }
+  if (strId === '106' || strId === 'bs-106') {
+    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-103' || p.id === 'prod-102') || null;
+  }
+  if (strId === '105') {
+    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-101' || p.id === 'prod-101') || null;
   }
 
   return ALL_CATALOG_PRODUCTS.find((p) => {
@@ -107,6 +120,14 @@ export const ProductDetail = () => {
   const [pincodeResult, setPincodeResult] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
   const [openAccordion, setOpenAccordion] = useState('desc');
+
+  const fallbackProduct = (productId) => {
+    const found =
+      findLocalProduct(productId) ||
+      BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-101') ||
+      BEST_SELLERS_PRODUCTS[0];
+    setProduct(found);
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -168,13 +189,6 @@ export const ProductDetail = () => {
     };
   }, [id]);
 
-  const fallbackProduct = (productId) => {
-    const found =
-      findLocalProduct(productId) ||
-      BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-101') ||
-      BEST_SELLERS_PRODUCTS[0];
-    setProduct(found);
-  };
 
   const gallery = Array.from(
     new Set(
@@ -196,6 +210,59 @@ export const ProductDetail = () => {
 
   const mobileScrollRef = useRef(null);
   const [mobileSlideIndex, setMobileSlideIndex] = useState(0);
+
+  // Dynamic Image Height Measurement for Right-Side Panel
+  const desktopImageContainerRef = useRef(null);
+  const desktopGalleryRef = useRef(null);
+  const rightPanelRef = useRef(null);
+  const [desktopImageHeight, setDesktopImageHeight] = useState(null);
+
+  useLayoutEffect(() => {
+    const measureHeight = () => {
+      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        const target = desktopImageContainerRef.current || desktopGalleryRef.current;
+        if (target) {
+          const h = target.offsetHeight;
+          if (h > 0) {
+            setDesktopImageHeight(h);
+          }
+        }
+      } else {
+        setDesktopImageHeight(null);
+      }
+    };
+
+    measureHeight();
+    const rafId = requestAnimationFrame(measureHeight);
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        measureHeight();
+      });
+      if (desktopImageContainerRef.current) {
+        resizeObserver.observe(desktopImageContainerRef.current);
+      }
+      if (desktopGalleryRef.current) {
+        resizeObserver.observe(desktopGalleryRef.current);
+      }
+    }
+
+    window.addEventListener('resize', measureHeight);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', measureHeight);
+    };
+  }, [loading, selectedImage, product?.id]);
+
+  // Reset scroll position of right details panel on product navigation
+  useEffect(() => {
+    if (rightPanelRef.current) {
+      rightPanelRef.current.scrollTop = 0;
+    }
+  }, [id]);
 
   const handleMobileScroll = () => {
     if (!mobileScrollRef.current) return;
@@ -727,7 +794,7 @@ export const ProductDetail = () => {
             </div>
 
             {/* DESKTOP VIEW (>= md): Side-by-Side Vertical Thumbnails + Main Product Viewer */}
-            <div className="hidden md:flex md:flex-row gap-5 items-start flex-1 w-full">
+            <div ref={desktopGalleryRef} className="hidden md:flex md:flex-row gap-5 items-start flex-1 w-full">
               {/* Vertical Thumbnail Strip */}
               <div className="flex flex-col gap-2.5 max-h-[560px] overflow-y-auto no-scrollbar scroll-smooth p-0.5">
                 {gallery.map((imgUrl, idx) => (
@@ -757,6 +824,7 @@ export const ProductDetail = () => {
 
               {/* Main Product Image Container with Interactive Click-to-Zoom */}
               <div
+                ref={desktopImageContainerRef}
                 className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-colors ${
                   isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
                 }`}
@@ -826,7 +894,11 @@ export const ProductDetail = () => {
           </div>
 
           {/* RIGHT SIDE: Product Info & Actions Panel (~45% Desktop Width) */}
-          <div className="w-full lg:flex-1 flex flex-col text-left space-y-4 sm:space-y-5 pt-0 min-w-0">
+          <div
+            ref={rightPanelRef}
+            className="w-full lg:flex-1 flex flex-col text-left space-y-4 sm:space-y-5 pt-0 min-w-0 lg:overflow-y-auto no-scrollbar lg:pb-6"
+            style={desktopImageHeight ? { height: `${desktopImageHeight}px`, maxHeight: `${desktopImageHeight}px` } : undefined}
+          >
             {/* 1. PRODUCT TITLE & BRAND */}
             <div>
               <span className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-400 block mb-1 font-medium">
@@ -842,6 +914,7 @@ export const ProductDetail = () => {
                   {product.shortDescription}
                 </p>
               )}
+
 
               {/* NAME OPTIONS (Rendered dynamically if available) */}
               {Array.isArray(product.nameOptions || product.name_options) &&
@@ -995,16 +1068,6 @@ export const ProductDetail = () => {
               </div>
             )}
 
-            {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD */}
-            <DeliveryReminderWidget
-              pincode={pincode}
-              setPincode={setPincode}
-              handleCheckPincode={handleCheckPincode}
-              checkingPincode={checkingPincode}
-              pincodeResult={pincodeResult}
-              setPincodeResult={setPincodeResult}
-            />
-
             {/* ACCORDION SECTIONS */}
             <div className="pt-3 border-t border-neutral-200 space-y-1">
               {/* Product Description */}
@@ -1075,6 +1138,18 @@ export const ProductDetail = () => {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (After Size Details & Additional Information) */}
+              <div className="pt-3 pb-2">
+                <DeliveryReminderWidget
+                  pincode={pincode}
+                  setPincode={setPincode}
+                  handleCheckPincode={handleCheckPincode}
+                  checkingPincode={checkingPincode}
+                  pincodeResult={pincodeResult}
+                  setPincodeResult={setPincodeResult}
+                />
               </div>
 
               {/* Product Details (Dynamic Bullet Points) */}

@@ -618,6 +618,7 @@ export const Checkout = () => {
       const orderPayload = {
         orderNumber: randomOrderNum,
         addressId: sanitizedAddressId,
+        shippingAddress: (showNewAddressForm || addresses.length === 0) ? addressPayload : selectedAddr,
         paymentMethod: paymentMethod,
         paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Pending',
         paymentType: paymentMethod === 'cod' ? 'COD' : paymentMethod === 'card' ? 'Card' : 'UPI',

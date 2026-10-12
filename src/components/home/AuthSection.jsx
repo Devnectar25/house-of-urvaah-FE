@@ -30,10 +30,10 @@ export const AuthSection = () => {
   };
 
   return (
-    <section id="account-section" className="w-full bg-[#FAF8F3] py-16 md:py-24 border-y border-neutral-200/80 font-serif select-none overflow-hidden">
+    <section id="account-section" className="w-full bg-[#FAF8F3] pt-12 md:pt-16 pb-8 md:pb-10 border-y border-neutral-200/80 font-serif select-none overflow-hidden">
       <div className="w-full max-w-[1500px] mx-auto px-6 sm:px-10 lg:px-16">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12 md:mb-16">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12">
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
             ATELIER MEMBERSHIP & CONCIERGE
           </span>
@@ -147,7 +147,7 @@ export const AuthSection = () => {
         )}
 
         {/* Member Privileges Highlights Footer */}
-        <div className="mt-14 pt-10 border-t border-neutral-200/80 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+        <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-neutral-200/80 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
           <div className="flex flex-col items-center">
             <ShieldCheck className="w-5 h-5 text-neutral-700 mb-2 stroke-[1.5]" />
             <span className="text-xs font-semibold tracking-[0.2em] uppercase text-neutral-900">EXPRESS CHECKOUT</span>

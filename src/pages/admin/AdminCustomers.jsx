@@ -128,7 +128,7 @@ export const AdminCustomers = () => {
     setCustomerDetails(null);
 
     try {
-      const username = user.id || user.email || user.name;
+      const username = user.email || user.id || user.name;
       const res = await apiClient(`/api/users/profile?username=${encodeURIComponent(username)}`);
       setCustomerDetails(res);
     } catch (err) {
@@ -140,11 +140,13 @@ export const AdminCustomers = () => {
 
   // Client filtering
   const filteredCustomers = customers.filter((cust) => {
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      !searchQuery.trim() ||
-      (cust.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (cust.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (cust.phone || '').includes(searchQuery);
+      !q ||
+      (cust.name || '').toLowerCase().includes(q) ||
+      (cust.email || '').toLowerCase().includes(q) ||
+      (cust.phone || '').includes(q) ||
+      (cust.formattedAddress || '').toLowerCase().includes(q);
 
     const matchesStatus =
       statusFilter === 'all' ||
@@ -324,6 +326,7 @@ export const AdminCustomers = () => {
               <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
                 <th className="py-3 px-4">Customer</th>
                 <th className="py-3 px-4">Contact Info</th>
+                <th className="py-3 px-4">Address</th>
                 <th className="py-3 px-4">Joined Date</th>
                 <th className="py-3 px-4">Orders</th>
                 <th className="py-3 px-4">Total Spent</th>
@@ -344,6 +347,9 @@ export const AdminCustomers = () => {
                       <div className="h-3 bg-neutral-200 rounded w-24" />
                     </td>
                     <td className="py-3.5 px-4">
+                      <div className="h-3.5 bg-neutral-200 rounded w-44" />
+                    </td>
+                    <td className="py-3.5 px-4">
                       <div className="h-4 bg-neutral-200 rounded w-24" />
                     </td>
                     <td className="py-3.5 px-4">
@@ -362,7 +368,7 @@ export const AdminCustomers = () => {
                 ))
               ) : paginatedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
+                  <td colSpan={8} className="py-16 text-center">
                     <Users className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
                     <h3 className="text-sm font-semibold text-brand-dark mb-1">No customers found</h3>
                     <p className="text-xs text-neutral-500 max-w-xs mx-auto">
@@ -406,6 +412,24 @@ export const AdminCustomers = () => {
                             <Phone className="w-3.5 h-3.5 text-neutral-400" />
                             <span>{user.phone}</span>
                           </div>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-xs max-w-xs">
+                        {user.formattedAddress ? (
+                          <div className="flex items-start gap-1.5 text-neutral-700">
+                            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
+                            <span className="line-clamp-2 leading-relaxed font-sans" title={user.formattedAddress}>
+                              {user.formattedAddress}
+                            </span>
+                            {user.addresses && user.addresses.length > 1 && (
+                              <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] bg-neutral-100 text-neutral-600 font-semibold border border-neutral-200" title={`${user.addresses.length} saved addresses`}>
+                                +{user.addresses.length - 1}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-400 italic text-[11px]">No address saved</span>
                         )}
                       </td>
 
@@ -612,25 +636,67 @@ export const AdminCustomers = () => {
                 </div>
 
                 {/* Addresses */}
-                <div>
-                  <h4 className="font-semibold text-brand-dark uppercase tracking-wider text-[11px] mb-2 flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-neutral-500" />
-                    <span>Saved Addresses ({customerDetails?.addresses?.length || 0})</span>
-                  </h4>
-                  {customerDetails?.addresses && customerDetails.addresses.length > 0 ? (
-                    <div className="space-y-2">
-                      {customerDetails.addresses.map((addr, idx) => (
-                        <div key={idx} className="p-3 bg-white border border-neutral-200 rounded-lg text-neutral-700 space-y-1">
-                          <div className="font-semibold text-brand-dark">{addr.fullname || addr.name}</div>
-                          <div>{addr.street || addr.address_line1}, {addr.city}, {addr.state} - {addr.pincode || addr.postal_code}</div>
-                          <div className="text-[11px] text-neutral-500">Phone: {addr.phone || addr.mobile}</div>
+                {(() => {
+                  const modalAddresses = (customerDetails?.addresses && customerDetails.addresses.length > 0)
+                    ? customerDetails.addresses
+                    : (selectedCustomer?.addresses || []);
+
+                  return (
+                    <div>
+                      <h4 className="font-semibold text-brand-dark uppercase tracking-wider text-[11px] mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-neutral-500" />
+                          <span>Saved Addresses ({modalAddresses.length})</span>
+                        </span>
+                      </h4>
+                      {modalAddresses.length > 0 ? (
+                        <div className="space-y-2.5">
+                          {modalAddresses.map((addr, idx) => {
+                            const recipient = addr.recipient_name || addr.fullName || addr.fullname || addr.name || selectedCustomer?.name;
+                            const fullLine = addr.full_address || addr.street || addr.address_line1 || addr.address || 'Address on file';
+                            const locationLine = [addr.city, addr.state].filter(Boolean).join(', ') + 
+                              ((addr.postal_code || addr.pincode) ? ` - ${addr.postal_code || addr.pincode}` : '');
+                            const phoneLine = addr.phone || addr.mobile;
+
+                            return (
+                              <div key={addr.id || idx} className="p-3.5 bg-neutral-50/80 border border-neutral-200/90 rounded-xl text-neutral-700 space-y-1.5 shadow-2xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="font-semibold text-brand-dark flex items-center gap-2">
+                                    <span>{recipient}</span>
+                                    {addr.address_label && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neutral-200/80 text-neutral-800">
+                                        {addr.address_label}
+                                      </span>
+                                    )}
+                                    {addr.is_default && (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                                        Default
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-xs text-neutral-800 leading-relaxed">
+                                  <div>{fullLine}</div>
+                                  {locationLine && (
+                                    <div className="text-neutral-600 font-medium mt-0.5">{locationLine}</div>
+                                  )}
+                                </div>
+                                {phoneLine && (
+                                  <div className="text-[11px] text-neutral-500 flex items-center gap-1 pt-1 border-t border-neutral-200/60">
+                                    <Phone className="w-3 h-3 text-neutral-400" />
+                                    <span>{phoneLine}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-neutral-400 italic">No saved address records found for this account.</p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-neutral-400 italic">No saved address records found for this account.</p>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Recent Orders Summary */}
                 <div>

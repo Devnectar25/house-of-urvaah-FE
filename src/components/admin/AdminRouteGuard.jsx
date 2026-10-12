@@ -1,33 +1,7 @@
 import React, { useEffect, useState, useTransition } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import { getAuthToken, getStoredUser, clearAuthSession } from '../../lib/apiClient';
+import { getAdminAuthToken, getAdminStoredUser, clearAdminAuthSession, decodeJwtPayload } from '../../lib/apiClient';
 import { Loader2 } from 'lucide-react';
-
-/**
- * Safely decodes the payload of a JWT without external libraries
- */
-export function decodeJwtPayload(token) {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    try {
-      return JSON.parse(atob(parts[1]));
-    } catch {
-      return null;
-    }
-  }
-}
 
 export const VALID_ADMIN_ROLES = ['admin', 'super_admin', 'subadmin', 'sub_admin'];
 
@@ -35,7 +9,7 @@ export const VALID_ADMIN_ROLES = ['admin', 'super_admin', 'subadmin', 'sub_admin
  * Synchronously checks authentication, token expiration, and role validity.
  */
 function evaluateAuth(allowedRoles) {
-  const token = getAuthToken();
+  const token = getAdminAuthToken();
 
   // 1. Token presence check
   if (!token) {
@@ -47,30 +21,30 @@ function evaluateAuth(allowedRoles) {
   if (payload && typeof payload.exp === 'number') {
     const currentTimeInSec = Math.floor(Date.now() / 1000);
     if (payload.exp <= currentTimeInSec) {
-      clearAuthSession();
+      clearAdminAuthSession();
       return { status: 'expired' };
     }
   }
 
   // 3. Role check
-  const storedUser = getStoredUser();
+  const storedUser = getAdminStoredUser();
   const rawRole = payload?.role || storedUser?.role || '';
   const normalizedRole = String(rawRole).trim().toLowerCase();
 
-  if (!normalizedRole || !VALID_ADMIN_ROLES.includes(normalizedRole)) {
-    clearAuthSession();
+  if (normalizedRole && !VALID_ADMIN_ROLES.includes(normalizedRole)) {
+    clearAdminAuthSession();
     return { status: 'unauthorized' };
   }
 
-  // 6. Role-based route restriction
+  // 4. Role-based route restriction
   if (allowedRoles && Array.isArray(allowedRoles) && allowedRoles.length > 0) {
     const normalizedAllowed = allowedRoles.map((r) => String(r).trim().toLowerCase());
-    if (!normalizedAllowed.includes(normalizedRole)) {
+    if (normalizedRole && !normalizedAllowed.includes(normalizedRole)) {
       return { status: 'forbidden', role: normalizedRole };
     }
   }
 
-  return { status: 'authorized', role: normalizedRole, user: storedUser };
+  return { status: 'authorized', role: normalizedRole || 'admin', user: storedUser };
 }
 
 /**
@@ -88,8 +62,8 @@ export const AdminRouteGuard = ({ allowedRoles = null, children = null }) => {
   const [authState, setAuthState] = useState(() => evaluateAuth(allowedRoles));
 
   // Live invalidation listeners:
-  // - Handles 401/403 API responses emitted across the admin panel
-  // - Handles cross-tab logout via storage event
+  // - Handles genuine 401 API responses emitted across the admin panel
+  // - Handles cross-tab logout via storage event for admin token
   // - Periodic token expiration timer while idle on the page
   useEffect(() => {
     const handleUnauthorizedEvent = () => {
@@ -97,13 +71,14 @@ export const AdminRouteGuard = ({ allowedRoles = null, children = null }) => {
     };
 
     const handleStorageChange = (e) => {
-      if (e.key === 'urvaah_token') {
+      // ONLY respond to admin session storage changes; ignore customer token changes
+      if (e.key === 'urvaah_admin_token' || e.key === 'urvaah_admin_user') {
         const fresh = evaluateAuth(allowedRoles);
         setAuthState(fresh);
       }
     };
 
-    window.addEventListener('urvaah:auth:unauthorized', handleUnauthorizedEvent);
+    window.addEventListener('urvaah:admin:unauthorized', handleUnauthorizedEvent);
     window.addEventListener('storage', handleStorageChange);
 
     // Periodically re-check expiration every 15 seconds
@@ -115,7 +90,7 @@ export const AdminRouteGuard = ({ allowedRoles = null, children = null }) => {
     }, 15000);
 
     return () => {
-      window.removeEventListener('urvaah:auth:unauthorized', handleUnauthorizedEvent);
+      window.removeEventListener('urvaah:admin:unauthorized', handleUnauthorizedEvent);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };

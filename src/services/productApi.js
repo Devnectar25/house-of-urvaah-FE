@@ -65,8 +65,11 @@ export const productApi = {
   /**
    * Fetch related products
    */
-  async getRelatedProducts(id, category = '') {
-    const endpoint = `/api/products/${id}/related${category ? `?category=${encodeURIComponent(category)}` : ''}`;
+  async getRelatedProducts(id, category = '', limit = 16) {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (limit) params.append('limit', String(limit));
+    const endpoint = `/api/products/${id}/related${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await apiFetch(endpoint);
     return res?.data || res || [];
   }

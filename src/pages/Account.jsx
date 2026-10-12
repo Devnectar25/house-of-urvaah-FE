@@ -28,6 +28,26 @@ const findLocalProduct = (id) => {
   });
 };
 
+const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', 'MY COUPONS', 'ACCOUNT DETAILS'];
+
+const normalizeTabName = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const cleaned = raw.trim().toUpperCase().replace(/[-_]/g, ' ');
+  if (cleaned === 'ACCOUNT DETAILS' || cleaned === 'DETAILS' || cleaned === 'PROFILE' || cleaned === 'ACCOUNT') {
+    return 'ACCOUNT DETAILS';
+  }
+  if (cleaned === 'VIEW ORDERS' || cleaned === 'ORDERS' || cleaned === 'MY ORDERS') {
+    return 'VIEW ORDERS';
+  }
+  if (cleaned === 'VIEW WISHLIST' || cleaned === 'WISHLIST' || cleaned === 'MY WISHLIST') {
+    return 'VIEW WISHLIST';
+  }
+  if (cleaned === 'MY COUPONS' || cleaned === 'COUPONS' || cleaned === 'DISCOUNTS') {
+    return 'MY COUPONS';
+  }
+  return VALID_TABS.find((t) => t.toUpperCase() === cleaned) || null;
+};
+
 export const Account = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,22 +167,62 @@ export const Account = () => {
   };
 
   const getInitialTab = () => {
+    if (location.pathname === '/account-details') {
+      return 'ACCOUNT DETAILS';
+    }
+
     const param = new URLSearchParams(location.search).get('tab');
-    if (param) return param;
-    if (location.state?.tab) return location.state.tab;
+    if (param) {
+      const normalized = normalizeTabName(param);
+      if (normalized) return normalized;
+    }
+
+    if (location.state?.tab) {
+      const normalized = normalizeTabName(location.state.tab);
+      if (normalized) return normalized;
+    }
+
+    try {
+      const saved = sessionStorage.getItem('activeAccountTab');
+      if (saved) {
+        const normalized = normalizeTabName(saved);
+        if (normalized) return normalized;
+      }
+    } catch (_) {}
+
     return 'VIEW ORDERS';
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
 
   useEffect(() => {
+    if (location.pathname === '/account-details') {
+      setActiveTab('ACCOUNT DETAILS');
+      try {
+        sessionStorage.setItem('activeAccountTab', 'ACCOUNT DETAILS');
+      } catch (_) {}
+      return;
+    }
+
     const param = new URLSearchParams(location.search).get('tab');
     if (param) {
-      setActiveTab(param);
+      const normalized = normalizeTabName(param);
+      if (normalized) {
+        setActiveTab(normalized);
+        try {
+          sessionStorage.setItem('activeAccountTab', normalized);
+        } catch (_) {}
+      }
     } else if (location.state?.tab) {
-      setActiveTab(location.state.tab);
+      const normalized = normalizeTabName(location.state.tab);
+      if (normalized) {
+        setActiveTab(normalized);
+        try {
+          sessionStorage.setItem('activeAccountTab', normalized);
+        } catch (_) {}
+      }
     }
-  }, [location.search, location.state]);
+  }, [location.pathname, location.search, location.state]);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [fullNameInput, setFullNameInput] = useState('');
@@ -193,6 +253,9 @@ export const Account = () => {
 
   const handleConfirmSignOut = async () => {
     setIsSigningOut(true);
+    try {
+      sessionStorage.removeItem('activeAccountTab');
+    } catch (_) {}
     await logoutUser();
     setShowSignOutModal(false);
     setIsSigningOut(false);
@@ -351,6 +414,18 @@ export const Account = () => {
       return;
     }
     setActiveTab(tab);
+
+    try {
+      sessionStorage.setItem('activeAccountTab', tab);
+    } catch (_) {}
+
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set('tab', tab);
+    const targetPath = location.pathname === '/account-details' && tab !== 'ACCOUNT DETAILS'
+      ? '/account'
+      : location.pathname;
+
+    navigate(`${targetPath}?${searchParams.toString()}`, { replace: true });
   };
 
   const handleSaveProfile = async (e) => {

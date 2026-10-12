@@ -262,6 +262,12 @@ export const RegisteredUsersModal = ({ isOpen, onClose, period = '30d' }) => {
                                 {cleanPhone}
                               </div>
                             )}
+                            {u.formattedAddress && (
+                              <div className="text-[10.5px] text-neutral-500 font-sans truncate flex items-center gap-1 mt-0.5" title={u.formattedAddress}>
+                                <span className="text-neutral-400">📍</span>
+                                <span className="truncate">{u.formattedAddress}</span>
+                              </div>
+                            )}
                           </div>
                         </td>
 
