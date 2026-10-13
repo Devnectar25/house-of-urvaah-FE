@@ -431,12 +431,12 @@ export const AdminFabricVideo = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
               {/* Left 3 Videos Showcase */}
-              <div className="lg:col-span-7 bg-[#F5F5F0] p-1 sm:p-2 rounded-sm border border-[#EBEBE6]">
+              <div className="lg:col-span-8 bg-[#F5F5F0] p-1 sm:p-2 rounded-sm border border-[#EBEBE6]">
                 <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   {videos.map((vid, idx) => (
                     <div
                       key={vid.id || idx}
-                      className="relative aspect-[9/16] overflow-hidden bg-neutral-900 rounded-sm shadow-xs group"
+                      className="relative aspect-[9/14] overflow-hidden bg-neutral-900 rounded-sm shadow-xs group"
                     >
                       {/* Top Tag Badge */}
                       <div className="absolute top-2 left-2 z-20 bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[7px] sm:text-[8px] md:text-[9px] tracking-[0.2em] font-serif uppercase text-neutral-900 shadow-xs pointer-events-none select-none truncate max-w-[85%]">
@@ -474,7 +474,7 @@ export const AdminFabricVideo = () => {
               </div>
 
               {/* Right Editorial Copy Preview */}
-              <div className="lg:col-span-5 px-3 sm:px-5 py-2 space-y-3 font-serif">
+              <div className="lg:col-span-4 px-3 sm:px-5 py-2 space-y-3 font-serif">
                 <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-500 block">
                   {editorial.subheading || 'EDITORIAL VISION'}
                 </span>

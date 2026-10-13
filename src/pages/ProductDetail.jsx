@@ -116,6 +116,7 @@ export const ProductDetail = () => {
   const [shareCopied, setShareCopied] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
   const [pincode, setPincode] = useState('');
   const [pincodeResult, setPincodeResult] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
@@ -127,6 +128,30 @@ export const ProductDetail = () => {
       BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-101') ||
       BEST_SELLERS_PRODUCTS[0];
     setProduct(found);
+  };
+
+  // Check persistent subscription state for this product & selected size
+  useEffect(() => {
+    if (product?.id) {
+      try {
+        const key = `urvaah_stock_notified_${product.id}_${selectedSize || 'all'}`;
+        const generalKey = `urvaah_stock_notified_${product.id}_all`;
+        const isStored = localStorage.getItem(key) === 'true' || localStorage.getItem(generalKey) === 'true';
+        setHasSubscribedStock(isStored);
+      } catch (e) {
+        setHasSubscribedStock(false);
+      }
+    }
+  }, [product?.id, selectedSize]);
+
+  const handleStockSubscribed = ({ productId, size } = {}) => {
+    const targetId = productId || product?.id;
+    const targetSize = size || selectedSize || 'all';
+    try {
+      localStorage.setItem(`urvaah_stock_notified_${targetId}_${targetSize}`, 'true');
+      localStorage.setItem(`urvaah_stock_notified_${targetId}_all`, 'true');
+    } catch (e) {}
+    setHasSubscribedStock(true);
   };
 
   useEffect(() => {
@@ -159,7 +184,7 @@ export const ProductDetail = () => {
               ...prev,
               ...data,
               id: String(data.id || id),
-              name: isCorsetSet ? 'GILDED MIST CORSET' : (data.name || data.title || prev?.name),
+              name: isCorsetSet ? 'Sage Bloom Embroidered Corset' : (data.name || data.title || prev?.name),
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
               image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
@@ -999,14 +1024,26 @@ export const ProductDetail = () => {
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
             {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0) ? (
               <div className="flex items-center gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsStockModalOpen(true)}
-                  className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
-                >
-                  <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
-                  <span>NOTIFY ME WHEN AVAILABLE</span>
-                </button>
+                {hasSubscribedStock ? (
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
+                    title="Alert registered — you will be notified when this item is back in stock"
+                  >
+                    <span>OUT OF STOCK</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsStockModalOpen(true)}
+                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
+                  >
+                    <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                    <span>NOTIFY ME WHEN AVAILABLE</span>
+                  </button>
+                )}
 
                 {/* Wishlist Heart Icon Button */}
                 <button
@@ -1684,6 +1721,7 @@ export const ProductDetail = () => {
         selectedSize={selectedSize}
         selectedColor="Default"
         user={user}
+        onSubscribed={handleStockSubscribed}
       />
     </div>
   );

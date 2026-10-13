@@ -8,7 +8,8 @@ export const StockNotificationModal = ({
   product,
   selectedSize,
   selectedColor,
-  user
+  user,
+  onSubscribed
 }) => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -98,9 +99,11 @@ export const StockNotificationModal = ({
       if (res?.alreadySubscribed) {
         setResultStatus('already');
         setMessage(res.message || "You're already subscribed to this item.");
+        onSubscribed?.({ email: cleanEmail, productId: product.id, size: selectedSize });
       } else if (res?.success) {
         setResultStatus('success');
         setMessage(res.message || "You're on the list! We'll notify you when this item is back in stock.");
+        onSubscribed?.({ email: cleanEmail, productId: product.id, size: selectedSize });
       } else {
         setResultStatus('error');
         setMessage(res?.message || 'Unable to register notification. Please try again.');
