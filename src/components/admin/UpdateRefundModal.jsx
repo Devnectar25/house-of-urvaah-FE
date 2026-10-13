@@ -25,32 +25,27 @@ import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 const REFUND_STATUS_OPTIONS = [
   {
     value: 'Requested',
-    label: 'Requested',
-    description: 'Customer requested a refund / cancellation',
+    label: 'Request',
     dotColor: 'bg-amber-500'
   },
   {
     value: 'Processing',
     label: 'Processing',
-    description: 'Refund is actively being reviewed or processed',
     dotColor: 'bg-indigo-500'
   },
   {
     value: 'Completed',
     label: 'Completed / Paid',
-    description: 'Refund has been successfully disbursed to the customer',
     dotColor: 'bg-emerald-500'
   },
   {
     value: 'On Hold',
     label: 'On Hold',
-    description: 'Refund is paused pending customer response or verification',
     dotColor: 'bg-purple-500'
   },
   {
     value: 'Failed',
     label: 'Failed / Rejected',
-    description: 'Refund request was declined or payment failed',
     dotColor: 'bg-stone-500'
   }
 ];
@@ -1032,7 +1027,7 @@ export const UpdateRefundModal = ({
               >
                 {REFUND_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    ● {opt.label} — {opt.description}
+                    {opt.label}
                   </option>
                 ))}
               </select>

@@ -34,11 +34,11 @@ import * as XLSX from 'xlsx';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
-  { value: 'Requested', label: 'Requested' },
+  { value: 'Requested', label: 'Request' },
   { value: 'Processing', label: 'Processing' },
-  { value: 'Completed', label: 'Completed' },
-  { value: 'Failed', label: 'Failed' },
-  { value: 'On Hold', label: 'On Hold' }
+  { value: 'Completed', label: 'Completed / Paid' },
+  { value: 'On Hold', label: 'On Hold' },
+  { value: 'Failed', label: 'Failed / Rejected' }
 ];
 
 // Helper: Normalize displayed status for a refund record

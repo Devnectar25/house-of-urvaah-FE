@@ -1,17 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, ShoppingBag, Check } from 'lucide-react';
+import { X, Heart, ShoppingBag, Check, Bell } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { StockNotificationModal } from '../product/StockNotificationModal';
 
 export const QuickViewModal = () => {
-  const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist } = useCart();
+  const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist, user } = useCart();
   const [selectedSize, setSelectedSize] = useState('M');
   const [addedSuccess, setAddedSuccess] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
+
+  const isOutOfStock = Boolean(
+    quickViewProduct?.inStock === false ||
+    quickViewProduct?.instock === false ||
+    (quickViewProduct?.stockQuantity !== undefined && quickViewProduct.stockQuantity !== null && Number(quickViewProduct.stockQuantity) <= 0) ||
+    (quickViewProduct?.stock_quantity !== undefined && quickViewProduct.stock_quantity !== null && Number(quickViewProduct.stock_quantity) <= 0) ||
+    (quickViewProduct?.stock !== undefined && quickViewProduct.stock !== null && Number(quickViewProduct.stock) <= 0) ||
+    quickViewProduct?.isOutOfStock === true ||
+    quickViewProduct?.status === 'Out of Stock' ||
+    quickViewProduct?.status === 'out_of_stock'
+  );
+
+  useEffect(() => {
+    if (quickViewProduct?.id) {
+      try {
+        const generalKey = `urvaah_stock_notified_${quickViewProduct.id}_all`;
+        const sizeKey = `urvaah_stock_notified_${quickViewProduct.id}_${selectedSize || 'all'}`;
+        const isStored =
+          localStorage.getItem(generalKey) === 'true' ||
+          localStorage.getItem(sizeKey) === 'true';
+        setHasSubscribedStock(isStored);
+      } catch (e) {
+        setHasSubscribedStock(false);
+      }
+    }
+  }, [quickViewProduct?.id, selectedSize]);
+
+  const handleStockSubscribed = ({ productId, size } = {}) => {
+    const targetId = productId || quickViewProduct?.id;
+    const targetSize = size || selectedSize || 'all';
+    try {
+      localStorage.setItem(`urvaah_stock_notified_${targetId}_${targetSize}`, 'true');
+      localStorage.setItem(`urvaah_stock_notified_${targetId}_all`, 'true');
+    } catch (e) {}
+    setHasSubscribedStock(true);
+  };
 
   // Lock background screen scroll while QuickView is active
-  useModalScrollLock(Boolean(quickViewProduct), () => setQuickViewProduct(null));
+  useModalScrollLock(Boolean(quickViewProduct || isStockModalOpen), () => {
+    if (!isStockModalOpen) setQuickViewProduct(null);
+  });
 
   if (!quickViewProduct) return null;
 
@@ -122,24 +163,47 @@ export const QuickViewModal = () => {
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
-              <Button
-                fullWidth
-                variant="primary"
-                onClick={handleAdd}
-                className="flex items-center justify-center gap-2 py-3.5"
-              >
-                {addedSuccess ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    ADDED TO BAG
-                  </>
+              {isOutOfStock ? (
+                hasSubscribedStock ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex-1 py-3.5 px-4 bg-neutral-200 text-neutral-500 text-xs font-semibold tracking-[0.18em] uppercase cursor-not-allowed border border-neutral-300 select-none"
+                    title="Alert registered — you will be notified when this item is back in stock"
+                  >
+                    OUT OF STOCK
+                  </button>
                 ) : (
-                  <>
-                    <ShoppingBag className="w-4 h-4" />
-                    ADD TO BAG
-                  </>
-                )}
-              </Button>
+                  <Button
+                    fullWidth
+                    variant="primary"
+                    onClick={() => setIsStockModalOpen(true)}
+                    className="flex items-center justify-center gap-2 py-3.5 bg-neutral-900 hover:bg-black text-white"
+                  >
+                    <Bell className="w-4 h-4 text-amber-300" />
+                    NOTIFY ME WHEN AVAILABLE
+                  </Button>
+                )
+              ) : (
+                <Button
+                  fullWidth
+                  variant="primary"
+                  onClick={handleAdd}
+                  className="flex items-center justify-center gap-2 py-3.5"
+                >
+                  {addedSuccess ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      ADDED TO BAG
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-4 h-4" />
+                      ADD TO BAG
+                    </>
+                  )}
+                </Button>
+              )}
 
               <button
                 onClick={() => toggleWishlist(quickViewProduct.id)}
@@ -153,6 +217,17 @@ export const QuickViewModal = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* Stock Notification / Out of Stock Popup */}
+        <StockNotificationModal
+          isOpen={isStockModalOpen}
+          onClose={() => setIsStockModalOpen(false)}
+          product={quickViewProduct}
+          selectedSize={selectedSize}
+          selectedColor="Default"
+          user={user}
+          onSubscribed={handleStockSubscribed}
+        />
       </div>
     </AnimatePresence>
   );

@@ -131,6 +131,8 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     tag: 'ESSENTIAL',
     isNew: false,
     isBestSeller: true,
+    inStock: false,
+    stockQuantity: 0,
     image: '/assets/Images/Peach02.png',
     hoverImage: '/assets/Images/Peach04.png',
     gallery: [

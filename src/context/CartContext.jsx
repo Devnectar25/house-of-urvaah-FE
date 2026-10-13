@@ -418,6 +418,19 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (product, selectedSize = 'M') => {
     if (!product) return;
 
+    // Defensive check: Do not add out-of-stock items to cart
+    const isOutOfStock = Boolean(
+      product.inStock === false ||
+      product.instock === false ||
+      (product.stockQuantity !== undefined && product.stockQuantity !== null && Number(product.stockQuantity) <= 0) ||
+      (product.stock_quantity !== undefined && product.stock_quantity !== null && Number(product.stock_quantity) <= 0) ||
+      (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) ||
+      product.isOutOfStock === true ||
+      product.status === 'Out of Stock' ||
+      product.status === 'out_of_stock'
+    );
+    if (isOutOfStock) return;
+
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
