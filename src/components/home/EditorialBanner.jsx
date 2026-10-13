@@ -188,8 +188,8 @@ export const EditorialBanner = () => {
 
   return (
     <section id="editorial" className="my-16 py-12 bg-brand-sand text-brand-dark overflow-hidden font-serif scroll-mt-20">
-      <div className="max-w-[1800px] mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
           {/* Left Editorial 3-Video Frame */}
           <motion.div
             ref={containerRef}
@@ -197,7 +197,7 @@ export const EditorialBanner = () => {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="lg:col-span-7 relative w-full"
+            className="lg:col-span-8 xl:col-span-8 relative w-full"
           >
             {/* Unified Frame Container blending seamlessly into section background (bg-brand-sand) */}
             <div
@@ -205,11 +205,11 @@ export const EditorialBanner = () => {
               className="relative w-full bg-brand-sand rounded-sm overflow-hidden p-1.5 sm:p-2 border border-brand-sand shadow-none"
             >
               {/* 3 Videos side by side (horizontal scroll on small mobile, 3-col grid on sm+) */}
-              <div className="flex sm:grid sm:grid-cols-3 gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible snap-x snap-mandatory scrollbar-none">
+              <div className="flex sm:grid sm:grid-cols-3 gap-2 sm:gap-2.5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory scrollbar-none">
                 {videos.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="relative flex-shrink-0 w-[72vw] sm:w-auto snap-center aspect-[9/16] overflow-hidden bg-[#EBEBE6] group select-none"
+                    className="relative flex-shrink-0 w-[84vw] sm:w-auto snap-center aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none"
                   >
                     {/* Individual Video Tag */}
                     <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap">
@@ -281,7 +281,6 @@ export const EditorialBanner = () => {
                         className={`w-full h-full object-cover transition-opacity duration-700 ${
                           videoLoaded[item.id] ? 'opacity-100' : 'opacity-0'
                         }`}
-                        style={{ aspectRatio: '9 / 16' }}
                       >
                         <source
                           src={item.url}
@@ -318,7 +317,7 @@ export const EditorialBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="lg:col-span-5 flex flex-col justify-center px-4 md:px-8 py-4"
+            className="lg:col-span-4 xl:col-span-4 flex flex-col justify-center px-4 md:px-6 py-4"
           >
             <span className="text-[11px] md:text-xs tracking-[0.25em] uppercase text-neutral-500 font-serif mb-2">
               {fabricConfig?.subheading || 'EDITORIAL VISION'}

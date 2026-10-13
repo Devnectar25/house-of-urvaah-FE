@@ -26,7 +26,8 @@ import {
   HelpCircle,
   Inbox,
   Bell,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -46,6 +47,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
+  { name: 'Email Notifications', path: '/admin/email-notifications', icon: Mail, key: 'email-notifications' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },

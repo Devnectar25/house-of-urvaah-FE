@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Scissors, ShieldCheck, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Sparkles, Scissors, ShieldCheck } from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 
@@ -93,15 +92,6 @@ export const AboutUs = () => {
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light">
                 We strive to be more than just a fashion label – we're your partner in building a wardrobe that reflects who you are, one collection at a time.
               </p>
-            </div>
-
-            <div className="pt-2">
-              <Link
-                to="/#best-sellers"
-                className="inline-flex items-center gap-3 text-xs font-serif tracking-[0.25em] uppercase font-semibold text-[#111111] border-b border-[#111111] pb-1 hover:opacity-60 transition-opacity"
-              >
-                EXPLORE THE COLLECTION <ArrowRight className="w-4 h-4 stroke-[1.5]" />
-              </Link>
             </div>
           </motion.div>
 

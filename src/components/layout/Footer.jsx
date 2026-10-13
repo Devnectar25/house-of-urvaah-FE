@@ -92,7 +92,7 @@ export const Footer = () => {
           </div>
 
           {/* Column 4: CONNECT & LOCATION */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 sm:relative sm:-left-[50px]">
             <button
               type="button"
               onClick={() => toggleSection('connect')}
@@ -148,7 +148,7 @@ export const Footer = () => {
                   Subscribe for atelier updates, private sales & runway invitations.
                 </p>
                 <form onSubmit={handleNewsletterSubmit} className="space-y-2">
-                  <div className="relative flex items-center bg-[#FAF8F3] hover:bg-white border border-neutral-300 hover:border-neutral-400 focus-within:border-neutral-900 focus-within:bg-white focus-within:ring-2 focus-within:ring-neutral-900/10 rounded-full transition-all duration-300 shadow-2xs group">
+                  <div className="flex items-stretch bg-white border border-neutral-300 hover:border-neutral-400 focus-within:border-black transition-colors rounded-xs overflow-hidden shadow-2xs">
                     <input
                       type="email"
                       placeholder="ENTER YOUR EMAIL"
@@ -157,26 +157,26 @@ export const Footer = () => {
                         setNewsletterEmail(e.target.value);
                         if (newsletterStatus === 'error') setNewsletterStatus('idle');
                       }}
-                      className="w-full bg-transparent text-xs tracking-wider uppercase outline-none py-3 pl-4 pr-12 placeholder:text-neutral-400 font-medium text-neutral-900 min-h-[46px]"
+                      className="w-full bg-white text-xs tracking-[0.18em] uppercase outline-none py-2.5 px-3.5 placeholder:text-neutral-400 font-sans font-normal text-neutral-900 h-10 min-w-0"
                       aria-label="Newsletter email address"
                     />
                     <button
                       type="submit"
                       aria-label="Subscribe to newsletter"
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center hover:bg-black hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+                      className="bg-black hover:bg-neutral-800 text-white px-3.5 flex items-center justify-center transition-colors cursor-pointer shrink-0 h-10 group"
                     >
-                      <ArrowRight className="w-3.5 h-3.5 stroke-[2]" />
+                      <ArrowRight className="w-4 h-4 stroke-[1.75] group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </div>
 
                   {newsletterStatus === 'error' && (
-                    <p className="text-xs text-rose-600 font-medium tracking-wide px-2">
+                    <p className="text-xs text-rose-600 font-medium tracking-wide px-1">
                       {newsletterMessage}
                     </p>
                   )}
 
                   {newsletterStatus === 'success' && (
-                    <div className="p-2.5 bg-neutral-900 text-white text-xs tracking-wider uppercase font-medium flex items-center gap-2 rounded-full px-3.5 shadow-sm">
+                    <div className="p-2.5 bg-black text-white text-xs tracking-wider uppercase font-medium flex items-center gap-2 px-3 shadow-xs rounded-xs">
                       <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 stroke-[2.5]" />
                       <span>Thank you for subscribing</span>
                     </div>

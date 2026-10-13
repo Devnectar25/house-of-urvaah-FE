@@ -101,7 +101,7 @@ export const FEATURED_CATEGORIES = [
 const RAW_BEST_SELLERS_PRODUCTS = [
   {
     id: 'bs-105',
-    name: 'Ivory Corset Kurti',
+    name: 'Ivory Heart Corset Kurti/Dress',
     price: 8990,
     originalPrice: 11990,
     category: 'CO-ORD SETS',
@@ -124,7 +124,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
   },
   {
     id: 'bs-104',
-    name: 'ROSEWOOD BLOOM SET',
+    name: 'Blush Pink Embroidered Floral Co-Ord Set',
     price: 4990,
     category: 'CORSET TOPS',
     subcategory: 'Tops & Shirts',
@@ -168,7 +168,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
   },
   {
     id: 'bs-101',
-    name: 'CHESTNUT BLOOM SET',
+    name: 'Mocha Brown Embroidered Co-Ord Set',
     price: 8990,
     originalPrice: 11990,
     category: 'PARTY WEAR',
@@ -190,7 +190,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
   },
   {
     id: 'bs-103',
-    name: 'GILDED MIST CORSET',
+    name: 'Sage Bloom Embroidered Corset',
     price: 12990,
     category: 'CORSET TOPS',
     subcategory: 'Corset Sets',
@@ -214,7 +214,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
 const RAW_MOCK_PRODUCTS = [
   {
     id: 'prod-101',
-    name: 'CHESTNUT BLOOM SET',
+    name: 'Mocha Brown Embroidered Co-Ord Set',
     price: 8990,
     originalPrice: 11990,
     category: 'PARTY WEAR',
@@ -230,7 +230,7 @@ const RAW_MOCK_PRODUCTS = [
   },
   {
     id: 'prod-102',
-    name: 'GILDED MIST CORSET',
+    name: 'Sage Bloom Embroidered Corset',
     price: 12990,
     category: 'CORSET TOPS',
     subcategory: 'Corset Sets',

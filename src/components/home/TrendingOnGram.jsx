@@ -111,7 +111,7 @@ const GRAM_VIDEOS = [
     link: '#party-wear',
     product: {
       id: 'bs-104',
-      name: 'ROSEWOOD BLOOM SET',
+      name: 'Blush Pink Embroidered Floral Co-Ord Set',
       price: 4990,
       formattedPrice: '₹ 4,990',
       category: 'PARTY WEAR',
@@ -158,7 +158,7 @@ const GRAM_VIDEOS = [
     link: '#silk-collection',
     product: {
       id: 'bs-105',
-      name: 'Ivory Corset Kurti',
+      name: 'Ivory Heart Corset Kurti/Dress',
       price: 8990,
       formattedPrice: '₹ 8,990',
       category: 'CO-ORD SETS',

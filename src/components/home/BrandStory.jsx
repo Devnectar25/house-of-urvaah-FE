@@ -75,15 +75,6 @@ export const BrandStory = () => {
             );
           })}
         </div>
-
-        <div className="mt-12">
-          <a
-            href="#our-story"
-            className="inline-block text-xs font-semibold tracking-[0.25em] uppercase text-brand-dark border-b border-black pb-1 hover:text-neutral-500 hover:border-neutral-400 transition-colors"
-          >
-            READ OUR FULL SUSTAINABILITY MANIFESTO →
-          </a>
-        </div>
       </div>
     </section>
   );
