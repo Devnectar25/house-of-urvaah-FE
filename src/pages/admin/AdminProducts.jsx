@@ -417,11 +417,11 @@ export const AdminProducts = () => {
               ) : (
                 /* Product Row List */
                 products.map((product) => {
-                  const qty = product.stockQuantity ?? 0;
+                  const qty = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
                   let statusLabel = 'Available';
                   let statusStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200/80';
 
-                  if (qty === 0 || product.inStock === false) {
+                  if (qty <= 0 || (product.inStock === false && qty <= 0)) {
                     statusLabel = 'Out of Stock';
                     statusStyle = 'bg-rose-50 text-rose-700 border-rose-200/80';
                   } else if (qty < 5) {

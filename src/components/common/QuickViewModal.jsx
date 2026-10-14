@@ -13,12 +13,15 @@ export const QuickViewModal = () => {
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
 
+  const qty = Number(
+    quickViewProduct?.stockQuantity !== undefined && quickViewProduct?.stockQuantity !== null
+      ? quickViewProduct.stockQuantity
+      : (quickViewProduct?.stock_quantity ?? quickViewProduct?.stock ?? quickViewProduct?.quantity ?? 0)
+  );
+
   const isOutOfStock = Boolean(
-    quickViewProduct?.inStock === false ||
-    quickViewProduct?.instock === false ||
-    (quickViewProduct?.stockQuantity !== undefined && quickViewProduct.stockQuantity !== null && Number(quickViewProduct.stockQuantity) <= 0) ||
-    (quickViewProduct?.stock_quantity !== undefined && quickViewProduct.stock_quantity !== null && Number(quickViewProduct.stock_quantity) <= 0) ||
-    (quickViewProduct?.stock !== undefined && quickViewProduct.stock !== null && Number(quickViewProduct.stock) <= 0) ||
+    qty <= 0 ||
+    (qty <= 0 && (quickViewProduct?.inStock === false || quickViewProduct?.instock === false)) ||
     quickViewProduct?.isOutOfStock === true ||
     quickViewProduct?.status === 'Out of Stock' ||
     quickViewProduct?.status === 'out_of_stock'

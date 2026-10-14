@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Plus,
@@ -11,6 +11,21 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import {
+  normalizeSize,
+  isValidSize,
+  filterValidSizes,
+  STANDARD_QUICK_SIZES
+} from '../../utils/sizeValidator';
+import {
+  validateColorInput,
+  normalizeColor,
+  getSwatchCss,
+  filterValidColors,
+  POPULAR_FASHION_COLORS
+} from '../../utils/colorValidator';
+import RichDescriptionEditor from './RichDescriptionEditor';
+
 
 const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
   { label: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
@@ -22,6 +37,8 @@ const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
 
 export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
   useModalScrollLock(isOpen, onClose);
+
+  const imagesRef = useRef(null);
 
   // Form State initialized empty/default
   const [formData, setFormData] = useState({
@@ -63,7 +80,9 @@ const DEFAULT_CATEGORIES = [
 
   // Size, Color & Image URL input buffers
   const [sizeInput, setSizeInput] = useState('');
+  const [sizeError, setSizeError] = useState(null);
   const [colorInput, setColorInput] = useState('');
+  const [colorError, setColorError] = useState(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
@@ -95,6 +114,11 @@ const DEFAULT_CATEGORIES = [
     } else if (field === 'price') {
       if (value === '' || value === null || isNaN(value) || Number(value) < 0) {
         err = 'Valid current price is required';
+      }
+    } else if (field === 'images') {
+      const list = Array.isArray(value) ? value.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
+      if (list.length === 0) {
+        err = 'At least 1 product image is required to create a product';
       }
     }
     setErrors(prev => ({ ...prev, [field]: err }));
@@ -139,13 +163,35 @@ const DEFAULT_CATEGORIES = [
 
   // Size tag handlers
   const handleAddSize = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !sizeInput.trim()) return;
-    e.preventDefault();
-    const newSize = sizeInput.trim().toUpperCase();
-    if (!formData.sizes.includes(newSize)) {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
+    if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') return;
+    if (e) e.preventDefault();
+
+    const raw = sizeInput.trim();
+    if (!raw) return;
+
+    const normalized = normalizeSize(raw);
+    if (!isValidSize(normalized)) {
+      setSizeError(`"${raw}" is not a recognized size. Please use standard apparel sizes (e.g. XS, S, M, L, XL, XXL, FREE SIZE or 26, 28, 30).`);
+      return;
     }
+
+    if (formData.sizes.includes(normalized)) {
+      setSizeError(`Size "${normalized}" is already added.`);
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, sizes: [...prev.sizes, normalized] }));
     setSizeInput('');
+    setSizeError(null);
+  };
+
+  const handleTogglePresetSize = (sz) => {
+    setSizeError(null);
+    if (formData.sizes.includes(sz)) {
+      handleRemoveSize(sz);
+    } else {
+      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, sz] }));
+    }
   };
 
   const handleRemoveSize = (sizeToRemove) => {
@@ -153,17 +199,46 @@ const DEFAULT_CATEGORIES = [
       ...prev,
       sizes: prev.sizes.filter(s => s !== sizeToRemove)
     }));
+    setSizeError(null);
   };
 
-  // Color tag handlers
-  const handleAddColor = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !colorInput.trim()) return;
-    e.preventDefault();
-    const newColor = colorInput.trim();
-    if (!formData.colors.includes(newColor)) {
-      setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
+  // Color tag & preset handlers
+  const handleTogglePresetColor = (colorName) => {
+    const isSelected = formData.colors.some(
+      c => c.toLowerCase() === colorName.toLowerCase()
+    );
+    if (isSelected) {
+      setFormData(prev => ({
+        ...prev,
+        colors: prev.colors.filter(c => c.toLowerCase() !== colorName.toLowerCase())
+      }));
+    } else {
+      const result = validateColorInput(colorName, formData.colors);
+      if (result.valid) {
+        setFormData(prev => ({
+          ...prev,
+          colors: [...prev.colors, result.normalized]
+        }));
+      }
     }
+    setColorError(null);
+  };
+
+  const handleAddColor = (e) => {
+    if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') return;
+    if (e) e.preventDefault();
+    const raw = colorInput.trim();
+    if (!raw) return;
+
+    const result = validateColorInput(raw, formData.colors);
+    if (!result.valid) {
+      setColorError(result.error);
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, colors: [...prev.colors, result.normalized] }));
     setColorInput('');
+    setColorError(null);
   };
 
   const handleRemoveColor = (colorToRemove) => {
@@ -171,6 +246,7 @@ const DEFAULT_CATEGORIES = [
       ...prev,
       colors: prev.colors.filter(c => c !== colorToRemove)
     }));
+    setColorError(null);
   };
 
   // Name Options Handlers
@@ -292,6 +368,8 @@ const DEFAULT_CATEGORIES = [
           ...prev,
           images: [...prev.images, uploadedUrl]
         }));
+        setErrors(prev => ({ ...prev, images: '' }));
+        setSubmitError(null);
       } else {
         throw new Error('No image URL returned from server.');
       }
@@ -326,13 +404,20 @@ const DEFAULT_CATEGORIES = [
     setImageUrlInput('');
     setShowUrlInput(false);
     setSubmitError(null);
+    setErrors(prev => ({ ...prev, images: '' }));
   };
 
   const handleRemoveImage = (indexToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, idx) => idx !== indexToRemove)
-    }));
+    setFormData(prev => {
+      const nextImages = prev.images.filter((_, idx) => idx !== indexToRemove);
+      if (nextImages.length === 0) {
+        setErrors(errs => ({ ...errs, images: 'At least 1 product image is required to create a product' }));
+      }
+      return {
+        ...prev,
+        images: nextImages
+      };
+    });
   };
 
   // Submit / Create Handler
@@ -343,9 +428,15 @@ const DEFAULT_CATEGORIES = [
     const isNameValid = validateField('name', formData.name);
     const isCategoryValid = validateField('category_id', formData.category_id);
     const isPriceValid = validateField('price', formData.price);
+    const isImagesValid = validateField('images', formData.images);
 
-    if (!isNameValid || !isCategoryValid || !isPriceValid) {
-      setSubmitError('Please fill in all required fields highlighted below.');
+    if (!isNameValid || !isCategoryValid || !isPriceValid || !isImagesValid) {
+      if (!isImagesValid && isNameValid && isCategoryValid && isPriceValid) {
+        setSubmitError('At least 1 product image is required to create a product.');
+        imagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        setSubmitError('Please fill in all required fields and upload at least 1 product image.');
+      }
       return;
     }
 
@@ -353,6 +444,21 @@ const DEFAULT_CATEGORIES = [
     if (hasBlob) {
       setSubmitError('Temporary browser blob URLs cannot be saved. Please re-upload your images.');
       return;
+    }
+
+    // If user has a pending color in the input field, validate and commit it
+    let currentColors = [...formData.colors];
+    if (colorInput.trim()) {
+      const check = validateColorInput(colorInput.trim(), currentColors);
+      if (!check.valid) {
+        setColorError(check.error);
+        setSubmitError(`Invalid color: ${check.error}`);
+        return;
+      }
+      currentColors.push(check.normalized);
+      setFormData(prev => ({ ...prev, colors: currentColors }));
+      setColorInput('');
+      setColorError(null);
     }
 
     setCreating(true);
@@ -392,8 +498,8 @@ const DEFAULT_CATEGORIES = [
         promoted: formData.promoted,
         is_recommended: formData.is_recommended,
         isRecommended: formData.is_recommended,
-        sizes: formData.sizes.length > 0 ? formData.sizes : ['XS', 'S', 'M', 'L'],
-        colors: formData.colors.length > 0 ? formData.colors : ['Default'],
+        sizes: filterValidSizes(formData.sizes).length > 0 ? filterValidSizes(formData.sizes) : ['XS', 'S', 'M', 'L'],
+        colors: filterValidColors(currentColors).length > 0 ? filterValidColors(currentColors) : ['Default'],
         specifications: validSpecs,
         additionalInfo: validSpecs,
         additional_info: validSpecs,
@@ -563,19 +669,18 @@ const DEFAULT_CATEGORIES = [
               />
             </div>
 
-            {/* 4.1 Full Description */}
+            {/* 4.1 Full Description with Rich Formatting Toolbar */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Full Description (Detailed Website Story / Overview)
-              </label>
-              <textarea
-                rows={5}
+              <RichDescriptionEditor
                 value={formData.fullDescription}
-                onChange={(e) => setFormData(prev => ({ ...prev, fullDescription: e.target.value }))}
+                onChange={(val) => setFormData(prev => ({ ...prev, fullDescription: val }))}
                 placeholder="Comprehensive product story, artisan detailing, styling ideas, and garment drape overview..."
-                className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
+                title="OVERVIEW DESCRIPTION & DETAILS"
+                badgeText="STANDARD SECTION"
+                rows={6}
               />
             </div>
+
 
             {/* 4.5 PRODUCT CONTENT SECTION */}
             <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
@@ -785,12 +890,42 @@ const DEFAULT_CATEGORIES = [
               </label>
             </div>
 
-            {/* 7. Available Sizes (Tag/Chip Input) */}
+            {/* 7. Available Sizes (Tag/Chip Input with Presets & Strict Validation) */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Sizes Available
-              </label>
-              <div className="flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl min-h-[44px]">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                  Sizes Available
+                </label>
+                <span className="text-[11px] text-neutral-400">
+                  Quick-pick presets or enter custom size
+                </span>
+              </div>
+
+              {/* Quick Add Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                <span className="text-[10px] uppercase font-semibold text-neutral-400 mr-0.5">Presets:</span>
+                {STANDARD_QUICK_SIZES.map((sz) => {
+                  const isSelected = formData.sizes.includes(sz);
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => handleTogglePresetSize(sz)}
+                      className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all border ${
+                        isSelected
+                          ? 'bg-brand-dark text-white border-brand-dark shadow-2xs'
+                          : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
+                      }`}
+                    >
+                      {isSelected ? `✓ ${sz}` : `+ ${sz}`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className={`flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border rounded-xl min-h-[44px] transition-colors ${
+                sizeError ? 'border-rose-400 ring-1 ring-rose-400/20' : 'border-neutral-200 focus-within:border-neutral-400'
+              }`}>
                 {formData.sizes.map((sz) => (
                   <span
                     key={sz}
@@ -806,47 +941,135 @@ const DEFAULT_CATEGORIES = [
                     </button>
                   </span>
                 ))}
-                <input
-                  type="text"
-                  value={sizeInput}
-                  onChange={(e) => setSizeInput(e.target.value)}
-                  onKeyDown={handleAddSize}
-                  placeholder="Type size (e.g. S, M, L) & press Enter..."
-                  className="flex-1 min-w-[140px] bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
-                />
+                <div className="flex-1 flex items-center min-w-[170px] gap-1.5">
+                  <input
+                    type="text"
+                    value={sizeInput}
+                    onChange={(e) => {
+                      setSizeInput(e.target.value);
+                      if (sizeError) setSizeError(null);
+                    }}
+                    onKeyDown={handleAddSize}
+                    placeholder="Type size (e.g. XL or 28) & press Enter..."
+                    className="flex-1 bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
+                  />
+                  {sizeInput.trim() && (
+                    <button
+                      type="button"
+                      onClick={handleAddSize}
+                      className="shrink-0 px-2.5 py-1 text-xs font-semibold bg-brand-dark text-white rounded-md hover:bg-black transition-colors"
+                    >
+                      Add
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {sizeError && (
+                <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{sizeError}</span>
+                </div>
+              )}
             </div>
 
             {/* 8. Available Colors (Tag/Chip Input) */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Colors Available
-              </label>
-              <div className="flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl min-h-[44px]">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                  Colors Available
+                </label>
+                <span className="text-[11px] text-neutral-400">
+                  HEX (e.g. #8B0000) or apparel color name
+                </span>
+              </div>
+
+              {/* Quick Add Color Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                <span className="text-[10px] uppercase font-semibold text-neutral-400 mr-0.5">Presets:</span>
+                {POPULAR_FASHION_COLORS.map(({ name, hex }) => {
+                  const isSelected = formData.colors.some(
+                    c => c.toLowerCase() === name.toLowerCase() || c.toLowerCase() === hex.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => handleTogglePresetColor(name)}
+                      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md font-semibold transition-all border ${
+                        isSelected
+                          ? 'bg-brand-dark text-white border-brand-dark shadow-2xs'
+                          : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                        style={{ background: hex }}
+                      />
+                      <span>{isSelected ? `✓ ${name}` : `+ ${name}`}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                className={`flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border rounded-xl min-h-[44px] transition-colors ${
+                  colorError
+                    ? 'border-rose-400 ring-1 ring-rose-400/20'
+                    : 'border-neutral-200 focus-within:border-neutral-400'
+                }`}
+              >
                 {formData.colors.map((col) => (
                   <span
                     key={col}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-neutral-200 text-brand-dark text-xs font-semibold rounded-md shadow-2xs"
                   >
-                    {col}
+                    <span
+                      className="w-3 h-3 rounded-full border border-black/20 shrink-0 shadow-2xs"
+                      style={{ background: getSwatchCss(col) }}
+                      aria-hidden="true"
+                    />
+                    <span>{col}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveColor(col)}
-                      className="text-neutral-400 hover:text-rose-600 transition-colors"
+                      className="text-neutral-400 hover:text-rose-600 transition-colors ml-0.5"
+                      title={`Remove ${col}`}
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
-                <input
-                  type="text"
-                  value={colorInput}
-                  onChange={(e) => setColorInput(e.target.value)}
-                  onKeyDown={handleAddColor}
-                  placeholder="Type color (e.g. Royal Blue) & press Enter..."
-                  className="flex-1 min-w-[160px] bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
-                />
+                <div className="flex-1 flex items-center min-w-[200px] gap-1.5">
+                  <input
+                    type="text"
+                    value={colorInput}
+                    onChange={(e) => {
+                      setColorInput(e.target.value);
+                      if (colorError) setColorError(null);
+                    }}
+                    onKeyDown={handleAddColor}
+                    placeholder="Type color (e.g. Emerald Green) & press Enter..."
+                    className="flex-1 bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
+                  />
+                  {colorInput.trim() && (
+                    <button
+                      type="button"
+                      onClick={handleAddColor}
+                      className="shrink-0 px-2.5 py-1 text-xs font-semibold bg-brand-dark text-white rounded-md hover:bg-black transition-colors"
+                    >
+                      Add
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {colorError && (
+                <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5 animate-in fade-in">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{colorError}</span>
+                </div>
+              )}
             </div>
 
             {/* 9. Additional Information (Storefront Accordion) */}
@@ -967,23 +1190,32 @@ const DEFAULT_CATEGORIES = [
             </div>
 
             {/* 11. Product Images */}
-            <div className="space-y-3">
+            <div ref={imagesRef} className="space-y-3 scroll-mt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Product Images
+                    Product Images <span className="text-rose-600 font-bold">*</span>
                   </label>
                   <p className="text-[11px] text-neutral-400">
-                    Upload up to 5 images. The first image will be the main cover photo.
+                    At least 1 product image is required. Upload up to 5 images. The first image will be the main cover photo.
                   </p>
                 </div>
-                <span className="text-xs font-mono text-neutral-500 font-medium">
+                <span className={`text-xs font-mono font-medium ${formData.images.length === 0 ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>
                   {formData.images.length} / 5 selected
                 </span>
               </div>
 
+              {errors.images && (
+                <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.images}</span>
+                </div>
+              )}
+
               {/* Images Thumbnail Grid */}
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              <div className={`grid grid-cols-3 sm:grid-cols-5 gap-3 p-1 rounded-xl transition-colors ${
+                errors.images ? 'border border-dashed border-rose-400 bg-rose-50/10' : ''
+              }`}>
                 {formData.images.map((imgUrl, idx) => (
                   <div
                     key={idx}

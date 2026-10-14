@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Bell, Mail, Phone, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const StockNotificationModal = ({
   isOpen,
@@ -19,6 +21,9 @@ export const StockNotificationModal = ({
   const [message, setMessage] = useState('');
   const [validationError, setValidationError] = useState('');
 
+  // Lock background scrolling and handle ESC key to close modal
+  useModalScrollLock(Boolean(isOpen && product), onClose);
+
   // Pre-fill user details if logged in
   useEffect(() => {
     if (user?.email) {
@@ -31,16 +36,6 @@ export const StockNotificationModal = ({
     setMessage('');
     setValidationError('');
   }, [isOpen, user]);
-
-  // Handle ESC key to close modal
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen || !product) return null;
 
@@ -118,18 +113,24 @@ export const StockNotificationModal = ({
 
   const productImage = product.image || (Array.isArray(product.gallery) && product.gallery[0]) || '';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
+  const modalContent = (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 pointer-events-auto"
+      onClick={onClose}
+    >
       <div 
-        className="relative w-full max-w-md bg-white border border-neutral-200 shadow-2xl p-6 sm:p-8 text-neutral-900 transition-all font-sans"
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none bg-white border border-neutral-200 shadow-2xl p-6 sm:p-8 text-neutral-900 transition-all font-sans pointer-events-auto"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="stock-modal-title"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-black transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-black transition-colors cursor-pointer pointer-events-auto z-10"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
@@ -199,7 +200,7 @@ export const StockNotificationModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-3 bg-black text-white text-xs font-semibold tracking-[0.2em] uppercase hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="w-full py-3 bg-black text-white text-xs font-semibold tracking-[0.2em] uppercase hover:bg-neutral-800 transition-colors cursor-pointer pointer-events-auto"
               >
                 CONTINUE BROWSING
               </button>
@@ -221,29 +222,41 @@ export const StockNotificationModal = ({
               <label className="text-[11px] font-semibold tracking-wider uppercase text-neutral-700 block">
                 Notification Channel
               </label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs" role="tablist">
                 <button
                   type="button"
-                  onClick={() => setChannel('email')}
-                  className={`py-2 px-3 border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  role="tab"
+                  aria-selected={channel === 'email'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setChannel('email');
+                  }}
+                  className={`py-2 px-3 border flex items-center justify-center gap-1.5 transition-all cursor-pointer pointer-events-auto select-none ${
                     channel === 'email'
-                      ? 'border-black bg-neutral-900 text-white font-semibold'
-                      : 'border-neutral-300 text-neutral-700 hover:border-black bg-white'
+                      ? 'border-black bg-neutral-900 text-white font-semibold shadow-xs'
+                      : 'border-neutral-300 text-neutral-700 hover:border-black bg-white hover:bg-neutral-50'
                   }`}
                 >
-                  <Mail className="w-3.5 h-3.5" />
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
                   <span>Email Only</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setChannel('both')}
-                  className={`py-2 px-3 border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  role="tab"
+                  aria-selected={channel === 'both'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setChannel('both');
+                  }}
+                  className={`py-2 px-3 border flex items-center justify-center gap-1.5 transition-all cursor-pointer pointer-events-auto select-none ${
                     channel === 'both'
-                      ? 'border-black bg-neutral-900 text-white font-semibold'
-                      : 'border-neutral-300 text-neutral-700 hover:border-black bg-white'
+                      ? 'border-black bg-neutral-900 text-white font-semibold shadow-xs'
+                      : 'border-neutral-300 text-neutral-700 hover:border-black bg-white hover:bg-neutral-50'
                   }`}
                 >
-                  <Phone className="w-3.5 h-3.5" />
+                  <Phone className="w-3.5 h-3.5 shrink-0" />
                   <span>Email & WhatsApp</span>
                 </button>
               </div>
@@ -262,7 +275,7 @@ export const StockNotificationModal = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email address"
-                  className="w-full h-10 px-3.5 text-xs border border-neutral-300 focus:border-black focus:outline-hidden bg-white text-neutral-900 font-sans"
+                  className="w-full h-10 px-3.5 text-xs border border-neutral-300 focus:border-black focus:outline-hidden bg-white text-neutral-900 font-sans pointer-events-auto"
                 />
               </div>
             </div>
@@ -284,7 +297,7 @@ export const StockNotificationModal = ({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className="w-full h-10 px-3.5 text-xs border border-neutral-300 focus:border-black focus:outline-hidden bg-white text-neutral-900 font-sans"
+                    className="w-full h-10 px-3.5 text-xs border border-neutral-300 focus:border-black focus:outline-hidden bg-white text-neutral-900 font-sans pointer-events-auto"
                   />
                 </div>
               </div>
@@ -301,7 +314,7 @@ export const StockNotificationModal = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-11 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-400 text-xs font-bold tracking-[0.2em] uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="w-full h-11 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-400 text-xs font-bold tracking-[0.2em] uppercase transition-all flex items-center justify-center gap-2 cursor-pointer pointer-events-auto shadow-sm"
               >
                 {loading ? (
                   <>
@@ -321,4 +334,8 @@ export const StockNotificationModal = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };
