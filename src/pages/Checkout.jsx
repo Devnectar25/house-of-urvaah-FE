@@ -35,7 +35,6 @@ import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
 import { InvoiceModal } from '../components/common/InvoiceModal';
-import Swal from 'sweetalert2';
 
 const ORDER_SESSION_KEY = 'urvaah_last_placed_order';
 
