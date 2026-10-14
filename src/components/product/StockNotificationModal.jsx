@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Bell, Mail, Phone, CheckCircle2, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const StockNotificationModal = ({
   isOpen,
@@ -19,6 +20,9 @@ export const StockNotificationModal = ({
   const [message, setMessage] = useState('');
   const [validationError, setValidationError] = useState('');
 
+  // Lock background scrolling and handle ESC key to close modal
+  useModalScrollLock(Boolean(isOpen && product), onClose);
+
   // Pre-fill user details if logged in
   useEffect(() => {
     if (user?.email) {
@@ -31,16 +35,6 @@ export const StockNotificationModal = ({
     setMessage('');
     setValidationError('');
   }, [isOpen, user]);
-
-  // Handle ESC key to close modal
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   if (!isOpen || !product) return null;
 
@@ -119,12 +113,16 @@ export const StockNotificationModal = ({
   const productImage = product.image || (Array.isArray(product.gallery) && product.gallery[0]) || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
+    <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+      >
       <div 
-        className="relative w-full max-w-md bg-white border border-neutral-200 shadow-2xl p-6 sm:p-8 text-neutral-900 transition-all font-sans"
+        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-white border border-neutral-200 shadow-2xl p-6 sm:p-8 text-neutral-900 transition-all font-sans"
         role="dialog"
         aria-modal="true"
         aria-labelledby="stock-modal-title"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
