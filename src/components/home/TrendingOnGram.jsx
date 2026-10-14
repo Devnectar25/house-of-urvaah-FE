@@ -758,7 +758,7 @@ export const TrendingOnGram = () => {
   };
 
   return (
-    <section className="pt-[100px] pb-12 md:pb-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
+    <section className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching BestSellers typography and left alignment */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">

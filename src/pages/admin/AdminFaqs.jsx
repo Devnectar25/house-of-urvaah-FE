@@ -40,6 +40,10 @@ export const AdminFaqs = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
   // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState(null);
@@ -283,6 +287,19 @@ export const AdminFaqs = () => {
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, statusFilter]);
+
+  // Pagination Calculations
+  const totalFiltered = filteredFaqs.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalFiltered);
+  const paginatedFaqs = filteredFaqs.slice(startIndex, endIndex);
 
   // Metrics
   const totalCount = faqs.length;
@@ -536,7 +553,7 @@ export const AdminFaqs = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E0D5]/70 text-xs text-neutral-800">
-                {filteredFaqs.map((faq) => (
+                {paginatedFaqs.map((faq) => (
                   <tr
                     key={faq.id}
                     className="hover:bg-[#FAF8F3]/60 transition-colors group"
@@ -619,6 +636,91 @@ export const AdminFaqs = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        {!loading && !error && filteredFaqs.length > 0 && (
+          <div className="border-t border-[#E5E0D5] bg-[#FAF8F3]/70 px-4 sm:px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Left: Summary Count & Page Size Dropdown */}
+            <div className="flex items-center gap-3 text-xs text-neutral-600 font-sans flex-wrap">
+              <div>
+                Showing <strong className="text-neutral-900 font-bold">{totalFiltered > 0 ? startIndex + 1 : 0}</strong> to{' '}
+                <strong className="text-neutral-900 font-bold">{endIndex}</strong> of{' '}
+                <strong className="text-neutral-900 font-bold">{totalFiltered}</strong> FAQs
+              </div>
+
+              <div className="flex items-center gap-1.5 border-l border-[#E5E0D5] pl-3">
+                <span className="text-neutral-400 text-xs">Show:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-xs rounded-lg border border-[#E5E0D5] bg-white font-medium text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-900 cursor-pointer"
+                >
+                  <option value={5}>5 / page</option>
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right: Interactive Page Numbers and Navigation */}
+            <div className="flex items-center gap-1.5 select-none">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={validCurrentPage <= 1}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E0D5] bg-white hover:bg-neutral-100 text-xs font-semibold text-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pNum) => {
+                  if (totalPages > 7) {
+                    if (pNum !== 1 && pNum !== totalPages && Math.abs(pNum - validCurrentPage) > 1) {
+                      if (pNum === 2 || pNum === totalPages - 1) {
+                        return (
+                          <span key={pNum} className="px-1 text-xs text-neutral-400 font-mono">
+                            …
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
+                  }
+
+                  const isActive = pNum === validCurrentPage;
+                  return (
+                    <button
+                      key={pNum}
+                      type="button"
+                      onClick={() => setCurrentPage(pNum)}
+                      className={`min-w-7 h-7 px-2 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center font-mono ${
+                        isActive
+                          ? 'bg-neutral-900 text-white shadow-2xs'
+                          : 'bg-white hover:bg-neutral-100 text-neutral-700 border border-[#E5E0D5]'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={validCurrentPage >= totalPages}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E0D5] bg-white hover:bg-neutral-100 text-xs font-semibold text-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

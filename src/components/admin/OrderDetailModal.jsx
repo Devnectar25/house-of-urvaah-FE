@@ -3,17 +3,24 @@ import {
   X,
   Loader2,
   AlertCircle,
+  AlertTriangle,
+  RotateCcw,
   Package,
   MapPin,
   CheckCircle2,
   RefreshCw,
   Save,
   Lock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Truck,
+  PackageCheck,
+  ArrowUpRight,
+  FileText
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { InvoiceModal } from '../common/InvoiceModal';
 
 // Status options matching House of Urvaah lifecycle and policy values
 const ORDER_STATUS_OPTIONS = [
@@ -26,7 +33,11 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Shipped', label: 'Shipped' },
   { value: 'Out for Delivery', label: 'Out for Delivery' },
   { value: 'Delivered', label: 'Delivered' },
+  { value: 'Cancellation Requested', label: 'Cancellation Requested' },
   { value: 'Cancelled', label: 'Cancelled' },
+  { value: 'Return Requested', label: 'Return Requested' },
+  { value: 'Return Approved', label: 'Return Approved' },
+  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
   { value: 'Returned', label: 'Returned' },
   { value: 'Exchanged', label: 'Exchanged' }
 ];
@@ -55,6 +66,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [savingStatus, setSavingStatus] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
   // Synchronous Ref tracking confirmed status & payment status across async saves & modal closes
   const confirmedRef = React.useRef({ status: '', paymentStatus: '' });
@@ -255,6 +267,269 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  const handleApproveCancellation = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Cancelled',
+          paymentStatus: (order.payment_method || '').toLowerCase() === 'cod' ? order.payment_status : 'Pending'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Cancelled'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Cancelled');
+      setSelectedStatus('Cancelled');
+      confirmedRef.current.status = 'Cancelled';
+      setSaveSuccessMsg('Cancellation approved successfully! Order cancelled and routed to Refund Desk.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Cancelled',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Cancelled',
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to approve cancellation:', err);
+      setSaveError(err.message || 'Failed to approve cancellation.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleRejectCancellation = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const restoredStatus = order.original_status || 'Processing';
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Restore',
+          cancelReason: 'Cancellation request rejected by Admin'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: restoredStatus
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus(restoredStatus);
+      setSelectedStatus(restoredStatus);
+      confirmedRef.current.status = restoredStatus;
+      setSaveSuccessMsg(`Cancellation rejected. Order restored to ${restoredStatus}.`);
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: restoredStatus,
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: restoredStatus,
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to reject cancellation:', err);
+      setSaveError(err.message || 'Failed to reject cancellation.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleApproveReturn = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Return Approved'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Return Approved',
+        logistics_status: 'In Transit to House of Urvaah'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Return Approved');
+      setSelectedStatus('Return Approved');
+      confirmedRef.current.status = 'Return Approved';
+      setSaveSuccessMsg('Return request approved! Courier reverse pickup initiated in transit to House of Urvaah.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Return Approved',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Return Approved',
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to approve return:', err);
+      setSaveError(err.message || 'Failed to approve return request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleRejectReturn = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Return Rejected',
+          cancelReason: 'Return request rejected by Admin'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Delivered'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Delivered');
+      setSelectedStatus('Delivered');
+      confirmedRef.current.status = 'Delivered';
+      setSaveSuccessMsg('Return request rejected. Order restored as Delivered.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Delivered',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Delivered',
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to reject return:', err);
+      setSaveError(err.message || 'Failed to reject return request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleMarkReceivedAtUrvaah = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Received at House of Urvaah'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Received at House of Urvaah',
+        is_product_received: true,
+        refund_status: 'Pending',
+        refund_eligible_amount: order.total
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Received at House of Urvaah');
+      setSelectedStatus('Received at House of Urvaah');
+      confirmedRef.current.status = 'Received at House of Urvaah';
+      setSaveSuccessMsg('Package verified at House of Urvaah! Stock restocked and routed to Refund Desk.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Received at House of Urvaah',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Received at House of Urvaah',
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to confirm delivery to House of Urvaah:', err);
+      setSaveError(err.message || 'Failed to confirm delivery to House of Urvaah.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   // Check if status has unsaved changes compared to last confirmed state
   const hasUnsavedChanges = Boolean(
     order &&
@@ -291,14 +566,25 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               View customer details, shipping address, line items, and manage status.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleCloseModal}
-            className="p-1.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
-            title="Close Modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsInvoiceOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#c5a880] bg-[#faf8f5] hover:bg-neutral-900 hover:text-white text-neutral-900 text-xs font-admin font-semibold tracking-wide transition-colors cursor-pointer shadow-2xs"
+              title="View or Print Official Tax Invoice"
+            >
+              <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
+              <span>Invoice</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="p-1.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+              title="Close Modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body Container */}
@@ -411,6 +697,283 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 </div>
               </div>
 
+              {/* Customer Cancellation Request Review & Approval Card */}
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'cancellation requested') && (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-amber-950 uppercase tracking-wide">
+                          Customer Cancellation Request Pending Approval
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                          Action Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900/90 leading-relaxed">
+                        The customer has requested to cancel this order prior to delivery.
+                      </p>
+
+                      {/* Payment & Refund Routing Info */}
+                      <div className="mt-2 p-3 bg-white/90 border border-amber-200 rounded-lg text-xs space-y-1.5">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500 font-medium">Payment Mode:</span>
+                          <span className="font-bold text-brand-dark uppercase">
+                            {order.payment_method || 'Online'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500 font-medium">Order Total / Refund Value:</span>
+                          <span className="font-bold text-brand-dark">
+                            ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-neutral-600 pt-1 border-t border-neutral-100">
+                          {(order.payment_method || '').toLowerCase() === 'cod' ? (
+                            <span className="text-neutral-700">
+                              ℹ️ <strong>Cash on Delivery (COD)</strong> order: Approving will cancel the order and restock inventory. No payment was collected, so no refund is required.
+                            </span>
+                          ) : (
+                            <span className="text-indigo-900">
+                              ⚡ <strong>Online / UPI Payment</strong>: Approving will cancel the order, restock inventory, and <strong>automatically send the order to the Refund Desk</strong> with a full refund of ₹{totalAmount.toLocaleString('en-IN')} ready for disbursement.
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      {order.cancel_reason && (
+                        <div className="mt-2 p-2.5 bg-amber-100/60 border border-amber-200/80 rounded-lg text-xs">
+                          <span className="text-[10px] font-bold text-amber-800 uppercase block">Customer Reason:</span>
+                          <p className="text-amber-950 font-medium mt-0.5">{order.cancel_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Approval / Rejection Buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleRejectCancellation}
+                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Reject Request
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleApproveCancellation}
+                      className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve Cancellation</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Post-Delivery Return Request Review Banner */}
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'return requested') && (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
+                      <RotateCcw className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-amber-950 uppercase tracking-wide">
+                          Customer Return Request (Post-Delivery)
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                          Action Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900/90 leading-relaxed">
+                        The customer has requested to return this delivered order. Approving will initiate the courier reverse pickup back to the House of Urvaah atelier.
+                      </p>
+
+                      <div className="mt-2 p-3 bg-white/90 border border-amber-200 rounded-lg text-xs space-y-1.5">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500 font-medium">Payment Mode:</span>
+                          <span className="font-bold text-brand-dark uppercase">
+                            {order.payment_method || 'Online'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="text-neutral-500 font-medium">Order Value:</span>
+                          <span className="font-bold text-brand-dark">
+                            ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-900 pt-1 border-t border-amber-100">
+                          📦 Reverse courier pickup will be initiated. <strong>Refund Desk will begin once the package is delivered back to House of Urvaah and verified.</strong>
+                        </p>
+                      </div>
+
+                      {(order.cancel_reason || order.return_reason) && (
+                        <div className="mt-2 p-2.5 bg-amber-100/60 border border-amber-200/80 rounded-lg text-xs">
+                          <span className="text-[10px] font-bold text-amber-800 uppercase block">Return Reason:</span>
+                          <p className="text-amber-950 font-medium mt-0.5">{order.cancel_reason || order.return_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Approve / Reject Return Buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleRejectReturn}
+                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Reject Return
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleApproveReturn}
+                      className="px-5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve Return Request</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Return Approved & In Transit to Urvaah House Banner */}
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'return approved') && (
+                <div className="bg-sky-50 border-2 border-sky-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-sky-100 rounded-lg text-sky-800 shrink-0 mt-0.5">
+                      <Truck className="w-5 h-5 text-sky-600" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-sky-950 uppercase tracking-wide">
+                          Return Flow Started: In Transit to House of Urvaah
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 border border-sky-300 uppercase">
+                          Reverse Transit Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-sky-900/90 leading-relaxed">
+                        Reverse pickup has been authorized. The package is currently in transit to House of Urvaah. Once delivered to our warehouse, confirm receipt below to automatically restock items and activate the Refund Desk.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-sky-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleMarkReceivedAtUrvaah}
+                      className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <PackageCheck className="w-4 h-4 text-emerald-400" />
+                          <span>Mark Received at House of Urvaah</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Received at House of Urvaah / Refund Desk Active Banner */}
+              {(['received at house of urvaah', 'received at homved', 'returned'].includes(
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+              )) && (
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xs flex-wrap">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-emerald-950 uppercase tracking-wide">
+                          Received at House of Urvaah — Refund Desk Active
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 uppercase">
+                          Restocked & In Refund Desk
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-900/90 leading-relaxed">
+                        Package verified and restocked into warehouse inventory. Order has been routed to the Refund Desk with ₹{(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} eligible for customer disbursement.
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href="/admin/refund-desk"
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <span>Open Refund Desk</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+
+              {/* Cancelled & Refund Desk Status Banner */}
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'cancelled') && (
+                <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+                  (order.payment_method || '').toLowerCase() === 'cod'
+                    ? 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                    : (order.refund_status === 'Completed' || order.refund_status === 'Refunded')
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-indigo-50 border-indigo-200 text-indigo-950'
+                }`}>
+                  <div className="p-2 rounded-lg bg-white/80 border border-current shrink-0 mt-0.5">
+                    <Package className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold uppercase tracking-wider">
+                        {(order.payment_method || '').toLowerCase() === 'cod'
+                          ? 'Cancelled COD Order'
+                          : `Refund Desk Status: ${order.refund_status || 'Pending'}`}
+                      </span>
+                    </div>
+                    <p className="leading-relaxed">
+                      {(order.payment_method || '').toLowerCase() === 'cod'
+                        ? 'Order cancelled prior to delivery. No payment was collected, so no refund is necessary.'
+                        : (order.refund_status === 'Completed' || order.refund_status === 'Refunded')
+                        ? `Full refund of ₹${(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been disbursed via Refund Desk${order.refund_transaction_id ? ` (UTR: ${order.refund_transaction_id})` : ''}.`
+                        : `Full amount ₹${(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been sent to the Refund Desk for customer disbursement.`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Status Management Section */}
               <div className="bg-neutral-50/50 border border-neutral-200/80 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between border-b border-neutral-200/60 pb-2">
@@ -447,7 +1010,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
                       Order Status
                     </label>
-                    {['delivered', 'cancelled', 'returned', 'exchanged'].includes(
+                    {['cancelled', 'refunded', 'exchanged'].includes(
                       (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
                     ) ? (
                       <div className="w-full bg-neutral-100 border border-neutral-200/80 text-brand-dark text-xs rounded-xl px-3 py-2.5 font-semibold flex items-center justify-between">
@@ -622,6 +1185,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           </button>
         </div>
       </div>
+
+      {/* Official Haute Couture Invoice Modal */}
+      <InvoiceModal
+        isOpen={isInvoiceOpen}
+        onClose={() => setIsInvoiceOpen(false)}
+        order={order}
+        orderId={order?.order_number || order?.id || orderId}
+      />
     </div>
   );
 };

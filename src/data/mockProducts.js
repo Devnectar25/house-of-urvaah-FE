@@ -149,6 +149,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     id: 'bs-102',
     name: 'Teal Embroidered Floral Co-Ord Set',
     price: 10990,
+    originalPrice: 13990,
     category: 'CO-ORD SETS',
     subcategory: 'Printed Ensembles',
     tag: 'EDITORIAL',
@@ -165,6 +166,7 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     colors: ['#5B9BD5', '#111111'],
     sizes: ['XS', 'S', 'M', 'L'],
     description: 'A halter-neck top and mini skirt set in a teal floral embroidered fabric, finished with all-over sequin detailing that catches the light with every move. The skirt hem is edged with a hand-finished potli trim for a playful, textured finish.\nFully lined for comfort, with an adjustable tie-back on the top for a customizable fit and a smooth side-zip closure on the skirt.\nStyle it for a beach day, a vacation dinner, or a night out — this one does double duty.',
+    fullDescription: 'Crafted with exacting precision in our Indian ateliers, this signature set balances opulent embroidery with contemporary resort wear ease. Featuring hand-sewn metallic sequins and tonal floral motifs over structured georgette, the silhouette is tailored to flatter across daytime celebrations and high-octane evening soirees alike. Finished with artisanal potli tassels, luxury concealed zipper hardware, and double-stitched reinforced hems.',
     additionalInfo: 'Fabric: Embroidered fabric with sequin detailing\nSkirt hem: Hand-finished potli trim\nClosure: Adjustable tie-back (top), side zip on left of skirt\nLining: Fully lined (top and skirt)\nAvailable sizes: S, M, L\nTop: Lightly Padded',
     additionalInfoText: 'Fabric: Embroidered fabric with sequin detailing\nSkirt hem: Hand-finished potli trim\nClosure: Adjustable tie-back (top), side zip on left of skirt\nLining: Fully lined (top and skirt)\nAvailable sizes: S, M, L\nTop: Lightly Padded'
   },

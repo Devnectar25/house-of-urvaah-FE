@@ -651,7 +651,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_type', requestType)}
-                  className="font-semibold text-brand-dark text-xs font-admin py-1 inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="font-semibold text-brand-dark hover:text-black text-xs font-admin py-1 inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Request Type"
                 >
                   <span>{requestType}</span>
@@ -671,7 +671,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_on', formatDateTime(requestDate))}
-                  className="text-neutral-700 text-xs py-1 font-sans inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="text-neutral-700 hover:text-neutral-950 text-xs py-1 font-sans inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Requested Date & Time"
                 >
                   <span>{formatDateTime(requestDate)}</span>
@@ -815,7 +815,8 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('order_ref', orderNumber)}
-                  className="font-admin font-bold text-brand-dark hover:text-black hover:underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  className="font-admin font-bold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  style={{ textDecoration: 'none' }}
                   title="Click to copy Order #"
                 >
                   <span>#{orderNumber}</span>

@@ -22,6 +22,14 @@ const DEFAULT_CATEGORIES = [
   { id: 4, category_id: 4, name: 'PARTY WEAR' }
 ];
 
+const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
+  { label: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
+  { label: 'Skirt hem', value: 'Hand-finished potli trim' },
+  { label: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
+  { label: 'Lining', value: 'Fully lined (top and skirt)' },
+  { label: 'Top', value: 'Lightly Padded' }
+];
+
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
   useModalScrollLock(Boolean(isOpen && product), onClose);
 
@@ -38,6 +46,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     subCategory: '',
     shortDescription: '',
     description: '',
+    fullDescription: '',
     nameOptions: [],
     productDetails: [],
     originalPrice: 0,
@@ -114,10 +123,23 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         // Map specifications array or object
         let specPairs = [];
-        if (Array.isArray(data.specifications)) {
-          specPairs = data.specifications;
+        if (Array.isArray(data.specifications) && data.specifications.length > 0) {
+          specPairs = data.specifications.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
+        } else if (Array.isArray(data.productDetails) && data.productDetails.length > 0) {
+          specPairs = data.productDetails.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
+        } else if (Array.isArray(data.product_details) && data.product_details.length > 0) {
+          specPairs = data.product_details.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
         } else if (data.specifications && typeof data.specifications === 'object') {
-          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
+          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value: String(value || '') }));
         } else if (data.fabric || data.fitType) {
           if (data.fabric) specPairs.push({ label: 'Fabric', value: data.fabric });
           if (data.fitType) specPairs.push({ label: 'Fit Type', value: data.fitType });
@@ -144,6 +166,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
           description: data.description || '',
+          fullDescription: data.fullDescription || data.full_description || data.fulldescription || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: origPrice,
@@ -186,6 +209,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.description || '',
+          fullDescription: product.fullDescription || product.full_description || product.fulldescription || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: product.originalPrice || product.price || 0,
@@ -347,17 +371,17 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     }));
   };
 
-  // Specification Key-Value Pair Handlers
+  // Specification / Additional Information Key-Value Pair Handlers
   const handleAddSpecification = () => {
     setFormData(prev => ({
       ...prev,
-      specifications: [...prev.specifications, { label: '', value: '' }]
+      specifications: [...(prev.specifications || []), { label: '', value: '' }]
     }));
   };
 
   const handleSpecChange = (index, key, val) => {
     setFormData(prev => {
-      const updated = [...prev.specifications];
+      const updated = [...(prev.specifications || [])];
       updated[index] = { ...updated[index], [key]: val };
       return { ...prev, specifications: updated };
     });
@@ -366,7 +390,21 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const handleRemoveSpecification = (index) => {
     setFormData(prev => ({
       ...prev,
-      specifications: prev.specifications.filter((_, i) => i !== index)
+      specifications: (prev.specifications || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleLoadAdditionalInfoTemplate = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: DEFAULT_ADDITIONAL_INFO_TEMPLATE.map(row => ({ ...row }))
+    }));
+  };
+
+  const handleClearAdditionalInfo = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: []
     }));
   };
 
@@ -484,6 +522,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
     try {
       const validNameOptions = (formData.nameOptions || []).map(n => n.trim()).filter(Boolean);
+      const validSpecs = (formData.specifications || []).filter(s => (s.label && s.label.trim()) || (s.value && s.value.trim()));
       const validProductDetails = (formData.productDetails || []).filter(d => d.label.trim() || d.value.trim());
 
       const payload = {
@@ -494,10 +533,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         shortDescription: formData.shortDescription.trim(),
         short_description: formData.shortDescription.trim(),
         description: formData.description.trim(),
+        fullDescription: formData.fullDescription.trim(),
+        full_description: formData.fullDescription.trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
-        productDetails: validProductDetails,
-        product_details: validProductDetails,
+        productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
+        product_details: validSpecs.length > 0 ? validSpecs : validProductDetails,
         originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
         discountPercent: Number(formData.discountPercent) || 0,
@@ -514,7 +555,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         isRecommended: formData.is_recommended,
         sizes: formData.sizes,
         colors: formData.colors,
-        specifications: formData.specifications,
+        specifications: validSpecs,
+        additionalInfo: validSpecs,
+        additional_info: validSpecs,
         careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
@@ -758,7 +801,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       href={`/admin/reviews?search=${encodeURIComponent(formData.name || product.name || '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-dark hover:underline pt-2 border-t border-neutral-100"
+                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-dark hover:text-black no-underline hover:no-underline pt-2 border-t border-neutral-100 transition-colors"
+                      style={{ textDecoration: 'none' }}
                     >
                       <MessageSquare className="w-3 h-3 text-neutral-500" />
                       <span>Manage Reviews</span>
@@ -946,6 +990,20 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 />
               </div>
 
+              {/* 4.1 Full Description */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                  Full Description (Detailed Website Story / Overview)
+                </label>
+                <textarea
+                  rows={5}
+                  value={formData.fullDescription}
+                  onChange={(e) => setFormData(prev => ({ ...prev, fullDescription: e.target.value }))}
+                  placeholder="Comprehensive product story, artisan detailing, styling ideas, and garment drape overview..."
+                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
+                />
+              </div>
+
               {/* 4.5 PRODUCT CONTENT SECTION */}
               <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
                 <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">Product Content</h3>
@@ -959,7 +1017,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={handleAddNameOption}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Name Option
                     </button>
@@ -1000,7 +1058,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={handleAddProductDetail}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
                     </button>
@@ -1278,45 +1336,100 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 </div>
               </div>
 
-              {/* 9. Specifications (Repeatable Key-Value List) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Specifications (Optional)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddSpecification}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Row
-                  </button>
+              {/* 9. Additional Information (Storefront Accordion) */}
+              <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                        Additional Information
+                      </label>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
+                        Storefront Accordion
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Dynamically customize rows displayed under the "ADDITIONAL INFORMATION" accordion on the product page.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={handleLoadAdditionalInfoTemplate}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                      title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
+                    >
+                      Load Preset
+                    </button>
+                    {(formData.specifications || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAdditionalInfo}
+                        className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
+                        title="Clear all rows"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddSpecification}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
+                    </button>
+                  </div>
                 </div>
-                {formData.specifications.length === 0 ? (
-                  <p className="text-xs text-neutral-400 italic">No specifications added yet. Click "+ Add Row" for key details like Fabric, Fit, or Length.</p>
+
+                {!formData.specifications || formData.specifications.length === 0 ? (
+                  <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
+                    <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleLoadAdditionalInfoTemplate}
+                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                      >
+                        Load Standard Preset Rows
+                      </button>
+                      <span className="text-neutral-300">•</span>
+                      <button
+                        type="button"
+                        onClick={handleAddSpecification}
+                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                      >
+                        + Add Custom Row
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-2">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                      <div className="col-span-4">Attribute / Title</div>
+                      <div className="col-span-7">Value / Specification Detail</div>
+                      <div className="col-span-1 text-center">Action</div>
+                    </div>
                     {formData.specifications.map((spec, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
                         <input
                           type="text"
                           value={spec.label}
                           onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
-                          placeholder="Label (e.g. Fabric)"
-                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          placeholder="e.g. Fabric, Closure, Lining, Care"
+                          className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
                         />
                         <input
                           type="text"
                           value={spec.value}
                           onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                          placeholder="Value (e.g. 100% Chanderi Silk)"
-                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          placeholder="e.g. Embroidered fabric with sequin detailing"
+                          className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveSpecification(idx)}
-                          className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
-                          title="Remove specification"
+                          className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Remove row"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1414,7 +1527,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={() => setShowUrlInput(true)}
-                      className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark underline"
+                      className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark no-underline hover:no-underline transition-colors cursor-pointer"
+                      style={{ textDecoration: 'none' }}
                     >
                       + Or add image via direct URL
                     </button>

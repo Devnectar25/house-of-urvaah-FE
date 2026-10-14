@@ -12,6 +12,14 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
+const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
+  { label: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
+  { label: 'Skirt hem', value: 'Hand-finished potli trim' },
+  { label: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
+  { label: 'Lining', value: 'Fully lined (top and skirt)' },
+  { label: 'Top', value: 'Lightly Padded' }
+];
+
 export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
   useModalScrollLock(isOpen, onClose);
 
@@ -22,6 +30,7 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     subCategory: '',
     shortDescription: '',
     description: '',
+    fullDescription: '',
     nameOptions: [''],
     productDetails: [{ label: '', value: '' }],
     originalPrice: '',
@@ -33,11 +42,10 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     is_recommended: true,
     sizes: [],
     colors: [],
-    specifications: [{ label: '', value: '' }],
+    specifications: DEFAULT_ADDITIONAL_INFO_TEMPLATE.map(row => ({ ...row })),
     careInstructions: '',
     images: []
   });
-
 
 const DEFAULT_CATEGORIES = [
   { id: 1, category_id: 1, name: 'CORSET TOPS' },
@@ -208,7 +216,7 @@ const DEFAULT_CATEGORIES = [
     }));
   };
 
-  // Specification Key-Value Pair Handlers
+  // Specification / Additional Information Key-Value Pair Handlers
   const handleAddSpecification = () => {
     setFormData(prev => ({
       ...prev,
@@ -228,6 +236,20 @@ const DEFAULT_CATEGORIES = [
     setFormData(prev => ({
       ...prev,
       specifications: prev.specifications.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleLoadAdditionalInfoTemplate = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: DEFAULT_ADDITIONAL_INFO_TEMPLATE.map(row => ({ ...row }))
+    }));
+  };
+
+  const handleClearAdditionalInfo = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: []
     }));
   };
 
@@ -350,10 +372,12 @@ const DEFAULT_CATEGORIES = [
         shortDescription: formData.shortDescription.trim(),
         short_description: formData.shortDescription.trim(),
         description: formData.description.trim(),
+        fullDescription: formData.fullDescription.trim(),
+        full_description: formData.fullDescription.trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
-        productDetails: validProductDetails,
-        product_details: validProductDetails,
+        productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
+        product_details: validSpecs.length > 0 ? validSpecs : validProductDetails,
         originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
         discountPercent: Number(formData.discountPercent) || 0,
@@ -371,6 +395,8 @@ const DEFAULT_CATEGORIES = [
         sizes: formData.sizes.length > 0 ? formData.sizes : ['XS', 'S', 'M', 'L'],
         colors: formData.colors.length > 0 ? formData.colors : ['Default'],
         specifications: validSpecs,
+        additionalInfo: validSpecs,
+        additional_info: validSpecs,
         careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
@@ -537,6 +563,20 @@ const DEFAULT_CATEGORIES = [
               />
             </div>
 
+            {/* 4.1 Full Description */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                Full Description (Detailed Website Story / Overview)
+              </label>
+              <textarea
+                rows={5}
+                value={formData.fullDescription}
+                onChange={(e) => setFormData(prev => ({ ...prev, fullDescription: e.target.value }))}
+                placeholder="Comprehensive product story, artisan detailing, styling ideas, and garment drape overview..."
+                className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
+              />
+            </div>
+
             {/* 4.5 PRODUCT CONTENT SECTION */}
             <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
               <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">Product Content</h3>
@@ -550,7 +590,7 @@ const DEFAULT_CATEGORIES = [
                   <button
                     type="button"
                     onClick={handleAddNameOption}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Name Option
                   </button>
@@ -591,7 +631,7 @@ const DEFAULT_CATEGORIES = [
                   <button
                     type="button"
                     onClick={handleAddProductDetail}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
                   </button>
@@ -809,50 +849,107 @@ const DEFAULT_CATEGORIES = [
               </div>
             </div>
 
-            {/* 9. Specifications (Repeatable Key-Value List) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                  Specifications (Optional)
-                </label>
-                <button
-                  type="button"
-                  onClick={handleAddSpecification}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
-                >
-                  <Plus className="w-4.5 h-4.5 stroke-[2.5]" /> Add Row
-                </button>
+            {/* 9. Additional Information (Storefront Accordion) */}
+            <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                      Additional Information
+                    </label>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
+                      Storefront Accordion
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Dynamically customize rows displayed under the "ADDITIONAL INFORMATION" accordion on the product page.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={handleLoadAdditionalInfoTemplate}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                    title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
+                  >
+                    Load Preset
+                  </button>
+                  {formData.specifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAdditionalInfo}
+                      className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
+                      title="Clear all rows"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAddSpecification}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2">
-                {formData.specifications.map((spec, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={spec.label}
-                      onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
-                      placeholder="Label (e.g. Fabric)"
-                      className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
-                    />
-                    <input
-                      type="text"
-                      value={spec.value}
-                      onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                      placeholder="Value (e.g. Cotton Silk)"
-                      className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
-                    />
-                    {formData.specifications.length > 1 && (
+
+              {formData.specifications.length === 0 ? (
+                <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
+                  <p className="text-xs text-neutral-500 mb-2">No additional information rows added.</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleLoadAdditionalInfoTemplate}
+                      className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                    >
+                      Load Standard Preset Rows
+                    </button>
+                    <span className="text-neutral-300">•</span>
+                    <button
+                      type="button"
+                      onClick={handleAddSpecification}
+                      className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                    >
+                      + Add Custom Row
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    <div className="col-span-4">Attribute / Title</div>
+                    <div className="col-span-7">Value / Specification Detail</div>
+                    <div className="col-span-1 text-center">Action</div>
+                  </div>
+                  {formData.specifications.map((spec, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
+                      <input
+                        type="text"
+                        value={spec.label}
+                        onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
+                        placeholder="e.g. Fabric, Closure, Lining, Care"
+                        className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
+                      />
+                      <input
+                        type="text"
+                        value={spec.value}
+                        onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
+                        placeholder="e.g. Embroidered fabric with sequin detailing"
+                        className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
+                      />
                       <button
                         type="button"
                         onClick={() => handleRemoveSpecification(idx)}
-                        className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
+                        className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
                         title="Remove row"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 10. Care Instructions */}
@@ -943,7 +1040,8 @@ const DEFAULT_CATEGORIES = [
                   <button
                     type="button"
                     onClick={() => setShowUrlInput(true)}
-                    className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark underline"
+                    className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark no-underline hover:no-underline transition-colors cursor-pointer"
+                    style={{ textDecoration: 'none' }}
                   >
                     + Or add image via direct URL
                   </button>

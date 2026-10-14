@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Settings,
-  ShieldCheck,
-  Database,
-  Globe,
   Mail,
   User,
   CheckCircle2,
   AlertCircle,
   Save,
   RefreshCw,
-  Sliders,
-  Server
+  Sliders
 } from 'lucide-react';
 import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
@@ -25,8 +21,6 @@ export const AdminSettings = () => {
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
-  const [dbStatus, setDbStatus] = useState('Healthy');
-  const [apiStatus, setApiStatus] = useState('Connected');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -61,45 +55,8 @@ export const AdminSettings = () => {
       {/* Header Banner */}
       <AdminPageHeader
         title="Admin Settings & Configuration"
-        subtitle="System diagnostics, active admin account privileges, and global store parameters."
+        subtitle="Active admin account privileges and global store parameters."
       />
-
-      {/* System Health Diagnostics */}
-      <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs">
-        <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Server className="w-4 h-4 text-neutral-500" />
-          <span>System & Backend Health Diagnostics</span>
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider">Database Link</span>
-              <div className="font-bold text-emerald-900 mt-0.5">{dbStatus}</div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">PostgreSQL Pool Online</div>
-            </div>
-            <Database className="w-5 h-5 text-emerald-600" />
-          </div>
-
-          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider">API Server</span>
-              <div className="font-bold text-emerald-900 mt-0.5">{apiStatus}</div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">Vercel API Node v20.x</div>
-            </div>
-            <Globe className="w-5 h-5 text-emerald-600" />
-          </div>
-
-          <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-purple-800 tracking-wider">Security Guard</span>
-              <div className="font-bold text-purple-900 mt-0.5">JWT Auth Active</div>
-              <div className="text-[10px] text-purple-700 mt-0.5">Protected Admin Portal</div>
-            </div>
-            <ShieldCheck className="w-5 h-5 text-purple-600" />
-          </div>
-        </div>
-      </div>
 
       {/* Admin Account & Store Settings Form */}
       <form onSubmit={handleSaveSettings} className="grid grid-cols-1 lg:grid-cols-2 gap-6">

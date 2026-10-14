@@ -232,3 +232,5 @@ export const QuickViewModal = () => {
     </AnimatePresence>
   );
 };
+
+export default QuickViewModal;
