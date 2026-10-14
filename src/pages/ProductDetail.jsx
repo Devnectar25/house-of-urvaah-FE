@@ -38,6 +38,8 @@ import { RelatedProducts } from '../components/product/RelatedProducts';
 import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWidget';
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
+import RichTextRenderer from '../components/common/RichTextRenderer';
+
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -1108,7 +1110,7 @@ export const ProductDetail = () => {
             </div>
 
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
-            {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0) ? (
+            {(Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0) <= 0) || (product.inStock === false && Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0) <= 0) ? (
               <div className="flex items-center gap-2.5 pt-1">
                 {hasSubscribedStock ? (
                   <button
@@ -1206,10 +1208,13 @@ export const ProductDetail = () => {
                   {openAccordions['desc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                 </button>
                 {openAccordions['desc'] && (
-                  <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
-                    {product.description || product.fullDescription || product.full_description || 'Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams.'}
-                  </div>
+                  <RichTextRenderer
+                    content={product.description || product.fullDescription || product.full_description}
+                    fallback="Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams."
+                    className="mt-2 text-xs sm:text-sm pr-2"
+                  />
                 )}
+
               </div>
 
               {/* Size Details */}
@@ -1296,10 +1301,13 @@ export const ProductDetail = () => {
                   {openAccordions['fulldesc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                 </button>
                 {openAccordions['fulldesc'] && (
-                  <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
-                    {product.fullDescription || product.full_description || product.description || 'Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams.'}
-                  </div>
+                  <RichTextRenderer
+                    content={product.fullDescription || product.full_description || product.description}
+                    fallback="Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams."
+                    className="mt-2 text-xs sm:text-sm pr-2"
+                  />
                 )}
+
               </div>
 
               {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (After Size Details & Additional Information) */}

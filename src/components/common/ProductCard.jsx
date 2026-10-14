@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Eye, ShoppingBag, Bell, X, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { StockNotificationModal } from '../product/StockNotificationModal';
+import { getSwatchCss } from '../../utils/colorValidator';
 
 export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOriginalPrice = false }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -16,16 +17,20 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
 
   const navigate = useNavigate();
   const { addToCart, toggleWishlist, isInWishlist, setPdpProduct, pdpProduct, quickViewProduct, setQuickViewProduct, user } = useCart();
-  const isWishlisted = isInWishlist(product.id);
-  const isModalOpen = Boolean(pdpProduct || quickViewProduct || isStockModalOpen);
-  const activeHover = isHovered && !isModalOpen;
+  const isWishlisted = Boolean(isInWishlist && product?.id && isInWishlist(product.id));
+  const isModalOpen = Boolean(pdpProduct || quickViewProduct);
+  const activeHover = isHovered && !isModalOpen && !isStockModalOpen;
+
+
+  const qty = Number(
+    product?.stockQuantity !== undefined && product?.stockQuantity !== null
+      ? product.stockQuantity
+      : (product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 0)
+  );
 
   const isOutOfStock = Boolean(
-    product?.inStock === false ||
-    product?.instock === false ||
-    (product?.stockQuantity !== undefined && product.stockQuantity !== null && Number(product.stockQuantity) <= 0) ||
-    (product?.stock_quantity !== undefined && product.stock_quantity !== null && Number(product.stock_quantity) <= 0) ||
-    (product?.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) ||
+    qty <= 0 ||
+    (qty <= 0 && (product?.inStock === false || product?.instock === false)) ||
     product?.isOutOfStock === true ||
     product?.status === 'Out of Stock' ||
     product?.status === 'out_of_stock'
@@ -97,6 +102,7 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   };
 
   const handleCardClick = () => {
+    if (isStockModalOpen) return;
     if (product?.id) {
       let targetId = product.id;
       if (product.id === 'bs-101' || product.id === '101' || product.id === '105' || product.id === 'prod-105' || product.id === 'bs-105' || (product.name && (product.name.toUpperCase().includes('CHESTNUT BLOOM SET') || product.name.toUpperCase().includes('MOCHA BROWN EMBROIDERED CO-ORD SET')))) {
@@ -362,7 +368,8 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
               <span
                 key={idx}
                 className="w-2.5 h-2.5 rounded-full border border-black/20"
-                style={{ backgroundColor: color }}
+                style={{ background: getSwatchCss(color) }}
+                title={color}
               />
             ))}
           </div>

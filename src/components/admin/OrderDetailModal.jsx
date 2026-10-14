@@ -21,6 +21,7 @@ import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
+import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Status options matching House of Urvaah lifecycle and policy values
 const ORDER_STATUS_OPTIONS = [
@@ -39,6 +40,13 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Return Approved', label: 'Return Approved' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
   { value: 'Returned', label: 'Returned' },
+  { value: 'Replacement Request Processing', label: 'Replacement Request Processing' },
+  { value: 'Replace Approved', label: 'Replace Approved' },
+  { value: 'Replacement Processing', label: 'Replacement Processing' },
+  { value: 'Replacement Shipped', label: 'Replacement Shipped' },
+  { value: 'Replacement Out for Delivery', label: 'Replacement Out for Delivery' },
+  { value: 'Replaced', label: 'Replaced' },
+  { value: 'Replace Rejected', label: 'Replace Rejected' },
   { value: 'Exchanged', label: 'Exchanged' }
 ];
 
@@ -84,8 +92,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       if (!data) throw new Error('Order details not found');
 
       setOrder(data);
+      const isCod = (data.payment_method || '').toLowerCase() === 'cod' ||
+                    (data.payment_type || '').toLowerCase() === 'cod' ||
+                    (data.payment_method || '').toLowerCase().includes('cash');
       const initStatus = data.status || 'Placed';
-      const initPaymentStatus = data.payment_status || 'Pending';
+      const initPaymentStatus = (initStatus === 'Delivered' && isCod) ? 'Paid' : (data.payment_status || 'Pending');
 
       confirmedRef.current = { status: initStatus, paymentStatus: initPaymentStatus };
       setConfirmedStatus(initStatus);
@@ -137,9 +148,19 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSaveError(null);
     setSaveSuccessMsg(null);
 
+    const isCod = (order?.payment_method || '').toLowerCase() === 'cod' ||
+                  (order?.payment_type || '').toLowerCase() === 'cod' ||
+                  (order?.payment_method || '').toLowerCase().includes('cash');
+
+    let effectivePaymentStatus = selectedPaymentStatus;
+    if (newStatus === 'Delivered' && isCod) {
+      effectivePaymentStatus = 'Paid';
+      setSelectedPaymentStatus('Paid');
+    }
+
     const isUnsaved =
       newStatus !== confirmedRef.current.status ||
-      selectedPaymentStatus !== confirmedRef.current.paymentStatus;
+      effectivePaymentStatus !== confirmedRef.current.paymentStatus;
 
     // Update parent table pill optimistically in local state immediately without API call
     const notifyPreview = onOptimisticPreview || onStatusPreview;
@@ -147,7 +168,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       notifyPreview({
         id: order.id,
         status: newStatus,
-        payment_status: selectedPaymentStatus,
+        payment_status: effectivePaymentStatus,
         isPreview: isUnsaved
       });
     }
@@ -193,9 +214,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSaveSuccessMsg(null);
 
     try {
+      const isCod = (order?.payment_method || '').toLowerCase() === 'cod' ||
+                    (order?.payment_type || '').toLowerCase() === 'cod' ||
+                    (order?.payment_method || '').toLowerCase().includes('cash');
+      const effectivePaymentStatus = (selectedStatus === 'Delivered' && isCod) ? 'Paid' : selectedPaymentStatus;
+
       const payload = {
         status: selectedStatus,
-        paymentStatus: selectedPaymentStatus
+        paymentStatus: effectivePaymentStatus
       };
 
       const response = await apiClient(`/api/orders/${order.id}/status`, {
@@ -206,11 +232,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       const updatedData = response?.data || response || {
         ...order,
         status: selectedStatus,
-        payment_status: selectedPaymentStatus
+        payment_status: effectivePaymentStatus
       };
 
       const newConfirmedStatus = updatedData.status || selectedStatus;
-      const newConfirmedPaymentStatus = updatedData.payment_status || selectedPaymentStatus;
+      const newConfirmedPaymentStatus = updatedData.payment_status || effectivePaymentStatus;
 
       // Update confirmed ref synchronously FIRST before state dispatch
       confirmedRef.current = {
@@ -248,6 +274,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           isPreview: false
         });
       }
+
+      // Broadcast update across all customer sessions and tabs
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: newConfirmedStatus,
+        payment_status: newConfirmedPaymentStatus
+      });
     } catch (err) {
       console.error('Failed to update order status:', err);
       setSaveError(err.message || 'Failed to update order status. Please try again.');
@@ -311,6 +344,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           isPreview: false
         });
       }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Cancelled'
+      });
     } catch (err) {
       console.error('Failed to approve cancellation:', err);
       setSaveError(err.message || 'Failed to approve cancellation.');
@@ -364,6 +402,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           isPreview: false
         });
       }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: restoredStatus
+      });
     } catch (err) {
       console.error('Failed to reject cancellation:', err);
       setSaveError(err.message || 'Failed to reject cancellation.');
@@ -471,6 +514,171 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     } catch (err) {
       console.error('Failed to reject return:', err);
       setSaveError(err.message || 'Failed to reject return request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleApproveReplacement = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Replace Approved'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Replace Approved',
+        logistics_status: 'Replacement Approved'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Replace Approved');
+      setSelectedStatus('Replace Approved');
+      confirmedRef.current.status = 'Replace Approved';
+      setSaveSuccessMsg('Replacement approved! Reverse pickup scheduled and replacement dispatched.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Replace Approved',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Replace Approved',
+          isPreview: false
+        });
+      }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Replace Approved'
+      });
+    } catch (err) {
+      console.error('Failed to approve replacement:', err);
+      setSaveError(err.message || 'Failed to approve replacement request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleRejectReplacement = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Replace Rejected',
+          cancelReason: 'Replacement request rejected by Admin'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Delivered'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Delivered');
+      setSelectedStatus('Delivered');
+      confirmedRef.current.status = 'Delivered';
+      setSaveSuccessMsg('Replacement request rejected. Order remains Delivered.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Delivered',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Delivered',
+          isPreview: false
+        });
+      }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Delivered'
+      });
+    } catch (err) {
+      console.error('Failed to reject replacement:', err);
+      setSaveError(err.message || 'Failed to reject replacement request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleCompleteReplacement = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Replaced'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Replaced'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Replaced');
+      setSelectedStatus('Replaced');
+      confirmedRef.current.status = 'Replaced';
+      setSaveSuccessMsg('Replacement marked as completed & delivered.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Replaced',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Replaced',
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to complete replacement:', err);
+      setSaveError(err.message || 'Failed to complete replacement.');
     } finally {
       setSavingStatus(false);
     }
@@ -864,6 +1072,135 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 </div>
               )}
 
+              {/* Customer Replacement Request Review Banner */}
+              {(['replacement request processing', 'replace requested', 'replacement requested'].includes(
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+              )) && (
+                <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg text-purple-800 shrink-0 mt-0.5">
+                      <RefreshCw className="w-5 h-5 text-purple-700" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-purple-950 uppercase tracking-wide">
+                          Customer Replacement Request (Delivered Order Exchange)
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
+                          Action Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-900/90 leading-relaxed">
+                        The customer has requested an exchange / replacement for this delivered piece. Approving will confirm the requested replacement piece and coordinate reverse pickup of the delivered item.
+                      </p>
+
+                      {(order.cancel_reason || order.return_reason) && (
+                        <div className="mt-2 p-2.5 bg-purple-100/70 border border-purple-200 rounded-lg text-xs">
+                          <span className="text-[10px] font-bold text-purple-800 uppercase block">Exchange Details / Sizing Preference:</span>
+                          <p className="text-purple-950 font-medium mt-0.5">{order.cancel_reason || order.return_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Approve / Reject Replacement Buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-purple-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleRejectReplacement}
+                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Reject Replacement
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleApproveReplacement}
+                      className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve Replacement</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Replacement Approved & In Transit Banner */}
+              {(['replace approved', 'replacement processing', 'replacement shipped', 'replacement out for delivery'].includes(
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+              )) && (
+                <div className="bg-indigo-50 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-800 shrink-0 mt-0.5">
+                      <Truck className="w-5 h-5 text-indigo-700" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-indigo-950 uppercase tracking-wide">
+                          Replacement In Progress
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
+                          Replacement In Motion
+                        </span>
+                      </div>
+                      <p className="text-xs text-indigo-900/90 leading-relaxed">
+                        Replacement has been authorized. Reverse pickup for the original piece is scheduled, and the replacement piece is prepared for dispatch. When the exchange is delivered, click below to finalize.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-indigo-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleCompleteReplacement}
+                      className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <PackageCheck className="w-4 h-4 text-white" />
+                          <span>Mark Replacement Completed & Delivered</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Replacement Completed Banner */}
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'replaced') && (
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
+                      <PackageCheck className="w-5 h-5 text-emerald-700" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs sm:text-sm font-admin font-bold text-emerald-950 uppercase tracking-wide">
+                        Replacement Order Completed
+                      </h4>
+                      <p className="text-xs text-emerald-900/90 leading-relaxed">
+                        The replacement piece has been delivered to the customer and the exchange cycle is completed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Return Approved & In Transit to Urvaah House Banner */}
               {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'return approved') && (
                 <div className="bg-sky-50 border-2 border-sky-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
@@ -1036,9 +1373,24 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                   {/* Payment Status Dropdown */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
-                      Payment Status
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+                        Payment Status
+                      </label>
+                      {(() => {
+                        const isCod = (order?.payment_method || '').toLowerCase() === 'cod' ||
+                                      (order?.payment_type || '').toLowerCase() === 'cod' ||
+                                      (order?.payment_method || '').toLowerCase().includes('cash');
+                        if (selectedStatus === 'Delivered' && isCod) {
+                          return (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              COD Collected on Delivery
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                     <select
                       value={selectedPaymentStatus}
                       onChange={(e) => handlePaymentStatusChange(e.target.value)}

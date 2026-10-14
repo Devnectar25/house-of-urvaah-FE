@@ -497,12 +497,15 @@ export const CartProvider = ({ children }) => {
     if (!product) return;
 
     // Defensive check: Do not add out-of-stock items to cart
+    const itemQty = Number(
+      product.stockQuantity !== undefined && product.stockQuantity !== null
+        ? product.stockQuantity
+        : (product.stock_quantity ?? product.stock ?? product.quantity ?? 0)
+    );
+
     const isOutOfStock = Boolean(
-      product.inStock === false ||
-      product.instock === false ||
-      (product.stockQuantity !== undefined && product.stockQuantity !== null && Number(product.stockQuantity) <= 0) ||
-      (product.stock_quantity !== undefined && product.stock_quantity !== null && Number(product.stock_quantity) <= 0) ||
-      (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) ||
+      itemQty <= 0 ||
+      (itemQty <= 0 && (product.inStock === false || product.instock === false)) ||
       product.isOutOfStock === true ||
       product.status === 'Out of Stock' ||
       product.status === 'out_of_stock'

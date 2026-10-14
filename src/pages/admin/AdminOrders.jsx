@@ -27,6 +27,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../../lib/orderSync';
 
 const checkStatusMatches = (orderStatus, filterStatus) => {
   if (!filterStatus || filterStatus === 'all') return true;
@@ -66,14 +67,32 @@ const checkStatusMatches = (orderStatus, filterStatus) => {
     return o === 'received at house of urvaah' || o === 'received at homved';
   }
   if (f === 'exchanged' || f === 'exchange' || f === 'exchanges') {
-    return o.startsWith('exchange');
+    return o.startsWith('exchange') || o.startsWith('replace') || o.includes('replacement');
+  }
+  if (f === 'replacement request processing' || f === 'replace requested' || f === 'replacement requested') {
+    return o === 'replacement request processing' || o === 'replace requested' || o === 'replacement requested';
+  }
+  if (f === 'replace approved' || f === 'replacement approved') {
+    return o === 'replace approved' || o === 'replacement approved';
+  }
+  if (f === 'replaced') {
+    return o === 'replaced';
   }
   return o === f;
 };
 
-const checkPaymentStatusMatches = (orderPaymentStatus, filterPaymentStatus) => {
+const checkPaymentStatusMatches = (orderPaymentStatus, filterPaymentStatus, order = null) => {
   if (!filterPaymentStatus || filterPaymentStatus === 'all') return true;
-  const o = (orderPaymentStatus || '').toLowerCase();
+  let effectiveStatus = orderPaymentStatus;
+  if (order) {
+    const isCod = (order.payment_method || '').toLowerCase() === 'cod' ||
+                  (order.payment_type || '').toLowerCase() === 'cod' ||
+                  (order.payment_method || '').toLowerCase().includes('cash');
+    if ((order.status || '').toLowerCase() === 'delivered' && isCod) {
+      effectiveStatus = 'Paid';
+    }
+  }
+  const o = (effectiveStatus || '').toLowerCase();
   const f = filterPaymentStatus.toLowerCase();
   if (f === 'pending') {
     return o === 'pending' || o === 'failed';
@@ -95,6 +114,9 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Return Approved', label: 'Return Approved' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
   { value: 'Returned', label: 'Returned' },
+  { value: 'Replacement Request Processing', label: 'Replacement Requested' },
+  { value: 'Replace Approved', label: 'Replacement Approved' },
+  { value: 'Replaced', label: 'Replaced' },
   { value: 'Exchanged', label: 'Exchanged' }
 ];
 
@@ -257,21 +279,28 @@ export const AdminOrders = () => {
     setCurrentPage(1);
   }, [location.search]);
 
-  // Fetch Stat Cards Counts
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    setStatsError(null);
+  // Fetch Stat Cards Counts (supports silent background sync without UI flicker)
+  const fetchStats = useCallback(async (silent = false) => {
+    if (!silent) {
+      setStatsLoading(true);
+      setStatsError(null);
+    }
     try {
       const response = await apiClient('/api/orders/stats');
       const data = response?.data || response || {};
       setStats(data);
     } catch (err) {
       console.error('Failed to load order stats:', err);
-      setStatsError(err.message || 'Failed to load order metrics');
+      if (!silent) {
+        setStatsError(err.message || 'Failed to load order metrics');
+      }
     } finally {
-      setStatsLoading(false);
+      if (!silent) {
+        setStatsLoading(false);
+      }
     }
   }, []);
+
 
   useEffect(() => {
     fetchStats();
@@ -300,6 +329,9 @@ export const AdminOrders = () => {
   const handleOrderUpdatedInList = useCallback((updatedOrder) => {
     if (!updatedOrder || !updatedOrder.id) return;
 
+    // Broadcast change so user's customer UI and other admin sessions update dynamically
+    broadcastOrderUpdate(updatedOrder);
+
     setOrders((prevOrders) => {
       const existingOrder = prevOrders.find((o) => o.id === updatedOrder.id);
       if (!existingOrder) return prevOrders;
@@ -309,7 +341,7 @@ export const AdminOrders = () => {
       // Check if merged order still matches active filters
       const matchesStatus = checkStatusMatches(mergedOrder.status, selectedStatus);
 
-      const matchesPaymentStatus = checkPaymentStatusMatches(mergedOrder.payment_status, selectedPaymentStatus);
+      const matchesPaymentStatus = checkPaymentStatusMatches(mergedOrder.payment_status, selectedPaymentStatus, mergedOrder);
 
       const matchesPaymentType =
         selectedPaymentType === 'all' ||
@@ -362,13 +394,15 @@ export const AdminOrders = () => {
     fetchStats();
   }, [selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, fetchStats]);
 
-  // Fetch Filtered Orders List
-  const fetchOrders = useCallback(async () => {
+  // Fetch Filtered Orders List (supports silent background sync without UI flicker)
+  const fetchOrders = useCallback(async (silent = false) => {
     // If date range is invalid, do not send query
     if (dateError) return;
 
-    setOrdersLoading(true);
-    setOrdersError(null);
+    if (!silent) {
+      setOrdersLoading(true);
+      setOrdersError(null);
+    }
 
     try {
       const params = new URLSearchParams();
@@ -419,15 +453,70 @@ export const AdminOrders = () => {
       setTotalPages(pagination.totalPages || Math.ceil((pagination.totalOrders || list.length || 1) / limit));
     } catch (err) {
       console.error('Failed to load orders:', err);
-      setOrdersError(err.message || 'Failed to load orders from server. Please try again.');
+      if (!silent) {
+        setOrdersError(err.message || 'Failed to load orders from server. Please try again.');
+      }
     } finally {
-      setOrdersLoading(false);
+      if (!silent) {
+        setOrdersLoading(false);
+      }
     }
   }, [currentPage, limit, selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, dateError, sortOrder]);
+
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Real-time synchronization listener for order updates across all tabs / devices
+  useEffect(() => {
+    const unsubscribe = subscribeToOrderUpdates((payload) => {
+      if (!payload || (!payload.id && !payload.order_number)) return;
+
+      setOrders((prevOrders) => {
+        const idx = prevOrders.findIndex(
+          (o) =>
+            (payload.id && (o.id === payload.id || o._id === payload.id)) ||
+            (payload.order_number && (o.order_number === payload.order_number || o.orderNumber === payload.order_number))
+        );
+        if (idx !== -1) {
+          const updated = {
+            ...prevOrders[idx],
+            status: payload.status || prevOrders[idx].status,
+            payment_status: payload.payment_status || payload.paymentStatus || prevOrders[idx].payment_status,
+            cancel_reason: payload.cancel_reason || payload.cancelReason || prevOrders[idx].cancel_reason,
+            isPreview: false
+          };
+          const next = [...prevOrders];
+          next[idx] = updated;
+          return next;
+        } else if (currentPage === 1 && !isFilterActive) {
+          // New order placed: add to top and refresh table silently without reloading UI
+          fetchOrders(true);
+        }
+        return prevOrders;
+      });
+
+      // Update stat cards dynamically and silently without skeleton flicker
+      fetchStats(true);
+    });
+
+    return () => unsubscribe();
+  }, [currentPage, isFilterActive, fetchOrders, fetchStats]);
+
+  // Window focus listener for silent real-time sync (NO automatic 5s/6s polling interval)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchOrders(true);
+      fetchStats(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchOrders, fetchStats]);
+
 
   // Toggle Date sorting between newest first and oldest first
   const handleToggleSortOrder = () => {
@@ -458,23 +547,31 @@ export const AdminOrders = () => {
     navigate('/admin/orders', { replace: true });
   };
 
-  // Click Stat Card to pre-filter and update URL
+  // Click Stat Card to pre-filter and update URL (with click-to-toggle support)
   const handleStatCardClick = (statusValue, paymentStatusValue = null) => {
-    const params = new URLSearchParams();
-    const newStatus = statusValue || 'all';
-    const newPaymentStatus = paymentStatusValue || 'all';
+    const isCurrentlyActive =
+      (statusValue && statusValue !== 'all' && selectedStatus.toLowerCase() === statusValue.toLowerCase()) ||
+      (paymentStatusValue && paymentStatusValue !== 'all' && selectedPaymentStatus.toLowerCase() === paymentStatusValue.toLowerCase());
 
-    setSelectedStatus(newStatus);
-    setSelectedPaymentStatus(newPaymentStatus);
+    const targetStatus = isCurrentlyActive ? 'all' : (statusValue || 'all');
+    const targetPaymentStatus = isCurrentlyActive ? 'all' : (paymentStatusValue || 'all');
 
-    if (newStatus !== 'all') {
-      params.set('status', newStatus);
-    }
-    if (newPaymentStatus !== 'all') {
-      params.set('paymentStatus', newPaymentStatus);
-    }
-
+    setSelectedStatus(targetStatus);
+    setSelectedPaymentStatus(targetPaymentStatus);
     setCurrentPage(1);
+
+    const params = new URLSearchParams(location.search);
+    if (targetStatus !== 'all') {
+      params.set('status', targetStatus);
+    } else {
+      params.delete('status');
+    }
+    if (targetPaymentStatus !== 'all') {
+      params.set('paymentStatus', targetPaymentStatus);
+    } else {
+      params.delete('paymentStatus');
+    }
+
     const searchStr = params.toString();
     navigate(searchStr ? `/admin/orders?${searchStr}` : '/admin/orders', { replace: true });
 
@@ -484,6 +581,7 @@ export const AdminOrders = () => {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
 
   // Helper for Order Status Pill Styling
   const getOrderStatusPill = (status) => {
@@ -524,7 +622,22 @@ export const AdminOrders = () => {
     if (s.includes('return')) {
       return 'bg-orange-50 text-orange-700 border-orange-200';
     }
-    if (s.includes('exchange')) {
+    if (s.includes('replacement request processing') || s.includes('replace requested') || s.includes('replacement requested')) {
+      return 'bg-purple-100 text-purple-900 border-purple-300 font-bold';
+    }
+    if (s.includes('replace approved') || s.includes('replacement approved')) {
+      return 'bg-indigo-50 text-indigo-800 border-indigo-300 font-bold';
+    }
+    if (s.includes('replacement processing') || s.includes('replacement shipped') || s.includes('replacement out for delivery')) {
+      return 'bg-sky-50 text-sky-800 border-sky-300 font-bold';
+    }
+    if (s === 'replaced') {
+      return 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold';
+    }
+    if (s.includes('replace rejected')) {
+      return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    if (s.includes('exchange') || s.includes('replace')) {
       return 'bg-teal-50 text-teal-700 border-teal-200';
     }
     return 'bg-neutral-100 text-neutral-700 border-neutral-200';
@@ -684,7 +797,109 @@ export const AdminOrders = () => {
       />
 
       {/* ========================================================================= */}
-      {/* 1. DETAILED SEARCH & FILTERS PANEL                                        */}
+      {/* 1. STAT CARDS / STATUS METRICS BREAKDOWN SECTION (ABOVE FILTERS)          */}
+      {/* ========================================================================= */}
+      <div className="space-y-3 pt-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase font-admin">
+            Order Status Breakdown
+          </h3>
+          <span className="text-[11px] text-neutral-400 hidden sm:inline">
+            Click any metric card to filter the orders table below
+          </span>
+        </div>
+
+        {statsError ? (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <span>Failed to load order statistics: {statsError}</span>
+            </div>
+            <button
+              onClick={fetchStats}
+              className="px-3 py-1 bg-brand-dark text-white rounded-lg font-semibold hover:bg-black transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+            {STAT_CARDS_DEF.map((card) => {
+              const IconComp = card.icon;
+              const isActive =
+                card.key === 'total'
+                  ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
+                  : card.key === 'pendingPayment'
+                  ? selectedPaymentStatus.toLowerCase() === 'pending'
+                  : Boolean(
+                      selectedStatus &&
+                      card.statusFilter &&
+                      selectedStatus.toLowerCase() === card.statusFilter.toLowerCase()
+                    );
+
+              return (
+                <div
+                  key={card.key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleStatCardClick(card.statusFilter, card.paymentStatusFilter);
+                    }
+                  }}
+                  className={`border rounded-xl p-4 shadow-sm transition-all flex flex-col justify-between space-y-3 group cursor-pointer select-none ${
+                    isActive
+                      ? 'border-brand-dark ring-2 ring-brand-dark/20 shadow-md bg-neutral-50/90'
+                      : 'bg-white border-neutral-200/80 hover:shadow-md hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2 rounded-lg border ${card.colorClass}`}>
+                      <IconComp className="w-4 h-4" />
+                    </div>
+                    {statsLoading ? (
+                      <div className="h-5 w-8 bg-neutral-200 rounded animate-pulse" />
+                    ) : (
+                      <span className={`text-xs font-admin font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
+                        {card.count}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                      {card.label}
+                    </h3>
+                    {statsLoading ? (
+                      <div className="h-6 w-14 bg-neutral-200 rounded mt-1 animate-pulse" />
+                    ) : (
+                      <p className="text-lg font-admin font-bold text-brand-dark mt-0.5">
+                        {card.count}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    className={`text-[11px] font-medium flex items-center gap-1 transition-colors pt-1 border-t ${
+                      isActive
+                        ? 'text-brand-dark font-semibold border-neutral-100'
+                        : 'text-neutral-400 group-hover:text-brand-dark border-neutral-100'
+                    }`}
+                  >
+                    <span>{isActive ? 'Filtered view' : 'Click to filter'}</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. DETAILED SEARCH & FILTERS PANEL (BELOW METRIC CARDS)                   */}
       {/* ========================================================================= */}
       <div id="orders-filters-section" className="bg-white border border-neutral-200/80 rounded-xl p-5 shadow-sm space-y-4">
         {/* Filters Header */}
@@ -693,6 +908,7 @@ export const AdminOrders = () => {
             <Filter className="w-4 h-4 text-neutral-500" />
             <span>Search & Filter Parameters</span>
           </div>
+
 
           <button
             type="button"
@@ -863,95 +1079,6 @@ export const AdminOrders = () => {
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* 2. STAT CARDS / STATUS METRICS BREAKDOWN SECTION                          */}
-      {/* ========================================================================= */}
-      <div className="space-y-3 pt-1">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase font-admin">
-            Order Status Breakdown
-          </h3>
-          <span className="text-[11px] text-neutral-400 hidden sm:inline">
-            Click any metric card to filter the orders table below
-          </span>
-        </div>
-
-        {statsError ? (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-              <span>Failed to load order statistics: {statsError}</span>
-            </div>
-            <button
-              onClick={fetchStats}
-              className="px-3 py-1 bg-brand-dark text-white rounded-lg font-semibold hover:bg-black transition-colors cursor-pointer"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-            {STAT_CARDS_DEF.map((card) => {
-              const IconComp = card.icon;
-              const isActive =
-                card.key === 'total'
-                  ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
-                  : card.key === 'pendingPayment'
-                  ? selectedPaymentStatus === 'Pending'
-                  : selectedStatus === card.statusFilter;
-
-              return (
-                <div
-                  key={card.key}
-                  onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
-                  className={`bg-white border rounded-xl p-4 shadow-sm transition-all flex flex-col justify-between space-y-3 group cursor-pointer select-none ${
-                    isActive
-                      ? 'border-neutral-300 shadow-md bg-neutral-50/60'
-                      : 'border-neutral-200/80 hover:shadow-md hover:border-neutral-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className={`p-2 rounded-lg border ${card.colorClass}`}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    {statsLoading ? (
-                      <div className="h-5 w-8 bg-neutral-200 rounded animate-pulse" />
-                    ) : (
-                      <span className={`text-xs font-admin font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
-                        {card.count}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                      {card.label}
-                    </h3>
-                    {statsLoading ? (
-                      <div className="h-6 w-14 bg-neutral-200 rounded mt-1 animate-pulse" />
-                    ) : (
-                      <p className="text-lg font-admin font-bold text-brand-dark mt-0.5">
-                        {card.count}
-                      </p>
-                    )}
-                  </div>
-
-                  <div
-                    className={`text-[11px] font-medium flex items-center gap-1 transition-colors pt-1 border-t ${
-                      isActive
-                        ? 'text-brand-dark font-semibold border-neutral-100'
-                        : 'text-neutral-400 group-hover:text-brand-dark border-neutral-100'
-                    }`}
-                  >
-                    <span>{isActive ? 'Filtered view' : 'Click to filter'}</span>
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* ========================================================================= */}
       {/* 3. ORDERS TABLE CONTAINER (RECENT ORDERS ON TOP)                          */}
@@ -1220,13 +1347,31 @@ export const AdminOrders = () => {
 
                       {/* Payment Status Pill */}
                       <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getPaymentStatusPill(
-                            ord.payment_status || ord.payment_type
-                          )}`}
-                        >
-                          {ord.payment_status || 'Pending'}
-                        </span>
+                        {(() => {
+                          const isCod = (ord.payment_method || '').toLowerCase() === 'cod' ||
+                                        (ord.payment_type || '').toLowerCase() === 'cod' ||
+                                        (ord.payment_method || '').toLowerCase().includes('cash');
+                          const isCancelled = (ord.status || '').toLowerCase() === 'cancelled' || (ord.status || '').toLowerCase() === 'canceled';
+                          const isPaid = ((ord.status || '').toLowerCase() === 'delivered' && isCod) || (ord.payment_status || '').toLowerCase() === 'paid';
+
+                          if (isCancelled && isCod && !isPaid) {
+                            return <span className="text-neutral-400 text-xs font-mono">—</span>;
+                          }
+
+                          const displayPaymentStatus = isPaid
+                            ? 'Paid'
+                            : (ord.payment_status || 'Pending');
+
+                          return (
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getPaymentStatusPill(
+                                displayPaymentStatus
+                              )}`}
+                            >
+                              {displayPaymentStatus}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

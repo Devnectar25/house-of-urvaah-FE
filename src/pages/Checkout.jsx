@@ -26,7 +26,9 @@ import {
   FileText,
   XCircle,
   Clock,
-  PackageCheck
+  PackageCheck,
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -35,6 +37,9 @@ import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
 import { InvoiceModal } from '../components/common/InvoiceModal';
+import { useModalScrollLock } from '../hooks/useModalScrollLock';
+import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
+import Swal from 'sweetalert2';
 
 const ORDER_SESSION_KEY = 'urvaah_last_placed_order';
 
@@ -107,13 +112,17 @@ const formatOrderDetails = (ord, currentUser) => {
   const discount = Number(ord.discount || 0);
   const shippingFee = Number(ord.shipping_fee || ord.shippingFee || 0);
 
-  const createdAt = ord.created_at || ord.createddate ? new Date(ord.created_at || ord.createddate) : new Date();
+  const rawCreatedAt = ord.created_at || ord.createddate || ord.createdAt || ord.placedAt;
+  const createdAt = rawCreatedAt ? new Date(rawCreatedAt) : new Date();
   const deliveryDate = new Date(createdAt);
   deliveryDate.setDate(deliveryDate.getDate() + 7);
   const estDeliveryStr = deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   return {
+    id: ord.id || null,
     orderNumber: orderNum,
+    createdAt: rawCreatedAt || createdAt.toISOString(),
+    placedAt: rawCreatedAt || createdAt.toISOString(),
     trackingNumber: ord.tracking_number || ord.trackingNumber || `TRK-${String(orderNum).replace(/\D/g, '').slice(-6) || 'VHYNGE'}`,
     estimatedDelivery: estDeliveryStr,
     items: mappedItems,
@@ -122,7 +131,7 @@ const formatOrderDetails = (ord, currentUser) => {
     shippingFee: shippingFee,
     totalPaid: totalPaid,
     shippingAddress: {
-      name: addrObj.name || addrObj.recipient_name || ord.customer_name || currentUser?.name || 'Customer Name',
+      name: addrObj.name || addrObj.recipient_name || ord.recipient_name || ord.customer_name || currentUser?.name || 'Customer Name',
       street: addrObj.street || addrObj.full_address || ord.full_address || 'Address Details',
       city: addrObj.city || ord.city || '',
       state: addrObj.state || ord.state || '',
@@ -131,7 +140,7 @@ const formatOrderDetails = (ord, currentUser) => {
     },
     paymentMethod: ord.payment_method || ord.paymentMethod || 'Online Payment',
     customerEmail: ord.customer_email || ord.email || currentUser?.email || '',
-    customerPhone: ord.customer_phone || ord.phone || currentUser?.phone || '',
+    customerPhone: ord.recipient_phone || ord.customer_phone || ord.phone || currentUser?.phone || '',
     status: ord.status || 'Confirmed'
   };
 };
@@ -317,6 +326,27 @@ export const Checkout = () => {
   const [orderCancelled, setOrderCancelled] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isCancelOrderModalOpen, setIsCancelOrderModalOpen] = useState(false);
+  const [cancelOrderReason, setCancelOrderReason] = useState('Ordered by mistake');
+  const [cancelOrderComments, setCancelOrderComments] = useState('');
+  const [cancelOrderError, setCancelOrderError] = useState('');
+
+  useModalScrollLock(isCancelOrderModalOpen, () => !isCancellingOrder && setIsCancelOrderModalOpen(false));
+
+  // Address edit modal state (24-hour order edit window)
+  const [isEditAddressModalOpen, setIsEditAddressModalOpen] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [addressEditForm, setAddressEditForm] = useState({
+    name: '',
+    phone: '',
+    street: '',
+    city: '',
+    state: '',
+    pincode: ''
+  });
+  const [addressEditError, setAddressEditError] = useState('');
+
+  useModalScrollLock(isEditAddressModalOpen, () => !isSavingAddress && setIsEditAddressModalOpen(false));
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -440,6 +470,128 @@ export const Checkout = () => {
       }
     }
   }, [location.state, searchParams, user, cart?.length, navigate]);
+
+  // Real-time synchronization: update order status dynamically when admin or other session updates it
+  useEffect(() => {
+    const currentOrderNum = placedOrderNumber || placedOrderDetails?.orderNumber || searchParams.get('orderNumber') || searchParams.get('orderId');
+    if (!currentOrderNum) return;
+
+    const unsubscribe = subscribeToOrderUpdates((payload) => {
+      if (!payload) return;
+      const targetNum = String(currentOrderNum).toLowerCase();
+      const match =
+        String(payload.order_number || payload.orderNumber || '').toLowerCase() === targetNum ||
+        String(payload.id || '').toLowerCase() === targetNum;
+
+      if (match && payload.status) {
+        setPlacedOrderDetails((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status: payload.status,
+            paymentStatus: payload.payment_status || payload.paymentStatus || prev.paymentStatus,
+            cancel_reason: payload.cancel_reason || payload.cancelReason || prev.cancel_reason
+          };
+        });
+        if (payload.status === 'Cancelled') {
+          setOrderCancelled(true);
+        }
+      }
+
+      if (match && (payload.shippingAddress || payload.shipping_address)) {
+        const sa = payload.shippingAddress || payload.shipping_address;
+        setPlacedOrderDetails((prev) => {
+          if (!prev) return prev;
+          const next = {
+            ...prev,
+            customerPhone: payload.customerPhone || sa.phone || prev.customerPhone,
+            shippingAddress: {
+              ...prev.shippingAddress,
+              ...sa
+            }
+          };
+          try {
+            sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [placedOrderNumber, placedOrderDetails?.orderNumber, searchParams]);
+
+  // Auto-open Address Edit modal if directed from Account or navigation state
+  useEffect(() => {
+    if (location.state?.openAddressEdit && placedOrderDetails) {
+      const ord = placedOrderDetails;
+      const rawCreatedAt = ord.createdAt || ord.created_at || ord.createddate || ord.placedAt;
+      const orderCreatedMs = rawCreatedAt ? new Date(rawCreatedAt).getTime() : Date.now();
+      const diffHours = (Date.now() - orderCreatedMs) / (1000 * 60 * 60);
+      const statusLower = (ord.status || '').toLowerCase();
+      const isLocked = ['shipped', 'dispatched', 'out for delivery', 'delivered', 'cancelled', 'cancellation requested', 'returned'].some((s) => statusLower.includes(s));
+
+      if (diffHours <= 24 && !isLocked) {
+        const addr = ord.shippingAddress || ord.shipping_address || {};
+        setAddressEditForm({
+          name: addr.name || addr.recipient_name || ord.recipient_name || ord.customer_name || user?.name || '',
+          phone: ord.recipient_phone || ord.customer_phone || ord.phone || addr.phone || user?.phone || '',
+          street: addr.street || addr.full_address || ord.full_address || '',
+          city: addr.city || ord.city || '',
+          state: addr.state || ord.state || '',
+          pincode: addr.pincode || addr.postal_code || ord.postal_code || ''
+        });
+        setAddressEditError('');
+        setIsEditAddressModalOpen(true);
+      }
+    }
+  }, [location.state?.openAddressEdit, placedOrderDetails, user]);
+
+  // Dynamic background polling & window focus listener for zero-reload status updates
+  useEffect(() => {
+    const currentOrderNum = placedOrderNumber || placedOrderDetails?.orderNumber || searchParams.get('orderNumber') || searchParams.get('orderId');
+    if (!currentOrderNum) return;
+
+    const refreshLatestStatus = async () => {
+      try {
+        const res = await apiClient(`/api/orders/${currentOrderNum}`);
+        const ord = res?.data || res?.order;
+        if (ord && ord.status) {
+          setPlacedOrderDetails((prev) => {
+            if (!prev) return prev;
+            if (prev.status !== ord.status || prev.paymentStatus !== ord.payment_status) {
+              return {
+                ...prev,
+                status: ord.status,
+                paymentStatus: ord.payment_status || prev.paymentStatus,
+                cancel_reason: ord.cancel_reason || prev.cancel_reason
+              };
+            }
+            return prev;
+          });
+          if (ord.status === 'Cancelled') {
+            setOrderCancelled(true);
+          }
+        }
+      } catch (e) {
+        // Silent check
+      }
+    };
+
+    const handleFocus = () => refreshLatestStatus();
+    window.addEventListener('focus', handleFocus);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshLatestStatus();
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [placedOrderNumber, placedOrderDetails?.orderNumber, searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -1063,9 +1215,28 @@ export const Checkout = () => {
     const isReturned = currentStatusStr === 'returned' || currentStatusStr === 'return completed';
     const isInReturnFlow = isReturnRequested || isReturnApproved || isReceivedAtUrvaah || isReturned;
 
-    const isDelivered = (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed')) && !isInReturnFlow;
-    const isOutForDelivery = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && (isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery'));
-    const isShipped = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && (isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched'));
+    // Replacement Flow States in Checkout
+    const isReplacementRequested = currentStatusStr === 'replacement request processing' || currentStatusStr === 'replace requested' || currentStatusStr === 'replacement requested';
+    const isReplacementApproved = currentStatusStr === 'replace approved' || currentStatusStr === 'replacement approved';
+    const isReplacementInTransit = currentStatusStr === 'replacement processing' || currentStatusStr === 'replacement shipped' || currentStatusStr === 'in reverse transit';
+    const isReplacementOutForDelivery = currentStatusStr === 'replacement out for delivery';
+    const isReplaced = currentStatusStr === 'replaced';
+    const isReplacementRejected = currentStatusStr === 'replace rejected';
+    const isInReplacementFlow = isReplacementRequested || isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced || isReplacementRejected;
+
+    const isDelivered = (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed')) && !isInReturnFlow && !isInReplacementFlow;
+    const isOutForDelivery = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery'));
+    const isShipped = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched'));
+
+    // 24-hour shipping address editing rule
+    const rawOrderTime = details.createdAt || details.placedAt || details.created_at;
+    const orderCreatedMs = rawOrderTime ? new Date(rawOrderTime).getTime() : Date.now();
+    const diffHours = (Date.now() - orderCreatedMs) / (1000 * 60 * 60);
+    const isWithin24Hours = diffHours <= 24;
+    const hoursRemaining = Math.max(1, Math.ceil(24 - diffHours));
+
+    const isAddressLockedStatus = isShipped || isOutForDelivery || isDelivered || isOrderCancelled || isCancellationRequested || isInReturnFlow || isInReplacementFlow;
+    const canEditAddress = isWithin24Hours && !isAddressLockedStatus;
 
     const handleReorder = () => {
       if (details && details.items) {
@@ -1173,64 +1344,304 @@ export const Checkout = () => {
       }
     };
 
-    const handleCancelOrder = async () => {
+    const handleReplaceOrder = async () => {
       if (isCancellingOrder) return;
 
-      const result = await Swal.fire({
-        title: 'Cancel Order?',
-        text: 'Are you sure you want to cancel this order? This will submit a cancellation request to our atelier team for admin approval.',
-        icon: 'warning',
+      const { value: formValues } = await Swal.fire({
+        title: 'Request Product Replacement',
+        html: `
+          <div class="text-left font-sans space-y-3">
+            <p class="text-xs text-neutral-600">Select a reason and your preferred replacement size:</p>
+            <div>
+              <label class="block text-[11px] font-bold text-neutral-700 uppercase mb-1">Reason for Exchange</label>
+              <select id="swal-replace-reason" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 focus:outline-none">
+                <option value="Size or fit issue - need different size">Size or fit issue - need different size</option>
+                <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                <option value="Color or variant exchange">Color or variant exchange</option>
+                <option value="Fabric or styling not as expected">Fabric or styling not as expected</option>
+                <option value="Wrong piece delivered">Wrong piece delivered</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-neutral-700 uppercase mb-1">Preferred Replacement Size</label>
+              <select id="swal-replace-size" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 focus:outline-none">
+                <option value="XS">XS</option>
+                <option value="S">S</option>
+                <option value="M" selected>M</option>
+                <option value="L">L</option>
+                <option value="XL">XL</option>
+                <option value="XXL">XXL</option>
+              </select>
+            </div>
+            <textarea id="swal-replace-comment" placeholder="Optional notes for atelier concierge..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 resize-none h-16 focus:outline-none"></textarea>
+            <div class="p-3 bg-purple-50 border border-purple-100 rounded-lg text-[11px] text-purple-900 leading-relaxed">
+              Complimentary reverse pickup will be scheduled from your delivery address. Once reviewed, your replacement piece will be dispatched with priority delivery.
+            </div>
+          </div>
+        `,
+        focusConfirm: false,
         showCancelButton: true,
-        confirmButtonColor: '#e11d48',
-        cancelButtonColor: '#171717',
-        confirmButtonText: 'Yes, Request Cancellation',
-        cancelButtonText: 'Keep Order',
+        confirmButtonColor: '#171717',
+        cancelButtonColor: '#737373',
+        confirmButtonText: 'Submit Replacement Request',
+        cancelButtonText: 'Keep Piece',
         reverseButtons: true,
-        focusCancel: true,
         background: '#ffffff',
-        color: '#171717',
         customClass: {
           popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
           title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
-          htmlContainer: 'text-sm text-neutral-600',
           confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer',
           cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+        },
+        preConfirm: () => {
+          const reason = document.getElementById('swal-replace-reason')?.value || 'Size or fit issue - need different size';
+          const size = document.getElementById('swal-replace-size')?.value || 'M';
+          const comments = document.getElementById('swal-replace-comment')?.value || '';
+          return { reason, size, comments };
         }
       });
 
-      if (result.isConfirmed) {
+      if (formValues) {
         setIsCancellingOrder(true);
         const orderNum = details?.orderNumber || placedOrderNumber;
+        const fullReason = `Replacement: ${formValues.reason} (Preferred Size: ${formValues.size})${formValues.comments ? ` - Notes: ${formValues.comments}` : ''}`;
         if (orderNum) {
           try {
-            const res = await apiClient(`/api/orders/${orderNum}/cancel`, { method: 'POST' });
-            const targetStatus = res?.data?.status || 'Cancellation Requested';
-            setPlacedOrderDetails((prev) => ({ ...prev, status: targetStatus }));
-            if (targetStatus === 'Cancelled') {
-              setOrderCancelled(true);
-            }
+            await apiClient(`/api/orders/${orderNum}/replace`, {
+              method: 'POST',
+              body: JSON.stringify({
+                type: 'Replacement',
+                cancelReason: fullReason,
+                reason: fullReason,
+                replacementSize: formValues.size,
+                comments: formValues.comments
+              })
+            });
+            setPlacedOrderDetails((prev) => ({
+              ...prev,
+              status: 'Replacement Request Processing',
+              cancel_reason: fullReason,
+              return_type: 'Replacement'
+            }));
+
+            // Dynamically broadcast to admin panel and across all browser tabs
+            broadcastOrderUpdate({
+              orderNumber: orderNum,
+              order_number: orderNum,
+              status: 'Replacement Request Processing',
+              cancel_reason: fullReason
+            });
+
+            await Swal.fire({
+              title: 'Replacement Request Submitted',
+              text: 'Your exchange request has been submitted to House of Urvaah atelier team for verification.',
+              icon: 'success',
+              confirmButtonColor: '#171717',
+              confirmButtonText: 'OK',
+              background: '#ffffff'
+            });
           } catch (e) {
-            console.warn('Cancel order API fallback:', e.message);
-            setPlacedOrderDetails((prev) => ({ ...prev, status: 'Cancellation Requested' }));
+            console.warn('Replacement order error:', e.message);
+            await Swal.fire({
+              title: 'Submission Failed',
+              text: e.message || 'Could not submit replacement request. Please try again.',
+              icon: 'error',
+              confirmButtonColor: '#171717',
+              confirmButtonText: 'OK'
+            });
+          } finally {
+            setIsCancellingOrder(false);
           }
         }
-        setIsCancellingOrder(false);
+      }
+    };
 
-        await Swal.fire({
-          title: 'Cancellation Request Submitted',
-          text: 'Your cancellation request has been submitted to our atelier team for admin approval prior to delivery.',
-          icon: 'success',
-          confirmButtonColor: '#171717',
-          confirmButtonText: 'OK',
-          background: '#ffffff',
-          color: '#171717',
-          customClass: {
-            popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
-            title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
-            htmlContainer: 'text-sm text-neutral-600',
-            confirmButton: 'rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+    const handleCancelOrder = () => {
+      setCancelOrderReason(isDelivered ? 'Size or fit issue' : 'Ordered by mistake');
+      setCancelOrderComments('');
+      setCancelOrderError('');
+      setIsCancelOrderModalOpen(true);
+    };
+
+    const handleConfirmCancellation = async (e) => {
+      if (e) e.preventDefault();
+      if (!cancelOrderReason) {
+        setCancelOrderError('Please select a reason for cancellation.');
+        return;
+      }
+      setIsCancellingOrder(true);
+      setCancelOrderError('');
+
+      const finalReason = cancelOrderComments.trim()
+        ? `${cancelOrderReason} - ${cancelOrderComments.trim()}`
+        : cancelOrderReason;
+
+      const orderNum = details?.orderNumber || placedOrderNumber;
+      if (orderNum) {
+        try {
+          const res = await apiClient(`/api/orders/${orderNum}/cancel`, {
+            method: 'POST',
+            body: JSON.stringify({ cancelReason: finalReason })
+          });
+          const targetStatus = res?.data?.status || 'Cancellation Requested';
+          setPlacedOrderDetails((prev) => ({
+            ...prev,
+            status: targetStatus,
+            cancel_reason: finalReason
+          }));
+          if (targetStatus === 'Cancelled') {
+            setOrderCancelled(true);
           }
+          setIsCancelOrderModalOpen(false);
+
+          // Dynamically broadcast to admin panel and across all browser tabs
+          broadcastOrderUpdate({
+            orderNumber: orderNum,
+            order_number: orderNum,
+            status: targetStatus,
+            cancel_reason: finalReason
+          });
+
+          setToast({
+            type: 'success',
+            title: 'Cancellation Submitted',
+            message: 'Your cancellation request has been submitted to our atelier team.'
+          });
+        } catch (err) {
+          console.warn('Cancel order API fallback:', err.message);
+          setPlacedOrderDetails((prev) => ({
+            ...prev,
+            status: 'Cancellation Requested',
+            cancel_reason: finalReason
+          }));
+          setIsCancelOrderModalOpen(false);
+          setToast({
+            type: 'success',
+            title: 'Cancellation Submitted',
+            message: 'Your cancellation request has been recorded.'
+          });
+        } finally {
+          setIsCancellingOrder(false);
+        }
+      }
+    };
+
+    const handleOpenEditAddress = () => {
+      const currentAddr = details?.shippingAddress || {};
+      setAddressEditForm({
+        name: currentAddr.name || details?.customerName || user?.name || '',
+        phone: details?.customerPhone || currentAddr.phone || user?.phone || '',
+        street: currentAddr.street || '',
+        city: currentAddr.city || '',
+        state: currentAddr.state || '',
+        pincode: currentAddr.pincode || ''
+      });
+      setAddressEditError('');
+      setIsEditAddressModalOpen(true);
+    };
+
+    const handleSaveShippingAddress = async (e) => {
+      e.preventDefault();
+      setAddressEditError('');
+
+      const name = (addressEditForm.name || '').trim();
+      const phone = (addressEditForm.phone || '').trim();
+      const street = (addressEditForm.street || '').trim();
+      const city = (addressEditForm.city || '').trim();
+      const state = (addressEditForm.state || '').trim();
+      const pincode = (addressEditForm.pincode || '').trim();
+
+      if (!name) {
+        setAddressEditError('Please enter recipient full name');
+        return;
+      }
+      const digitsOnlyPhone = phone.replace(/\D/g, '');
+      if (digitsOnlyPhone.length < 10) {
+        setAddressEditError('Please enter a valid 10-digit mobile number');
+        return;
+      }
+      if (!street) {
+        setAddressEditError('Please enter flat, street or building details');
+        return;
+      }
+      if (!city) {
+        setAddressEditError('Please enter city');
+        return;
+      }
+      if (!state) {
+        setAddressEditError('Please select or enter state');
+        return;
+      }
+      const digitsOnlyPin = pincode.replace(/\D/g, '');
+      if (digitsOnlyPin.length !== 6) {
+        setAddressEditError('Please enter a valid 6-digit PIN code');
+        return;
+      }
+
+      setIsSavingAddress(true);
+      try {
+        const targetOrderId = details.id || details.orderNumber;
+        const res = await apiClient(`/api/orders/${targetOrderId}/address`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name,
+            phone,
+            street,
+            city,
+            state,
+            pincode
+          })
         });
+
+        if (res.success) {
+          const updatedAddr = {
+            name,
+            street,
+            city,
+            state,
+            pincode,
+            country: 'INDIA'
+          };
+
+          setPlacedOrderDetails((prev) => {
+            if (!prev) return prev;
+            const next = {
+              ...prev,
+              customerPhone: phone,
+              shippingAddress: updatedAddr
+            };
+            try {
+              sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(next));
+            } catch (err) {}
+            return next;
+          });
+
+          broadcastOrderUpdate({
+            orderId: targetOrderId,
+            orderNumber: details.orderNumber,
+            shippingAddress: updatedAddr,
+            customerPhone: phone,
+            updatedAt: new Date().toISOString()
+          });
+
+          setIsEditAddressModalOpen(false);
+          Swal.fire({
+            icon: 'success',
+            title: 'Shipping Address Updated',
+            text: 'Your delivery address has been successfully updated for this order.',
+            timer: 2500,
+            showConfirmButton: false,
+            confirmButtonColor: '#171717'
+          });
+        } else {
+          setAddressEditError(res.message || 'Failed to update address. Please try again.');
+        }
+      } catch (err) {
+        console.error('Error updating shipping address:', err);
+        setAddressEditError(err.message || 'An error occurred while updating the address.');
+      } finally {
+        setIsSavingAddress(false);
       }
     };
 
@@ -1447,13 +1858,39 @@ export const Checkout = () => {
 
               {/* Card 2: Shipping Address */}
               <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
-                <div className="flex items-center gap-2 mb-6 border-b border-neutral-200 pb-4">
-                  <div className="w-6 h-6 rounded-full bg-brand-dark text-white flex items-center justify-center">
-                    <MapPin className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between mb-6 border-b border-neutral-200 pb-4 flex-wrap gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-brand-dark text-white flex items-center justify-center shrink-0">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
+                      SHIPPING ADDRESS
+                    </h3>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-serif tracking-[0.15em] uppercase text-black font-semibold">
-                    SHIPPING ADDRESS
-                  </h3>
+
+                  {canEditAddress && (
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[10px] font-sans font-bold tracking-wider uppercase text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        <span>Editable for {hoursRemaining}h</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleOpenEditAddress}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-black bg-black text-white hover:bg-neutral-800 text-[11px] font-sans font-semibold tracking-wider uppercase rounded transition-all cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Edit Address</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {!canEditAddress && !isOrderCancelled && !isCancellationRequested && (
+                    <span className="text-[10px] font-sans font-medium text-neutral-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-neutral-400" />
+                      <span>Address locked</span>
+                    </span>
+                  )}
                 </div>
 
                 <div className="bg-[#FAF8F3] border border-neutral-200/80 p-6 text-xs font-sans text-neutral-800 leading-relaxed space-y-2.5">
@@ -1478,16 +1915,102 @@ export const Checkout = () => {
                     </div>
                   </div>
                 </div>
+
+                {canEditAddress && (
+                  <div className="mt-3.5 flex items-center justify-between text-[11px] text-neutral-500 font-sans px-1">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Need to update address? Allowed within 24 hours of ordering.</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenEditAddress}
+                      className="text-black font-semibold underline hover:text-neutral-700 cursor-pointer text-xs ml-2 shrink-0"
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* RIGHT COLUMN: ORDER JOURNEY Timeline & Order Status */}
             <div className="lg:col-span-5 space-y-8 text-left">
-              {/* Card 1: ORDER JOURNEY Timeline */}
-              <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
-                <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-500 block mb-6 font-semibold pb-3 border-b border-neutral-200">
-                  ORDER JOURNEY
-                </h3>
+              {/* Card 1: ORDER JOURNEY Timeline or REPLACEMENT JOURNEY */}
+              {isInReplacementFlow ? (
+                <div className="bg-white border border-purple-200/80 p-6 sm:p-8">
+                  <div className="flex items-center justify-between pb-3 mb-6 border-b border-purple-100">
+                    <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-purple-950 font-semibold flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 text-purple-700" />
+                      <span>EXCHANGE & REPLACEMENT JOURNEY</span>
+                    </h3>
+                    <span className="text-[10px] font-sans font-bold tracking-[0.16em] uppercase text-purple-700">
+                      STEP {isReplaced ? '4 OF 4' : (isReplacementOutForDelivery || isReplacementInTransit) ? '3 OF 4' : isReplacementApproved ? '2 OF 4' : '1 OF 4'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-6 relative pl-1">
+                    {/* Connected Vertical Line */}
+                    <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
+
+                    {/* Step 1: REPLACEMENT REQUESTED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-purple-700 text-white shadow-xs">
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">REPLACEMENT REQUESTED</h4>
+                        <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-purple-700">
+                          COMPLETED
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 2: ATELIER APPROVED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'bg-purple-700 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>ATELIER APPROVED</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'text-purple-700 font-bold' : 'text-neutral-400'}`}>
+                          {isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'COMPLETED' : 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 3: IN TRANSIT */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'bg-purple-700 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>IN TRANSIT</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'text-purple-700 font-bold' : 'text-neutral-400'}`}>
+                          {isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? (isReplaced ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 4: REPLACED & DELIVERED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplaced ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <PackageCheck className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplaced ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>REPLACED & DELIVERED</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplaced ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
+                          {isReplaced ? 'DELIVERED' : 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : !isOrderCancelled && !isCancellationRequested && !isInReturnFlow ? (
+                <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
+                  <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-500 block mb-6 font-semibold pb-3 border-b border-neutral-200">
+                    ORDER JOURNEY
+                  </h3>
 
                 <div className="space-y-6 relative pl-1">
                   {/* Connected Vertical Line */}
@@ -1546,6 +2069,7 @@ export const Checkout = () => {
                   </div>
                 </div>
               </div>
+              ) : null}
 
               {/* Card 2: Order Status & Actions */}
               <div className="bg-white border border-neutral-200/80 p-6 sm:p-8 font-sans">
@@ -1568,6 +2092,16 @@ export const Checkout = () => {
                   <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase rounded-full ${
                     isOrderCancelled 
                       ? 'bg-red-900 text-white' 
+                      : isReplacementRequested
+                      ? 'bg-purple-700 text-white font-bold'
+                      : isReplacementApproved
+                      ? 'bg-indigo-700 text-white font-bold'
+                      : isReplacementInTransit
+                      ? 'bg-blue-700 text-white font-bold'
+                      : isReplaced
+                      ? 'bg-emerald-700 text-white font-bold'
+                      : isReplacementRejected
+                      ? 'bg-rose-700 text-white'
                       : isReturnRequested
                       ? 'bg-amber-600 text-white'
                       : isReturnApproved
@@ -1586,6 +2120,16 @@ export const Checkout = () => {
                   }`}>
                     {isOrderCancelled
                       ? 'CANCELLED'
+                      : isReplacementRequested
+                      ? 'REPLACEMENT REQUESTED'
+                      : isReplacementApproved
+                      ? 'REPLACEMENT APPROVED'
+                      : isReplacementInTransit
+                      ? 'REPLACEMENT IN TRANSIT'
+                      : isReplaced
+                      ? 'REPLACED'
+                      : isReplacementRejected
+                      ? 'REPLACEMENT REJECTED'
                       : isReturnRequested
                       ? 'RETURN REQUESTED'
                       : isReturnApproved
@@ -1605,16 +2149,33 @@ export const Checkout = () => {
                 </div>
 
                 {/* Payment Method Container */}
-                <div className="bg-[#FAF8F3] border border-neutral-200/80 p-4 mb-6 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-brand-dark text-white flex items-center justify-center flex-shrink-0">
-                    <CreditCard className="w-5 h-5" />
+                <div className="bg-[#FAF8F3] border border-neutral-200/80 p-4 mb-6 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-brand-dark text-white flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div className="text-left font-sans">
+                      <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-400 font-bold block mb-0.5">
+                        Payment Method
+                      </span>
+                      <span className="text-xs font-bold text-black uppercase tracking-wider">{details.paymentMethod}</span>
+                    </div>
                   </div>
-                  <div className="text-left font-sans">
-                    <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-400 font-bold block mb-0.5">
-                      Payment Method
-                    </span>
-                    <span className="text-xs font-bold text-black uppercase tracking-wider">{details.paymentMethod}</span>
-                  </div>
+                  {/* Payment status badge for COD / Online */}
+                  {(() => {
+                    const isCod = (details.paymentMethod || '').toLowerCase().includes('cash') || (details.paymentMethod || '').toLowerCase().includes('cod');
+                    const isPaid = (isDelivered && isCod) || (details.paymentStatus || details.payment_status || '').toLowerCase() === 'paid';
+                    if (isOrderCancelled && isCod && !isPaid) {
+                      return null;
+                    }
+                    return (
+                      <span className={`px-2.5 py-1 text-[10px] font-sans font-bold tracking-[0.16em] uppercase rounded-full border ${
+                        isPaid ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-neutral-100 text-neutral-700 border-neutral-300'
+                      }`}>
+                        {isPaid ? 'PAID' : 'PENDING'}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Action Buttons Stack (Luxury Atelier Button Theme) */}
@@ -1634,28 +2195,76 @@ export const Checkout = () => {
                     CONTINUE SHOPPING
                   </Link>
 
-                  {/* Pre-Delivery Cancel Button */}
-                  {!isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isDelivered && (
+                  {/* Cancel Order Button (Both Pre-Delivery and Post-Delivery) */}
+                  {!isOrderCancelled && !isCancellationRequested && !isInReplacementFlow && (
                     <button
                       type="button"
                       onClick={handleCancelOrder}
-                      className="w-full py-3.5 px-4 border border-red-300 text-red-700 hover:bg-red-50 text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-3.5 px-4 border border-neutral-900 bg-[#dcdcdc] hover:bg-[#d0d0d0] text-xs font-sans font-bold tracking-[0.25em] uppercase text-neutral-900 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                     >
-                      <XCircle className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4" />
                       <span>CANCEL ORDER</span>
                     </button>
                   )}
 
-                  {/* Post-Delivery Return Button */}
-                  {!isOrderCancelled && isDelivered && !isInReturnFlow && (
+                  {/* Post-Delivery Replace Button */}
+                  {!isOrderCancelled && !isCancellationRequested && isDelivered && !isInReplacementFlow && (
                     <button
                       type="button"
-                      onClick={handleReturnOrder}
-                      className="w-full py-3.5 px-4 border border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      onClick={handleReplaceOrder}
+                      className="w-full py-3.5 px-4 border border-purple-900/40 text-purple-950 bg-purple-50/70 hover:bg-purple-900 hover:text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                     >
-                      <RotateCcw className="w-4 h-4" />
-                      <span>RETURN ORDER</span>
+                      <RefreshCw className="w-4 h-4" />
+                      <span>REPLACE PRODUCT</span>
                     </button>
+                  )}
+
+                  {/* Replacement Requested Status Pill */}
+                  {isReplacementRequested && (
+                    <div className="w-full py-3 px-4 bg-purple-50 border border-purple-200 text-purple-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <Clock className="w-4 h-4 text-purple-700" />
+                      <span>Replacement Pending Atelier Review</span>
+                    </div>
+                  )}
+
+                  {/* Replacement Approved Status Pill */}
+                  {isReplacementApproved && (
+                    <div className="w-full py-3 px-4 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <CheckCircle2 className="w-4 h-4 text-indigo-700" />
+                      <span>Replacement Approved • Exchange In Motion</span>
+                    </div>
+                  )}
+
+                  {/* Replacement In Transit Status Pill */}
+                  {(isReplacementInTransit || isReplacementOutForDelivery) && (
+                    <div className="w-full py-3 px-4 bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <Truck className="w-4 h-4 text-blue-700 animate-pulse" />
+                      <span>Replacement Order In Transit</span>
+                    </div>
+                  )}
+
+                  {/* Product Replaced Completed Pill */}
+                  {isReplaced && (
+                    <div className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <PackageCheck className="w-4 h-4 text-emerald-700" />
+                      <span>Product Replacement Completed</span>
+                    </div>
+                  )}
+
+                  {/* Replacement Rejected Pill */}
+                  {isReplacementRejected && (
+                    <div className="w-full py-3 px-4 bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <AlertCircle className="w-4 h-4 text-rose-700" />
+                      <span>Replacement Not Approved</span>
+                    </div>
+                  )}
+
+                  {/* Pre-Delivery Cancelled Pill */}
+                  {isOrderCancelled && (
+                    <div className="w-full py-3 px-4 bg-red-50 border border-red-200 text-red-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <XCircle className="w-4 h-4 text-red-700" />
+                      <span>Order Cancelled</span>
+                    </div>
                   )}
 
                   {/* Pre-Delivery Cancellation Review Pill */}
@@ -1710,6 +2319,356 @@ export const Checkout = () => {
           order={details}
           orderId={details.orderNumber}
         />
+
+        {/* Atelier Cancel Order Modal with Reason Selection */}
+        <AnimatePresence>
+          {isCancelOrderModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-red-500 font-sans">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isCancellingOrder && setIsCancelOrderModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              />
+
+              {/* Modal Box */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="relative z-10 w-full max-w-lg bg-white shadow-2xl p-6 sm:p-8 border border-neutral-200 max-h-[90vh] overflow-y-auto text-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsCancelOrderModalOpen(false)}
+                  disabled={isCancellingOrder}
+                  className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4 stroke-[2]" />
+                </button>
+
+                {/* Header */}
+                <div className="mb-5">
+                  <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
+                    HOUSE OF URVAAH ATELIER
+                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full border border-red-200 bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                      <XCircle className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-serif tracking-[0.12em] uppercase text-neutral-900 font-semibold">
+                      CANCEL ORDER
+                    </h3>
+                  </div>
+                  <p className="text-xs text-neutral-500 font-sans mt-2 leading-relaxed">
+                    We're sorry to see you cancel order #{details.orderNumber}. Please select a reason below so we can process your request.
+                  </p>
+                </div>
+
+                <form onSubmit={handleConfirmCancellation} className="space-y-4">
+                  {cancelOrderError && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{cancelOrderError}</span>
+                    </div>
+                  )}
+
+                  {/* Reason for Cancellation */}
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider mb-1.5">
+                      Reason for Cancellation <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={cancelOrderReason}
+                        onChange={(e) => setCancelOrderReason(e.target.value)}
+                        required
+                        className="w-full appearance-none px-3.5 py-2.5 bg-white border border-neutral-300 text-xs sm:text-sm text-neutral-800 focus:outline-none focus:border-black cursor-pointer pr-10 font-sans"
+                      >
+                        {isDelivered ? (
+                          <>
+                            <option value="Size or fit issue">Size or fit issue</option>
+                            <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                            <option value="Quality or fabric not as expected">Quality or fabric not as expected</option>
+                            <option value="Received incorrect item or color">Received incorrect item or color</option>
+                            <option value="Did not match online images">Did not match online images</option>
+                            <option value="Changed my mind">Changed my mind</option>
+                            <option value="Other">Other</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Ordered by mistake">Ordered by mistake</option>
+                            <option value="Found better price elsewhere">Found better price elsewhere</option>
+                            <option value="Delivery taking too long">Delivery taking too long</option>
+                            <option value="Changed my mind">Changed my mind</option>
+                            <option value="Item not needed anymore">Item not needed anymore</option>
+                            <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
+                            <option value="Other">Other</option>
+                          </>
+                        )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Additional Comments (Optional) */}
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider mb-1.5">
+                      Additional Comments / Feedback (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={cancelOrderComments}
+                      onChange={(e) => setCancelOrderComments(e.target.value)}
+                      placeholder="Please share any additional details to help us improve..."
+                      className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 text-xs sm:text-sm text-neutral-800 focus:outline-none focus:border-black font-sans resize-none"
+                    />
+                  </div>
+
+                  {/* Policy Info Note */}
+                  <div className="p-3 bg-[#FAF8F3] border border-neutral-200 text-[11px] text-neutral-600 leading-relaxed font-sans">
+                    {isDelivered
+                      ? 'Once submitted, your post-delivery cancellation request will be reviewed by our atelier team. Upon approval, reverse pickup will be scheduled and your refund processed via the Refund Desk.'
+                      : 'Once submitted, your request will be reviewed by our atelier admin team. If you paid online, your refund will be automatically routed to the Refund Desk upon approval.'}
+                  </div>
+
+                  {/* Buttons Stack */}
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isCancellingOrder}
+                      onClick={() => setIsCancelOrderModalOpen(false)}
+                      className="w-full sm:w-1/2 py-3 border border-neutral-300 text-neutral-800 text-xs font-bold tracking-[0.2em] uppercase hover:border-black transition-colors cursor-pointer text-center disabled:opacity-50"
+                    >
+                      KEEP ORDER
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCancellingOrder}
+                      className="w-full sm:w-1/2 py-3 bg-red-600 text-white text-xs font-bold tracking-[0.2em] uppercase hover:bg-red-700 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {isCancellingOrder ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>SUBMITTING...</span>
+                        </>
+                      ) : (
+                        <span>SUBMIT CANCELLATION</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Atelier Edit Shipping Address Modal (24-Hour Edit Window) */}
+        <AnimatePresence>
+          {isEditAddressModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-neutral-800 selection:text-white font-sans">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isSavingAddress && setIsEditAddressModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              />
+
+              {/* Modal Box */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="relative z-10 w-full max-w-lg bg-white shadow-2xl p-6 sm:p-8 border border-neutral-200 max-h-[90vh] overflow-y-auto text-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditAddressModalOpen(false)}
+                  disabled={isSavingAddress}
+                  className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4 stroke-[2]" />
+                </button>
+
+                {/* Header */}
+                <div className="mb-5">
+                  <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
+                    HOUSE OF URVAAH ATELIER
+                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full border border-neutral-300 bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-serif tracking-[0.12em] uppercase text-neutral-900 font-semibold">
+                      EDIT SHIPPING ADDRESS
+                    </h3>
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <span className="text-[10px] font-sans font-bold tracking-wider uppercase text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-amber-600" />
+                      <span>24-Hour Edit Window Active ({hoursRemaining}h left)</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-500 font-sans mt-2 leading-relaxed">
+                    Update the recipient and delivery destination for Order #{details.orderNumber}. Ensure your PIN code and phone number are accurate for prompt dispatch.
+                  </p>
+                </div>
+
+                {addressEditError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{addressEditError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveShippingAddress} className="space-y-4">
+                  {/* Recipient Full Name */}
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                      Recipient Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={addressEditForm.name}
+                      onChange={(e) => setAddressEditForm({ ...addressEditForm, name: e.target.value })}
+                      placeholder="e.g. Kuldeep Mahajan"
+                      required
+                      className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans"
+                    />
+                  </div>
+
+                  {/* Phone Number */}
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                      Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-neutral-500 font-sans">
+                        +91
+                      </span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={addressEditForm.phone}
+                        onChange={(e) => setAddressEditForm({ ...addressEditForm, phone: e.target.value.replace(/\D/g, '') })}
+                        placeholder="10-digit mobile number"
+                        required
+                        className="w-full pl-12 pr-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Street Address */}
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                      Address (Flat / Building / Street) <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={addressEditForm.street}
+                      onChange={(e) => setAddressEditForm({ ...addressEditForm, street: e.target.value })}
+                      placeholder="Flat 402, Lotus Residency, MG Road"
+                      required
+                      className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans resize-none"
+                    />
+                  </div>
+
+                  {/* City and State */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressEditForm.city}
+                        onChange={(e) => setAddressEditForm({ ...addressEditForm, city: e.target.value })}
+                        placeholder="e.g. Mumbai"
+                        required
+                        className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                        State <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={addressEditForm.state}
+                        onChange={(e) => setAddressEditForm({ ...addressEditForm, state: e.target.value })}
+                        required
+                        className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans bg-white"
+                      >
+                        <option value="">Select State</option>
+                        {INDIAN_STATES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* PIN Code */}
+                  <div>
+                    <label className="block text-[11px] font-bold tracking-wider uppercase text-neutral-700 mb-1">
+                      PIN Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={addressEditForm.pincode}
+                      onChange={(e) => setAddressEditForm({ ...addressEditForm, pincode: e.target.value.replace(/\D/g, '') })}
+                      placeholder="6-digit PIN code"
+                      required
+                      className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans"
+                    />
+                  </div>
+
+                  {/* Policy Info Note */}
+                  <div className="p-3 bg-[#FAF8F3] border border-neutral-200 text-[11px] text-neutral-600 leading-relaxed font-sans">
+                    Address updates are permitted for up to 24 hours from when the order was placed. Once dispatched by our atelier logistics team, routing changes cannot be applied.
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isSavingAddress}
+                      onClick={() => setIsEditAddressModalOpen(false)}
+                      className="w-full sm:w-1/2 py-3 border border-neutral-300 text-neutral-800 text-xs font-bold tracking-[0.2em] uppercase hover:border-black transition-colors cursor-pointer text-center disabled:opacity-50"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingAddress}
+                      className="w-full sm:w-1/2 py-3 bg-black text-white text-xs font-bold tracking-[0.2em] uppercase hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {isSavingAddress ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>SAVING...</span>
+                        </>
+                      ) : (
+                        <span>UPDATE ADDRESS</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
