@@ -127,6 +127,7 @@ export const Footer = () => {
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.policies ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
               <li><Link to="/privacy-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Privacy Policy</Link></li>
               <li><Link to="/shipping-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Shipping &amp; Delivery</Link></li>
+              <li><Link to="/return-refund-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Returns &amp; Refunds</Link></li>
               <li><Link to="/terms-and-conditions" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Terms and Conditions</Link></li>
               <li><Link to="/cookie-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Cookie Policy</Link></li>
             </ul>
