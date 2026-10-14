@@ -513,7 +513,8 @@ export const AdminLeads = () => {
                     <td className="py-3.5 px-4 space-y-0.5">
                       <a
                         href={`mailto:${lead.email}`}
-                        className="flex items-center gap-1.5 text-neutral-700 hover:text-black hover:underline text-xs"
+                        className="flex items-center gap-1.5 text-neutral-700 hover:text-black no-underline hover:no-underline text-xs"
+                        style={{ textDecoration: 'none' }}
                         title="Click to email client"
                       >
                         <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
@@ -719,7 +720,8 @@ export const AdminLeads = () => {
                   </span>
                   <a
                     href={`mailto:${selectedLead.email}`}
-                    className="text-xs sm:text-sm font-semibold text-neutral-900 hover:text-black hover:underline flex items-center gap-1.5"
+                    className="text-xs sm:text-sm font-semibold text-neutral-900 hover:text-black no-underline hover:no-underline flex items-center gap-1.5"
+                    style={{ textDecoration: 'none' }}
                   >
                     <Mail className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                     <span className="truncate">{selectedLead.email}</span>
@@ -733,7 +735,8 @@ export const AdminLeads = () => {
                   {selectedLead.phone ? (
                     <a
                       href={`tel:${selectedLead.phone}`}
-                      className="text-xs sm:text-sm font-semibold text-neutral-900 hover:text-black hover:underline flex items-center gap-1.5"
+                      className="text-xs sm:text-sm font-semibold text-neutral-900 hover:text-black no-underline hover:no-underline flex items-center gap-1.5"
+                      style={{ textDecoration: 'none' }}
                     >
                       <Phone className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                       <span>+91 {selectedLead.phone}</span>

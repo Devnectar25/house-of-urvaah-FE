@@ -16,13 +16,13 @@ import {
   Filter,
   X,
   AlertCircle,
-  Eye,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
-  Calendar,
   User,
-  Hash
+  Hash,
+  ArrowDown,
+  ArrowUp
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
@@ -54,7 +54,16 @@ const checkStatusMatches = (orderStatus, filterStatus) => {
     return o === 'cancelled' || o === 'canceled' || o === 'cancellation requested' || o === 'refunded';
   }
   if (f === 'returned' || f === 'return' || f === 'returns') {
-    return o.startsWith('return');
+    return o.startsWith('return') || o.includes('house of urvaah');
+  }
+  if (f === 'return requested') {
+    return o === 'return requested';
+  }
+  if (f === 'return approved') {
+    return o === 'return approved';
+  }
+  if (f === 'received at house of urvaah') {
+    return o === 'received at house of urvaah' || o === 'received at homved';
   }
   if (f === 'exchanged' || f === 'exchange' || f === 'exchanges') {
     return o.startsWith('exchange');
@@ -80,7 +89,11 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Shipped', label: 'Shipped' },
   { value: 'Out for Delivery', label: 'Out for Delivery' },
   { value: 'Delivered', label: 'Delivered' },
+  { value: 'Cancellation Requested', label: 'Cancellation Requested' },
   { value: 'Cancelled', label: 'Cancelled' },
+  { value: 'Return Requested', label: 'Return Requested' },
+  { value: 'Return Approved', label: 'Return Approved' },
+  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
   { value: 'Returned', label: 'Returned' },
   { value: 'Exchanged', label: 'Exchanged' }
 ];
@@ -100,6 +113,44 @@ const PAYMENT_TYPE_OPTIONS = [
   { value: 'COD', label: 'Cash on Delivery (COD)' },
   { value: 'Online', label: 'Online' }
 ];
+
+const formatOrderDateTime = (dateStr) => {
+  if (!dateStr) return { date: '-', time: '', isRecent: false, relative: '' };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { date: '-', time: '', isRecent: false, relative: '' };
+
+  const date = d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  const time = d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const diffMs = Date.now() - d.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  let relative = '';
+  let isRecent = false;
+
+  if (diffMinutes >= 0 && diffMinutes < 2) {
+    relative = 'Just now';
+    isRecent = true;
+  } else if (diffMinutes >= 2 && diffMinutes < 60) {
+    relative = `${diffMinutes}m ago`;
+    isRecent = true;
+  } else if (diffHours >= 1 && diffHours < 24) {
+    relative = `${diffHours}h ago`;
+    isRecent = true;
+  }
+
+  return { date, time, isRecent, relative };
+};
 
 export const AdminOrders = () => {
   const navigate = useNavigate();
@@ -133,6 +184,7 @@ export const AdminOrders = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = newest first, 'asc' = oldest first
 
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState(null);
@@ -355,6 +407,13 @@ export const AdminOrders = () => {
         list = list.filter((o) => new Date(o.created_at).getTime() <= toTs);
       }
 
+      // Guarantee recent orders appear at the top by default (created_at DESC)
+      list.sort((a, b) => {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      });
+
       setOrders(list);
       setTotalOrders(pagination.totalOrders ?? list.length);
       setTotalPages(pagination.totalPages || Math.ceil((pagination.totalOrders || list.length || 1) / limit));
@@ -364,11 +423,24 @@ export const AdminOrders = () => {
     } finally {
       setOrdersLoading(false);
     }
-  }, [currentPage, limit, selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, dateError]);
+  }, [currentPage, limit, selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, dateError, sortOrder]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Toggle Date sorting between newest first and oldest first
+  const handleToggleSortOrder = () => {
+    const nextOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortOrder(nextOrder);
+    setOrders((prev) =>
+      [...prev].sort((a, b) => {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return nextOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      })
+    );
+  };
 
   // Reset all filters in a single action and clear URL
   const handleClearFilters = () => {
@@ -406,8 +478,8 @@ export const AdminOrders = () => {
     const searchStr = params.toString();
     navigate(searchStr ? `/admin/orders?${searchStr}` : '/admin/orders', { replace: true });
 
-    // Scroll smoothly down to filters/table section
-    const element = document.getElementById('orders-results-section');
+    // Scroll smoothly to orders table section at the top of the page
+    const element = document.getElementById('orders-table-section');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
@@ -434,8 +506,20 @@ export const AdminOrders = () => {
     if (s.includes('pending') || s.includes('placed')) {
       return 'bg-amber-50 text-amber-700 border-amber-200';
     }
+    if (s.includes('cancellation requested') || s.includes('cancel_requested')) {
+      return 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
+    }
     if (s.includes('cancel')) {
       return 'bg-neutral-100 text-neutral-700 border-neutral-200';
+    }
+    if (s.includes('return requested')) {
+      return 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
+    }
+    if (s.includes('return approved')) {
+      return 'bg-sky-50 text-sky-800 border-sky-300 font-bold';
+    }
+    if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
+      return 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold';
     }
     if (s.includes('return')) {
       return 'bg-orange-50 text-orange-700 border-orange-200';
@@ -530,6 +614,15 @@ export const AdminOrders = () => {
       statusFilter: 'Delivered'
     },
     {
+      key: 'cancellationRequested',
+      label: 'Cancel Requests',
+      count: stats?.cancellationRequested ?? 0,
+      icon: AlertCircle,
+      colorClass: 'bg-amber-50 text-amber-700 border-amber-300',
+      badgeBg: 'bg-amber-200 text-amber-900',
+      statusFilter: 'Cancellation Requested'
+    },
+    {
       key: 'cancelled',
       label: 'Cancelled',
       count: stats?.cancelled ?? stats?.canceled ?? 0,
@@ -574,94 +667,31 @@ export const AdminOrders = () => {
       <AdminPageHeader
         title="Order Management"
         subtitle="Track, filter, and manage store orders, dispatch status, and customer payments."
-      />
-
-      {/* Stat Cards Grid Section */}
-      <div>
-        {statsError ? (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-              <span>Failed to load order statistics: {statsError}</span>
-            </div>
+        actions={
+          <div className="flex items-center gap-2">
             <button
-              onClick={fetchStats}
-              className="px-3 py-1 bg-brand-dark text-white rounded-lg font-semibold hover:bg-black transition-colors cursor-pointer"
+              type="button"
+              onClick={fetchOrders}
+              disabled={ordersLoading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-neutral-200/90 text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Refresh order data"
             >
-              Retry
+              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Orders</span>
             </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-            {STAT_CARDS_DEF.map((card) => {
-              const IconComp = card.icon;
-              const isActive =
-                card.key === 'total'
-                  ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
-                  : card.key === 'pendingPayment'
-                  ? selectedPaymentStatus === 'Pending'
-                  : selectedStatus === card.statusFilter;
+        }
+      />
 
-              return (
-                <div
-                  key={card.key}
-                  onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
-                  className={`bg-white border rounded-xl p-4 shadow-sm transition-all flex flex-col justify-between space-y-3 group cursor-pointer select-none ${
-                    isActive
-                      ? 'ring-2 ring-brand-dark/90 border-brand-dark shadow-md bg-neutral-50/40'
-                      : 'border-neutral-200/80 hover:shadow-md hover:border-neutral-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className={`p-2 rounded-lg border ${card.colorClass}`}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    {statsLoading ? (
-                      <div className="h-5 w-8 bg-neutral-200 rounded animate-pulse" />
-                    ) : (
-                      <span className={`text-xs font-admin font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
-                        {card.count}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                      {card.label}
-                    </h3>
-                    {statsLoading ? (
-                      <div className="h-6 w-14 bg-neutral-200 rounded mt-1 animate-pulse" />
-                    ) : (
-                      <p className="text-lg font-admin font-bold text-brand-dark mt-0.5">
-                        {card.count}
-                      </p>
-                    )}
-                  </div>
-
-                  <div
-                    className={`text-[11px] font-medium flex items-center gap-1 transition-colors pt-1 border-t ${
-                      isActive
-                        ? 'text-brand-dark font-semibold border-brand-dark/20'
-                        : 'text-neutral-400 group-hover:text-brand-dark border-neutral-100'
-                    }`}
-                  >
-                    <span>{isActive ? 'Filtered view' : 'Click to manage'}</span>
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Filters Panel Container */}
-      <div id="orders-results-section" className="bg-white border border-neutral-200/80 rounded-xl p-5 shadow-sm space-y-4">
+      {/* ========================================================================= */}
+      {/* 1. DETAILED SEARCH & FILTERS PANEL                                        */}
+      {/* ========================================================================= */}
+      <div id="orders-filters-section" className="bg-white border border-neutral-200/80 rounded-xl p-5 shadow-sm space-y-4">
         {/* Filters Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-          <div className="flex items-center gap-2 text-brand-dark font-semibold text-sm tracking-tight">
+          <div className="flex items-center gap-2 text-brand-dark font-semibold text-sm tracking-tight font-admin">
             <Filter className="w-4 h-4 text-neutral-500" />
-            <span>Filters</span>
+            <span>Search & Filter Parameters</span>
           </div>
 
           <button
@@ -771,15 +801,10 @@ export const AdminOrders = () => {
                 type="text"
                 value={orderIdInput}
                 onChange={(e) => setOrderIdInput(e.target.value)}
-                placeholder="e.g. HOU-ORD-1001"
+                placeholder="e.g. HOU-924856"
                 className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all"
               />
             </div>
-            {orderIdInput && !orderIdInput.toUpperCase().includes('HOU') && (
-              <p className="text-[10px] text-neutral-400 mt-1">
-                Hint: Standard order IDs start with HOU-ORD-
-              </p>
-            )}
           </div>
         </div>
 
@@ -838,22 +863,182 @@ export const AdminOrders = () => {
         )}
       </div>
 
-      {/* Orders Table Container */}
-      <div className="bg-white border border-neutral-200/80 rounded-xl shadow-sm overflow-hidden">
-        {/* Table Subheader Count */}
-        <div className="px-6 py-4 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
-          <h2 className="text-base font-semibold tracking-wider text-brand-dark uppercase flex items-center gap-2">
-            <span>Orders List</span>
-            <span className="px-2.5 py-0.5 bg-neutral-200/80 rounded-full text-neutral-800 text-xs font-semibold">
-              {totalOrders}
-            </span>
-          </h2>
+      {/* ========================================================================= */}
+      {/* 2. STAT CARDS / STATUS METRICS BREAKDOWN SECTION                          */}
+      {/* ========================================================================= */}
+      <div className="space-y-3 pt-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase font-admin">
+            Order Status Breakdown
+          </h3>
+          <span className="text-[11px] text-neutral-400 hidden sm:inline">
+            Click any metric card to filter the orders table below
+          </span>
+        </div>
 
-          {isFilterActive && (
-            <span className="text-xs text-neutral-500 font-medium">
-              Filtered View
+        {statsError ? (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <span>Failed to load order statistics: {statsError}</span>
+            </div>
+            <button
+              onClick={fetchStats}
+              className="px-3 py-1 bg-brand-dark text-white rounded-lg font-semibold hover:bg-black transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+            {STAT_CARDS_DEF.map((card) => {
+              const IconComp = card.icon;
+              const isActive =
+                card.key === 'total'
+                  ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
+                  : card.key === 'pendingPayment'
+                  ? selectedPaymentStatus === 'Pending'
+                  : selectedStatus === card.statusFilter;
+
+              return (
+                <div
+                  key={card.key}
+                  onClick={() => handleStatCardClick(card.statusFilter, card.paymentStatusFilter)}
+                  className={`bg-white border rounded-xl p-4 shadow-sm transition-all flex flex-col justify-between space-y-3 group cursor-pointer select-none ${
+                    isActive
+                      ? 'border-neutral-300 shadow-md bg-neutral-50/60'
+                      : 'border-neutral-200/80 hover:shadow-md hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2 rounded-lg border ${card.colorClass}`}>
+                      <IconComp className="w-4 h-4" />
+                    </div>
+                    {statsLoading ? (
+                      <div className="h-5 w-8 bg-neutral-200 rounded animate-pulse" />
+                    ) : (
+                      <span className={`text-xs font-admin font-bold px-2 py-0.5 rounded-full ${card.badgeBg}`}>
+                        {card.count}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                      {card.label}
+                    </h3>
+                    {statsLoading ? (
+                      <div className="h-6 w-14 bg-neutral-200 rounded mt-1 animate-pulse" />
+                    ) : (
+                      <p className="text-lg font-admin font-bold text-brand-dark mt-0.5">
+                        {card.count}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    className={`text-[11px] font-medium flex items-center gap-1 transition-colors pt-1 border-t ${
+                      isActive
+                        ? 'text-brand-dark font-semibold border-neutral-100'
+                        : 'text-neutral-400 group-hover:text-brand-dark border-neutral-100'
+                    }`}
+                  >
+                    <span>{isActive ? 'Filtered view' : 'Click to filter'}</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. ORDERS TABLE CONTAINER (RECENT ORDERS ON TOP)                          */}
+      {/* ========================================================================= */}
+      <div id="orders-table-section" className="bg-white border border-neutral-200/80 rounded-xl shadow-sm overflow-hidden">
+        {/* Table Subheader Count, Quick Controls & Recency Indicator */}
+        <div className="px-6 py-4 border-b border-neutral-200/80 flex flex-wrap items-center justify-between gap-3 bg-neutral-50/50">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-base font-semibold tracking-wider text-brand-dark uppercase flex items-center gap-2 font-admin">
+              <span>Orders List</span>
+              <span className="px-2.5 py-0.5 bg-neutral-200/80 rounded-full text-neutral-800 text-xs font-semibold">
+                {totalOrders}
+              </span>
+            </h2>
+
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+              <Clock className="w-3 h-3 text-emerald-600" />
+              <span>Recent Orders on Top</span>
             </span>
-          )}
+
+            {isFilterActive && (
+              <span className="text-xs text-neutral-500 font-medium">
+                • Filtered View
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Quick search input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input
+                type="text"
+                value={orderIdInput}
+                onChange={(e) => setOrderIdInput(e.target.value)}
+                placeholder="Search Order ID..."
+                className="pl-8 pr-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark w-36 sm:w-48 shadow-2xs"
+              />
+              {orderIdInput && (
+                <button
+                  type="button"
+                  onClick={() => setOrderIdInput('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Jump to Advanced Filters button */}
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('orders-filters-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors cursor-pointer shadow-2xs"
+              title="Jump to advanced search & filters"
+            >
+              <Filter className="w-3.5 h-3.5 text-neutral-500" />
+              <span className="hidden sm:inline">Advanced Filters</span>
+              <span className="sm:hidden">Filters</span>
+            </button>
+
+            {isFilterActive && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
+                title="Reset all active filters"
+              >
+                <X className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={fetchOrders}
+              disabled={ordersLoading}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Refresh order list"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
         </div>
 
         {/* Orders Fetch Error State */}
@@ -878,8 +1063,21 @@ export const AdminOrders = () => {
             <thead>
               <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
                 <th className="py-3 px-4 w-44">Order ID</th>
-                <th className="py-3 px-4 w-72">Customer</th>
-                <th className="py-3 px-4 w-32">Date</th>
+                <th className="py-3 px-4 w-64">Customer</th>
+                <th
+                  onClick={handleToggleSortOrder}
+                  className="py-3 px-4 w-44 cursor-pointer select-none group hover:bg-neutral-100/70 transition-colors"
+                  title={`Sort by Date & Time (Currently: ${sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}). Click to toggle.`}
+                >
+                  <div className="flex items-center gap-1.5 text-neutral-700 group-hover:text-brand-dark">
+                    <span>Date & Time</span>
+                    {sortOrder === 'desc' ? (
+                      <ArrowDown className="w-3.5 h-3.5 text-brand-dark" />
+                    ) : (
+                      <ArrowUp className="w-3.5 h-3.5 text-brand-dark" />
+                    )}
+                  </div>
+                </th>
                 <th className="py-3 px-4 w-24">Items</th>
                 <th className="py-3 px-4 w-32">Total</th>
                 <th className="py-3 px-4 text-center w-36">Status</th>
@@ -899,7 +1097,8 @@ export const AdminOrders = () => {
                       <div className="h-3 bg-neutral-200 rounded w-48" />
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="h-4 bg-neutral-200 rounded w-20" />
+                      <div className="h-4 bg-neutral-200 rounded w-28" />
+                      <div className="h-3 bg-neutral-100 rounded w-16 mt-1" />
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="h-4 bg-neutral-200 rounded w-16" />
@@ -945,13 +1144,7 @@ export const AdminOrders = () => {
                 orders.map((ord) => {
                   const itemsList = Array.isArray(ord.items) ? ord.items : [];
                   const itemCount = itemsList.length || 1;
-                  const formattedDate = ord.created_at
-                    ? new Date(ord.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })
-                    : '-';
+                  const dateTimeInfo = formatOrderDateTime(ord.created_at);
                   const formattedTotal = ord.total
                     ? `₹${parseFloat(ord.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                     : '₹0.00';
@@ -968,7 +1161,7 @@ export const AdminOrders = () => {
                       </td>
 
                       {/* Customer Info */}
-                      <td className="py-3 px-4 w-72">
+                      <td className="py-3 px-4 w-64">
                         <div className="font-semibold text-brand-dark truncate max-w-xs">
                           {ord.user_id || ord.customer_email || 'Guest Customer'}
                         </div>
@@ -977,9 +1170,21 @@ export const AdminOrders = () => {
                         </div>
                       </td>
 
-                      {/* Date */}
+                      {/* Date & Time */}
                       <td className="py-3 px-4 text-neutral-600 whitespace-nowrap">
-                        {formattedDate}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-brand-dark">{dateTimeInfo.date}</span>
+                          {dateTimeInfo.isRecent && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                              {dateTimeInfo.relative}
+                            </span>
+                          )}
+                        </div>
+                        {dateTimeInfo.time && (
+                          <div className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                            {dateTimeInfo.time}
+                          </div>
+                        )}
                       </td>
 
                       {/* Items */}

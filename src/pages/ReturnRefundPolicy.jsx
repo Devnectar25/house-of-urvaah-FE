@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   FileText,
   XCircle,
-  Edit3,
+  Pencil,
   Package,
   RefreshCw,
   AlertTriangle,
@@ -132,7 +132,7 @@ export const ReturnRefundPolicy = () => {
           <div className="space-y-4 pt-8 sm:pt-10 border-t border-neutral-100">
             <div className="flex items-center gap-3.5 mb-4">
               <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Edit3 className="w-5 h-5 text-neutral-900" />
+                <Pencil className="w-5 h-5 text-neutral-900" />
               </div>
               <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
                 3. Order Amendments

@@ -9,7 +9,7 @@ import {
   CreditCard,
   Plus,
   MapPin,
-  Edit3,
+  Pencil,
   ArrowLeft,
   Tag,
   ShoppingBag,
@@ -24,7 +24,9 @@ import {
   Calendar,
   RotateCcw,
   FileText,
-  XCircle
+  XCircle,
+  Clock,
+  PackageCheck
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -32,10 +34,115 @@ import { getSupabaseMediaUrl } from '../lib/supabase';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
+import { InvoiceModal } from '../components/common/InvoiceModal';
 import Swal from 'sweetalert2';
+
+const ORDER_SESSION_KEY = 'urvaah_last_placed_order';
+
+const readCachedOrder = (expectedOrderParam) => {
+  try {
+    const raw = sessionStorage.getItem(ORDER_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.orderNumber) return null;
+    if (expectedOrderParam) {
+      const exp = String(expectedOrderParam).trim().toLowerCase();
+      if (
+        String(parsed.orderNumber).trim().toLowerCase() === exp ||
+        String(parsed.id || '').trim().toLowerCase() === exp
+      ) {
+        return parsed;
+      }
+      return null;
+    }
+    const placedTime = parsed.placedAt ? new Date(parsed.placedAt).getTime() : Date.now();
+    if (Date.now() - placedTime < 24 * 60 * 60 * 1000) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Helper to format order for confirmation screen
+const formatOrderDetails = (ord, currentUser) => {
+  if (!ord) return null;
+  const orderNum = ord.order_number || ord.orderNumber || (ord.id ? `HOU-${ord.id}` : 'HOU-340391');
+
+  let addrObj = ord.shipping_address || ord.shippingAddress || {};
+  if (typeof addrObj === 'string') {
+    try { addrObj = JSON.parse(addrObj); } catch (e) { addrObj = { street: addrObj }; }
+  }
+
+  const rawItems = Array.isArray(ord.items) && ord.items.length > 0 
+    ? ord.items 
+    : [
+        {
+          id: ord.product_id || ord.id || '1',
+          name: ord.product_name || ord.title || ord.name || 'PEACH BLOOM CORSET SET',
+          price: Number(ord.price || ord.total || ord.total_amount || 0),
+          quantity: Number(ord.quantity || 1),
+          image: ord.image || ord.image_url || '/assets/Images/Brown01.png',
+          selectedSize: ord.selectedSize || ord.size || 'M'
+        }
+      ];
+
+  const mappedItems = rawItems.map((it) => ({
+    id: String(it.id || it.product_id || '1'),
+    name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
+    price: Number(it.price || 0),
+    quantity: Number(it.quantity || 1),
+    image: it.image || it.image_url || '/assets/Images/Brown01.png',
+    selectedSize: it.selectedSize || it.size || 'M',
+    product: {
+      id: String(it.id || it.product_id || '1'),
+      name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
+      price: Number(it.price || 0),
+      image: it.image || it.image_url || '/assets/Images/Brown01.png'
+    }
+  }));
+
+  const totalPaid = Number(ord.total || ord.total_amount || ord.totalAmount || ord.total_price || 0);
+  const subtotal = Number(ord.subtotal || totalPaid || 0);
+  const discount = Number(ord.discount || 0);
+  const shippingFee = Number(ord.shipping_fee || ord.shippingFee || 0);
+
+  const createdAt = ord.created_at || ord.createddate ? new Date(ord.created_at || ord.createddate) : new Date();
+  const deliveryDate = new Date(createdAt);
+  deliveryDate.setDate(deliveryDate.getDate() + 7);
+  const estDeliveryStr = deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  return {
+    orderNumber: orderNum,
+    trackingNumber: ord.tracking_number || ord.trackingNumber || `TRK-${String(orderNum).replace(/\D/g, '').slice(-6) || 'VHYNGE'}`,
+    estimatedDelivery: estDeliveryStr,
+    items: mappedItems,
+    subtotal: subtotal,
+    discount: discount,
+    shippingFee: shippingFee,
+    totalPaid: totalPaid,
+    shippingAddress: {
+      name: addrObj.name || addrObj.recipient_name || ord.customer_name || currentUser?.name || 'Customer Name',
+      street: addrObj.street || addrObj.full_address || ord.full_address || 'Address Details',
+      city: addrObj.city || ord.city || '',
+      state: addrObj.state || ord.state || '',
+      pincode: addrObj.pincode || addrObj.postal_code || ord.postal_code || '',
+      country: addrObj.country || 'INDIA'
+    },
+    paymentMethod: ord.payment_method || ord.paymentMethod || 'Online Payment',
+    customerEmail: ord.customer_email || ord.email || currentUser?.email || '',
+    customerPhone: ord.customer_phone || ord.phone || currentUser?.phone || '',
+    status: ord.status || 'Confirmed'
+  };
+};
 
 export const Checkout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const orderParamFromUrl = searchParams.get('orderId') || searchParams.get('orderNumber');
+
   const {
     cart,
     user,
@@ -44,20 +151,82 @@ export const Checkout = () => {
     cartSubtotal,
     freeShippingProgress,
     clearCart,
+    removeFromCart,
     setPendingAction,
     addToCart,
+    selectedCartItemKeys,
+    setSelectedCartItemKeys,
   } = useCart();
 
-  // Protect route: Redirect if not authenticated
+  // Active selected purchase items vs other bag items
+  const activeSelectedKeys = React.useMemo(() => {
+    const cartKeys = (cart || []).map((it) => `${it.product?.id}_${it.selectedSize}`);
+    if (selectedCartItemKeys && selectedCartItemKeys.length > 0) {
+      const valid = selectedCartItemKeys.filter((k) => cartKeys.includes(k));
+      if (valid.length > 0) return valid;
+    }
+    // Fallback: If no keys explicitly selected, select ONLY the most recent item added (last item in cart)
+    if (cart && cart.length > 0) {
+      const last = cart[cart.length - 1];
+      return [`${last.product?.id}_${last.selectedSize}`];
+    }
+    return [];
+  }, [selectedCartItemKeys, cart]);
+
+  const selectedItems = React.useMemo(() => {
+    return (cart || []).filter((item) => activeSelectedKeys.includes(`${item.product?.id}_${item.selectedSize}`));
+  }, [cart, activeSelectedKeys]);
+
+  const unselectedItems = React.useMemo(() => {
+    return (cart || []).filter((item) => !activeSelectedKeys.includes(`${item.product?.id}_${item.selectedSize}`));
+  }, [cart, activeSelectedKeys]);
+
+  const orderSubtotal = React.useMemo(() => {
+    return selectedItems.reduce(
+      (acc, item) => acc + Number(item.product?.price || 0) * Number(item.quantity || 1),
+      0
+    );
+  }, [selectedItems]);
+
+  const handleIncludeItemInOrder = (item) => {
+    const key = `${item.product?.id}_${item.selectedSize}`;
+    setSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), key])));
+  };
+
+  const handleExcludeItemFromOrder = (item) => {
+    const key = `${item.product?.id}_${item.selectedSize}`;
+    setSelectedCartItemKeys((prev) => (prev || []).filter((k) => k !== key));
+  };
+
+  const initialCachedOrder = React.useMemo(() => {
+    if (location.state?.viewOrder) {
+      return formatOrderDetails(location.state.viewOrder, user);
+    }
+    if (orderParamFromUrl) {
+      return readCachedOrder(orderParamFromUrl);
+    }
+    const recentCached = readCachedOrder(null);
+    if (recentCached && (!cart || cart.length === 0)) {
+      return recentCached;
+    }
+    return null;
+  }, [location.state?.viewOrder, orderParamFromUrl, cart, user]);
+
+  // Protect route: Redirect if not authenticated (unless viewing an order confirmation)
   useEffect(() => {
-    if (!authLoading && !user) {
+    const hasOrder = Boolean(
+      orderParamFromUrl ||
+      initialCachedOrder ||
+      readCachedOrder(orderParamFromUrl || null)
+    );
+    if (!authLoading && !user && !hasOrder) {
       if (setPendingAction) {
         setPendingAction(() => () => navigate('/checkout'));
       }
       openAuthModal('login');
       navigate('/');
     }
-  }, [user, authLoading, openAuthModal, navigate, setPendingAction]);
+  }, [user, authLoading, openAuthModal, navigate, setPendingAction, orderParamFromUrl, initialCachedOrder]);
 
   // Saved Addresses State
   const [addresses, setAddresses] = useState([]);
@@ -117,8 +286,12 @@ export const Checkout = () => {
 
   // Order Placement State
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
-  const [placedOrderNumber, setPlacedOrderNumber] = useState('');
+  const [orderPlaced, setOrderPlaced] = useState(() => Boolean(initialCachedOrder));
+  const [placedOrderNumber, setPlacedOrderNumber] = useState(() => initialCachedOrder?.orderNumber || orderParamFromUrl || '');
+  const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(() => initialCachedOrder?.totalPaid || 0);
+  const [placedOrderDetails, setPlacedOrderDetails] = useState(() => initialCachedOrder);
+  const [isFetchingOrder, setIsFetchingOrder] = useState(() => Boolean(orderParamFromUrl && !initialCachedOrder));
+  const [orderFetchError, setOrderFetchError] = useState(false);
   const [toast, setToast] = useState(null); // { message: string, type: 'info' | 'error' | 'success' }
   const [paymentErrorMessage, _setPaymentErrorMessage] = useState('');
 
@@ -142,10 +315,9 @@ export const Checkout = () => {
     }, 5000);
     return () => clearTimeout(timer);
   }, [toast]);
-  const [confirmedGrandTotal, setConfirmedGrandTotal] = useState(0);
-  const [placedOrderDetails, setPlacedOrderDetails] = useState(null);
   const [orderCancelled, setOrderCancelled] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -200,83 +372,9 @@ export const Checkout = () => {
     }
   };
 
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
-
-  // Helper to format order for confirmation screen
-  const formatOrderDetails = (ord, currentUser) => {
-    if (!ord) return null;
-    const orderNum = ord.order_number || ord.orderNumber || (ord.id ? `HOU-${ord.id}` : 'HOU-340391');
-
-    let addrObj = ord.shipping_address || ord.shippingAddress || {};
-    if (typeof addrObj === 'string') {
-      try { addrObj = JSON.parse(addrObj); } catch (e) { addrObj = { street: addrObj }; }
-    }
-
-    const rawItems = Array.isArray(ord.items) && ord.items.length > 0 
-      ? ord.items 
-      : [
-          {
-            id: ord.product_id || ord.id || '1',
-            name: ord.product_name || ord.title || ord.name || 'PEACH BLOOM CORSET SET',
-            price: Number(ord.price || ord.total || ord.total_amount || 0),
-            quantity: Number(ord.quantity || 1),
-            image: ord.image || ord.image_url || '/assets/Images/Brown01.png',
-            selectedSize: ord.selectedSize || ord.size || 'M'
-          }
-        ];
-
-    const mappedItems = rawItems.map((it) => ({
-      id: String(it.id || it.product_id || '1'),
-      name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
-      price: Number(it.price || 0),
-      quantity: Number(it.quantity || 1),
-      image: it.image || it.image_url || '/assets/Images/Brown01.png',
-      selectedSize: it.selectedSize || it.size || 'M',
-      product: {
-        id: String(it.id || it.product_id || '1'),
-        name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
-        price: Number(it.price || 0),
-        image: it.image || it.image_url || '/assets/Images/Brown01.png'
-      }
-    }));
-
-    const totalPaid = Number(ord.total || ord.total_amount || ord.totalAmount || ord.total_price || 0);
-    const subtotal = Number(ord.subtotal || totalPaid || 0);
-    const discount = Number(ord.discount || 0);
-    const shippingFee = Number(ord.shipping_fee || ord.shippingFee || 0);
-
-    const createdAt = ord.created_at || ord.createddate ? new Date(ord.created_at || ord.createddate) : new Date();
-    const deliveryDate = new Date(createdAt);
-    deliveryDate.setDate(deliveryDate.getDate() + 7);
-    const estDeliveryStr = deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
-    return {
-      orderNumber: orderNum,
-      trackingNumber: ord.tracking_number || ord.trackingNumber || `TRK-${String(orderNum).replace(/\D/g, '').slice(-6) || 'VHYNGE'}`,
-      estimatedDelivery: estDeliveryStr,
-      items: mappedItems,
-      subtotal: subtotal,
-      discount: discount,
-      shippingFee: shippingFee,
-      totalPaid: totalPaid,
-      shippingAddress: {
-        name: addrObj.name || addrObj.recipient_name || ord.customer_name || currentUser?.name || 'Customer Name',
-        street: addrObj.street || addrObj.full_address || 'Address Details',
-        city: addrObj.city || '',
-        state: addrObj.state || '',
-        pincode: addrObj.pincode || addrObj.postal_code || '',
-        country: addrObj.country || 'INDIA'
-      },
-      paymentMethod: ord.payment_method || ord.paymentMethod || 'Online Payment',
-      customerEmail: ord.customer_email || ord.email || currentUser?.email || '',
-      customerPhone: ord.customer_phone || ord.phone || currentUser?.phone || '',
-      status: ord.status || 'Confirmed'
-    };
-  };
-
-  // Check for viewOrder passed from Account page or URL orderId
+  // Check for viewOrder passed from Account page, URL orderId/orderNumber, or sessionStorage fallback
   useEffect(() => {
+    const orderParam = searchParams.get('orderId') || searchParams.get('orderNumber');
     if (location.state?.viewOrder) {
       const formatted = formatOrderDetails(location.state.viewOrder, user);
       if (formatted) {
@@ -284,10 +382,25 @@ export const Checkout = () => {
         setPlacedOrderNumber(formatted.orderNumber);
         setConfirmedGrandTotal(formatted.totalPaid);
         setOrderPlaced(true);
+        setIsFetchingOrder(false);
+        try {
+          sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(formatted));
+        } catch (e) {}
       }
-    } else {
-      const orderParam = searchParams.get('orderId') || searchParams.get('orderNumber');
-      if (orderParam && user) {
+    } else if (orderParam) {
+      const cached = readCachedOrder(orderParam);
+      if (cached && !placedOrderDetails) {
+        setPlacedOrderDetails(cached);
+        setPlacedOrderNumber(cached.orderNumber);
+        setConfirmedGrandTotal(cached.totalPaid);
+        setOrderPlaced(true);
+        setIsFetchingOrder(false);
+      }
+
+      if (user) {
+        if (!cached && !placedOrderDetails) {
+          setIsFetchingOrder(true);
+        }
         apiClient(`/api/orders/${orderParam}`)
           .then((res) => {
             const ord = res.data || res.order;
@@ -297,12 +410,37 @@ export const Checkout = () => {
               setPlacedOrderNumber(formatted.orderNumber);
               setConfirmedGrandTotal(formatted.totalPaid);
               setOrderPlaced(true);
+              setOrderFetchError(false);
+              try {
+                sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(formatted));
+              } catch (e) {}
+            } else if (!cached && !placedOrderDetails) {
+              setOrderFetchError(true);
             }
           })
-          .catch(() => {});
+          .catch((err) => {
+            console.warn('Could not fetch order from API:', err);
+            if (!cached && !placedOrderDetails) {
+              setOrderFetchError(true);
+            }
+          })
+          .finally(() => {
+            setIsFetchingOrder(false);
+          });
+      }
+    } else if (!orderParam && (!cart || cart.length === 0)) {
+      // If user refreshed on /checkout without query param, restore recent cached order if available
+      const cached = readCachedOrder(null);
+      if (cached) {
+        setPlacedOrderDetails(cached);
+        setPlacedOrderNumber(cached.orderNumber);
+        setConfirmedGrandTotal(cached.totalPaid);
+        setOrderPlaced(true);
+        setIsFetchingOrder(false);
+        navigate(`/checkout?orderNumber=${encodeURIComponent(cached.orderNumber)}`, { replace: true });
       }
     }
-  }, [location.state, searchParams, user]);
+  }, [location.state, searchParams, user, cart?.length, navigate]);
 
   useEffect(() => {
     if (user) {
@@ -324,12 +462,12 @@ export const Checkout = () => {
     }).format(val || 0);
   };
 
-  // Calculations
+  // Calculations (strictly computed on selected purchase items)
   const shippingFee = 0; // Free express shipping
   const discountAmount = appliedCoupon
-    ? Math.round((cartSubtotal * appliedCoupon.discountPercent) / 100)
+    ? Math.round((orderSubtotal * appliedCoupon.discountPercent) / 100)
     : 0;
-  const grandTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
+  const grandTotal = Math.max(0, orderSubtotal - discountAmount + shippingFee);
 
   // Apply Coupon Handler
   const handleApplyCoupon = (e) => {
@@ -376,15 +514,17 @@ export const Checkout = () => {
     const finalPaid = (amount !== undefined && amount > 0) ? amount : (grandTotal || 0);
     setConfirmedGrandTotal(finalPaid);
 
-    const snapshotItems = cart.map((item) => ({
-      id: item.product.id,
-      name: item.product.name,
-      price: item.product.price,
-      quantity: item.quantity,
-      image: item.product.image || (item.product.gallery && item.product.gallery[0]) || '/assets/Images/Brown01.png',
-      selectedSize: item.selectedSize || 'M',
-      product: item.product,
-    }));
+    const snapshotItems = (selectedItems && selectedItems.length > 0)
+      ? selectedItems.map((item) => ({
+          id: item.product?.id || item.id,
+          name: item.product?.name || item.name,
+          price: item.product?.price || item.price,
+          quantity: item.quantity,
+          image: item.product?.image || (item.product?.gallery && item.product?.gallery[0]) || item.image || '/assets/Images/Brown01.png',
+          selectedSize: item.selectedSize || 'M',
+          product: item.product,
+        }))
+      : [];
 
     const selectedAddr = (showNewAddressForm || addresses.length === 0)
       ? {
@@ -408,13 +548,14 @@ export const Checkout = () => {
     });
 
     const trackingNum = `TRK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const orderNum = orderNumber || `ORD-2026-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    setPlacedOrderDetails({
-      orderNumber: orderNumber || `ORD-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+    const details = {
+      orderNumber: orderNum,
       trackingNumber: trackingNum,
       estimatedDelivery: estimatedDeliveryStr,
       items: snapshotItems,
-      subtotal: cartSubtotal,
+      subtotal: orderSubtotal,
       discount: discountAmount,
       shippingFee: shippingFee,
       totalPaid: finalPaid,
@@ -423,12 +564,31 @@ export const Checkout = () => {
       customerEmail: user?.email || '',
       customerPhone: selectedAddr.phone || user?.phone || '',
       status: 'Pending',
-    });
+      placedAt: new Date().toISOString()
+    };
 
-    if (clearCart) clearCart();
-    setPlacedOrderNumber(orderNumber);
+    setPlacedOrderDetails(details);
+
+    try {
+      sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(details));
+    } catch (e) {
+      console.warn('Could not cache placed order to sessionStorage', e);
+    }
+
+    // Remove only the purchased items from cart, keeping unselected items in bag!
+    if (selectedItems && selectedItems.length > 0) {
+      selectedItems.forEach((item) => {
+        removeFromCart(item.product?.id, item.selectedSize);
+      });
+    }
+    setPlacedOrderNumber(orderNum);
     setIsPlacingOrder(false);
     setOrderPlaced(true);
+    setIsFetchingOrder(false);
+
+    // Update URL to /checkout?orderNumber=... so refresh keeps the confirmation screen
+    navigate(`/checkout?orderNumber=${encodeURIComponent(orderNum)}`, { replace: true });
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -449,11 +609,13 @@ export const Checkout = () => {
       } else {
         setIsPlacingOrder(false);
         setPaymentErrorMessage(verifyRes?.message || 'Payment verification failed. Your items remain saved in your bag so you can try again.');
+        showToast(verifyRes?.message || 'Payment verification failed.', 'error');
       }
     } catch (err) {
-      console.warn('Payment verification API warning:', err.message);
-      // Finalize order gracefully so user is confirmed
-      finalizeOrderSuccess(orderNumber, amountPaid || grandTotal);
+      console.error('Payment verification API error:', err.message);
+      setIsPlacingOrder(false);
+      setPaymentErrorMessage(err.message || 'Payment verification failed. Your bag is saved - please check your connection and try again.');
+      showToast('Payment verification failed. Please try again.', 'error');
     }
   };
 
@@ -573,6 +735,12 @@ export const Checkout = () => {
           return;
         }
 
+        if (showNewAddressForm && addresses.length >= 4) {
+          setIsPlacingOrder(false);
+          setPaymentErrorMessage('You can save a maximum of 4 delivery addresses. Please select from your saved addresses or edit an existing one.');
+          return;
+        }
+
         const addressPayload = {
           user_id: user.id || user.username || user.email,
           address_label: newShippingForm.type || 'Home',
@@ -622,11 +790,11 @@ export const Checkout = () => {
         paymentMethod: paymentMethod,
         paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Pending',
         paymentType: paymentMethod === 'cod' ? 'COD' : paymentMethod === 'card' ? 'Card' : 'UPI',
-        subtotal: cartSubtotal,
+        subtotal: orderSubtotal,
         shipping: shippingFee,
         total: grandTotal,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
-        items: cart.map((item) => {
+        items: selectedItems.map((item) => {
           let cleanId = item.product?.id || item.id || item.productId;
           if (typeof cleanId === 'string') {
             const digits = cleanId.replace(/\D/g, '');
@@ -641,6 +809,7 @@ export const Checkout = () => {
             name: item.product?.name || item.name || 'Garment',
             price: Number(item.product?.price || item.price || 0),
             quantity: item.quantity || 1,
+            size: item.selectedSize || 'M',
             image: item.product?.image || item.image || ''
           };
         })
@@ -712,14 +881,10 @@ export const Checkout = () => {
       const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_SIPp9QznVVM48W';
 
       if (!rzpLoaded || !window.Razorpay) {
-        console.warn('Razorpay SDK unavailable. Completing payment verification test flow.');
-        await verifyAndCompletePayment({
-          razorpay_order_id: rzpOrderData?.id || `order_test_${Date.now()}`,
-          razorpay_payment_id: `pay_test_${Date.now()}`,
-          razorpay_signature: 'test_signature',
-          order_id: internalOrderId,
-          orderNumber
-        });
+        setIsPlacingOrder(false);
+        const errMsg = 'Payment gateway could not be loaded. Please check your network or ad-blocker settings and try again.';
+        setPaymentErrorMessage(errMsg);
+        showToast(errMsg, 'error');
         return;
       }
 
@@ -752,7 +917,16 @@ export const Checkout = () => {
           ondismiss: function () {
             console.log('Razorpay modal dismissed by user.');
             setIsPlacingOrder(false);
-            showToast('Payment window was closed. Your bag is saved - please try again.', 'info');
+            showToast('Payment window was closed. Your items remain saved in your bag.', 'info');
+            if (internalOrderId) {
+              apiClient('/api/payments/failure', {
+                method: 'POST',
+                body: JSON.stringify({
+                  order_id: internalOrderId,
+                  reason: 'Payment modal closed by user before completion'
+                })
+              }).catch(() => {});
+            }
           }
         }
       };
@@ -760,17 +934,21 @@ export const Checkout = () => {
       const razorpayModal = new window.Razorpay(rzpOptions);
       razorpayModal.on('payment.failed', async function (resp) {
         console.warn('Razorpay SDK payment.failed triggered:', resp.error);
-        if (resp.error?.description === 'Authentication failed' || razorpayKey.startsWith('rzp_test_')) {
-          await verifyAndCompletePayment({
-            razorpay_order_id: rzpOrderData?.id || `order_test_${Date.now()}`,
-            razorpay_payment_id: `pay_test_${Date.now()}`,
-            razorpay_signature: 'test_signature',
-            order_id: internalOrderId,
-            orderNumber
-          });
-        } else {
-          setIsPlacingOrder(false);
-          setPaymentErrorMessage(`Payment failed: ${resp.error?.description || 'Transaction declined. Please try again.'}`);
+        setIsPlacingOrder(false);
+        const errMsg = resp.error?.description || resp.error?.reason || 'Payment failed or was declined. Please try again.';
+        setPaymentErrorMessage(`Payment failed: ${errMsg}`);
+        showToast(errMsg, 'error');
+
+        if (internalOrderId) {
+          apiClient('/api/payments/failure', {
+            method: 'POST',
+            body: JSON.stringify({
+              order_id: internalOrderId,
+              reason: errMsg,
+              error_code: resp.error?.code || 'PAYMENT_FAILED',
+              error_description: errMsg
+            })
+          }).catch(err => console.warn('[Checkout] Failed to record payment failure:', err.message));
         }
       });
       razorpayModal.open();
@@ -782,13 +960,62 @@ export const Checkout = () => {
     }
   };
 
-  if (authLoading || (!user && !orderPlaced)) {
+  const hasOrderInSession = Boolean(
+    orderPlaced ||
+    placedOrderDetails ||
+    orderParamFromUrl ||
+    readCachedOrder(orderParamFromUrl || null)
+  );
+
+  if (authLoading || (!user && !hasOrderInSession)) {
     return (
       <div className="min-h-screen bg-white text-brand-dark pt-32 pb-20 flex flex-col items-center justify-center font-serif">
         <div className="w-8 h-8 border-2 border-brand-dark border-t-transparent animate-spin mb-4" />
         <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
           Loading Checkout Session...
         </p>
+      </div>
+    );
+  }
+
+  if (isFetchingOrder) {
+    return (
+      <div className="min-h-screen bg-white text-brand-dark pt-32 pb-20 flex flex-col items-center justify-center font-serif">
+        <div className="w-8 h-8 border-2 border-brand-dark border-t-transparent animate-spin mb-4" />
+        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+          Loading Order Confirmation...
+        </p>
+      </div>
+    );
+  }
+
+  if (orderFetchError && !orderPlaced) {
+    return (
+      <div className="min-h-screen bg-white text-brand-dark pt-28 sm:pt-32 pb-20 font-serif">
+        <SEOHead title="Order Not Found | House of Urvaah" noindex={true} />
+        <div className="max-w-md mx-auto px-4 text-center py-16">
+          <AlertCircle className="w-12 h-12 stroke-[1] text-amber-600 mx-auto mb-4" />
+          <h2 className="text-xl font-serif tracking-[0.15em] uppercase text-black mb-2">
+            Order Not Found
+          </h2>
+          <p className="text-xs font-sans text-neutral-500 uppercase tracking-wider mb-6">
+            We couldn't locate the details for this order. You can check your complete order history in your account.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/account?tab=VIEW ORDERS"
+              className="inline-block bg-brand-dark text-white text-xs font-sans font-bold tracking-[0.25em] uppercase px-6 py-3.5 hover:bg-neutral-800 transition-colors"
+            >
+              VIEW MY ORDERS
+            </Link>
+            <Link
+              to="/"
+              className="inline-block border border-neutral-300 text-brand-dark text-xs font-sans font-bold tracking-[0.25em] uppercase px-6 py-3.5 hover:border-black transition-colors"
+            >
+              EXPLORE COLLECTION
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -829,9 +1056,17 @@ export const Checkout = () => {
     };
 
     const currentStatusStr = (details.status || 'Confirmed').toLowerCase();
-    const isDelivered = currentStatusStr.includes('delivered') || currentStatusStr.includes('completed');
-    const isOutForDelivery = isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery');
-    const isShipped = isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched');
+    const isCancellationRequested = currentStatusStr === 'cancellation requested' || currentStatusStr === 'cancel_requested';
+    const isOrderCancelled = orderCancelled || ((currentStatusStr === 'cancelled' || currentStatusStr === 'canceled') && !isCancellationRequested);
+    const isReturnRequested = currentStatusStr === 'return requested' || currentStatusStr === 'return request processing';
+    const isReturnApproved = currentStatusStr === 'return approved';
+    const isReceivedAtUrvaah = currentStatusStr === 'received at house of urvaah' || currentStatusStr === 'received at urvaah house';
+    const isReturned = currentStatusStr === 'returned' || currentStatusStr === 'return completed';
+    const isInReturnFlow = isReturnRequested || isReturnApproved || isReceivedAtUrvaah || isReturned;
+
+    const isDelivered = (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed')) && !isInReturnFlow;
+    const isOutForDelivery = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && (isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery'));
+    const isShipped = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && (isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched'));
 
     const handleReorder = () => {
       if (details && details.items) {
@@ -845,7 +1080,98 @@ export const Checkout = () => {
     };
 
     const handleDownloadInvoice = () => {
-      window.print();
+      setIsInvoiceModalOpen(true);
+    };
+
+    const handleReturnOrder = async () => {
+      if (isCancellingOrder) return;
+
+      const { value: formValues } = await Swal.fire({
+        title: 'Return Order (Post-Delivery)',
+        html: `
+          <div class="text-left font-sans space-y-3">
+            <p class="text-xs text-neutral-600">Select a reason for returning your delivered atelier piece:</p>
+            <select id="swal-return-reason" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 focus:outline-none">
+              <option value="Size or fit issue">Size or fit issue</option>
+              <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+              <option value="Quality or fabric not as expected">Quality or fabric not as expected</option>
+              <option value="Received incorrect item or color">Received incorrect item or color</option>
+              <option value="Did not match online images">Did not match online images</option>
+              <option value="Changed my mind">Changed my mind</option>
+              <option value="Other">Other</option>
+            </select>
+            <textarea id="swal-return-comment" placeholder="Optional comments / notes..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 resize-none h-20 focus:outline-none"></textarea>
+            <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-[11px] text-indigo-900 leading-relaxed">
+              Once submitted, your return request will be reviewed by admin. Upon approval, reverse pickup will be scheduled back to House of Urvaah, followed by full refund processing at our Refund Desk.
+            </div>
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonColor: '#171717',
+        cancelButtonColor: '#737373',
+        confirmButtonText: 'Submit Return Request',
+        cancelButtonText: 'Keep Piece',
+        reverseButtons: true,
+        background: '#ffffff',
+        customClass: {
+          popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
+          title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
+          confirmButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer',
+          cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+        },
+        preConfirm: () => {
+          const reason = document.getElementById('swal-return-reason')?.value || 'Return requested by customer';
+          const comments = document.getElementById('swal-return-comment')?.value || '';
+          return { reason, comments };
+        }
+      });
+
+      if (formValues) {
+        setIsCancellingOrder(true);
+        const orderNum = details?.orderNumber || placedOrderNumber;
+        if (orderNum) {
+          try {
+            await apiClient(`/api/orders/${orderNum}/return`, {
+              method: 'POST',
+              body: JSON.stringify({
+                cancelReason: formValues.reason,
+                comments: formValues.comments
+              })
+            });
+            setPlacedOrderDetails((prev) => ({
+              ...prev,
+              status: 'Return Requested',
+              cancel_reason: formValues.reason
+            }));
+            await Swal.fire({
+              title: 'Return Request Submitted',
+              text: 'Your return request has been submitted to House of Urvaah admin for review.',
+              icon: 'success',
+              confirmButtonColor: '#171717',
+              confirmButtonText: 'OK',
+              background: '#ffffff',
+              customClass: {
+                popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
+                title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
+                htmlContainer: 'text-sm text-neutral-600',
+                confirmButton: 'rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+              }
+            });
+          } catch (e) {
+            console.warn('Return order error:', e.message);
+            await Swal.fire({
+              title: 'Submission Failed',
+              text: e.message || 'Could not submit return request. Please try again.',
+              icon: 'error',
+              confirmButtonColor: '#171717',
+              confirmButtonText: 'OK'
+            });
+          } finally {
+            setIsCancellingOrder(false);
+          }
+        }
+      }
     };
 
     const handleCancelOrder = async () => {
@@ -853,12 +1179,12 @@ export const Checkout = () => {
 
       const result = await Swal.fire({
         title: 'Cancel Order?',
-        text: 'Are you sure you want to cancel this order? This action cannot be undone.',
+        text: 'Are you sure you want to cancel this order? This will submit a cancellation request to our atelier team for admin approval.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#e11d48',
         cancelButtonColor: '#171717',
-        confirmButtonText: 'Yes, Cancel Order',
+        confirmButtonText: 'Yes, Request Cancellation',
         cancelButtonText: 'Keep Order',
         reverseButtons: true,
         focusCancel: true,
@@ -875,19 +1201,25 @@ export const Checkout = () => {
 
       if (result.isConfirmed) {
         setIsCancellingOrder(true);
-        setOrderCancelled(true);
-        if (details?.orderNumber) {
+        const orderNum = details?.orderNumber || placedOrderNumber;
+        if (orderNum) {
           try {
-            await apiClient(`/api/orders/${details.orderNumber}/cancel`, { method: 'POST' });
+            const res = await apiClient(`/api/orders/${orderNum}/cancel`, { method: 'POST' });
+            const targetStatus = res?.data?.status || 'Cancellation Requested';
+            setPlacedOrderDetails((prev) => ({ ...prev, status: targetStatus }));
+            if (targetStatus === 'Cancelled') {
+              setOrderCancelled(true);
+            }
           } catch (e) {
             console.warn('Cancel order API fallback:', e.message);
+            setPlacedOrderDetails((prev) => ({ ...prev, status: 'Cancellation Requested' }));
           }
         }
         setIsCancellingOrder(false);
 
         await Swal.fire({
-          title: 'Order Cancelled',
-          text: 'Your order has been cancelled successfully.',
+          title: 'Cancellation Request Submitted',
+          text: 'Your cancellation request has been submitted to our atelier team for admin approval prior to delivery.',
           icon: 'success',
           confirmButtonColor: '#171717',
           confirmButtonText: 'OK',
@@ -1234,9 +1566,17 @@ export const Checkout = () => {
 
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-xs font-bold tracking-wider uppercase text-neutral-500">Current Status</span>
-                  <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase ${
-                    orderCancelled 
+                  <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase rounded-full ${
+                    isOrderCancelled 
                       ? 'bg-red-900 text-white' 
+                      : isReturnRequested
+                      ? 'bg-amber-600 text-white'
+                      : isReturnApproved
+                      ? 'bg-indigo-600 text-white'
+                      : isReceivedAtUrvaah
+                      ? 'bg-blue-600 text-white'
+                      : isReturned
+                      ? 'bg-emerald-600 text-white'
                       : isDelivered 
                       ? 'bg-emerald-600 text-white' 
                       : isOutForDelivery 
@@ -1245,7 +1585,23 @@ export const Checkout = () => {
                       ? 'bg-amber-500 text-black' 
                       : 'bg-yellow-400 text-black'
                   }`}>
-                    {orderCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : (details.status || 'PROCESSING').toUpperCase()}
+                    {isOrderCancelled
+                      ? 'CANCELLED'
+                      : isReturnRequested
+                      ? 'RETURN REQUESTED'
+                      : isReturnApproved
+                      ? 'RETURN IN TRANSIT'
+                      : isReceivedAtUrvaah
+                      ? 'RECEIVED AT URVAAH HOUSE'
+                      : isReturned
+                      ? 'RETURNED & REFUNDED'
+                      : isDelivered
+                      ? 'DELIVERED'
+                      : isOutForDelivery
+                      ? 'OUT FOR DELIVERY'
+                      : isShipped
+                      ? 'SHIPPED'
+                      : (details.status || 'PROCESSING').toUpperCase()}
                   </span>
                 </div>
 
@@ -1279,7 +1635,8 @@ export const Checkout = () => {
                     CONTINUE SHOPPING
                   </Link>
 
-                  {!orderCancelled && !isDelivered && (
+                  {/* Pre-Delivery Cancel Button */}
+                  {!isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isDelivered && (
                     <button
                       type="button"
                       onClick={handleCancelOrder}
@@ -1289,11 +1646,71 @@ export const Checkout = () => {
                       <span>CANCEL ORDER</span>
                     </button>
                   )}
+
+                  {/* Post-Delivery Return Button */}
+                  {!isOrderCancelled && isDelivered && !isInReturnFlow && (
+                    <button
+                      type="button"
+                      onClick={handleReturnOrder}
+                      className="w-full py-3.5 px-4 border border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>RETURN ORDER</span>
+                    </button>
+                  )}
+
+                  {/* Pre-Delivery Cancellation Review Pill */}
+                  {isCancellationRequested && (
+                    <div className="w-full py-3 px-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <Clock className="w-4 h-4 text-amber-700" />
+                      <span>Cancellation Pending Admin Approval</span>
+                    </div>
+                  )}
+
+                  {/* Post-Delivery Return Requested */}
+                  {isReturnRequested && (
+                    <div className="w-full py-3 px-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <Clock className="w-4 h-4 text-amber-700" />
+                      <span>Return Pending Admin Approval</span>
+                    </div>
+                  )}
+
+                  {/* Post-Delivery Return Approved */}
+                  {isReturnApproved && (
+                    <div className="w-full py-3 px-4 bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <Truck className="w-4 h-4 text-indigo-700" />
+                      <span>Return In Transit To House of Urvaah</span>
+                    </div>
+                  )}
+
+                  {/* Post-Delivery Received at House of Urvaah */}
+                  {isReceivedAtUrvaah && (
+                    <div className="w-full py-3 px-4 bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <PackageCheck className="w-4 h-4 text-blue-700" />
+                      <span>Delivered to House of Urvaah • Refund Desk Queued</span>
+                    </div>
+                  )}
+
+                  {/* Post-Delivery Returned */}
+                  {isReturned && (
+                    <div className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                      <span>Return Completed & Refund Disbursed</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Haute Couture Official Invoice Modal */}
+        <InvoiceModal
+          isOpen={isInvoiceModalOpen}
+          onClose={() => setIsInvoiceModalOpen(false)}
+          order={details}
+          orderId={details.orderNumber}
+        />
       </div>
     );
   }
@@ -1443,6 +1860,10 @@ export const Checkout = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      if (addresses.length >= 4) {
+                        showToast('Maximum 4 delivery addresses allowed. Please select or edit an existing address.', 'error');
+                        return;
+                      }
                       setNewShippingForm({
                         fullName: user?.name || '',
                         phone: user?.phone || '',
@@ -1456,10 +1877,16 @@ export const Checkout = () => {
                       setNewAddressErrors({});
                       setShowNewAddressForm(true);
                     }}
-                    className="text-xs font-bold tracking-wider uppercase text-brand-dark hover:underline flex items-center gap-1 cursor-pointer"
+                    disabled={addresses.length >= 4}
+                    className={`text-xs font-bold tracking-wider uppercase flex items-center gap-1.5 transition-colors ${
+                      addresses.length >= 4
+                        ? 'text-neutral-400 cursor-not-allowed'
+                        : 'text-brand-dark hover:underline cursor-pointer'
+                    }`}
+                    title={addresses.length >= 4 ? 'Maximum 4 addresses reached' : 'Add New Address'}
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>ADD NEW ADDRESS</span>
+                    <span>ADD NEW ADDRESS {addresses.length >= 4 ? '(4/4 MAX)' : `(${addresses.length}/4)`}</span>
                   </button>
                 )}
               </div>
@@ -1501,10 +1928,10 @@ export const Checkout = () => {
                                   e.stopPropagation();
                                   openEditAddressOnCheckout(idx);
                                 }}
-                                className="text-neutral-400 hover:text-black p-1 cursor-pointer"
+                                className="text-neutral-400 hover:text-black p-1 cursor-pointer transition-colors"
                                 title="Edit Address"
                               >
-                                <Edit3 className="w-3.5 h-3.5" />
+                                <Pencil className="w-3.5 h-3.5" />
                               </button>
                               {isSelected && (
                                 <span className="flex items-center gap-1 text-[10px] font-bold tracking-widest uppercase text-emerald-800">
@@ -1797,7 +2224,7 @@ export const Checkout = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isPlacingOrder}
+                disabled={isPlacingOrder || selectedItems.length === 0}
                 className="w-full py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {isPlacingOrder ? (
@@ -1805,6 +2232,8 @@ export const Checkout = () => {
                     <Loader2 className="w-4 h-4 animate-spin text-white stroke-[2.25] shrink-0" />
                     <span>PROCESSING ORDER...</span>
                   </>
+                ) : selectedItems.length === 0 ? (
+                  <span>SELECT ITEMS TO PLACE ORDER</span>
                 ) : (
                   <>
                     <Lock className="w-4 h-4 stroke-[2]" />
@@ -1842,55 +2271,150 @@ export const Checkout = () => {
             <div className="lg:sticky lg:top-28 bg-[#FAF8F3] border border-neutral-200/80 p-6 sm:p-8 space-y-6 font-sans">
               <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
                 <h3 className="font-serif text-base sm:text-lg tracking-[0.15em] uppercase text-black font-semibold">
-                  ORDER SUMMARY ({cart.reduce((a, b) => a + b.quantity, 0)})
+                  ORDER SUMMARY ({selectedItems.reduce((a, b) => a + b.quantity, 0)})
                 </h3>
                 <Link
                   to="/"
                   className="text-[11px] text-neutral-500 hover:text-black font-semibold tracking-wider uppercase"
                 >
-                  EDIT CART
+                  CONTINUE SHOPPING
                 </Link>
               </div>
 
-              {/* CART ITEMS LIST */}
-              <div
-                className="divide-y divide-neutral-200/80 max-h-[360px] overflow-y-auto no-scrollbar scrollbar-none"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                {cart.map((item, idx) => (
-                  <div key={`${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-0 last:pb-0 flex gap-3.5 items-center">
-                    <div className="relative flex-shrink-0">
-                      <img
-                        src={getSupabaseMediaUrl(item.product.image)}
-                        alt={item.product.name}
-                        className="w-16 h-20 object-cover object-top border border-neutral-200 bg-white"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
-                        }}
-                      />
-                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums">
-                        {item.quantity}
-                      </span>
-                    </div>
+              {/* 1. ACTIVE ITEMS IN THIS ORDER */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-sans font-bold uppercase tracking-[0.18em] text-neutral-800 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>SELECTED FOR THIS ORDER ({selectedItems.length})</span>
+                  </span>
+                  {selectedItems.length > 0 && unselectedItems.length > 0 && (
+                    <span className="text-[10px] text-emerald-800 font-semibold tracking-wider">
+                      Active
+                    </span>
+                  )}
+                </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 truncate">
-                        {item.product.name}
+                {selectedItems.length === 0 ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl text-center text-xs text-amber-900 space-y-1 my-3">
+                    <p className="font-semibold">No items currently selected for this order.</p>
+                    <p className="text-[11px] text-amber-800">
+                      Please click <strong>&quot;+ Add to Order&quot;</strong> on any product in your bag below to purchase it.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className="divide-y divide-neutral-200/80 max-h-[300px] overflow-y-auto no-scrollbar scrollbar-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {selectedItems.map((item, idx) => (
+                      <div key={`selected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-1 last:pb-1 flex gap-3.5 items-center">
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={getSupabaseMediaUrl(item.product.image)}
+                            alt={item.product.name}
+                            className="w-16 h-20 object-cover object-top border border-neutral-200 bg-white"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                            }}
+                          />
+                          <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums">
+                            {item.quantity}
+                          </span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 truncate">
+                            {item.product.name}
+                          </h4>
+                          <p className="text-[11px] text-neutral-500 tracking-wider mt-0.5">
+                            SIZE: <span className="font-bold text-neutral-800">{item.selectedSize}</span>
+                          </p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs font-bold text-neutral-900">
+                              {formatPrice(item.product.price * item.quantity)}
+                            </span>
+
+                            {/* Move to other bag items */}
+                            {cart.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleExcludeItemFromOrder(item)}
+                                className="text-[10px] font-sans text-neutral-500 hover:text-red-700 tracking-wider uppercase underline underline-offset-2 transition-colors cursor-pointer"
+                                title="Keep in bag for later"
+                              >
+                                Keep in Bag
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. OTHER ITEMS IN YOUR BAG (Saved from previous additions) */}
+              {unselectedItems.length > 0 && (
+                <div className="pt-4 border-t border-neutral-300/80 mt-4">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div>
+                      <h4 className="text-xs font-serif font-bold uppercase tracking-[0.16em] text-neutral-900 flex items-center gap-1.5">
+                        <ShoppingBag className="w-3.5 h-3.5 text-neutral-700" />
+                        <span>OTHER ITEMS IN YOUR BAG ({unselectedItems.length})</span>
                       </h4>
-                      <p className="text-[11px] text-neutral-500 tracking-wider mt-0.5">
-                        SIZE: <span className="font-bold text-neutral-800">{item.selectedSize}</span>
-                      </p>
-                      <p className="text-xs font-bold text-neutral-900 mt-1">
-                        {formatPrice(item.product.price * item.quantity)}
+                      <p className="text-[10px] text-neutral-500 tracking-wide mt-0.5">
+                        Saved in your bag. Want to buy them together?
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              {/* DISCOUNT CODE INPUT FIELD */}
-              <div className="pt-4 border-t border-neutral-200">
+                  <div
+                    className="divide-y divide-neutral-200/60 max-h-[260px] overflow-y-auto no-scrollbar scrollbar-none bg-white/70 border border-neutral-200/80 rounded-xl p-3"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {unselectedItems.map((item, idx) => (
+                      <div key={`unselected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={getSupabaseMediaUrl(item.product.image)}
+                            alt={item.product.name}
+                            className="w-11 h-14 object-cover object-top border border-neutral-200 bg-white shrink-0 rounded-xs"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <h5 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-800 truncate">
+                              {item.product.name}
+                            </h5>
+                            <p className="text-[10px] text-neutral-500">
+                              Size: <strong className="text-neutral-700">{item.selectedSize}</strong> &bull; Qty: {item.quantity}
+                            </p>
+                            <p className="text-[11px] font-bold text-neutral-900">
+                              {formatPrice(item.product.price * item.quantity)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleIncludeItemInOrder(item)}
+                          className="px-2.5 py-1.5 rounded-lg border border-[#c5a880] hover:border-black bg-white hover:bg-[#FAF8F3] text-neutral-900 text-[10px] font-sans font-bold tracking-[0.14em] uppercase transition cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
+                        >
+                          <Plus className="w-3 h-3 text-[#8c734b]" />
+                          <span>ADD TO ORDER</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* DISCOUNT CODE INPUT FIELD (Commented out) */}
+              {/* <div className="pt-4 border-t border-neutral-200">
                 <label className="block text-[11px] font-bold text-neutral-600 tracking-wider uppercase mb-1.5 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-brand-dark" />
                   DISCOUNT VOUCHER / PROMO CODE
@@ -1940,25 +2464,25 @@ export const Checkout = () => {
                     {couponMessage.text}
                   </p>
                 )}
-              </div>
+              </div> */}
 
               {/* CALCULATED TOTALS */}
               <div className="pt-4 border-t border-neutral-200 space-y-2.5 text-xs">
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">Subtotal</span>
                   <span className="font-semibold text-neutral-900 font-sans tabular-nums">
-                    {formatPrice(cartSubtotal)}
+                    {formatPrice(orderSubtotal)}
                   </span>
                 </div>
 
-                {appliedCoupon && (
+                {/* {appliedCoupon && (
                   <div className="flex justify-between items-center text-emerald-800 font-semibold">
                     <span className="uppercase tracking-wider">
                       Discount ({appliedCoupon.code})
                     </span>
                     <span className="font-sans font-medium tabular-nums">-{formatPrice(discountAmount)}</span>
                   </div>
-                )}
+                )} */}
 
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">Shipping</span>

@@ -25,32 +25,27 @@ import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 const REFUND_STATUS_OPTIONS = [
   {
     value: 'Requested',
-    label: 'Requested',
-    description: 'Customer requested a refund / cancellation',
+    label: 'Request',
     dotColor: 'bg-amber-500'
   },
   {
     value: 'Processing',
     label: 'Processing',
-    description: 'Refund is actively being reviewed or processed',
     dotColor: 'bg-indigo-500'
   },
   {
     value: 'Completed',
     label: 'Completed / Paid',
-    description: 'Refund has been successfully disbursed to the customer',
     dotColor: 'bg-emerald-500'
   },
   {
     value: 'On Hold',
     label: 'On Hold',
-    description: 'Refund is paused pending customer response or verification',
     dotColor: 'bg-purple-500'
   },
   {
     value: 'Failed',
     label: 'Failed / Rejected',
-    description: 'Refund request was declined or payment failed',
     dotColor: 'bg-stone-500'
   }
 ];
@@ -656,7 +651,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_type', requestType)}
-                  className="font-semibold text-brand-dark text-xs font-admin py-1 inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="font-semibold text-brand-dark hover:text-black text-xs font-admin py-1 inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Request Type"
                 >
                   <span>{requestType}</span>
@@ -676,7 +671,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_on', formatDateTime(requestDate))}
-                  className="text-neutral-700 text-xs py-1 font-sans inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="text-neutral-700 hover:text-neutral-950 text-xs py-1 font-sans inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Requested Date & Time"
                 >
                   <span>{formatDateTime(requestDate)}</span>
@@ -820,7 +815,8 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('order_ref', orderNumber)}
-                  className="font-admin font-bold text-brand-dark hover:text-black hover:underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  className="font-admin font-bold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  style={{ textDecoration: 'none' }}
                   title="Click to copy Order #"
                 >
                   <span>#{orderNumber}</span>
@@ -1032,7 +1028,7 @@ export const UpdateRefundModal = ({
               >
                 {REFUND_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    ● {opt.label} — {opt.description}
+                    {opt.label}
                   </option>
                 ))}
               </select>

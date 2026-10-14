@@ -157,7 +157,7 @@ export const AdminAnalytics = () => {
   }, [categories, categorySortBy]);
 
   // Total spend by confirmed top customers
-  const topUsersTotalSpend = useMemo(() => {
+  const _topUsersTotalSpend = useMemo(() => {
     if (!topUsers || !Array.isArray(topUsers)) return 0;
     return topUsers.reduce((sum, u) => sum + (Number(u.totalRevenue) || 0), 0);
   }, [topUsers]);

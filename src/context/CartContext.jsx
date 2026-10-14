@@ -5,6 +5,13 @@ import { useModalScrollLock } from '../hooks/useModalScrollLock';
 
 const CartContext = createContext();
 
+export const getCartItemKey = (item) => {
+  if (!item) return '';
+  const prodId = item.product?.id || item.id || item.productId || '';
+  const size = item.selectedSize || item.size || 'M';
+  return `${String(prodId).trim()}_${String(size).trim()}`;
+};
+
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState(() => {
@@ -30,12 +37,53 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(null); // formatted user object
-  const [token, setTokenState] = useState(null);
+  const [user, setUser] = useState(() => getStoredUser()); // formatted user object
+  const [token, setTokenState] = useState(() => getAuthToken());
   const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(() => {
+    return !getAuthToken() && !getStoredUser();
+  });
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
+
+  // Selected cart items for checkout (Allows buying only chosen product while keeping other bag items separate)
+  const [selectedCartItemKeys, setSelectedCartItemKeys] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('urvaah_selected_cart_keys');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [];
+  });
+
+  const updateSelectedCartItemKeys = (keysOrFn) => {
+    setSelectedCartItemKeys((prev) => {
+      const next = typeof keysOrFn === 'function' ? keysOrFn(prev) : keysOrFn;
+      try {
+        sessionStorage.setItem('urvaah_selected_cart_keys', JSON.stringify(next || []));
+      } catch (e) {}
+      return next || [];
+    });
+  };
+
+  const toggleCartItemSelection = (itemKey) => {
+    updateSelectedCartItemKeys((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      if (current.includes(itemKey)) {
+        return current.filter((k) => k !== itemKey);
+      } else {
+        return [...current, itemKey];
+      }
+    });
+  };
+
+  const selectAllCartItems = () => {
+    const allKeys = cart.map(getCartItemKey);
+    updateSelectedCartItemKeys(allKeys);
+  };
+
+  const selectOnlyCartItem = (itemKey) => {
+    updateSelectedCartItemKeys([itemKey]);
+  };
 
   const formatUserData = (userData) => {
     if (!userData) return null;
@@ -59,7 +107,7 @@ export const CartProvider = ({ children }) => {
   const fetchUserProfile = async () => {
     try {
       const res = await apiClient('/api/users/profile');
-      if (res.success && res.user) {
+      if (res?.success && res?.user) {
         const formatted = formatUserData({
           ...res.user,
           addresses: res.addresses || []
@@ -67,16 +115,16 @@ export const CartProvider = ({ children }) => {
         if (formatted) {
           setUser(formatted);
           setStoredUser(formatted);
-        } else {
-          clearAuthSession();
-          setUser(null);
         }
       }
     } catch (err) {
       console.warn('Failed to fetch profile with stored JWT:', err.message);
-      if (err.status === 401 || err.status === 403 || err.status === 404) {
+      // ONLY clear session if server explicitly returned 401 Unauthorized (expired/invalid JWT)
+      // Never clear session on 404, 403, 500, network error, etc.!
+      if (err.status === 401) {
         clearAuthSession();
         setUser(null);
+        setTokenState(null);
       }
     }
   };
@@ -110,11 +158,13 @@ export const CartProvider = ({ children }) => {
 
     if (savedToken) {
       setTokenState(savedToken);
-      if (savedUser) {
+      if (savedUser && !user) {
         setUser(savedUser);
       }
-      // Refresh profile details in background
-      fetchUserProfile().finally(() => setAuthLoading(false));
+      // Re-fetch ground truth profile details in background without locking out the user
+      fetchUserProfile().finally(() => {
+        setAuthLoading(false);
+      });
     } else {
       // Fallback: check Supabase session
       supabase.auth.getSession().then(({ data: { session } }) => {
@@ -123,6 +173,8 @@ export const CartProvider = ({ children }) => {
           const formatted = formatUserData(session.user);
           setUser(formatted);
         }
+        setAuthLoading(false);
+      }).catch(() => {
         setAuthLoading(false);
       });
     }
@@ -134,10 +186,23 @@ export const CartProvider = ({ children }) => {
         const formatted = formatUserData(session.user);
         setUser(formatted);
       }
-      setAuthLoading(false);
+      if (!getAuthToken()) {
+        setAuthLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for global customer unauthorized event
+    const handleUnauthorized = () => {
+      setUser(null);
+      setTokenState(null);
+      setAuthLoading(false);
+    };
+    window.addEventListener('urvaah:auth:unauthorized', handleUnauthorized);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('urvaah:auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   // Lock background body scroll whenever any drawer or modal overlay is open
@@ -320,39 +385,52 @@ export const CartProvider = ({ children }) => {
       setAuthToken(jwtToken);
     }
 
-    // Merge guest cart items into logged-in user cart
+    // Merge guest cart items into logged-in user cart without accidental duplication
     const guestCartStr = localStorage.getItem('urvaah_guest_cart');
     if (guestCartStr) {
       try {
         const guestItems = JSON.parse(guestCartStr);
         if (Array.isArray(guestItems) && guestItems.length > 0) {
-          const userId = formatted.id || 'user';
-          setCart((prevUserCart) => {
-            const merged = [...prevUserCart];
-            for (const gItem of guestItems) {
-              const existingIdx = merged.findIndex(
-                (uItem) => String(uItem.product.id) === String(gItem.product.id) && uItem.selectedSize === gItem.selectedSize
-              );
-              if (existingIdx > -1) {
-                merged[existingIdx] = {
-                  ...merged[existingIdx],
-                  quantity: merged[existingIdx].quantity + gItem.quantity
-                };
-              } else {
-                merged.push(gItem);
-              }
-            }
-            localStorage.setItem(`urvaah_cart_${userId}`, JSON.stringify(merged));
-            return merged;
-          });
+          const userId = formatted.id || formatted.username || 'user';
+          const userCartKey = `urvaah_cart_${userId}`;
 
-          // Sync merged guest items to backend API
+          let userSavedCart = [];
+          try {
+            const rawUserCart = localStorage.getItem(userCartKey);
+            if (rawUserCart) {
+              const parsed = JSON.parse(rawUserCart);
+              if (Array.isArray(parsed)) userSavedCart = parsed;
+            }
+          } catch (e) {}
+
+          // Merge guest items into saved cart.
+          // For matching items, use gItem.quantity (the current active guest selection).
+          // NEVER compound quantity with (+ gItem.quantity) which previously doubled items on checkout!
+          const merged = [...userSavedCart];
+          for (const gItem of guestItems) {
+            const existingIdx = merged.findIndex(
+              (uItem) => String(uItem.product.id) === String(gItem.product.id) && uItem.selectedSize === gItem.selectedSize
+            );
+            if (existingIdx > -1) {
+              merged[existingIdx] = {
+                ...merged[existingIdx],
+                quantity: gItem.quantity
+              };
+            } else {
+              merged.push(gItem);
+            }
+          }
+
+          setCart(merged);
+          localStorage.setItem(userCartKey, JSON.stringify(merged));
+
+          // Sync merged guest items to backend API with setMode: true
           for (const gItem of guestItems) {
             const numericId = parseInt(String(gItem.product.id).replace(/\D/g, ''), 10);
             if (numericId && !isNaN(numericId)) {
               apiClient('/api/cart/add', {
                 method: 'POST',
-                body: JSON.stringify({ userId, productId: numericId, quantity: gItem.quantity })
+                body: JSON.stringify({ userId, productId: numericId, quantity: gItem.quantity, setMode: true })
               }).catch(() => {});
             }
           }
@@ -415,16 +493,38 @@ export const CartProvider = ({ children }) => {
     setIsAuthModalOpen(true);
   };
 
-  const addToCart = async (product, selectedSize = 'M') => {
+  const addToCart = async (product, selectedSize, options = {}) => {
     if (!product) return;
 
+    // Defensive check: Do not add out-of-stock items to cart
+    const isOutOfStock = Boolean(
+      product.inStock === false ||
+      product.instock === false ||
+      (product.stockQuantity !== undefined && product.stockQuantity !== null && Number(product.stockQuantity) <= 0) ||
+      (product.stock_quantity !== undefined && product.stock_quantity !== null && Number(product.stock_quantity) <= 0) ||
+      (product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) ||
+      product.isOutOfStock === true ||
+      product.status === 'Out of Stock' ||
+      product.status === 'out_of_stock'
+    );
+    if (isOutOfStock) return;
+
+    const sizeToUse = (typeof selectedSize === 'string' && selectedSize) ? selectedSize : (product.selectedSize || 'M');
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+    const targetItemKey = `${String(product.id).trim()}_${String(sizeToUse).trim()}`;
+
+    // Automatically set the newly chosen product as the single active purchase item by default!
+    if (options.selectOnlyThis !== false) {
+      updateSelectedCartItemKeys([targetItemKey]);
+    } else {
+      updateSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), targetItemKey])));
+    }
 
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
-        (item) => String(item.product.id) === String(product.id) && item.selectedSize === selectedSize
+        (item) => String(item.product.id) === String(product.id) && item.selectedSize === sizeToUse
       );
 
       let updated;
@@ -448,7 +548,7 @@ export const CartProvider = ({ children }) => {
               brand: product.brand || 'House of Urvaah',
               category: product.category || 'CLOTHING'
             },
-            selectedSize,
+            selectedSize: sizeToUse,
             quantity: 1
           }
         ];
@@ -458,7 +558,9 @@ export const CartProvider = ({ children }) => {
       return updated;
     });
 
-    setIsCartOpen(true);
+    if (options.openDrawer !== false) {
+      setIsCartOpen(true);
+    }
 
     if (!isGuest) {
       const rawNum = parseInt(String(product.id).replace(/\D/g, ''), 10);
@@ -509,8 +611,11 @@ export const CartProvider = ({ children }) => {
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
     setCart([]);
     localStorage.removeItem(cachedKey);
+    localStorage.setItem(cachedKey, JSON.stringify([]));
+    localStorage.removeItem('urvaah_guest_cart');
     if (!isGuest) {
       try {
+        await apiClient('/api/cart/clear', { method: 'DELETE' });
         await apiClient(`/api/cart/${userId}`, { method: 'DELETE' });
       } catch (e) {}
     }
@@ -690,6 +795,12 @@ export const CartProvider = ({ children }) => {
         cartCount,
         cartSubtotal,
         freeShippingProgress,
+        selectedCartItemKeys,
+        setSelectedCartItemKeys: updateSelectedCartItemKeys,
+        toggleCartItemSelection,
+        selectAllCartItems,
+        selectOnlyCartItem,
+        getCartItemKey,
       }}
     >
       {children}

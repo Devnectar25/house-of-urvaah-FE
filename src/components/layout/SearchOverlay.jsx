@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ArrowRight, Mic } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -13,11 +13,12 @@ const ALL_SEARCH_PRODUCTS = Array.from(
 );
 
 export const SearchOverlay = () => {
-  const { isSearchOpen, setIsSearchOpen, setQuickViewProduct } = useCart();
+  const { isSearchOpen, setIsSearchOpen } = useCart();
   const [searchTerm, setSearchTerm] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [voiceNotice, setVoiceNotice] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -260,7 +261,8 @@ export const SearchOverlay = () => {
                           product={product}
                           onQuickView={(p) => {
                             setIsSearchOpen(false);
-                            setQuickViewProduct(p);
+                            navigate(`/product/${p.id}`);
+                            window.scrollTo({ top: 0, behavior: 'instant' });
                           }}
                         />
                       ))}

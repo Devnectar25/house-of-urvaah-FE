@@ -27,14 +27,14 @@ export const BrandStory = () => {
   ];
 
   return (
-    <section className="py-20 bg-white border-t border-b border-neutral-200/80 font-serif text-brand-dark">
+    <section className="pt-10 md:pt-14 pb-6 md:pb-8 bg-white border-t border-b border-neutral-200/80 font-serif text-brand-dark">
       <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="max-w-2xl mx-auto mb-16 md:mb-20"
+          className="max-w-2xl mx-auto mb-10 md:mb-12"
         >
           <span className="text-[10px] tracking-[0.35em] text-neutral-400 font-serif uppercase block mb-2">
             PHILOSOPHY — JOIN LIFE

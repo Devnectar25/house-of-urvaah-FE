@@ -14,7 +14,8 @@ import {
   ArrowRight,
   AlertTriangle,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  MailCheck
 } from 'lucide-react';
 import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
@@ -204,14 +205,14 @@ export const AdminDashboard = () => {
       badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
     },
     // Row 3: Optional backend-supported marketing metrics
-    {
+    /* {
       id: 'coupons',
       label: 'Active Coupons',
       value: data?.activeCoupons,
       link: '/admin/coupons',
       icon: Ticket,
       badgeColor: 'bg-teal-50 text-teal-700 border-teal-200',
-    },
+    }, */
     {
       id: 'reviews',
       label: 'Total Reviews',
@@ -242,17 +243,23 @@ export const AdminDashboard = () => {
       link: '/admin/orders',
       icon: ShoppingCart,
     },
-    {
+    /* {
       title: 'Manage Coupons',
       description: 'Create and manage promotional discount incentives',
       link: '/admin/coupons',
       icon: Ticket,
-    },
+    }, */
     {
       title: 'Manage Customers',
       description: 'Review client account records and shopping profiles',
       link: '/admin/customers',
       icon: Users,
+    },
+    {
+      title: 'Newsletter Subscribers',
+      description: 'Monitor atelier audience signups and marketing email lists',
+      link: '/admin/newsletter',
+      icon: MailCheck,
     },
   ];
 

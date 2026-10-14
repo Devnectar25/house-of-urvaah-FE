@@ -661,6 +661,53 @@ export const TrendingOnGram = () => {
           const rawImage = item.image || fallback.src;
           const finalSrc = rawImage.startsWith('http') || rawImage.startsWith('/') ? rawImage : getSupabaseMediaUrl(rawImage);
 
+          const fallbackProduct = fallback.product;
+          const hasCustomProductImage = Boolean(item.product_image && String(item.product_image).trim());
+          const finalProductImage = hasCustomProductImage ? String(item.product_image).trim() : fallbackProduct.image;
+
+          // Parse dynamic product gallery
+          let customGallery = [];
+          if (Array.isArray(item.product_gallery) && item.product_gallery.length > 0) {
+            customGallery = item.product_gallery.filter(Boolean);
+          } else if (typeof item.product_gallery === 'string') {
+            try {
+              const parsed = JSON.parse(item.product_gallery);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                customGallery = parsed.filter(Boolean);
+              }
+            } catch (_) {}
+          }
+
+          let finalGallery = fallbackProduct.gallery || [];
+          if (customGallery.length > 0) {
+            finalGallery = customGallery;
+          } else if (hasCustomProductImage) {
+            finalGallery = [finalProductImage];
+          }
+
+          let formattedPrice = fallbackProduct.formattedPrice;
+          if (item.product_price && String(item.product_price).trim()) {
+            const rawPriceStr = String(item.product_price).trim();
+            if (rawPriceStr.startsWith('₹')) {
+              formattedPrice = rawPriceStr;
+            } else {
+              const numPrice = parseFloat(rawPriceStr.replace(/[^\d.]/g, ''));
+              formattedPrice = !isNaN(numPrice) ? `₹ ${numPrice.toLocaleString('en-IN')}` : rawPriceStr;
+            }
+          }
+
+          const dynamicProduct = {
+            ...fallbackProduct,
+            id: item.product_id || fallbackProduct.id,
+            name: item.product_name || fallbackProduct.name,
+            formattedPrice,
+            price: item.product_price
+              ? (parseFloat(String(item.product_price).replace(/[^\d.]/g, '')) || fallbackProduct.price)
+              : fallbackProduct.price,
+            image: finalProductImage,
+            gallery: finalGallery
+          };
+
           return {
             id: item.id ? `gram-${item.id}` : fallback.id,
             src: finalSrc,
@@ -668,7 +715,7 @@ export const TrendingOnGram = () => {
             category: item.caption ? item.caption.split('•')[0].trim() : fallback.category,
             handle: '@houseofurvaah',
             link: item.post_link || fallback.link,
-            product: fallback.product
+            product: dynamicProduct
           };
         });
 
@@ -711,7 +758,7 @@ export const TrendingOnGram = () => {
   };
 
   return (
-    <section className="pt-[100px] pb-12 md:pb-16 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
+    <section className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching BestSellers typography and left alignment */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">

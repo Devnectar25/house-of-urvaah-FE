@@ -626,7 +626,8 @@ export const AdminErrorMonitoring = () => {
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-[11px] text-rose-600 hover:text-rose-800 font-medium underline ml-auto cursor-pointer"
+              className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold no-underline hover:no-underline ml-auto cursor-pointer"
+              style={{ textDecoration: 'none' }}
             >
               Reset all filters
             </button>
@@ -841,7 +842,8 @@ export const AdminErrorMonitoring = () => {
                             href={item.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-brand-dark hover:underline flex items-center gap-1 truncate font-mono text-[11px]"
+                            className="text-brand-dark hover:text-black no-underline hover:no-underline flex items-center gap-1 truncate font-mono text-[11px]"
+                            style={{ textDecoration: 'none' }}
                           >
                             <span className="truncate">{item.url}</span>
                             <ExternalLink className="w-3 h-3 shrink-0 text-neutral-400" />

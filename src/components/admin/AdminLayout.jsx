@@ -14,7 +14,6 @@ import {
   Menu,
   X,
   LogOut,
-  ExternalLink,
   ChevronRight,
   ChevronDown,
   ShieldCheck,
@@ -27,7 +26,8 @@ import {
   Inbox,
   Bell,
   ShieldAlert,
-  Mail
+  Mail,
+  MailCheck
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -48,8 +48,9 @@ const ALL_NAV_ITEMS = [
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
   { name: 'Email Notifications', path: '/admin/email-notifications', icon: Mail, key: 'email-notifications' },
+  { name: 'Newsletter', path: '/admin/newsletter', icon: MailCheck, key: 'newsletter' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
-  { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
+  // { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
   { name: 'Leads', path: '/admin/leads', icon: Inbox, key: 'leads' },
   { name: 'Reviews', path: '/admin/reviews', icon: Star, key: 'reviews' },
@@ -71,13 +72,6 @@ const ALL_NAV_ITEMS = [
   { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },
 ];
 
-function formatRoleName(role) {
-  if (!role) return 'Super Admin';
-  const lower = String(role).toLowerCase();
-  if (lower === 'super_admin' || lower === 'admin' || lower === 'administrator') return 'Super Admin';
-  if (lower === 'sub_admin' || lower === 'subadmin') return 'Sub-Admin';
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
 
 export const AdminLayout = () => {
   const location = useLocation();
@@ -157,9 +151,6 @@ export const AdminLayout = () => {
     navigate('/admin/login', { replace: true });
   };
 
-  const rawName = currentUser?.name || currentUser?.username;
-  const adminName = (!rawName || rawName === 'Atelier Member') ? 'Admin' : rawName;
-  const adminRoleDisplay = formatRoleName(currentUser?.role);
 
   const isSuperAdmin = !currentUser?.role || currentUser?.role === 'super_admin' || currentUser?.username === 'Admin';
   const userPermissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
@@ -197,35 +188,14 @@ export const AdminLayout = () => {
             title="House of Urvaah Admin Dashboard"
           >
             <Logo className="h-11 sm:h-13 md:h-14 shrink-0" />
-            <span className="font-admin font-bold text-lg sm:text-xl text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors ml-[60px]">
+            <span className="font-admin font-bold text-xl sm:text-2xl md:text-[26px] text-neutral-950 tracking-tight group-hover:text-neutral-700 transition-colors ml-[140px] translate-y-[5px]">
               Admin Panel
             </span>
           </Link>
         </div>
 
-        {/* Right: Store preview, Admin User info & Logout */}
+        {/* Right: Logout Button */}
         <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-          <a
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 transition-all group"
-            title="Open customer storefront in a new tab"
-          >
-            <span>View Store</span>
-            <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-950 transition-colors" />
-          </a>
-
-          {/* Admin User & Role Stack */}
-          <div className="text-right flex flex-col justify-center">
-            <div className="text-sm sm:text-base font-bold text-neutral-950 leading-snug font-admin tracking-tight">
-              {adminName}
-            </div>
-            <div className="text-xs font-medium text-neutral-500 font-admin leading-tight mt-0.5">
-              {adminRoleDisplay}
-            </div>
-          </div>
-
           {/* Logout Button */}
           <button
             type="button"

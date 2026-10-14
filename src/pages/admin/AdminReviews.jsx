@@ -358,7 +358,8 @@ export const AdminReviews = () => {
                               href={`/product/${rev.productid}#customer-reviews`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-medium text-neutral-900 hover:text-black hover:underline flex items-center gap-1 group text-xs"
+                              className="font-medium text-neutral-900 hover:text-black no-underline hover:no-underline flex items-center gap-1 group text-xs"
+                              style={{ textDecoration: 'none' }}
                               title="View Customer Reviews for this garment on storefront"
                             >
                               <span className="truncate max-w-[190px]">{rev.product_name}</span>

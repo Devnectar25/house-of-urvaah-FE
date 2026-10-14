@@ -1,16 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Eye, ShoppingBag } from 'lucide-react';
+import { Heart, Eye, ShoppingBag, Bell, X, Check } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { StockNotificationModal } from '../product/StockNotificationModal';
 
 export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOriginalPrice = false }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
+  const [isSelectingSize, setIsSelectingSize] = useState(false);
+  const [selectedSize, setSelectedSize] = useState('M');
+  const [isAdding, setIsAdding] = useState(false);
+  const cardRef = useRef(null);
+
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist, setPdpProduct, pdpProduct, quickViewProduct } = useCart();
+  const { addToCart, toggleWishlist, isInWishlist, setPdpProduct, pdpProduct, quickViewProduct, setQuickViewProduct, user } = useCart();
   const isWishlisted = isInWishlist(product.id);
-  const isModalOpen = Boolean(pdpProduct || quickViewProduct);
+  const isModalOpen = Boolean(pdpProduct || quickViewProduct || isStockModalOpen);
   const activeHover = isHovered && !isModalOpen;
+
+  const isOutOfStock = Boolean(
+    product?.inStock === false ||
+    product?.instock === false ||
+    (product?.stockQuantity !== undefined && product.stockQuantity !== null && Number(product.stockQuantity) <= 0) ||
+    (product?.stock_quantity !== undefined && product.stock_quantity !== null && Number(product.stock_quantity) <= 0) ||
+    (product?.stock !== undefined && product.stock !== null && Number(product.stock) <= 0) ||
+    product?.isOutOfStock === true ||
+    product?.status === 'Out of Stock' ||
+    product?.status === 'out_of_stock'
+  );
+
+  const availableSizes = Array.isArray(product?.sizes) && product.sizes.length > 0
+    ? product.sizes
+    : ['XS', 'S', 'M', 'L', 'XL'];
+
+  useEffect(() => {
+    if (product?.id) {
+      try {
+        const generalKey = `urvaah_stock_notified_${product.id}_all`;
+        const sizeKey = `urvaah_stock_notified_${product.id}_M`;
+        const isStored =
+          localStorage.getItem(generalKey) === 'true' ||
+          localStorage.getItem(sizeKey) === 'true';
+        setHasSubscribedStock(isStored);
+      } catch (e) {
+        setHasSubscribedStock(false);
+      }
+    }
+  }, [product?.id]);
+
+  const handleStockSubscribed = ({ productId } = {}) => {
+    const targetId = productId || product?.id;
+    try {
+      localStorage.setItem(`urvaah_stock_notified_${targetId}_all`, 'true');
+    } catch (e) {}
+    setHasSubscribedStock(true);
+  };
 
   useEffect(() => {
     if (!product?.carouselImages || product.carouselImages.length <= 1) return;
@@ -19,6 +65,36 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
     }, 2500); // crossfade every 2.5s matching banner sections
     return () => clearInterval(interval);
   }, [product?.carouselImages]);
+
+  // Close size selection when clicking anywhere outside this card
+  useEffect(() => {
+    if (!isSelectingSize) return;
+
+    const handleDocumentClick = (e) => {
+      if (cardRef.current && !cardRef.current.contains(e.target)) {
+        setIsSelectingSize(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('touchstart', handleDocumentClick);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('touchstart', handleDocumentClick);
+    };
+  }, [isSelectingSize]);
+
+  const handleAddSelectedSize = (overrideSize = null) => {
+    const sizeToUse = overrideSize || selectedSize || (availableSizes.includes('M') ? 'M' : availableSizes[0] || 'M');
+    setIsAdding(true);
+    // Add product to shopping bag with selected size
+    addToCart(product, sizeToUse);
+
+    setTimeout(() => {
+      setIsAdding(false);
+      setIsSelectingSize(false);
+    }, 450);
+  };
 
   const handleCardClick = () => {
     if (product?.id) {
@@ -43,12 +119,16 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
 
   return (
     <div
+      ref={cardRef}
       onClick={handleCardClick}
       className={`group relative flex flex-col cursor-pointer transition-all duration-300 editorial-card ${
         isModalOpen ? 'pointer-events-none' : ''
       }`}
       onMouseEnter={() => !isModalOpen && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsSelectingSize(false);
+      }}
     >
       {/* Image Container */}
       <div className="relative w-full aspect-[3/4] bg-neutral-100 overflow-hidden mb-3">
@@ -105,42 +185,155 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
           />
         </button>
 
-        {/* Quick Action Overlay Bar at bottom of card (always visible on mobile, hover reveal on desktop) */}
-        <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-2 sm:p-3 transition-transform duration-300 ease-in-out flex items-center gap-1.5 sm:gap-2 ${
-          !isModalOpen ? 'md:translate-y-full md:group-hover:translate-y-0 translate-y-0' : 'translate-y-full pointer-events-none'
-        }`}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              addToCart(product);
-            }}
-            className="flex-1 bg-white text-brand-dark text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 hover:bg-neutral-100 transition-colors flex items-center justify-center gap-1 shadow-md min-h-[36px]"
-          >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            + Quick Add
-          </button>
-          
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (product?.id) {
-                let targetId = product.id;
-                if (product.id === 'bs-101' || product.id === '101' || product.id === '105' || product.id === 'prod-105' || product.id === 'bs-105' || (product.name && (product.name.toUpperCase().includes('CHESTNUT BLOOM SET') || product.name.toUpperCase().includes('MOCHA BROWN EMBROIDERED CO-ORD SET')))) {
-                  targetId = 'bs-101';
-                } else if (product.id === 'bs-103' || product.id === '103' || product.id === '106' || product.id === 'prod-102' || product.id === 'bs-106' || (product.name && (product.name.toUpperCase().includes('SAGE BLOOM EMBROIDERED CORSET') || product.name.toUpperCase().includes('GILDED MIST CORSET') || product.name.toUpperCase().includes('PEACH BLOOM CORSET SET')))) {
-                  targetId = 'bs-103';
+        {/* Quick Action Overlay Bar at bottom of card */}
+        {isOutOfStock ? (
+          <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-2 sm:p-3 transition-transform duration-300 ease-in-out flex items-center gap-1.5 sm:gap-2 z-10 ${
+            !isModalOpen ? 'md:translate-y-full md:group-hover:translate-y-0 translate-y-0' : 'translate-y-full pointer-events-none'
+          }`}>
+            {hasSubscribedStock ? (
+              <button
+                type="button"
+                disabled
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 bg-neutral-200/95 text-neutral-600 text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 flex items-center justify-center gap-1 shadow-md min-h-[36px] cursor-not-allowed select-none border border-neutral-300/80"
+                title="Alert registered — you will be notified when this item is back in stock"
+              >
+                <span>OUT OF STOCK</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsStockModalOpen(true);
+                }}
+                className="flex-1 bg-neutral-900 text-white hover:bg-black text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[36px] cursor-pointer group/notify"
+                title="Notify me when available"
+              >
+                <Bell className="w-3.5 h-3.5 text-amber-300 group-hover/notify:scale-110 transition-transform" />
+                <span>OUT OF STOCK</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCardClick();
+              }}
+              title="View Product Details"
+              aria-label="View Product Details"
+              className="bg-black/85 hover:bg-black text-white p-2 min-w-[36px] min-h-[36px] transition-colors flex items-center justify-center shadow-md cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : !isSelectingSize ? (
+          <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-2 sm:p-3 transition-transform duration-300 ease-in-out flex items-center gap-1.5 sm:gap-2 z-10 ${
+            !isModalOpen ? 'md:translate-y-full md:group-hover:translate-y-0 translate-y-0' : 'translate-y-full pointer-events-none'
+          }`}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSelectingSize(true);
+                if (!selectedSize || !availableSizes.includes(selectedSize)) {
+                  setSelectedSize(availableSizes.includes('M') ? 'M' : availableSizes[0] || 'M');
                 }
-                navigate(`/product/${targetId}`);
-                window.scrollTo({ top: 0, behavior: 'instant' });
-              }
-            }}
-            title="Quick View"
-            aria-label="Quick View"
-            className="bg-black/85 hover:bg-black text-white p-2 min-w-[36px] min-h-[36px] transition-colors flex items-center justify-center shadow-md"
+              }}
+              className="flex-1 bg-white text-brand-dark text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 hover:bg-neutral-100 transition-colors flex items-center justify-center gap-1 shadow-md min-h-[36px] cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              + Quick Add
+            </button>
+            
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCardClick();
+              }}
+              title="View Product Details"
+              aria-label="View Product Details"
+              className="bg-black/85 hover:bg-black text-white p-2 min-w-[36px] min-h-[36px] transition-colors flex items-center justify-center shadow-md cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          /* Size Selection Overlay (revealed upon clicking + Quick Add) */
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-md p-2.5 sm:p-3 shadow-xl border-t border-neutral-200/90 z-20 transition-all duration-300 ease-out flex flex-col gap-2.5"
           >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-        </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-brand-dark uppercase font-serif">
+                Select Size
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsSelectingSize(false);
+                }}
+                className="text-neutral-400 hover:text-black p-1 transition-colors cursor-pointer rounded-full hover:bg-neutral-100"
+                aria-label="Close size selector"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Size options buttons */}
+            <div className="flex flex-wrap items-center gap-1.5 justify-center">
+              {availableSizes.map((sz) => {
+                const isSelected = selectedSize === sz;
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSize(sz);
+                    }}
+                    className={`flex-1 min-w-[32px] max-w-[58px] h-8 sm:h-9 border text-[10px] sm:text-[11px] font-semibold tracking-wider transition-all duration-200 flex items-center justify-center cursor-pointer shadow-2xs ${
+                      isSelected
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-brand-dark border-neutral-300 hover:border-black hover:bg-neutral-50'
+                    }`}
+                    title={`Select size ${sz}`}
+                  >
+                    {sz}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Add to Bag Action Button */}
+            <div className="w-full">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddSelectedSize();
+                }}
+                disabled={isAdding}
+                className="w-full bg-brand-dark hover:bg-black text-white text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[34px] sm:min-h-[36px] cursor-pointer disabled:opacity-75"
+              >
+                {isAdding ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Added to Bag</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Add to Bag</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Details */}
@@ -175,6 +368,17 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
           </div>
         )}
       </div>
+
+      {/* Stock Notification / Out of Stock Popup */}
+      <StockNotificationModal
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        product={product}
+        selectedSize="all"
+        selectedColor="Default"
+        user={user}
+        onSubscribed={handleStockSubscribed}
+      />
     </div>
   );
 };

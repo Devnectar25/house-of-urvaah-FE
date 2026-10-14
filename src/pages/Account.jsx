@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { ProductCard } from '../components/common/ProductCard';
+import { InvoiceModal } from '../components/common/InvoiceModal';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
 
@@ -28,7 +29,7 @@ const findLocalProduct = (id) => {
   });
 };
 
-const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', 'MY COUPONS', 'ACCOUNT DETAILS'];
+const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', /* 'MY COUPONS', */ 'ACCOUNT DETAILS'];
 
 const normalizeTabName = (raw) => {
   if (!raw || typeof raw !== 'string') return null;
@@ -137,13 +138,24 @@ export const Account = () => {
 
   const isFormFilled = selectedCancelItems.length > 0 && cancelReason.trim().length > 0;
 
+  const isDeliveredModalOrder = Boolean(
+    cancelModalOrder && (
+      (cancelModalOrder.status || '').toLowerCase().includes('delivered') ||
+      (cancelModalOrder.status || '').toLowerCase().includes('completed')
+    )
+  );
+
   const handleSubmitCancellation = async () => {
     if (!cancelModalOrder || !isFormFilled) return;
     setIsSubmittingCancellation(true);
     const ord = cancelModalOrder;
     const orderNum = ord.order_number || ord.orderNumber || ord.id;
+    const isPostDelivery = (ord.status || '').toLowerCase().includes('delivered') || (ord.status || '').toLowerCase().includes('completed');
+    const endpoint = isPostDelivery ? `/api/orders/${orderNum}/return` : `/api/orders/${orderNum}/cancel`;
+    const targetStatus = isPostDelivery ? 'Return Requested' : 'Cancellation Requested';
+
     try {
-      await apiClient(`/api/orders/${orderNum}/cancel`, {
+      await apiClient(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           cancelReason,
@@ -151,19 +163,24 @@ export const Account = () => {
           itemIds: selectedCancelItems
         })
       });
+      setOrders((prev) =>
+        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: targetStatus, cancel_reason: cancelReason } : o))
+      );
+      setToastMsg({
+        text: isPostDelivery ? 'Return request submitted for admin review.' : 'Cancellation request submitted for admin review.',
+        type: 'success'
+      });
     } catch (e) {
-      console.warn('Cancel order fallback:', e.message);
+      console.warn('Order action error:', e.message);
+      setToastMsg({ text: e.message || 'Failed to submit request.', type: 'error' });
+    } finally {
+      setIsSubmittingCancellation(false);
+      setCancelModalOrder(null);
+      setSelectedCancelItems([]);
+      setCancelReason('');
+      setCancelComments('');
+      setTimeout(() => setToastMsg(null), 4000);
     }
-    setOrders((prev) =>
-      prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: 'Cancelled' } : o))
-    );
-    setIsSubmittingCancellation(false);
-    setCancelModalOrder(null);
-    setSelectedCancelItems([]);
-    setCancelReason('');
-    setCancelComments('');
-    setToastMsg({ text: 'Order cancelled successfully.', type: 'success' });
-    setTimeout(() => setToastMsg(null), 4000);
   };
 
   const getInitialTab = () => {
@@ -277,6 +294,7 @@ export const Account = () => {
   // Orders state
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
 
   // Fetch real profile details and addresses on mount / user change
   const loadProfileAndAddresses = async () => {
@@ -310,22 +328,33 @@ export const Account = () => {
     }
   }, [user]);
 
-  // Fetch orders when tab switches to VIEW ORDERS
+  // Fetch orders when user loads and when tab switches to VIEW ORDERS
+  const fetchUserOrders = async () => {
+    if (!user) return;
+    setOrdersLoading(true);
+    try {
+      const res = await apiClient('/api/orders/my-orders');
+      if (res && res.success && Array.isArray(res.data)) {
+        setOrders(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch orders:', err.message);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchUserOrders();
+    }
+  }, [user]);
+
   useEffect(() => {
     if (activeTab === 'VIEW ORDERS' && user) {
-      setOrdersLoading(true);
-      apiClient('/api/orders/my-orders')
-        .then(res => {
-          if (res.success && res.data) {
-            setOrders(res.data);
-          }
-        })
-        .catch(err => {
-          console.warn('Could not fetch orders:', err.message);
-        })
-        .finally(() => setOrdersLoading(false));
+      fetchUserOrders();
     }
-  }, [activeTab, user]);
+  }, [activeTab]);
 
   // Protect route
   useEffect(() => {
@@ -339,7 +368,7 @@ export const Account = () => {
   const tabConfig = [
     { name: 'VIEW ORDERS', icon: Package, badge: orders.length > 0 ? orders.length : null },
     { name: 'VIEW WISHLIST', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
-    { name: 'MY COUPONS', icon: Ticket },
+    // { name: 'MY COUPONS', icon: Ticket },
     { name: 'ACCOUNT DETAILS', icon: User }
   ];
 
@@ -449,6 +478,13 @@ export const Account = () => {
   };
 
   const openAddAddressModal = () => {
+    if (addresses.length >= 4) {
+      setToastMsg({
+        type: 'error',
+        text: 'Maximum 4 delivery addresses allowed. Please edit or delete an existing address.'
+      });
+      return;
+    }
     setEditingAddressIndex(null);
     setEditingAddressId(null);
     setAddressErrors({});
@@ -512,6 +548,13 @@ export const Account = () => {
   const handleSaveAddress = async (e) => {
     e.preventDefault();
     if (!validateAddressForm()) {
+      return;
+    }
+    if (!editingAddressId && addresses.length >= 4) {
+      setToastMsg({
+        type: 'error',
+        text: 'Maximum 4 delivery addresses allowed. Please edit or delete an existing address.'
+      });
       return;
     }
     setAddressSaving(true);
@@ -600,20 +643,35 @@ export const Account = () => {
   };
 
   const handleDeleteAddress = async (idx) => {
+    if (addresses.length <= 1) {
+      setToastMsg({
+        type: 'error',
+        text: 'At least 1 delivery address is required. You cannot delete your only saved address.'
+      });
+      return;
+    }
     const item = addresses[idx];
     if (item?.id && !String(item.id).startsWith('local-')) {
       try {
-        await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
+        const res = await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
+        if (res && res.message && !res.success) {
+          setToastMsg({ type: 'error', text: res.message });
+          return;
+        }
         await loadProfileAndAddresses();
+        setToastMsg({ type: 'success', text: 'Address removed successfully.' });
         return;
       } catch (err) {
         console.error('Failed to delete address via backend API:', err);
+        setToastMsg({ type: 'error', text: err.message || 'Failed to delete address.' });
+        return;
       }
     }
     const updatedList = addresses.filter((_, i) => i !== idx);
     const res = await updateUserProfile({ addresses: updatedList });
     if (res.success) {
       setAddresses(updatedList);
+      setToastMsg({ type: 'success', text: 'Address removed successfully.' });
     }
   };
 
@@ -723,23 +781,27 @@ export const Account = () => {
 
               {/* Header */}
               <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-7 h-7 rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-600 shrink-0 shadow-2xs">
-                  <X className="w-3.5 h-3.5 stroke-[2.2]" />
+                <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 shadow-2xs ${
+                  isDeliveredModalOrder ? 'border-neutral-800 bg-neutral-900 text-white' : 'border-red-200 bg-red-50 text-red-600'
+                }`}>
+                  {isDeliveredModalOrder ? <RotateCcw className="w-3.5 h-3.5 stroke-[2.2]" /> : <X className="w-3.5 h-3.5 stroke-[2.2]" />}
                 </div>
                 <h3 className="text-xl font-serif tracking-[0.1em] uppercase text-black font-semibold">
-                  Cancel Order
+                  {isDeliveredModalOrder ? 'Return Order (Post-Delivery)' : 'Cancel Order'}
                 </h3>
               </div>
               <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
-                We're sorry to see you cancel. Please tell us why you're cancelling your order.
+                {isDeliveredModalOrder
+                  ? 'Request a return for delivered items. Once approved by our atelier team, reverse pickup back to House of Urvaah will be initiated.'
+                  : "We're sorry to see you cancel. Please tell us why you're cancelling your order."}
               </p>
 
               <div className="space-y-4">
-                {/* Select Products to Cancel */}
+                {/* Select Products */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-serif tracking-[0.12em] uppercase text-black font-semibold">
-                      Select Products to Cancel
+                      {isDeliveredModalOrder ? 'Select Products to Return' : 'Select Products to Cancel'}
                     </span>
                     <div className="text-right">
                       <span className="text-[10px] font-sans font-bold text-neutral-400 uppercase tracking-widest block">
@@ -775,7 +837,7 @@ export const Account = () => {
                             <div
                               className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                                 isSelected
-                                  ? 'bg-red-600 text-white'
+                                  ? (isDeliveredModalOrder ? 'bg-black text-white' : 'bg-red-600 text-white')
                                   : 'border-2 border-neutral-300 bg-white'
                               }`}
                             >
@@ -806,10 +868,14 @@ export const Account = () => {
                             </div>
                           </div>
 
-                          {/* Cancelling Badge when selected */}
+                          {/* Selected Badge */}
                           {isSelected && (
-                            <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-red-500 border border-red-200 bg-red-50">
-                              Cancelling
+                            <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              isDeliveredModalOrder
+                                ? 'text-neutral-800 border-neutral-300 bg-neutral-100'
+                                : 'text-red-500 border-red-200 bg-red-50'
+                            }`}>
+                              {isDeliveredModalOrder ? 'Returning' : 'Cancelling'}
                             </span>
                           )}
                         </div>
@@ -818,10 +884,10 @@ export const Account = () => {
                   </div>
                 </div>
 
-                {/* Reason for Cancellation */}
+                {/* Reason for Return / Cancellation */}
                 <div>
                   <label className="block text-xs font-bold text-neutral-800 mb-1.5">
-                    Reason for Cancellation <span className="text-red-500">*</span>
+                    {isDeliveredModalOrder ? 'Reason for Return' : 'Reason for Cancellation'} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -830,13 +896,27 @@ export const Account = () => {
                       className="w-full appearance-none px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 focus:outline-none focus:border-neutral-400 cursor-pointer pr-10"
                     >
                       <option value="" disabled>Select a reason</option>
-                      <option value="Ordered by mistake">Ordered by mistake</option>
-                      <option value="Found better price elsewhere">Found better price elsewhere</option>
-                      <option value="Delivery taking too long">Delivery taking too long</option>
-                      <option value="Changed my mind">Changed my mind</option>
-                      <option value="Item not needed anymore">Item not needed anymore</option>
-                      <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
-                      <option value="Other">Other</option>
+                      {isDeliveredModalOrder ? (
+                        <>
+                          <option value="Size or fit issue">Size or fit issue</option>
+                          <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                          <option value="Quality or fabric not as expected">Quality or fabric not as expected</option>
+                          <option value="Received incorrect item or color">Received incorrect item or color</option>
+                          <option value="Did not match online images">Did not match online images</option>
+                          <option value="Changed my mind">Changed my mind</option>
+                          <option value="Other">Other</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Ordered by mistake">Ordered by mistake</option>
+                          <option value="Found better price elsewhere">Found better price elsewhere</option>
+                          <option value="Delivery taking too long">Delivery taking too long</option>
+                          <option value="Changed my mind">Changed my mind</option>
+                          <option value="Item not needed anymore">Item not needed anymore</option>
+                          <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
+                          <option value="Other">Other</option>
+                        </>
+                      )}
                     </select>
                     <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -851,22 +931,34 @@ export const Account = () => {
                     rows={3}
                     value={cancelComments}
                     onChange={(e) => setCancelComments(e.target.value)}
-                    placeholder="Any additional details?"
+                    placeholder={isDeliveredModalOrder ? "Provide any return or pickup notes..." : "Any additional details?"}
                     className="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-none"
                   />
                 </div>
 
-                {/* Cancellation Note */}
-                <div className="bg-red-50/60 border border-red-100 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                {/* Note Banner */}
+                <div className={`border rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 ${
+                  isDeliveredModalOrder ? 'bg-indigo-50/70 border-indigo-200' : 'bg-amber-50/70 border-amber-200'
+                }`}>
+                  {isDeliveredModalOrder ? (
+                    <Truck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  )}
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">
-                      CANCELLATION NOTE
+                    <span className={`text-[10px] font-bold uppercase tracking-wider block ${
+                      isDeliveredModalOrder ? 'text-indigo-800' : 'text-amber-800'
+                    }`}>
+                      {isDeliveredModalOrder ? 'RETURN & REFUND APPROVAL FLOW' : 'CANCELLATION APPROVAL FLOW'}
                     </span>
-                    <p className="text-[11px] sm:text-xs text-red-600/90 leading-relaxed font-normal">
-                      {isCODOrder
-                        ? 'Since this is a Cash on Delivery (COD) order, no refund is required for the cancelled items. You will only need to pay for the remaining items in your order upon delivery.'
-                        : 'Since this is a prepaid order, the estimated refund will be processed and credited to your original payment method within 5-7 business days.'}
+                    <p className={`text-[11px] sm:text-xs leading-relaxed font-normal ${
+                      isDeliveredModalOrder ? 'text-indigo-950' : 'text-amber-900'
+                    }`}>
+                      {isDeliveredModalOrder
+                        ? 'Your return request will be submitted for atelier admin approval. Once approved, reverse pickup back to House of Urvaah is scheduled. Upon safe arrival and inspection at Urvaah House, your refund will begin processing at our Refund Desk.'
+                        : isCODOrder
+                        ? 'Your request will be submitted for admin review prior to delivery. Once approved, this Cash on Delivery order will be cancelled with no payment due.'
+                        : 'Your request will be submitted to our atelier team for approval. Upon approval, online/UPI payments will be routed directly to our Refund Desk for full disbursement.'}
                     </p>
                   </div>
                 </div>
@@ -878,7 +970,7 @@ export const Account = () => {
                     onClick={handleCloseCancelModal}
                     className="px-5 py-3 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-xl transition-colors cursor-pointer"
                   >
-                    No, keep order
+                    {isDeliveredModalOrder ? 'No, keep piece' : 'No, keep order'}
                   </button>
 
                   {isFormFilled ? (
@@ -886,9 +978,15 @@ export const Account = () => {
                       type="button"
                       onClick={handleSubmitCancellation}
                       disabled={isSubmittingCancellation}
-                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                      className={`px-6 py-3 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDeliveredModalOrder ? 'bg-black hover:bg-neutral-800' : 'bg-red-600 hover:bg-red-700'
+                      }`}
                     >
-                      {isSubmittingCancellation ? 'Cancelling...' : 'Submit Cancellation'}
+                      {isSubmittingCancellation
+                        ? 'Submitting...'
+                        : isDeliveredModalOrder
+                        ? 'Submit Return Request'
+                        : 'Submit Cancellation Request'}
                     </button>
                   ) : (
                     <button
@@ -896,7 +994,7 @@ export const Account = () => {
                       disabled
                       className="px-6 py-3 bg-neutral-200 text-neutral-400 text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl cursor-not-allowed transition-all"
                     >
-                      Cancel {selectedCancelItems.length} Item(s)
+                      {isDeliveredModalOrder ? `Return ${selectedCancelItems.length} Item(s)` : `Cancel ${selectedCancelItems.length} Item(s)`}
                     </button>
                   )}
                 </div>
@@ -1055,9 +1153,9 @@ export const Account = () => {
                 {!isEditingProfile ? (
                   <button
                     onClick={() => setIsEditingProfile(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase font-sans text-brand-dark hover:underline cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase font-sans text-brand-dark hover:opacity-75 cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" />
                     <span>EDIT</span>
                   </button>
                 ) : (
@@ -1173,14 +1271,25 @@ export const Account = () => {
                     Manage your saved delivery addresses
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={openAddAddressModal}
-                  className="inline-flex items-center justify-center gap-2 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-5 py-2.5 uppercase transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>ADD ADDRESS</span>
-                </button>
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <span className="text-[11px] font-sans font-medium text-neutral-500 uppercase tracking-wider">
+                    ({addresses.length}/4 SAVED)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={openAddAddressModal}
+                    disabled={addresses.length >= 4}
+                    className={`inline-flex items-center justify-center gap-2 text-xs font-semibold tracking-widest px-5 py-2.5 uppercase transition-colors ${
+                      addresses.length >= 4
+                        ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                        : 'bg-brand-dark hover:bg-neutral-800 text-white cursor-pointer'
+                    }`}
+                    title={addresses.length >= 4 ? 'Maximum 4 addresses reached' : 'Add Address'}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>ADD ADDRESS</span>
+                  </button>
+                </div>
               </div>
 
               {/* Saved Addresses List / Empty State */}
@@ -1221,16 +1330,20 @@ export const Account = () => {
                           <button
                             type="button"
                             onClick={() => openEditAddressModal(idx)}
-                            className="text-neutral-500 hover:text-black p-1 cursor-pointer"
+                            className="text-neutral-500 hover:text-black p-1 cursor-pointer transition-colors"
                             title="Edit Address"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteAddress(idx)}
-                            className="text-neutral-400 hover:text-red-600 p-1 cursor-pointer"
-                            title="Delete Address"
+                            className={`p-1 transition-colors ${
+                              addresses.length <= 1
+                                ? 'text-neutral-300 cursor-not-allowed opacity-40'
+                                : 'text-neutral-400 hover:text-red-600 cursor-pointer'
+                            }`}
+                            title={addresses.length <= 1 ? "At least 1 address is required" : "Delete Address"}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1301,11 +1414,23 @@ export const Account = () => {
                   const orderNum = ord.order_number || ord.orderNumber || `ORD-2026-${ord.id || Math.floor(100000 + Math.random() * 900000)}`;
                   const orderStatus = ord.status || 'Pending';
                   const statusLower = orderStatus.toLowerCase();
-                  const isCancelled = statusLower.includes('cancel');
-                  const isDelivered = statusLower.includes('delivered') || statusLower.includes('completed');
-                  const isOutForDelivery = isDelivered || statusLower.includes('out') || statusLower.includes('delivery');
-                  const isShipped = isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched');
+                  const isCancellationRequested = statusLower === 'cancellation requested' || statusLower === 'cancel_requested';
+                  const isCancelled = (statusLower === 'cancelled' || statusLower === 'canceled') && !isCancellationRequested;
+
+                  // Post-delivery Return Flow States
+                  const isReturnRequested = statusLower === 'return requested' || statusLower === 'return request processing';
+                  const isReturnApproved = statusLower === 'return approved';
+                  const isReceivedAtUrvaah = statusLower === 'received at house of urvaah' || statusLower === 'received at urvaah house';
+                  const isReturned = statusLower === 'returned' || statusLower === 'return completed';
+                  const isReturnRejected = statusLower === 'return rejected';
+                  const isInReturnFlow = isReturnRequested || isReturnApproved || isReceivedAtUrvaah || isReturned || isReturnRejected;
+
+                  // Pre-return delivery status
+                  const isDelivered = (statusLower.includes('delivered') || statusLower.includes('completed')) && !isInReturnFlow;
+                  const isOutForDelivery = !isCancelled && !isCancellationRequested && !isInReturnFlow && (isDelivered || statusLower.includes('out') || statusLower.includes('delivery'));
+                  const isShipped = !isCancelled && !isCancellationRequested && !isInReturnFlow && (isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched'));
                   const isPaid = (ord.payment_status || ord.paymentStatus || 'Paid').toLowerCase() === 'paid';
+                  const isOnlinePayment = (ord.payment_method || ord.paymentMethod || '').toLowerCase() !== 'cod' && !(ord.payment_method || '').toLowerCase().includes('cash');
 
                   let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
                   if ((!orderTotal || orderTotal === 0) && ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
@@ -1351,8 +1476,20 @@ export const Account = () => {
                         <div className="flex items-center gap-2.5 flex-wrap">
                           {/* Status Badge */}
                           <span className={`px-3.5 py-1 text-[11px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 ${
-                            isCancelled 
+                            isCancellationRequested
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              : isCancelled 
                               ? 'bg-red-50 text-red-800 border-red-200' 
+                              : isReturnRequested
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              : isReturnApproved
+                              ? 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold'
+                              : isReceivedAtUrvaah
+                              ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
+                              : isReturned
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                              : isReturnRejected
+                              ? 'bg-rose-50 text-rose-900 border-rose-200'
                               : isDelivered 
                               ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
                               : isOutForDelivery 
@@ -1362,9 +1499,15 @@ export const Account = () => {
                               : 'bg-[#FAF8F3] text-neutral-800 border-[#E5E0D8]'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              isCancelled 
+                              isCancellationRequested || isReturnRequested
+                                ? 'bg-amber-600 animate-pulse'
+                                : isCancelled || isReturnRejected
                                 ? 'bg-red-600' 
-                                : isDelivered 
+                                : isReturnApproved
+                                ? 'bg-indigo-600 animate-pulse'
+                                : isReceivedAtUrvaah
+                                ? 'bg-blue-600 animate-pulse'
+                                : isReturned || isDelivered 
                                 ? 'bg-emerald-600' 
                                 : isOutForDelivery 
                                 ? 'bg-blue-600' 
@@ -1372,7 +1515,15 @@ export const Account = () => {
                                 ? 'bg-amber-600' 
                                 : 'bg-amber-500 animate-pulse'
                             }`} />
-                            <span>{orderStatus}</span>
+                            <span>{
+                              isCancellationRequested ? 'CANCELLATION REQUESTED' :
+                              isReturnRequested ? 'RETURN REQUESTED' :
+                              isReturnApproved ? 'RETURN IN TRANSIT' :
+                              isReceivedAtUrvaah ? 'RECEIVED AT URVAAH HOUSE' :
+                              isReturned ? 'RETURNED & REFUNDED' :
+                              isReturnRejected ? 'RETURN REJECTED' :
+                              orderStatus
+                            }</span>
                           </span>
 
                           {/* Payment Status Badge */}
@@ -1386,102 +1537,379 @@ export const Account = () => {
                         </div>
                       </div>
 
-                      {/* Horizontal ORDER PROGRESS JOURNEY Card */}
-                      <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs">
-                        <div className="flex items-center justify-between mb-5">
-                          <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-500 uppercase font-semibold">
-                            ORDER PROGRESS JOURNEY
-                          </h4>
-                          <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-neutral-400 font-medium">
-                            STEP {isDelivered ? '4 OF 4' : isOutForDelivery ? '3 OF 4' : isShipped ? '2 OF 4' : '1 OF 4'}
-                          </span>
-                        </div>
-
-                        {/* Progress Journey Steps */}
-                        <div className="grid grid-cols-4 gap-2 relative">
-                          {/* Background Line with Dynamic Fill */}
-                          <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-brand-dark transition-all duration-500" 
-                              style={{ 
-                                width: isCancelled 
-                                  ? '0%' 
-                                  : isDelivered 
-                                  ? '100%' 
-                                  : isOutForDelivery 
-                                  ? '66%' 
-                                  : isShipped 
-                                  ? '33%' 
-                                  : '0%' 
-                              }} 
-                            />
-                          </div>
-
-                          {/* Step 1: ORDER PLACED */}
-                          <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs transition-all ${
-                              isCancelled 
-                                ? 'bg-red-700 text-white ring-4 ring-red-100' 
-                                : 'bg-brand-dark text-white ring-4 ring-[#E8E2D8]'
-                            }`}>
-                              <Check className="w-4 h-4 stroke-[2.5]" />
-                            </div>
-                            <span className={`text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                              isCancelled ? 'text-red-700' : 'text-black'
-                            }`}>
-                              ORDER PLACED
+                      {/* Horizontal PROGRESS JOURNEY Card */}
+                      {isInReturnFlow ? (
+                        <div className="bg-[#FAF8F3] border border-indigo-200/60 rounded-2xl p-5 sm:p-6 shadow-2xs">
+                          <div className="flex items-center justify-between mb-5">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-indigo-900 uppercase font-semibold flex items-center gap-2">
+                              <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>RETURN & REFUND JOURNEY</span>
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-indigo-700 font-medium">
+                              STEP {isReceivedAtUrvaah || isReturned ? '4 OF 4' : isReturnApproved ? '3 OF 4' : '1 OF 4'}
                             </span>
                           </div>
 
-                          {/* Step 2: SHIPPED */}
-                          <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                              isShipped 
-                                ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
-                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                            }`}>
-                              <Package className="w-4 h-4 stroke-[1.8]" />
+                          <div className="grid grid-cols-4 gap-2 relative">
+                            {/* Background Line */}
+                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-700 transition-all duration-500"
+                                style={{
+                                  width: isReceivedAtUrvaah || isReturned
+                                    ? '100%'
+                                    : isReturnApproved
+                                    ? '66%'
+                                    : '0%'
+                                }}
+                              />
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                              isShipped ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                            }`}>
-                              SHIPPED
-                            </span>
-                          </div>
 
-                          {/* Step 3: OUT FOR DELIVERY */}
-                          <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                              isOutForDelivery 
-                                ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
-                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                            }`}>
-                              <Truck className="w-4 h-4 stroke-[1.8]" />
+                            {/* Step 1: RETURN REQUESTED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-indigo-700 text-white ring-4 ring-indigo-100">
+                                <Check className="w-4 h-4 stroke-[2.5]" />
+                              </div>
+                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-black">
+                                REQUESTED
+                              </span>
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                              isOutForDelivery ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                            }`}>
-                              OUT FOR DELIVERY
-                            </span>
-                          </div>
 
-                          {/* Step 4: DELIVERED */}
-                          <div className="flex flex-col items-center text-center z-10">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                              isDelivered 
-                                ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs' 
-                                : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                            }`}>
-                              <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
+                            {/* Step 2: ADMIN APPROVED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned
+                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                APPROVED
+                              </span>
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                              isDelivered ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
-                            }`}>
-                              DELIVERED
-                            </span>
+
+                            {/* Step 3: IN TRANSIT TO URVAAH */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned
+                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <Truck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                IN TRANSIT
+                              </span>
+                            </div>
+
+                            {/* Step 4: ATELIER RECEIVED & REFUND */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReceivedAtUrvaah || isReturned
+                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <PackageCheck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReceivedAtUrvaah || isReturned ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
+                              }`}>
+                                AT URVAAH / REFUND
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs">
+                          <div className="flex items-center justify-between mb-5">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-500 uppercase font-semibold">
+                              ORDER PROGRESS JOURNEY
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-neutral-400 font-medium">
+                              STEP {isDelivered ? '4 OF 4' : isOutForDelivery ? '3 OF 4' : isShipped ? '2 OF 4' : '1 OF 4'}
+                            </span>
+                          </div>
+
+                          {/* Progress Journey Steps */}
+                          <div className="grid grid-cols-4 gap-2 relative">
+                            {/* Background Line with Dynamic Fill */}
+                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-brand-dark transition-all duration-500" 
+                                style={{ 
+                                  width: isCancelled 
+                                    ? '0%' 
+                                    : isDelivered 
+                                    ? '100%' 
+                                    : isOutForDelivery 
+                                    ? '66%' 
+                                    : isShipped 
+                                    ? '33%' 
+                                    : '0%' 
+                                }} 
+                              />
+                            </div>
+
+                            {/* Step 1: ORDER PLACED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs transition-all ${
+                                isCancelled 
+                                  ? 'bg-red-700 text-white ring-4 ring-red-100' 
+                                  : 'bg-brand-dark text-white ring-4 ring-[#E8E2D8]'
+                              }`}>
+                                <Check className="w-4 h-4 stroke-[2.5]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isCancelled ? 'text-red-700' : 'text-black'
+                              }`}>
+                                ORDER PLACED
+                              </span>
+                            </div>
+
+                            {/* Step 2: SHIPPED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isShipped 
+                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <Package className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isShipped ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                SHIPPED
+                              </span>
+                            </div>
+
+                            {/* Step 3: OUT FOR DELIVERY */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isOutForDelivery 
+                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <Truck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isOutForDelivery ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                OUT FOR DELIVERY
+                              </span>
+                            </div>
+
+                            {/* Step 4: DELIVERED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isDelivered 
+                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs' 
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isDelivered ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
+                              }`}>
+                                DELIVERED
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Post-Delivery Return Requested Review Banner */}
+                      {isReturnRequested && (
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 text-amber-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Request Pending Admin Review
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                                Under Review
+                              </span>
+                            </div>
+                            <p className="text-amber-900/90 leading-relaxed font-normal">
+                              Your return request for this delivered order has been submitted to the House of Urvaah atelier team. Once approved by admin, reverse pickup will be initiated.
+                            </p>
+                            {ord.cancel_reason && (
+                              <p className="text-[11px] text-amber-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Return Reason:</span> {ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Return Approved Banner */}
+                      {isReturnApproved && (
+                        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-800 shrink-0 mt-0.5">
+                            <Truck className="w-5 h-5 text-indigo-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-indigo-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Approved — Package In Transit to House of Urvaah
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 uppercase">
+                                In Reverse Transit
+                              </span>
+                            </div>
+                            <p className="text-indigo-900/90 leading-relaxed font-normal">
+                              Your return request has been approved by admin! Reverse pickup is underway and the package is in transit back to House of Urvaah. Once delivered to our atelier, our Refund Desk will immediately initiate your refund.
+                            </p>
+                            <div className="pt-1 flex items-center gap-2 text-[11px] font-sans font-semibold text-indigo-800">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+                              <span>Destination: House of Urvaah Central Atelier</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Received at House of Urvaah Banner */}
+                      {isReceivedAtUrvaah && (
+                        <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-blue-100 rounded-xl text-blue-800 shrink-0 mt-0.5">
+                            <PackageCheck className="w-5 h-5 text-blue-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-blue-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Package Delivered to House of Urvaah — Refund Desk Initiated
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200/80 text-blue-900 border border-blue-300 uppercase">
+                                Received at Atelier
+                              </span>
+                            </div>
+                            <p className="text-blue-900/90 leading-relaxed font-normal">
+                              Your returned items have safely arrived at House of Urvaah! Inventory has been restocked and this order is now active at our Refund Desk for customer disbursement.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Returned & Refund Disbursed Banner */}
+                      {isReturned && (
+                        <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-emerald-100 rounded-xl text-emerald-800 shrink-0 mt-0.5">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-emerald-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Completed & Full Refund Disbursed
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300 uppercase">
+                                Refund Completed
+                              </span>
+                            </div>
+                            <p className="text-emerald-900/90 leading-relaxed font-normal">
+                              Full refund of ₹{Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed{ord.refund_method ? ` via ${ord.refund_method}` : ''}.
+                              {ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Transaction Reference / UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Return Rejected Banner */}
+                      {isReturnRejected && (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                              Return Request Not Approved
+                            </h4>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              Your return request could not be approved by the atelier team. For questions regarding atelier policies, please reach out to customer care.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pre-Delivery Cancellation Requested Review Banner */}
+                      {isCancellationRequested && (
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 text-amber-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Cancellation Request Pending Admin Approval
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                                Review In Progress
+                              </span>
+                            </div>
+                            <p className="text-amber-900/90 leading-relaxed font-normal">
+                              Your cancellation request has been submitted to our atelier admin team for verification prior to delivery.
+                              {isOnlinePayment
+                                ? ' Once approved, the full amount will automatically be routed to the Refund Desk for customer disbursement.'
+                                : ' As this is a Cash on Delivery order, no payment was collected.'}
+                            </p>
+                            {ord.cancel_reason && (
+                              <p className="text-[11px] text-amber-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Reason:</span> {ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pre-Delivery Cancelled & Refund Status Banner */}
+                      {isCancelled && (
+                        <div className={`rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 border shadow-2xs ${
+                          !isOnlinePayment 
+                            ? 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                            : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                            : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-950'
+                            : 'bg-amber-50 border-amber-200 text-amber-950'
+                        }`}>
+                          <div className="p-2 rounded-xl bg-white/90 border border-current shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold uppercase tracking-wide text-xs sm:text-sm">
+                                {!isOnlinePayment 
+                                  ? 'Order Cancelled (Cash on Delivery)'
+                                  : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                                  ? 'Refund Completed'
+                                  : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                                  ? 'Refund In Processing'
+                                  : 'Order Cancelled — Sent to Refund Desk'}
+                              </h4>
+                              {isOnlinePayment && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-white/80">
+                                  {ord.refund_status || 'Pending'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="leading-relaxed font-normal">
+                              {!isOnlinePayment
+                                ? 'This order was cancelled prior to delivery. No payment was charged for Cash on Delivery.'
+                                : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed${ord.refund_method ? ` via ${ord.refund_method}` : ''}.${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Reference/UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}`
+                                : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} is being processed by the Refund Desk.`
+                                : `Full amount of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been approved and queued at the Refund Desk for customer disbursement.`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Sub-card Products List */}
                       <div className="bg-white border border-neutral-200/80 rounded-2xl p-4 sm:p-5 divide-y divide-neutral-100 space-y-4 shadow-2xs">
@@ -1519,8 +1947,18 @@ export const Account = () => {
                               </div>
 
                               <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
-                                isCancelled 
+                                isCancellationRequested
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : isCancelled 
                                   ? 'bg-red-50 text-red-800 border-red-200' 
+                                  : isReturnRequested
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : isReturnApproved
+                                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                  : isReceivedAtUrvaah
+                                  ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                  : isReturned
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                                   : isDelivered 
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                                   : isOutForDelivery 
@@ -1529,7 +1967,7 @@ export const Account = () => {
                                   ? 'bg-amber-50 text-amber-800 border-amber-200' 
                                   : 'bg-neutral-100 text-neutral-800 border-neutral-200'
                               }`}>
-                                {isCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                {isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnApproved ? 'RETURN IN TRANSIT' : isReceivedAtUrvaah ? 'AT URVAAH HOUSE' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
                               </span>
                             </div>
                           );
@@ -1558,6 +1996,16 @@ export const Account = () => {
 
                           <button
                             type="button"
+                            onClick={() => setSelectedOrderForInvoice(ord)}
+                            className="px-5 py-2.5 rounded-xl border border-[#c5a880] hover:border-black bg-white hover:bg-[#faf8f5] text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                            title="View or download official tax invoice"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
+                            <span>Invoice</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => handleReorderOrder(ord)}
                             className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                           >
@@ -1565,7 +2013,8 @@ export const Account = () => {
                             <span>Reorder</span>
                           </button>
 
-                          {!isCancelled && !isDelivered && (
+                          {/* Pre-Delivery Cancel Button */}
+                          {!isCancelled && !isCancellationRequested && !isInReturnFlow && !isDelivered && (
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}
@@ -1573,6 +2022,55 @@ export const Account = () => {
                             >
                               Cancel Order
                             </button>
+                          )}
+
+                          {/* Post-Delivery Return Button */}
+                          {isDelivered && !isInReturnFlow && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrderInAccount(ord)}
+                              className="px-5 py-2.5 rounded-xl border border-neutral-900 hover:bg-neutral-900 hover:text-white bg-white text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Return Order</span>
+                            </button>
+                          )}
+
+                          {/* Pre-Delivery Cancellation Pending Review */}
+                          {isCancellationRequested && (
+                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Cancellation Pending Review</span>
+                            </span>
+                          )}
+
+                          {/* Post-Delivery Return Flow Status Badges */}
+                          {isReturnRequested && (
+                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Return Pending Review</span>
+                            </span>
+                          )}
+
+                          {isReturnApproved && (
+                            <span className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Return In Transit</span>
+                            </span>
+                          )}
+
+                          {isReceivedAtUrvaah && (
+                            <span className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <PackageCheck className="w-3.5 h-3.5 text-blue-600" />
+                              <span>At Urvaah House • Refund Desk</span>
+                            </span>
+                          )}
+
+                          {isReturned && (
+                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Refund Completed</span>
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1655,7 +2153,7 @@ export const Account = () => {
           </div>
         )}
 
-        {activeTab === 'MY COUPONS' && (
+        {/* {activeTab === 'MY COUPONS' && (
           <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
             <Ticket className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
             <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
@@ -1673,7 +2171,7 @@ export const Account = () => {
               <p className="text-xs text-neutral-600 mt-1">10% Off your inaugural House of Urvaah purchase.</p>
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* 3. ADD / EDIT ADDRESS MODAL */}
@@ -2031,6 +2529,14 @@ export const Account = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Official Haute Couture Invoice Modal */}
+      <InvoiceModal
+        isOpen={Boolean(selectedOrderForInvoice)}
+        onClose={() => setSelectedOrderForInvoice(null)}
+        order={selectedOrderForInvoice}
+        orderId={selectedOrderForInvoice?.order_number || selectedOrderForInvoice?.id}
+      />
     </div>
   );
 };

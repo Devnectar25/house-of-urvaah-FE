@@ -124,7 +124,7 @@ export const ProductReviews = ({ productId, productName }) => {
   // Calculate average rating
 
   return (
-    <section id="customer-reviews" className="w-full mt-12 sm:mt-16 pt-10 sm:pt-12 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
+    <section id="customer-reviews" className="w-full mt-4 sm:mt-5 pt-4 sm:pt-5 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
       {/* Header Row */}
       <div className={`flex flex-col md:flex-row md:items-end justify-between gap-6 ${reviews.length === 0 ? 'mb-6 pb-2 border-b-0' : 'mb-10 pb-6 border-b border-neutral-200/80'}`}>
         <div>
