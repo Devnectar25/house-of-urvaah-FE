@@ -1272,9 +1272,6 @@ export const Account = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 self-start sm:self-auto">
-                  <span className="text-[11px] font-sans font-medium text-neutral-500 uppercase tracking-wider">
-                    ({addresses.length}/4 SAVED)
-                  </span>
                   <button
                     type="button"
                     onClick={openAddAddressModal}
