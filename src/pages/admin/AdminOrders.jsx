@@ -105,6 +105,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Pending', label: 'Pending' },
   { value: 'Confirmed', label: 'Confirmed' },
   { value: 'Processing', label: 'Processing' },
+  { value: 'Packed', label: 'Packed' },
   { value: 'Shipped', label: 'Shipped' },
   { value: 'Out for Delivery', label: 'Out for Delivery' },
   { value: 'Delivered', label: 'Delivered' },
@@ -286,7 +287,7 @@ export const AdminOrders = () => {
       setStatsError(null);
     }
     try {
-      const response = await apiClient('/api/orders/stats');
+      const response = await apiClient(`/api/orders/stats?_t=${Date.now()}`);
       const data = response?.data || response || {};
       setStats(data);
     } catch (err) {
@@ -300,7 +301,6 @@ export const AdminOrders = () => {
       }
     }
   }, []);
-
 
   useEffect(() => {
     fetchStats();
@@ -325,75 +325,6 @@ export const AdminOrders = () => {
     });
   }, []);
 
-  // Update order in state when modal saves changes
-  const handleOrderUpdatedInList = useCallback((updatedOrder) => {
-    if (!updatedOrder || !updatedOrder.id) return;
-
-    // Broadcast change so user's customer UI and other admin sessions update dynamically
-    broadcastOrderUpdate(updatedOrder);
-
-    setOrders((prevOrders) => {
-      const existingOrder = prevOrders.find((o) => o.id === updatedOrder.id);
-      if (!existingOrder) return prevOrders;
-
-      const mergedOrder = { ...existingOrder, ...updatedOrder, isPreview: false };
-
-      // Check if merged order still matches active filters
-      const matchesStatus = checkStatusMatches(mergedOrder.status, selectedStatus);
-
-      const matchesPaymentStatus = checkPaymentStatusMatches(mergedOrder.payment_status, selectedPaymentStatus, mergedOrder);
-
-      const matchesPaymentType =
-        selectedPaymentType === 'all' ||
-        (mergedOrder.payment_type || mergedOrder.payment_method || '').toLowerCase().includes(selectedPaymentType.toLowerCase());
-
-      const matchesOrderId =
-        !debouncedOrderId ||
-        (mergedOrder.order_number || mergedOrder.id || '').toLowerCase().includes(debouncedOrderId.toLowerCase());
-
-      const matchesCustomer =
-        !debouncedCustomer ||
-        (mergedOrder.user_id || '').toLowerCase().includes(debouncedCustomer.toLowerCase()) ||
-        (mergedOrder.customer_email || '').toLowerCase().includes(debouncedCustomer.toLowerCase()) ||
-        (mergedOrder.fullname || mergedOrder.customer_name || '').toLowerCase().includes(debouncedCustomer.toLowerCase());
-
-      let matchesFromDate = true;
-      if (fromDate) {
-        const fromTs = new Date(fromDate).getTime();
-        const orderTs = new Date(mergedOrder.created_at).getTime();
-        matchesFromDate = orderTs >= fromTs;
-      }
-
-      let matchesToDate = true;
-      if (toDate) {
-        const toTs = new Date(toDate).setHours(23, 59, 59, 999);
-        const orderTs = new Date(mergedOrder.created_at).getTime();
-        matchesToDate = orderTs <= toTs;
-      }
-
-      const stillMatches =
-        matchesStatus &&
-        matchesPaymentStatus &&
-        matchesPaymentType &&
-        matchesOrderId &&
-        matchesCustomer &&
-        matchesFromDate &&
-        matchesToDate;
-
-      if (!stillMatches) {
-        // Remove row from current filtered view if it no longer matches active filter criteria
-        setTotalOrders((prevTotal) => Math.max(0, prevTotal - 1));
-        return prevOrders.filter((o) => o.id !== updatedOrder.id);
-      }
-
-      // Update row in place with new status and payment status
-      return prevOrders.map((o) => (o.id === updatedOrder.id ? mergedOrder : o));
-    });
-
-    // Re-fetch stat card counts to ensure absolute accuracy across all metric cards
-    fetchStats();
-  }, [selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, fetchStats]);
-
   // Fetch Filtered Orders List (supports silent background sync without UI flicker)
   const fetchOrders = useCallback(async (silent = false) => {
     // If date range is invalid, do not send query
@@ -409,6 +340,7 @@ export const AdminOrders = () => {
       params.set('page', currentPage);
       params.set('limit', limit);
       params.set('type', 'all');
+      params.set('_t', Date.now());
 
       if (selectedStatus && selectedStatus !== 'all') {
         params.set('status', selectedStatus);
@@ -463,48 +395,42 @@ export const AdminOrders = () => {
     }
   }, [currentPage, limit, selectedStatus, selectedPaymentStatus, selectedPaymentType, debouncedOrderId, debouncedCustomer, fromDate, toDate, dateError, sortOrder]);
 
-
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Combined refresh handler for both orders and stat counts
+  const handleRefreshAll = useCallback((silent = false) => {
+    fetchOrders(silent);
+    fetchStats(silent);
+  }, [fetchOrders, fetchStats]);
+
+  // Update order in state when modal saves changes
+  const handleOrderUpdatedInList = useCallback((updatedOrder) => {
+    if (!updatedOrder || !updatedOrder.id) return;
+
+    // Broadcast change so user's customer UI and other admin sessions update dynamically
+    broadcastOrderUpdate(updatedOrder);
+
+    // Re-fetch both orders table and stat counts immediately so the list and counts update accurately
+    fetchOrders(true);
+    fetchStats(true);
+  }, [fetchOrders, fetchStats]);
 
   // Real-time synchronization listener for order updates across all tabs / devices
   useEffect(() => {
     const unsubscribe = subscribeToOrderUpdates((payload) => {
       if (!payload || (!payload.id && !payload.order_number)) return;
 
-      setOrders((prevOrders) => {
-        const idx = prevOrders.findIndex(
-          (o) =>
-            (payload.id && (o.id === payload.id || o._id === payload.id)) ||
-            (payload.order_number && (o.order_number === payload.order_number || o.orderNumber === payload.order_number))
-        );
-        if (idx !== -1) {
-          const updated = {
-            ...prevOrders[idx],
-            status: payload.status || prevOrders[idx].status,
-            payment_status: payload.payment_status || payload.paymentStatus || prevOrders[idx].payment_status,
-            cancel_reason: payload.cancel_reason || payload.cancelReason || prevOrders[idx].cancel_reason,
-            isPreview: false
-          };
-          const next = [...prevOrders];
-          next[idx] = updated;
-          return next;
-        } else if (currentPage === 1 && !isFilterActive) {
-          // New order placed: add to top and refresh table silently without reloading UI
-          fetchOrders(true);
-        }
-        return prevOrders;
-      });
-
-      // Update stat cards dynamically and silently without skeleton flicker
+      // Update both orders table and stat cards dynamically and silently without skeleton flicker
+      fetchOrders(true);
       fetchStats(true);
     });
 
     return () => unsubscribe();
-  }, [currentPage, isFilterActive, fetchOrders, fetchStats]);
+  }, [fetchOrders, fetchStats]);
 
-  // Window focus listener for silent real-time sync (NO automatic 5s/6s polling interval)
+  // Window focus listener for silent real-time sync
   useEffect(() => {
     const handleFocus = () => {
       fetchOrders(true);
@@ -517,6 +443,15 @@ export const AdminOrders = () => {
     };
   }, [fetchOrders, fetchStats]);
 
+  // Auto periodic background poll (every 8s) to ensure live real-time sync for counts & orders
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrders(true);
+      fetchStats(true);
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [fetchOrders, fetchStats]);
 
   // Toggle Date sorting between newest first and oldest first
   const handleToggleSortOrder = () => {
@@ -545,12 +480,16 @@ export const AdminOrders = () => {
     setToDate('');
     setCurrentPage(1);
     navigate('/admin/orders', { replace: true });
+    fetchStats(true);
   };
 
   // Click Stat Card to pre-filter and update URL (with click-to-toggle support)
   const handleStatCardClick = (statusValue, paymentStatusValue = null) => {
     const isCurrentlyActive =
-      (statusValue && statusValue !== 'all' && selectedStatus.toLowerCase() === statusValue.toLowerCase()) ||
+      (statusValue && statusValue !== 'all' && (
+        selectedStatus.toLowerCase() === statusValue.toLowerCase() ||
+        (statusValue.toLowerCase() === 'processing' && (selectedStatus.toLowerCase() === 'processing' || selectedStatus.toLowerCase() === 'packed'))
+      )) ||
       (paymentStatusValue && paymentStatusValue !== 'all' && selectedPaymentStatus.toLowerCase() === paymentStatusValue.toLowerCase());
 
     const targetStatus = isCurrentlyActive ? 'all' : (statusValue || 'all');
@@ -784,12 +723,12 @@ export const AdminOrders = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={fetchOrders}
-              disabled={ordersLoading}
+              onClick={() => handleRefreshAll(false)}
+              disabled={ordersLoading || statsLoading}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-neutral-200/90 text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-              title="Refresh order data"
+              title="Refresh order data & metrics"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading || statsLoading ? 'animate-spin' : ''}`} />
               <span>Refresh Orders</span>
             </button>
           </div>
@@ -831,6 +770,8 @@ export const AdminOrders = () => {
                   ? selectedStatus === 'all' && selectedPaymentStatus === 'all'
                   : card.key === 'pendingPayment'
                   ? selectedPaymentStatus.toLowerCase() === 'pending'
+                  : card.key === 'processing'
+                  ? selectedStatus.toLowerCase() === 'processing' || selectedStatus.toLowerCase() === 'packed'
                   : Boolean(
                       selectedStatus &&
                       card.statusFilter &&
@@ -1157,12 +1098,12 @@ export const AdminOrders = () => {
 
             <button
               type="button"
-              onClick={fetchOrders}
-              disabled={ordersLoading}
+              onClick={() => handleRefreshAll(false)}
+              disabled={ordersLoading || statsLoading}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-              title="Refresh order list"
+              title="Refresh order list & metrics"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading || statsLoading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
@@ -1175,7 +1116,7 @@ export const AdminOrders = () => {
             <h4 className="text-sm font-semibold text-brand-dark mb-1">Failed to Load Orders</h4>
             <p className="text-xs text-neutral-600 mb-4">{ordersError}</p>
             <button
-              onClick={fetchOrders}
+              onClick={() => handleRefreshAll(false)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-dark text-white text-xs font-semibold rounded-lg hover:bg-black transition-colors cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -1383,35 +1324,54 @@ export const AdminOrders = () => {
 
         {/* Pagination Bar */}
         {!ordersLoading && totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between bg-neutral-50/50 text-xs">
+          <div className="px-6 py-4 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-neutral-50/50 text-xs">
             <div className="text-neutral-500">
-              Showing page <span className="font-semibold text-brand-dark">{currentPage}</span> of{' '}
-              <span className="font-semibold text-brand-dark">{totalPages}</span> ({totalOrders} total orders)
+              Showing <span className="font-semibold text-brand-dark">{(currentPage - 1) * limit + 1}</span>–
+              <span className="font-semibold text-brand-dark">{Math.min(currentPage * limit, totalOrders)}</span> of{' '}
+              <span className="font-semibold text-brand-dark">{totalOrders}</span> orders (Page {currentPage} of {totalPages})
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-1.5 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed transition-colors font-semibold uppercase tracking-wider text-[11px]"
                 title="Previous Page"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Prev</span>
               </button>
 
-              <span className="px-3 py-1 bg-white border border-neutral-200 rounded-lg font-semibold text-brand-dark">
-                {currentPage}
-              </span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                  const isActive = pageNum === currentPage;
+                  return (
+                    <button
+                      key={`admin-order-page-${pageNum}`}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-brand-dark text-white shadow-xs'
+                          : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100 hover:text-black'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
 
               <button
                 type="button"
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 disabled={currentPage >= totalPages}
-                className="p-1.5 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed transition-colors font-semibold uppercase tracking-wider text-[11px]"
                 title="Next Page"
               >
-                <ChevronRight className="w-4 h-4" />
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

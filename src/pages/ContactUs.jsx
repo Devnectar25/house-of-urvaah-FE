@@ -19,6 +19,8 @@ import { SEOHead } from '../components/common/SEOHead';
 import { apiClient } from '../lib/apiClient';
 import { WomanAiIcon } from '../components/common/WomanAiIcon';
 
+let cachedContactInfo = null;
+
 // Initial baseline FAQs for instantaneous zero-wait rendering
 const INITIAL_FAQS = [
   {
@@ -169,8 +171,51 @@ export const ContactUs = () => {
     }
   };
 
+  const [contactInfo, setContactInfo] = useState(() => cachedContactInfo || {
+    concierge: {
+      section_badge: 'CLIENT SERVICES',
+      section_title: 'ATELIER CONCIERGE',
+      email: 'concierge@houseofurvaah.com',
+      phone: '+91 22 4900 8800',
+      hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
+    },
+    boutiques: {
+      section_badge: 'FLAGSHIP BOUTIQUES',
+      section_title: 'ATELIER LOCATIONS',
+      locations: [
+        {
+          id: 1,
+          name: 'MUMBAI FLAGSHIP & STYLING SALON',
+          address: 'Kala Ghoda Arts District, Colaba Causeway, Mumbai 400001',
+          phone: '+91 22 4900 8800',
+          is_active: true
+        },
+        {
+          id: 2,
+          name: 'NEW DELHI CONCIERGE & SHOWROOM',
+          address: 'Mehrauli Heritage District, Style Mile, New Delhi 110030',
+          phone: '+91 11 4800 7700',
+          is_active: true
+        }
+      ]
+    }
+  });
+
+  const fetchContactInfo = async () => {
+    try {
+      const res = await apiClient('/api/ui/contact-info');
+      if (res && res.success && res.data) {
+        cachedContactInfo = res.data;
+        setContactInfo(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch dynamic contact details:', err.message);
+    }
+  };
+
   useEffect(() => {
     fetchFAQs();
+    fetchContactInfo();
   }, []);
 
   const validateIndianMobile = (value) => {
@@ -532,10 +577,10 @@ export const ContactUs = () => {
             {/* Atelier Concierge Channels */}
             <div className="bg-neutral-50 p-8 border border-neutral-200/80 rounded-xs space-y-6">
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-800 font-semibold block">
-                CLIENT SERVICES
+                {contactInfo.concierge?.section_badge || 'CLIENT SERVICES'}
               </span>
               <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                ATELIER CONCIERGE
+                {contactInfo.concierge?.section_title || 'ATELIER CONCIERGE'}
               </h3>
 
               <div className="space-y-4 text-xs font-serif text-neutral-800 font-normal">
@@ -543,8 +588,8 @@ export const ContactUs = () => {
                   <Mail className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CONCIERGE</span>
-                    <a href="mailto:concierge@houseofurvaah.com" className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      concierge@houseofurvaah.com
+                    <a href={`mailto:${contactInfo.concierge?.email || 'concierge@houseofurvaah.com'}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
+                      {contactInfo.concierge?.email || 'concierge@houseofurvaah.com'}
                     </a>
                   </div>
                 </div>
@@ -553,8 +598,8 @@ export const ContactUs = () => {
                   <Phone className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">DIRECT HOTLINE</span>
-                    <a href="tel:+912249008800" className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      +91 22 4900 8800
+                    <a href={`tel:${(contactInfo.concierge?.phone || '+91 22 4900 8800').replace(/\s+/g, '')}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
+                      {contactInfo.concierge?.phone || '+91 22 4900 8800'}
                     </a>
                   </div>
                 </div>
@@ -564,7 +609,7 @@ export const ContactUs = () => {
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">CONCIERGE HOURS</span>
                     <span className="block text-neutral-800 font-medium mt-0.5">
-                      Monday – Saturday: 10:00 AM – 8:00 PM IST
+                      {contactInfo.concierge?.hours || 'Monday – Saturday: 10:00 AM – 8:00 PM IST'}
                     </span>
                   </div>
                 </div>
@@ -574,34 +619,28 @@ export const ContactUs = () => {
             {/* Atelier Flagship Boutiques */}
             <div className="space-y-6">
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-800 font-semibold block">
-                FLAGSHIP BOUTIQUES
+                {contactInfo.boutiques?.section_badge || 'FLAGSHIP BOUTIQUES'}
               </span>
               <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                ATELIER LOCATIONS
+                {contactInfo.boutiques?.section_title || 'ATELIER LOCATIONS'}
               </h3>
 
               <div className="space-y-6 text-xs font-serif font-normal text-neutral-800 border-l-2 border-neutral-400 pl-4">
-                {/* Mumbai */}
-                <div>
-                  <h4 className="font-semibold uppercase text-neutral-900 tracking-wider text-sm mb-1">
-                    MUMBAI FLAGSHIP & STYLING SALON
-                  </h4>
-                  <p className="leading-relaxed text-neutral-800">
-                    Kala Ghoda Arts District, Colaba Causeway, Mumbai 400001
-                  </p>
-                  <span className="text-neutral-700 font-medium block mt-1">+91 22 4900 8800</span>
-                </div>
-
-                {/* New Delhi */}
-                <div>
-                  <h4 className="font-semibold uppercase text-neutral-900 tracking-wider text-sm mb-1">
-                    NEW DELHI CONCIERGE & SHOWROOM
-                  </h4>
-                  <p className="leading-relaxed text-neutral-800">
-                    Mehrauli Heritage District, Style Mile, New Delhi 110030
-                  </p>
-                  <span className="text-neutral-700 font-medium block mt-1">+91 11 4800 7700</span>
-                </div>
+                {(contactInfo.boutiques?.locations || [])
+                  .filter((loc) => loc.is_active !== false)
+                  .map((loc) => (
+                    <div key={loc.id || loc.name}>
+                      <h4 className="font-semibold uppercase text-neutral-900 tracking-wider text-sm mb-1">
+                        {loc.name}
+                      </h4>
+                      <p className="leading-relaxed text-neutral-800">
+                        {loc.address}
+                      </p>
+                      {loc.phone && (
+                        <span className="text-neutral-700 font-medium block mt-1">{loc.phone}</span>
+                      )}
+                    </div>
+                  ))}
               </div>
             </div>
           </motion.div>

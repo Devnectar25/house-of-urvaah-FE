@@ -17,7 +17,9 @@ import {
   ChevronRight,
   Loader2,
   X,
-  Play
+  Play,
+  Send,
+  Zap
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
@@ -136,6 +138,57 @@ export const AdminStockNotifications = () => {
     }
   };
 
+  // Directly dispatch notification to user and remove from waitlist
+  const handleDirectNotify = async (sub) => {
+    if (!window.confirm(`Send back-in-stock email to ${sub.contactEmail} and remove from the waitlist?`)) {
+      return;
+    }
+    setActionLoadingId(`notify-${sub.id}`);
+    try {
+      const res = await apiClient(`/api/stock-notifications/admin/subscriptions/${sub.id}/notify`, {
+        method: 'POST'
+      });
+      if (res?.success) {
+        showToast(`Stock alert sent to ${sub.contactEmail}. User removed from waitlist.`);
+        fetchMetrics();
+        fetchSubscriptions(pagination.page);
+      } else {
+        showToast(res?.message || 'Failed to dispatch notification.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to send notification email.', 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Check all and notify anyone whose stock is available
+  const [scanningStock, setScanningStock] = useState(false);
+  const handleCheckInStockNow = async () => {
+    setScanningStock(true);
+    try {
+      const res = await apiClient('/api/stock-notifications/admin/check-in-stock', {
+        method: 'POST'
+      });
+      if (res?.success) {
+        const count = res.result?.triggered || 0;
+        showToast(
+          count > 0
+            ? `Dispatched notifications to ${count} patrons. Their waitlist entries were removed.`
+            : 'Inventory scanned: No active patrons have available stock right now.'
+        );
+        fetchMetrics();
+        fetchSubscriptions(pagination.page);
+      } else {
+        showToast(res?.message || 'Failed to scan inventory.', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error processing in-stock notifications.', 'error');
+    } finally {
+      setScanningStock(false);
+    }
+  };
+
   // Cancel subscription
   const handleCancelSubscription = async (id) => {
     if (!window.confirm('Are you sure you want to cancel this customer restock alert request?')) {
@@ -225,6 +278,15 @@ export const AdminStockNotifications = () => {
         }
         actions={
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleCheckInStockNow}
+              disabled={scanningStock}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              title="Scan all products and automatically email & remove any waitlisted patrons whose stock is available"
+            >
+              <Zap className={`w-3.5 h-3.5 ${scanningStock ? 'animate-bounce' : ''}`} />
+              <span>{scanningStock ? 'Scanning...' : 'Check & Notify In-Stock'}</span>
+            </button>
             <button
               onClick={() => setIsTestModalOpen(true)}
               className="px-3.5 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl border border-neutral-300 transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -439,14 +501,14 @@ export const AdminStockNotifications = () => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50 text-[11px] font-bold tracking-wider uppercase text-neutral-600">
-                  <th className="py-3.5 px-4">Garment / Piece</th>
-                  <th className="py-3.5 px-4">Variant</th>
-                  <th className="py-3.5 px-4">Contact</th>
-                  <th className="py-3.5 px-4">Channel</th>
-                  <th className="py-3.5 px-4">Requested On</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">Delivery Dispatch</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3 px-3.5 w-[20%]">Garment / Piece</th>
+                  <th className="py-3 px-3 w-[10%]">Variant</th>
+                  <th className="py-3 px-3 w-[18%]">Contact</th>
+                  <th className="py-3 px-2.5 w-[8%] text-center">Channel</th>
+                  <th className="py-3 px-3 w-[11%]">Requested On</th>
+                  <th className="py-3 px-3 w-[12%]">Status</th>
+                  <th className="py-3 px-3 w-[11%]">Delivery</th>
+                  <th className="py-3 px-3.5 w-[10%] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -455,21 +517,21 @@ export const AdminStockNotifications = () => {
                   return (
                     <tr key={sub.id} className="hover:bg-neutral-50/80 transition-colors">
                       {/* Product details */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 px-3.5">
+                        <div className="flex items-center gap-2.5">
                           {sub.imageUrl ? (
                             <img
                               src={sub.imageUrl}
                               alt={sub.productTitle}
-                              className="w-10 h-12 object-cover rounded-md border border-neutral-200 shrink-0"
+                              className="w-9 h-11 object-cover rounded-md border border-neutral-200 shrink-0"
                             />
                           ) : (
-                            <div className="w-10 h-12 bg-neutral-100 rounded-md flex items-center justify-center shrink-0">
+                            <div className="w-9 h-11 bg-neutral-100 rounded-md flex items-center justify-center shrink-0">
                               <Package className="w-4 h-4 text-neutral-400" />
                             </div>
                           )}
                           <div className="min-w-0">
-                            <span className="font-semibold text-neutral-900 block truncate max-w-[180px]">
+                            <span className="font-semibold text-neutral-900 block truncate max-w-[150px]" title={sub.productTitle}>
                               {sub.productTitle}
                             </span>
                             <span className="text-[10px] text-neutral-400 block">ID: #{sub.productId}</span>
@@ -478,7 +540,7 @@ export const AdminStockNotifications = () => {
                       </td>
 
                       {/* Variant */}
-                      <td className="py-3.5 px-4 font-medium text-neutral-700">
+                      <td className="py-3 px-3 font-medium text-neutral-700">
                         {sub.size ? (
                           <span className="inline-block bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded text-[11px] font-semibold">
                             Size: {sub.size}
@@ -492,11 +554,11 @@ export const AdminStockNotifications = () => {
                       </td>
 
                       {/* Contact */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3">
                         {sub.contactEmail && (
                           <div className="flex items-center gap-1.5 text-neutral-900 font-medium">
                             <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                            <span className="truncate max-w-[170px]" title={sub.contactEmail}>{sub.contactEmail}</span>
+                            <span className="truncate max-w-[160px]" title={sub.contactEmail}>{sub.contactEmail}</span>
                           </div>
                         )}
                         {sub.contactPhone && (
@@ -508,14 +570,14 @@ export const AdminStockNotifications = () => {
                       </td>
 
                       {/* Channel */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-neutral-100 text-neutral-700 border border-neutral-200">
-                          {sub.channel === 'both' ? 'Email + WA' : sub.channel}
+                      <td className="py-3 px-2.5 text-center">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-neutral-100 text-neutral-700 border border-neutral-200">
+                          {sub.channel === 'both' ? 'Email+WA' : sub.channel}
                         </span>
                       </td>
 
                       {/* Created date */}
-                      <td className="py-3.5 px-4 text-neutral-500 text-[11px]">
+                      <td className="py-3 px-3 text-neutral-500 text-[11px] whitespace-nowrap">
                         {new Date(sub.createdAt).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -524,11 +586,16 @@ export const AdminStockNotifications = () => {
                       </td>
 
                       {/* Status */}
-                      <td className="py-3.5 px-4">
-                        {sub.status === 'active' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <Clock className="w-3 h-3" />
-                            Active (Waiting)
+                      <td className="py-3 px-3">
+                        {sub.isCurrentlyInStock && sub.status === 'active' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Stock Ready ({sub.currentVariantStock || sub.stockQuantity} avail)
+                          </span>
+                        ) : sub.status === 'active' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Awaiting Restock
                           </span>
                         ) : sub.status === 'notified' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -541,14 +608,14 @@ export const AdminStockNotifications = () => {
                             Cancelled
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
                             {sub.status}
                           </span>
                         )}
                       </td>
 
                       {/* Job Status & Delivery Details */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3">
                         {sub.job ? (
                           <div>
                             <span
@@ -565,22 +632,42 @@ export const AdminStockNotifications = () => {
                               Job: {sub.job.status}
                             </span>
                             {sub.job.lastError && (
-                              <p className="text-[10px] text-rose-600 mt-1 max-w-[150px] truncate" title={sub.job.lastError}>
+                              <p className="text-[10px] text-rose-600 mt-1 max-w-[130px] truncate" title={sub.job.lastError}>
                                 {sub.job.lastError}
                               </p>
                             )}
                           </div>
                         ) : sub.notifiedAt ? (
-                          <span className="text-[11px] text-neutral-500">
-                            Notified on {new Date(sub.notifiedAt).toLocaleDateString()}
+                          <span className="text-[11px] text-neutral-500 whitespace-nowrap">
+                            Notified {new Date(sub.notifiedAt).toLocaleDateString()}
                           </span>
                         ) : (
-                          <span className="text-neutral-400 text-[11px]">Pending Restock</span>
+                          <span className="text-neutral-400 text-[11px] whitespace-nowrap">Pending Restock</span>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        {sub.status === 'active' && (
+                          <button
+                            onClick={() => handleDirectNotify(sub)}
+                            disabled={actionLoadingId === `notify-${sub.id}`}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs ${
+                              sub.isCurrentlyInStock
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : 'bg-neutral-900 hover:bg-black text-white'
+                            }`}
+                            title="Send back-in-stock email and remove from waitlist"
+                          >
+                            {actionLoadingId === `notify-${sub.id}` ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Send className="w-3 h-3" />
+                            )}
+                            <span>{sub.isCurrentlyInStock ? 'Notify & Clear' : 'Send Email & Remove'}</span>
+                          </button>
+                        )}
+
                         {sub.job?.status === 'failed' && (
                           <button
                             onClick={() => handleRetryJob(sub.job.id)}
@@ -592,6 +679,7 @@ export const AdminStockNotifications = () => {
                             <span>Retry</span>
                           </button>
                         )}
+
                         {sub.status === 'active' && (
                           <button
                             onClick={() => handleCancelSubscription(sub.id)}

@@ -356,9 +356,10 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed bottom-[30px] right-2 sm:right-4 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
+          className="fixed bottom-0 sm:bottom-0 right-0 sm:right-0 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
           style={{
-            bottom: '30px',
+            bottom: '0px',
+            right: '0px',
             boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25)',
             overscrollBehavior: 'contain',
             overscrollBehaviorY: 'contain'

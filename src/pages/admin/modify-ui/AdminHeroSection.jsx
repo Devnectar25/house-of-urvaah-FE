@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
 
 export const AdminHeroSection = () => {
   const [slides, setSlides] = useState([]);
@@ -30,6 +31,13 @@ export const AdminHeroSection = () => {
   const [editingSlide, setEditingSlide] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState(null);
+
+  // Lock background scroll when modal, delete confirmation, or preview lightbox is open
+  useModalScrollLock(Boolean(isModalOpen || deleteTargetId || previewMediaUrl), () => {
+    if (previewMediaUrl) setPreviewMediaUrl(null);
+    else if (isModalOpen) setIsModalOpen(false);
+    else if (deleteTargetId) setDeleteTargetId(null);
+  });
 
   // Form states
   const [formData, setFormData] = useState({

@@ -315,21 +315,29 @@ export const CartProvider = ({ children }) => {
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
           if (res.data.length > 0) {
-            const mappedBackendCart = res.data.map((item) => ({
-              product: {
-                id: String(item.productId || item.product_id || item.id),
-                name: item.name || item.productname || item.title || 'Product',
-                price: Number(item.price || 0),
-                originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
-                image: item.image || item.image_url || '/assets/Images/Brown01.png',
-                brand: item.brand || 'House of Urvaah',
-                category: item.category || 'CLOTHING',
-                inStock: item.inStock ?? true,
-                stockQuantity: item.stockQuantity ?? 10
-              },
-              selectedSize: item.selectedSize || 'M',
-              quantity: Number(item.quantity || 1)
-            }));
+            const mappedBackendCart = res.data.map((item) => {
+              const stock = (item.stockQuantity !== null && item.stockQuantity !== undefined)
+                ? Number(item.stockQuantity)
+                : ((item.stock_quantity !== null && item.stock_quantity !== undefined)
+                  ? Number(item.stock_quantity)
+                  : 10);
+              const clampedQty = Math.max(1, Math.min(Number(item.quantity || 1), Math.max(1, stock)));
+              return {
+                product: {
+                  id: String(item.productId || item.product_id || item.id),
+                  name: item.name || item.productname || item.title || 'Product',
+                  price: Number(item.price || 0),
+                  originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
+                  image: item.image || item.image_url || '/assets/Images/Brown01.png',
+                  brand: item.brand || 'House of Urvaah',
+                  category: item.category || 'CLOTHING',
+                  inStock: item.inStock ?? true,
+                  stockQuantity: stock
+                },
+                selectedSize: item.selectedSize || 'M',
+                quantity: clampedQty
+              };
+            });
 
             setCart(mappedBackendCart);
             localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
@@ -358,7 +366,98 @@ export const CartProvider = ({ children }) => {
       .catch((err) => {
         console.warn('Could not fetch backend cart, using cached:', err.message);
       });
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
+
+  // Live stock synchronization whenever shopping bag opens or cart changes
+  useEffect(() => {
+    if (!cart || cart.length === 0) return;
+
+    let isCancelled = false;
+
+    const syncLiveStock = async () => {
+      try {
+        let hasChanges = false;
+        const verifiedCart = await Promise.all(
+          cart.map(async (item) => {
+            const rawId = item.product?.id || item.productId || item.id;
+            const cleanId = String(rawId).replace(/\D/g, '');
+            if (!cleanId) return item;
+
+            try {
+              const res = await apiClient(`/api/products/${cleanId}`);
+              if (res && res.success && res.data) {
+                const prod = res.data;
+                const liveStock = Number(
+                  prod.stockQuantity !== undefined && prod.stockQuantity !== null
+                    ? prod.stockQuantity
+                    : (prod.stock_quantity ?? prod.quantity ?? prod.stock ?? 0)
+                );
+                const sizeStock = prod.sizeStock || prod.size_stock || item.product?.sizeStock || {};
+                const itemSize = (item.selectedSize || 'M').trim().toUpperCase();
+                let sizeMaxStock = null;
+                if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === itemSize);
+                  if (matchKey !== undefined) {
+                    sizeMaxStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+                  }
+                }
+                const effectiveStock = sizeMaxStock !== null ? sizeMaxStock : liveStock;
+                const isOutOfStock = Boolean(
+                  effectiveStock <= 0 ||
+                  liveStock <= 0 ||
+                  prod.inStock === false ||
+                  prod.instock === false ||
+                  prod.is_active === false
+                );
+
+                const currentStock = item.product?.stockQuantity;
+                const currentQty = item.quantity;
+                const clampedQty = effectiveStock > 0 ? Math.min(currentQty, effectiveStock) : currentQty;
+
+                if (currentStock !== liveStock || currentQty !== clampedQty || item.product?.inStock !== !isOutOfStock) {
+                  hasChanges = true;
+                  return {
+                    ...item,
+                    quantity: clampedQty,
+                    product: {
+                      ...item.product,
+                      stockQuantity: liveStock,
+                      stock_quantity: liveStock,
+                      sizeStock: sizeStock,
+                      size_stock: sizeStock,
+                      inStock: !isOutOfStock,
+                      instock: !isOutOfStock
+                    }
+                  };
+                }
+              }
+            } catch (err) {
+              // Ignore network error for single item check
+            }
+            return item;
+          })
+        );
+
+        if (!isCancelled && hasChanges) {
+          const isGuest = !user && !getAuthToken();
+          const userId = user?.id || getStoredUser()?.id || 'guest';
+          const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+          setCart(verifiedCart);
+          localStorage.setItem(cachedKey, JSON.stringify(verifiedCart));
+        }
+      } catch (err) {
+        console.warn('Live cart stock check error:', err);
+      }
+    };
+
+    if (isCartOpen) {
+      syncLiveStock();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isCartOpen]);
 
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -503,7 +602,19 @@ export const CartProvider = ({ children }) => {
         : (product.stock_quantity ?? product.stock ?? product.quantity ?? 0)
     );
 
+    const sizeToUse = (typeof selectedSize === 'string' && selectedSize) ? selectedSize : (product.selectedSize || 'M');
+    const sizeStock = product.sizeStock || product.size_stock || {};
+    let sizeSpecificStock = null;
+    if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+      const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
+      if (matchKey !== undefined) {
+        sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+      }
+    }
+    const effectiveStock = sizeSpecificStock !== null ? sizeSpecificStock : itemQty;
+
     const isOutOfStock = Boolean(
+      effectiveStock <= 0 ||
       itemQty <= 0 ||
       (itemQty <= 0 && (product.inStock === false || product.instock === false)) ||
       product.isOutOfStock === true ||
@@ -512,7 +623,6 @@ export const CartProvider = ({ children }) => {
     );
     if (isOutOfStock) return;
 
-    const sizeToUse = (typeof selectedSize === 'string' && selectedSize) ? selectedSize : (product.selectedSize || 'M');
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
@@ -532,12 +642,49 @@ export const CartProvider = ({ children }) => {
 
       let updated;
       if (existingIndex > -1) {
+        const existing = prevCart[existingIndex];
+        const existingSizeStock = existing.product?.sizeStock || existing.product?.size_stock || sizeStock || {};
+        let existingSizeSpecificStock = null;
+        if (existingSizeStock && typeof existingSizeStock === 'object' && Object.keys(existingSizeStock).length > 0) {
+          const matchKey = Object.keys(existingSizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
+          if (matchKey !== undefined) {
+            existingSizeSpecificStock = Math.max(0, parseInt(existingSizeStock[matchKey], 10) || 0);
+          }
+        }
+
+        const maxStock = existingSizeSpecificStock !== null
+          ? existingSizeSpecificStock
+          : Number(
+              (itemQty > 0 ? itemQty : null) ??
+              existing.product?.stockQuantity ??
+              existing.product?.stock_quantity ??
+              existing.product?.quantity ??
+              99
+            );
+
+        if (existing.quantity >= maxStock) {
+          // Max available stock already in cart!
+          return prevCart;
+        }
+
+        const qtyToAdd = options.quantity || 1;
+        const newQty = Math.min(existing.quantity + qtyToAdd, maxStock);
+
         updated = [...prevCart];
         updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + 1
+          ...existing,
+          product: {
+            ...existing.product,
+            stockQuantity: itemQty > 0 ? itemQty : existing.product?.stockQuantity,
+            sizeStock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.sizeStock,
+            size_stock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.size_stock,
+            inStock: !isOutOfStock
+          },
+          quantity: newQty
         };
       } else {
+        const maxStock = effectiveStock > 0 ? effectiveStock : 1;
+        const qtyToAdd = Math.min(options.quantity || 1, maxStock);
         updated = [
           ...prevCart,
           {
@@ -549,10 +696,14 @@ export const CartProvider = ({ children }) => {
               image: product.image || (product.gallery && product.gallery[0]) || '/assets/Images/Brown01.png',
               colors: product.colors || ['#111111'],
               brand: product.brand || 'House of Urvaah',
-              category: product.category || 'CLOTHING'
+              category: product.category || 'CLOTHING',
+              inStock: !isOutOfStock,
+              stockQuantity: itemQty,
+              sizeStock: sizeStock,
+              size_stock: sizeStock
             },
             selectedSize: sizeToUse,
-            quantity: 1
+            quantity: qtyToAdd
           }
         ];
       }
@@ -634,7 +785,29 @@ export const CartProvider = ({ children }) => {
       const updated = prevCart
         .map((item) => {
           if (String(item.product.id) === String(productId) && item.selectedSize === selectedSize) {
-            const calculated = item.quantity + delta;
+            const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
+            let sizeSpecificStock = null;
+            if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+              const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+              if (matchKey !== undefined) {
+                sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+              }
+            }
+
+            const maxStock = sizeSpecificStock !== null
+              ? sizeSpecificStock
+              : Number(
+                  item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
+                    ? item.product.stockQuantity
+                    : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
+                );
+
+            if (delta > 0 && item.quantity >= maxStock) {
+              newQty = item.quantity;
+              return item;
+            }
+
+            const calculated = Math.min(maxStock, item.quantity + delta);
             newQty = calculated;
             return calculated > 0 ? { ...item, quantity: calculated } : null;
           }

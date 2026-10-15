@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -28,7 +28,8 @@ import {
   Clock,
   PackageCheck,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
+  Star
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -273,7 +274,7 @@ export const Checkout = () => {
   });
 
   // Payment Method State
-  const [paymentMethod, setPaymentMethod] = useState('online'); // 'online' | 'cod'
+  const [paymentMethod, setPaymentMethod] = useState('upi'); // 'upi' | 'card' | 'cod'
 
   // Billing Address State
   const [billingOption, setBillingOption] = useState('same'); // 'same' | 'different'
@@ -345,8 +346,23 @@ export const Checkout = () => {
     pincode: ''
   });
   const [addressEditError, setAddressEditError] = useState('');
+  const hasAutoOpenedAddressEditRef = useRef(false);
 
-  useModalScrollLock(isEditAddressModalOpen, () => !isSavingAddress && setIsEditAddressModalOpen(false));
+  const handleCloseEditAddressModal = () => {
+    setIsEditAddressModalOpen(false);
+    hasAutoOpenedAddressEditRef.current = true;
+    if (location.state?.openAddressEdit) {
+      navigate(location.pathname + location.search, {
+        replace: true,
+        state: { ...location.state, openAddressEdit: false }
+      });
+    }
+  };
+
+  useModalScrollLock(Boolean(isEditAddressModalOpen || isEditingModalOpen), () => {
+    if (!isSavingAddress && isEditAddressModalOpen) handleCloseEditAddressModal();
+    if (isEditingModalOpen) setIsEditingModalOpen(false);
+  });
 
   // Fetch saved addresses for user (Single source of truth)
   const loadAddresses = async () => {
@@ -523,7 +539,8 @@ export const Checkout = () => {
 
   // Auto-open Address Edit modal if directed from Account or navigation state
   useEffect(() => {
-    if (location.state?.openAddressEdit && placedOrderDetails) {
+    if (location.state?.openAddressEdit && placedOrderDetails && !hasAutoOpenedAddressEditRef.current) {
+      hasAutoOpenedAddressEditRef.current = true;
       const ord = placedOrderDetails;
       const rawCreatedAt = ord.createdAt || ord.created_at || ord.createddate || ord.placedAt;
       const orderCreatedMs = rawCreatedAt ? new Date(rawCreatedAt).getTime() : Date.now();
@@ -618,7 +635,13 @@ export const Checkout = () => {
   const discountAmount = appliedCoupon
     ? Math.round((orderSubtotal * appliedCoupon.discountPercent) / 100)
     : 0;
-  const grandTotal = Math.max(0, orderSubtotal - discountAmount + shippingFee);
+  const taxableAmount = Math.max(0, orderSubtotal - discountAmount);
+  // GST Tax Rule: If order > 2500 then 18% tax, if <= 2500 then 5% tax
+  const taxRate = taxableAmount > 2500 ? 18 : 5;
+  const taxAmount = taxableAmount > 0 ? Math.round(taxableAmount * (taxRate / 100)) : 0;
+  const basePayable = taxableAmount + taxAmount + shippingFee;
+  const cardSurcharge = paymentMethod === 'card' ? Math.round(basePayable * 0.02) : 0;
+  const grandTotal = basePayable + cardSurcharge;
 
   // Apply Coupon Handler
   const handleApplyCoupon = (e) => {
@@ -707,11 +730,13 @@ export const Checkout = () => {
       estimatedDelivery: estimatedDeliveryStr,
       items: snapshotItems,
       subtotal: orderSubtotal,
+      tax: taxAmount,
+      taxRate: taxRate,
       discount: discountAmount,
       shippingFee: shippingFee,
       totalPaid: finalPaid,
       shippingAddress: selectedAddr,
-      paymentMethod: paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'UPI',
+      paymentMethod: paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : paymentMethod === 'card' ? 'Credit / Debit Card' : 'UPI',
       customerEmail: user?.email || '',
       customerPhone: selectedAddr.phone || user?.phone || '',
       status: 'Pending',
@@ -938,11 +963,14 @@ export const Checkout = () => {
         orderNumber: randomOrderNum,
         addressId: sanitizedAddressId,
         shippingAddress: (showNewAddressForm || addresses.length === 0) ? addressPayload : selectedAddr,
-        paymentMethod: paymentMethod,
-        paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Pending',
+        paymentMethod: paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : paymentMethod === 'card' ? 'Credit / Debit Card' : 'UPI',
+        paymentStatus: 'Pending',
         paymentType: paymentMethod === 'cod' ? 'COD' : paymentMethod === 'card' ? 'Card' : 'UPI',
         subtotal: orderSubtotal,
+        tax: taxAmount,
+        taxRate: taxRate,
         shipping: shippingFee,
+        cardSurcharge: cardSurcharge,
         total: grandTotal,
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         items: selectedItems.map((item) => {
@@ -1044,13 +1072,14 @@ export const Checkout = () => {
         amount: rzpOrderData?.amount || Math.round(grandTotal * 100),
         currency: rzpOrderData?.currency || 'INR',
         name: 'House of Urvaah',
-        description: paymentMethod === 'card' ? 'Credit / Debit Card Purchase' : 'UPI / QR Code Purchase',
+        description: paymentMethod === 'card' ? 'Credit / Debit Card Purchase (Incl. 2% Card Fee)' : 'UPI / QR Code Purchase',
         image: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? undefined : `${window.location.origin}/assets/Images/Brown01.png`,
         order_id: (rzpOrderData?.id && !rzpOrderData.id.startsWith('order_rzp_test_')) ? rzpOrderData.id : undefined,
         prefill: {
           name: selectedAddr.name || user?.name || '',
           email: user?.email || '',
-          contact: selectedAddr.phone || user?.phone || ''
+          contact: selectedAddr.phone || user?.phone || '',
+          method: paymentMethod === 'card' ? 'card' : undefined
         },
         theme: {
           color: '#111111'
@@ -1528,6 +1557,7 @@ export const Checkout = () => {
     };
 
     const handleOpenEditAddress = () => {
+      hasAutoOpenedAddressEditRef.current = false;
       const currentAddr = details?.shippingAddress || {};
       setAddressEditForm({
         name: currentAddr.name || details?.customerName || user?.name || '',
@@ -1625,7 +1655,7 @@ export const Checkout = () => {
             updatedAt: new Date().toISOString()
           });
 
-          setIsEditAddressModalOpen(false);
+          handleCloseEditAddressModal();
           Swal.fire({
             icon: 'success',
             title: 'Shipping Address Updated',
@@ -1841,6 +1871,12 @@ export const Checkout = () => {
                       <span>-{formatPrice(details.discount)}</span>
                     </div>
                   )}
+                  {(details.tax > 0 || details.taxRate) && (
+                    <div className="flex justify-between items-center text-neutral-600">
+                      <span className="uppercase tracking-wider">GST / Tax ({details.taxRate || (details.subtotal > 2500 ? 18 : 5)}%)</span>
+                      <span className="font-semibold text-black">+{formatPrice(details.tax || Math.round(details.subtotal * ((details.subtotal > 2500 ? 18 : 5) / 100)))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="uppercase tracking-wider">Shipping</span>
                     <span className="font-semibold text-black">
@@ -1917,18 +1953,9 @@ export const Checkout = () => {
                 </div>
 
                 {canEditAddress && (
-                  <div className="mt-3.5 flex items-center justify-between text-[11px] text-neutral-500 font-sans px-1">
-                    <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Need to update address? Allowed within 24 hours of ordering.</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleOpenEditAddress}
-                      className="text-black font-semibold underline hover:text-neutral-700 cursor-pointer text-xs ml-2 shrink-0"
-                    >
-                      Change
-                    </button>
+                  <div className="mt-3.5 flex items-center gap-1.5 text-[11px] text-neutral-500 font-sans px-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Need to update address? Allowed within 24 hours of ordering.</span>
                   </div>
                 )}
               </div>
@@ -2207,6 +2234,25 @@ export const Checkout = () => {
                     </button>
                   )}
 
+                  {/* Post-Delivery Give Feedback Button */}
+                  {!isOrderCancelled && !isCancellationRequested && isDelivered && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const items = orderDetails?.items || [];
+                        const firstItem = items[0];
+                        const prodId = firstItem?.product_id || firstItem?.productId || firstItem?.id;
+                        if (prodId) {
+                          navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                        }
+                      }}
+                      className="w-full py-3.5 px-4 border border-black text-white bg-black hover:bg-neutral-800 text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    >
+                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span>GIVE FEEDBACK</span>
+                    </button>
+                  )}
+
                   {/* Post-Delivery Replace Button */}
                   {!isOrderCancelled && !isCancellationRequested && isDelivered && !isInReplacementFlow && (
                     <button
@@ -2478,7 +2524,7 @@ export const Checkout = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => !isSavingAddress && setIsEditAddressModalOpen(false)}
+                onClick={() => !isSavingAddress && handleCloseEditAddressModal()}
                 className="fixed inset-0 bg-black/60 backdrop-blur-xs"
               />
 
@@ -2488,13 +2534,13 @@ export const Checkout = () => {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="relative z-10 w-full max-w-lg bg-white shadow-2xl p-6 sm:p-8 border border-neutral-200 max-h-[90vh] overflow-y-auto text-left"
+                className="relative z-10 w-full max-w-lg bg-white shadow-2xl p-6 sm:p-8 border border-neutral-200 max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none text-left"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Close Button */}
                 <button
                   type="button"
-                  onClick={() => setIsEditAddressModalOpen(false)}
+                  onClick={handleCloseEditAddressModal}
                   disabled={isSavingAddress}
                   className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer disabled:opacity-50"
                   aria-label="Close modal"
@@ -2644,7 +2690,7 @@ export const Checkout = () => {
                     <button
                       type="button"
                       disabled={isSavingAddress}
-                      onClick={() => setIsEditAddressModalOpen(false)}
+                      onClick={handleCloseEditAddressModal}
                       className="w-full sm:w-1/2 py-3 border border-neutral-300 text-neutral-800 text-xs font-bold tracking-[0.2em] uppercase hover:border-black transition-colors cursor-pointer text-center disabled:opacity-50"
                     >
                       CANCEL
@@ -2770,11 +2816,11 @@ export const Checkout = () => {
         {/* TWO-COLUMN CHECKOUT LAYOUT */}
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
           {/* LEFT COLUMN: Main Form Area (Contact, Shipping, Payment, Billing) */}
-          <div className="lg:col-span-7 space-y-8 font-sans">
+          <div className="lg:col-span-7 space-y-4 font-sans">
             
             {/* 1. CONTACT SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-neutral-200">
+            <section className="bg-neutral-50/70 p-5 sm:p-6 border border-neutral-200/80">
+              <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-neutral-200">
                 <h2 className="text-base sm:text-lg font-serif tracking-[0.15em] uppercase text-black font-medium flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center font-sans font-bold">
                     1
@@ -2806,8 +2852,8 @@ export const Checkout = () => {
             </section>
 
             {/* 2. SHIPPING ADDRESS SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-neutral-200">
+            <section className="bg-neutral-50/70 p-5 sm:p-6 border border-neutral-200/80">
+              <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-neutral-200">
                 <h2 className="text-base sm:text-lg font-serif tracking-[0.15em] uppercase text-black font-medium flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center font-sans font-bold">
                     2
@@ -3065,7 +3111,7 @@ export const Checkout = () => {
               )}
 
               {/* Shipping Method Row */}
-              <div className="mt-6 pt-4 border-t border-neutral-200 flex items-center justify-between text-xs bg-white p-3.5 border border-neutral-200">
+              <div className="mt-4 flex items-center justify-between text-xs bg-white p-3.5 border border-neutral-200">
                 <div className="flex items-center gap-2.5">
                   <Truck className="w-4 h-4 text-emerald-800" />
                   <div>
@@ -3084,7 +3130,7 @@ export const Checkout = () => {
             </section>
 
             {/* 3. PAYMENT SECTION */}
-            <section className="bg-neutral-50/70 p-6 sm:p-8 border border-neutral-200/80">
+            <section className="bg-neutral-50/70 p-5 sm:p-6 border border-neutral-200/80">
               <div className="mb-4 pb-3 border-b border-neutral-200">
                 <h2 className="text-base sm:text-lg font-serif tracking-[0.15em] uppercase text-black font-medium flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-brand-dark text-white text-xs flex items-center justify-center font-sans font-bold">
@@ -3098,11 +3144,11 @@ export const Checkout = () => {
               </div>
 
               <div className="space-y-3 font-sans text-xs">
-                {/* Radio Option 1: Consolidated Payment Gateway (UPI, Cards, Wallets, Netbanking & More) */}
+                {/* Option 1: UPI & Netbanking */}
                 <label
-                  onClick={() => setPaymentMethod('online')}
+                  onClick={() => setPaymentMethod('upi')}
                   className={`block p-4 bg-white border cursor-pointer transition-all ${
-                    paymentMethod === 'online'
+                    paymentMethod === 'upi'
                       ? 'border-brand-dark ring-2 ring-brand-dark/20 shadow-xs'
                       : 'border-neutral-200 hover:border-neutral-300'
                   }`}
@@ -3112,21 +3158,65 @@ export const Checkout = () => {
                       <input
                         type="radio"
                         name="paymentMethod"
-                        checked={paymentMethod === 'online'}
-                        onChange={() => setPaymentMethod('online')}
-                        className="mt-0.5 accent-black"
+                        checked={paymentMethod === 'upi'}
+                        onChange={() => setPaymentMethod('upi')}
+                        className="mt-0.5 accent-black cursor-pointer"
                       />
                       <div>
-                        <span className="font-bold text-neutral-900 text-sm tracking-wide block uppercase">
-                          UPI, CARDS, WALLETS, NETBANKING & MORE
-                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-neutral-900 text-sm tracking-wide uppercase">
+                            UPI &amp; NETBANKING
+                          </span>
+                          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            0% Extra Charge
+                          </span>
+                        </div>
                         <p className="text-neutral-500 text-[11px] mt-0.5">
-                          Pay securely using GPay, PhonePe, Paytm, Credit/Debit Cards, or Netbanking.
+                          Pay instantly using GPay, PhonePe, Paytm, BHIM UPI, or Netbanking. Zero extra surcharge.
                         </p>
                         <div className="flex items-center gap-2 mt-2.5">
                           <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
                             <UpiLogo className="h-3.5 w-auto" />
                           </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Smartphone className="w-5 h-5 text-neutral-700 flex-shrink-0" />
+                  </div>
+                </label>
+
+                {/* Option 2: Credit / Debit Cards (+2% Extra Charge) */}
+                <label
+                  onClick={() => setPaymentMethod('card')}
+                  className={`block p-4 bg-white border cursor-pointer transition-all ${
+                    paymentMethod === 'card'
+                      ? 'border-brand-dark ring-2 ring-brand-dark/20 shadow-xs'
+                      : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={paymentMethod === 'card'}
+                        onChange={() => setPaymentMethod('card')}
+                        className="mt-0.5 accent-black cursor-pointer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-neutral-900 text-sm tracking-wide uppercase">
+                            CREDIT / DEBIT CARDS
+                          </span>
+                          <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            +2% Extra Charge (+{formatPrice(Math.round(basePayable * 0.02))})
+                          </span>
+                        </div>
+                        <p className="text-neutral-500 text-[11px] mt-0.5">
+                          Pay securely using Visa, Mastercard, RuPay, or American Express. A 2% processing fee is applied.
+                        </p>
+                        <div className="flex items-center gap-2 mt-2.5">
                           <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
                             <VisaLogo className="h-3 w-auto" />
                           </div>
@@ -3144,7 +3234,7 @@ export const Checkout = () => {
                   </div>
                 </label>
 
-                {/* Radio Option 2: Cash on Delivery */}
+                {/* Option 3: Cash on Delivery */}
                 <label
                   onClick={() => setPaymentMethod('cod')}
                   className={`block p-4 bg-white border cursor-pointer transition-all ${
@@ -3160,7 +3250,7 @@ export const Checkout = () => {
                         name="paymentMethod"
                         checked={paymentMethod === 'cod'}
                         onChange={() => setPaymentMethod('cod')}
-                        className="mt-0.5 accent-black"
+                        className="mt-0.5 accent-black cursor-pointer"
                       />
                       <div>
                         <span className="font-bold text-neutral-900 text-sm tracking-wide block uppercase">
@@ -3241,7 +3331,7 @@ export const Checkout = () => {
 
               {/* 1. ACTIVE ITEMS IN THIS ORDER */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3.5">
                   <span className="text-[10px] font-sans font-bold uppercase tracking-[0.18em] text-neutral-800 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
                     <span>SELECTED FOR THIS ORDER ({selectedItems.length})</span>
@@ -3262,12 +3352,12 @@ export const Checkout = () => {
                   </div>
                 ) : (
                   <div
-                    className="divide-y divide-neutral-200/80 max-h-[300px] overflow-y-auto no-scrollbar scrollbar-none"
+                    className="divide-y divide-neutral-200/80 max-h-[300px] overflow-y-auto no-scrollbar scrollbar-none pt-1"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                   >
                     {selectedItems.map((item, idx) => (
-                      <div key={`selected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-1 last:pb-1 flex gap-3.5 items-center">
-                        <div className="relative flex-shrink-0">
+                      <div key={`selected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-2 last:pb-1 flex gap-3.5 items-center">
+                        <div className="relative flex-shrink-0 pt-1 pr-1">
                           <img
                             src={getSupabaseMediaUrl(item.product.image)}
                             alt={item.product.name}
@@ -3277,7 +3367,7 @@ export const Checkout = () => {
                               e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
                             }}
                           />
-                          <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums">
+                          <span className="absolute top-0 right-0 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums shadow-xs">
                             {item.quantity}
                           </span>
                         </div>
@@ -3293,18 +3383,6 @@ export const Checkout = () => {
                             <span className="text-xs font-bold text-neutral-900">
                               {formatPrice(item.product.price * item.quantity)}
                             </span>
-
-                            {/* Move to other bag items */}
-                            {cart.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleExcludeItemFromOrder(item)}
-                                className="text-[10px] font-sans text-neutral-500 hover:text-red-700 tracking-wider uppercase underline underline-offset-2 transition-colors cursor-pointer"
-                                title="Keep in bag for later"
-                              >
-                                Keep in Bag
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -3433,14 +3511,37 @@ export const Checkout = () => {
                   </span>
                 </div>
 
-                {/* {appliedCoupon && (
+                {appliedCoupon && discountAmount > 0 && (
                   <div className="flex justify-between items-center text-emerald-800 font-semibold">
                     <span className="uppercase tracking-wider">
                       Discount ({appliedCoupon.code})
                     </span>
                     <span className="font-sans font-medium tabular-nums">-{formatPrice(discountAmount)}</span>
                   </div>
-                )} */}
+                )}
+
+                {/* Tax / GST Line Item */}
+                <div className="flex justify-between items-center text-neutral-600">
+                  <span className="uppercase tracking-wider">
+                    GST / Tax ({taxRate}%)
+                  </span>
+                  <span className="font-semibold text-neutral-900 font-sans tabular-nums">
+                    +{formatPrice(taxAmount)}
+                  </span>
+                </div>
+
+                {/* Card Surcharge Line Item (if card selected) */}
+                {paymentMethod === 'card' && (
+                  <div className="flex justify-between items-center text-amber-900 bg-amber-50/80 px-2.5 py-2 rounded-xs border border-amber-300/80 text-xs">
+                    <span className="uppercase tracking-wider text-[11px] font-semibold flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                      Card Processing Surcharge (2%)
+                    </span>
+                    <span className="font-sans font-bold tabular-nums">
+                      +{formatPrice(cardSurcharge)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">Shipping</span>
@@ -3454,7 +3555,7 @@ export const Checkout = () => {
                   <span className="font-serif tracking-wider">{formatPrice(grandTotal)}</span>
                 </div>
                 <p className="text-[10px] text-neutral-400 text-right uppercase tracking-wider">
-                  Includes all applicable GST & Luxury taxes
+                  Includes {taxRate}% GST ({formatPrice(taxAmount)}) & Luxury taxes
                 </p>
               </div>
 
@@ -3487,7 +3588,7 @@ export const Checkout = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white max-w-lg w-full p-6 sm:p-8 border border-neutral-200 shadow-xl relative"
+              className="bg-white max-w-lg w-full p-6 sm:p-8 border border-neutral-200 shadow-xl relative max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none"
             >
               <button
                 type="button"

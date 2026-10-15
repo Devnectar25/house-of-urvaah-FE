@@ -7,7 +7,8 @@ import {
   Loader2,
   AlertCircle,
   Image as ImageIcon,
-  CheckCircle2
+  CheckCircle2,
+  Layers
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
@@ -54,6 +55,7 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     discountPercent: '',
     price: '',
     stockQuantity: 0,
+    sizeStock: {},
     active: true,
     promoted: false,
     is_recommended: true,
@@ -180,7 +182,17 @@ const DEFAULT_CATEGORIES = [
       return;
     }
 
-    setFormData(prev => ({ ...prev, sizes: [...prev.sizes, normalized] }));
+    setFormData(prev => {
+      const nextSizes = [...prev.sizes, normalized];
+      const nextSizeStock = { ...(prev.sizeStock || {}), [normalized]: 0 };
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+      };
+    });
     setSizeInput('');
     setSizeError(null);
   };
@@ -190,15 +202,33 @@ const DEFAULT_CATEGORIES = [
     if (formData.sizes.includes(sz)) {
       handleRemoveSize(sz);
     } else {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, sz] }));
+      setFormData(prev => {
+        const nextSizes = [...prev.sizes, sz];
+        const nextSizeStock = { ...(prev.sizeStock || {}), [sz]: 0 };
+        const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+        return {
+          ...prev,
+          sizes: nextSizes,
+          sizeStock: nextSizeStock,
+          stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+        };
+      });
     }
   };
 
   const handleRemoveSize = (sizeToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      sizes: prev.sizes.filter(s => s !== sizeToRemove)
-    }));
+    setFormData(prev => {
+      const nextSizes = prev.sizes.filter(s => s !== sizeToRemove);
+      const nextSizeStock = { ...(prev.sizeStock || {}) };
+      delete nextSizeStock[sizeToRemove];
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal
+      };
+    });
     setSizeError(null);
   };
 
@@ -492,6 +522,8 @@ const DEFAULT_CATEGORIES = [
         stockQuantity: Number(formData.stockQuantity) || 0,
         stock_quantity: Number(formData.stockQuantity) || 0,
         quantity: Number(formData.stockQuantity) || 0,
+        sizeStock: formData.sizeStock || {},
+        size_stock: formData.sizeStock || {},
         instock: Number(formData.stockQuantity) > 0,
         active: formData.active,
         is_active: formData.active,
@@ -969,6 +1001,80 @@ const DEFAULT_CATEGORIES = [
                 <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{sizeError}</span>
+                </div>
+              )}
+
+              {/* 7b. Size-Wise Inventory & Stock Management */}
+              {formData.sizes.length > 0 && (
+                <div className="mt-3 p-4 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2.5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-neutral-700" />
+                        <h5 className="text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin">
+                          Size-Wise Inventory & Stock
+                        </h5>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">
+                        Set available stock per size. Sizes with 0 units will automatically show as <span className="font-semibold text-rose-600">Out of Stock</span> on the storefront.
+                      </p>
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-800 self-start sm:self-auto">
+                      <span className="text-[10px] text-neutral-500 uppercase font-semibold">Total:</span>
+                      <span>{formData.stockQuantity} units</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {formData.sizes.map((sz) => {
+                      const qty = formData.sizeStock?.[sz] !== undefined ? formData.sizeStock[sz] : 0;
+                      const isOutOfStock = qty <= 0;
+
+                      return (
+                        <div
+                          key={sz}
+                          className={`p-2.5 rounded-lg border transition-all ${
+                            isOutOfStock
+                              ? 'bg-rose-50/50 border-rose-200'
+                              : 'bg-neutral-50/70 border-neutral-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-neutral-900">Size {sz}</span>
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isOutOfStock
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isOutOfStock ? '0 (Out)' : `${qty} in stock`}
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            min="0"
+                            value={qty}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              const nextSizeStock = { ...(formData.sizeStock || {}), [sz]: val };
+                              const newTotal = Object.values(nextSizeStock).reduce(
+                                (acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0),
+                                0
+                              );
+                              setFormData((prev) => ({
+                                ...prev,
+                                sizeStock: nextSizeStock,
+                                stockQuantity: newTotal
+                              }));
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded text-xs font-bold text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black"
+                            placeholder="Units"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

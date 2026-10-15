@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Settings,
-  Mail,
-  User,
   CheckCircle2,
-  AlertCircle,
   Save,
   RefreshCw,
-  Sliders
+  Sliders,
+  Building2,
+  ExternalLink
 } from 'lucide-react';
-import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 export const AdminSettings = () => {
-  const currentUser = getStoredUser();
 
   const [storeName, setStoreName] = useState('House of Urvaah');
   const [supportEmail, setSupportEmail] = useState('support@houseofurvaah.com');
@@ -58,10 +55,33 @@ export const AdminSettings = () => {
         subtitle="Active admin account privileges and global store parameters."
       />
 
-      {/* Admin Account & Store Settings Form */}
-      <form onSubmit={handleSaveSettings} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Quick Link to Boutiques & Concierge */}
+      <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Client Services & Store Locations</span>
+          </span>
+          <h3 className="text-base font-serif font-bold tracking-wide uppercase">
+            Boutiques & Atelier Concierge Settings
+          </h3>
+          <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
+            Dynamically update the Atelier Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
+          </p>
+        </div>
+        <Link
+          to="/admin/modify-ui/boutiques-concierge"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors shrink-0 shadow-sm"
+        >
+          <span>Manage Boutiques & Concierge</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+
+      {/* Admin Store Settings Form */}
+      <form onSubmit={handleSaveSettings} className="max-w-2xl">
         {/* Store Parameters */}
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-6 shadow-2xs space-y-4">
           <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider border-b border-neutral-100 pb-3 flex items-center gap-2">
             <Sliders className="w-4 h-4 text-neutral-500" />
             <span>Storefront Settings</span>
@@ -134,39 +154,6 @@ export const AdminSettings = () => {
                 }`}
               />
             </button>
-          </div>
-        </div>
-
-        {/* Administrator Profile Details */}
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider border-b border-neutral-100 pb-3 flex items-center gap-2">
-              <User className="w-4 h-4 text-neutral-500" />
-              <span>Current Session Account</span>
-            </h3>
-
-            <div className="p-4 bg-neutral-50 border border-neutral-200/70 rounded-xl space-y-3">
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Administrator Name</span>
-                <span className="text-sm font-bold text-brand-dark font-admin">
-                  {currentUser?.name || currentUser?.username || 'Super Admin'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Admin Email / Username</span>
-                <span className="text-xs font-medium text-neutral-700 font-mono">
-                  {currentUser?.email || currentUser?.username || 'admin@houseofurvaah.com'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Assigned Role</span>
-                <span className="inline-block mt-0.5 px-2.5 py-0.5 bg-brand-dark text-white text-[10px] font-bold rounded uppercase tracking-wider font-admin">
-                  {currentUser?.role || 'Super Admin'}
-                </span>
-              </div>
-            </div>
           </div>
 
           <div className="pt-4 border-t border-neutral-100 flex items-center justify-end">

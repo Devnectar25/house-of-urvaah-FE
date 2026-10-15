@@ -162,9 +162,13 @@ export async function apiClient(endpoint, options = {}) {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${cleanEndpoint}`;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {}),
   };
+
+  if (options.body instanceof FormData && headers['Content-Type']) {
+    delete headers['Content-Type'];
+  }
 
   if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;

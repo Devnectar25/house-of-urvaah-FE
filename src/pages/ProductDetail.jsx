@@ -162,7 +162,7 @@ const formatAdditionalInfoRows = (product) => {
 export const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist, setIsCartOpen, openAuthModal, user } = useCart();
+  const { cart, addToCart, toggleWishlist, isInWishlist, setIsCartOpen, openAuthModal, user } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1056,16 +1056,23 @@ export const ProductDetail = () => {
                 <span className="text-2xl sm:text-3xl font-normal tracking-wider text-brand-dark font-sans">
                   {formatPrice(product.price)}
                 </span>
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <>
-                    <span className="text-sm sm:text-base text-neutral-400 line-through font-sans">
-                      {formatPrice(product.originalPrice)}
-                    </span>
-                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
-                      {product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-                    </span>
-                  </>
-                )}
+                {(() => {
+                  const pNum = parseFloat(String(product.price || '').replace(/[^0-9.]/g, ''));
+                  const opNum = parseFloat(String(product.originalPrice || '').replace(/[^0-9.]/g, ''));
+                  if (!isNaN(pNum) && !isNaN(opNum) && opNum > pNum) {
+                    return (
+                      <>
+                        <span className="text-sm sm:text-base text-neutral-400 line-through font-sans">
+                          {formatPrice(product.originalPrice)}
+                        </span>
+                        <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
+                          {product.discount || Math.round(((opNum - pNum) / opNum) * 100)}% OFF
+                        </span>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <span className="text-xs text-neutral-400 font-normal tracking-wide block font-sans mt-1">
                 Inclusive of All Taxes
@@ -1076,25 +1083,55 @@ export const ProductDetail = () => {
 
             {/* 5 & 6. SIZE SECTION & SIZE CHART */}
             <div className="space-y-2">
-              <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block font-sans">
-                SIZE: <span className="font-semibold text-black">{selectedSize}</span>
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block font-sans">
+                  SIZE: <span className="font-semibold text-black">{selectedSize}</span>
+                </span>
+                {(() => {
+                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+                  const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
+                  if (sizeQty !== null) {
+                    if (sizeQty <= 0) {
+                      return <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wide">Out of Stock in {selectedSize}</span>;
+                    } else if (sizeQty <= 3) {
+                      return <span className="text-[11px] font-semibold text-amber-700">Only {sizeQty} left in {selectedSize}</span>;
+                    }
+                  }
+                  return null;
+                })()}
+              </div>
 
               {/* Selectable Size Boxes */}
               <div className="flex flex-wrap gap-2 font-sans">
-                {availableSizes.map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setSelectedSize(sz)}
-                    className={`w-11 h-11 sm:w-12 sm:h-12 border flex items-center justify-center text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all cursor-pointer ${
-                      selectedSize === sz
-                        ? 'bg-black text-white border-black shadow-sm scale-105'
-                        : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
+                {availableSizes.map((sz) => {
+                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sz).trim().toUpperCase());
+                  const isSizeOut = matchKey !== undefined && (parseInt(sizeStock[matchKey], 10) || 0) <= 0;
+                  const isSelected = selectedSize === sz;
+
+                  return (
+                    <button
+                      key={sz}
+                      onClick={() => setSelectedSize(sz)}
+                      className={`relative w-11 h-11 sm:w-12 sm:h-12 border flex items-center justify-center text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all cursor-pointer overflow-hidden ${
+                        isSelected
+                          ? isSizeOut
+                            ? 'bg-neutral-800 text-neutral-300 border-neutral-900 shadow-sm scale-105'
+                            : 'bg-black text-white border-black shadow-sm scale-105'
+                          : isSizeOut
+                            ? 'bg-neutral-100 text-neutral-400 border-neutral-200 hover:border-neutral-400'
+                            : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
+                      }`}
+                      title={isSizeOut ? `Size ${sz} (Out of Stock)` : `Size ${sz}`}
+                    >
+                      <span className={isSizeOut ? 'line-through opacity-70' : ''}>{sz}</span>
+                      {isSizeOut && (
+                        <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-bl-sm" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Size Chart Button (Positioned directly below size buttons) */}
@@ -1110,89 +1147,124 @@ export const ProductDetail = () => {
             </div>
 
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
-            {(Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0) <= 0) || (product.inStock === false && Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0) <= 0) ? (
-              <div className="flex items-center gap-2.5 pt-1">
-                {hasSubscribedStock ? (
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
-                    title="Alert registered — you will be notified when this item is back in stock"
-                  >
-                    <span>OUT OF STOCK</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsStockModalOpen(true)}
-                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
-                  >
-                    <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
-                    <span>NOTIFY ME WHEN AVAILABLE</span>
-                  </button>
-                )}
+            {(() => {
+              const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
+              const sizeStock = product.sizeStock || product.size_stock || {};
+              const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+              const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
+              const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
 
-                {/* Wishlist Heart Icon Button */}
-                <button
-                  onClick={() => toggleWishlist(product.id)}
-                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                    isWishlisted
-                      ? 'border-red-600 bg-red-50 text-red-600'
-                      : 'border-neutral-300 text-brand-dark hover:border-black'
-                  }`}
-                  aria-label="Wishlist toggle"
-                  title="Save to Wishlist"
-                >
-                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
-                </button>
+              if (isSelectedSizeOut) {
+                return (
+                  <div className="flex items-center gap-2.5 pt-1">
+                    {hasSubscribedStock ? (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
+                        title="Alert registered — you will be notified when this size is back in stock"
+                      >
+                        <span>OUT OF STOCK ({selectedSize})</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsStockModalOpen(true)}
+                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
+                      >
+                        <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                        <span>NOTIFY ME FOR SIZE {selectedSize}</span>
+                      </button>
+                    )}
 
-                {/* Share Icon Button */}
-                <button
-                  onClick={handleOpenShare}
-                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
-                  aria-label="Share product"
-                  title="Share product with friends"
-                >
-                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 sm:gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="flex-1 h-11 sm:h-12.5 px-4 sm:px-6 text-xs sm:text-sm font-bold tracking-[0.14em] uppercase transition-all shadow-sm flex items-center justify-center gap-2 font-sans cursor-pointer bg-neutral-950 text-white hover:bg-neutral-800"
-                >
-                  <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
-                  <span className="truncate">{isAdded ? 'ADDED ✓' : 'ADD TO BAG'}</span>
-                </button>
+                    {/* Wishlist Heart Icon Button */}
+                    <button
+                      onClick={() => toggleWishlist(product.id)}
+                      className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isWishlisted
+                          ? 'border-red-600 bg-red-50 text-red-600'
+                          : 'border-neutral-300 text-brand-dark hover:border-black'
+                      }`}
+                      aria-label="Wishlist toggle"
+                      title="Save to Wishlist"
+                    >
+                      <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                    </button>
 
-                {/* Wishlist Heart Icon Button */}
-                <button
-                  onClick={() => toggleWishlist(product.id)}
-                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                    isWishlisted
-                      ? 'border-red-600 bg-red-50 text-red-600'
-                      : 'border-neutral-300 text-brand-dark hover:border-black'
-                  }`}
-                  aria-label="Wishlist toggle"
-                  title="Save to Wishlist"
-                >
-                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
-                </button>
+                    {/* Share Icon Button */}
+                    <button
+                      onClick={handleOpenShare}
+                      className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                      aria-label="Share product"
+                      title="Share product with friends"
+                    >
+                      <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                    </button>
+                  </div>
+                );
+              }
 
-                {/* Share Icon Button */}
-                <button
-                  onClick={handleOpenShare}
-                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
-                  aria-label="Share product"
-                  title="Share product with friends"
-                >
-                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-                </button>
-              </div>
-            )}
+              const availableStock = sizeQty !== null ? sizeQty : (totalStock > 0 ? totalStock : 99);
+              const cartItem = (cart || []).find(
+                (it) => String(it.product?.id) === String(product.id) && String(it.selectedSize).trim().toUpperCase() === String(selectedSize).trim().toUpperCase()
+              );
+              const isMaxStockInCart = availableStock > 0 && (cartItem?.quantity || 0) >= availableStock;
+
+              return (
+                <div>
+                  <div className="flex items-center gap-2 sm:gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={isMaxStockInCart ? () => setIsCartOpen(true) : handleAddToCart}
+                      disabled={isMaxStockInCart}
+                      className={`flex-1 h-11 sm:h-12.5 px-4 sm:px-6 text-xs sm:text-sm font-bold tracking-[0.14em] uppercase transition-all shadow-sm flex items-center justify-center gap-2 font-sans ${
+                        isMaxStockInCart
+                          ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed border border-neutral-300'
+                          : 'cursor-pointer bg-neutral-950 text-white hover:bg-neutral-800'
+                      }`}
+                      title={isMaxStockInCart ? `All available stock (${availableStock} units) in size ${selectedSize} is already in your bag` : undefined}
+                    >
+                      <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
+                      <span className="truncate">
+                        {isAdded ? 'ADDED ✓' : isMaxStockInCart ? `MAX LIMIT IN BAG (${availableStock})` : 'ADD TO BAG'}
+                      </span>
+                    </button>
+
+                    {/* Wishlist Heart Icon Button */}
+                    <button
+                      onClick={() => toggleWishlist(product.id)}
+                      className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isWishlisted
+                          ? 'border-red-600 bg-red-50 text-red-600'
+                          : 'border-neutral-300 text-brand-dark hover:border-black'
+                      }`}
+                      aria-label="Wishlist toggle"
+                      title="Save to Wishlist"
+                    >
+                      <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                    </button>
+
+                    {/* Share Icon Button */}
+                    <button
+                      onClick={handleOpenShare}
+                      className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                      aria-label="Share product"
+                      title="Share product with friends"
+                    >
+                      <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                    </button>
+                  </div>
+
+                  {availableStock > 0 && availableStock <= 5 && (
+                    <p className="text-xs text-amber-700 font-medium tracking-wide mt-2 flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      Only {availableStock} unit{availableStock > 1 ? 's' : ''} left in size {selectedSize} - order soon
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ACCORDION SECTIONS */}
             <div className="pt-3 border-t border-neutral-200 space-y-1">
@@ -1307,19 +1379,6 @@ export const ProductDetail = () => {
                     className="mt-2 text-xs sm:text-sm pr-2"
                   />
                 )}
-
-              </div>
-
-              {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (After Size Details & Additional Information) */}
-              <div className="pt-3 pb-2">
-                <DeliveryReminderWidget
-                  pincode={pincode}
-                  setPincode={setPincode}
-                  handleCheckPincode={handleCheckPincode}
-                  checkingPincode={checkingPincode}
-                  pincodeResult={pincodeResult}
-                  setPincodeResult={setPincodeResult}
-                />
               </div>
 
               {/* Product Details (Dynamic Bullet Points) */}
@@ -1401,6 +1460,18 @@ export const ProductDetail = () => {
                   )}
                 </div>
               )}
+
+              {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (Positioned at the end of all product information) */}
+              <div className="pt-3.5 pb-2">
+                <DeliveryReminderWidget
+                  pincode={pincode}
+                  setPincode={setPincode}
+                  handleCheckPincode={handleCheckPincode}
+                  checkingPincode={checkingPincode}
+                  pincodeResult={pincodeResult}
+                  setPincodeResult={setPincodeResult}
+                />
+              </div>
             </div>
           </div>
         </div>

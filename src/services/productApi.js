@@ -19,6 +19,9 @@ export const productApi = {
     const queryString = query.toString();
     const endpoint = `/api/products${queryString ? `?${queryString}` : ''}`;
     const res = await apiFetch(endpoint);
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.data)) return res.data.data;
+    if (Array.isArray(res)) return res;
     return res?.data || res || [];
   },
 
