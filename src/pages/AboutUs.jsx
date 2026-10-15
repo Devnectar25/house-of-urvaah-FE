@@ -11,7 +11,7 @@ export const AboutUs = () => {
   }, []);
 
   return (
-    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-28 sm:pt-32 md:pt-36 pb-12 md:pb-16 overflow-x-hidden select-none">
+    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-28 sm:pt-32 md:pt-36 pb-0 overflow-x-hidden select-none">
       <SEOHead
         title="About Us | House of Urvaah — Contemporary Women's Fashion"
         description="Learn about House of Urvaah: our passion for refined editorial fashion, timeless craftsmanship, and our mission to empower women with elevated wardrobes."
@@ -61,15 +61,7 @@ export const AboutUs = () => {
                 OUR STORY
               </h2>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light mb-4">
-                Founded with a passion for refined, editorial fashion,{' '}
-                <span
-                  className="font-script lowercase font-normal text-[1.15em] mx-1 inline-block"
-                  style={{ fontFamily: "'Parfumerie Script', cursive" }}
-                >
-                  house of
-                </span>{' '}
-                <span className="font-serif uppercase tracking-widest font-semibold">URVAAH</span>{' '}
-                brings together the artistry of thoughtful design with modern craftsmanship. We believe that true style lies in the balance of fluid silhouettes, fine fabrics, and understated detail.
+                Founded with a passion for refined, editorial fashion, House of Urvaah brings together the artistry of thoughtful design with modern craftsmanship. We believe that true style lies in the balance of fluid silhouettes, fine fabrics, and understated detail.
               </p>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light">
                 Our journey began with a simple mission: to make elevated, wardrobe-defining pieces accessible to every woman who seeks confidence through what she wears. Today, we serve style-conscious customers who trust us for genuine quality, considered design, and pieces that transcend passing trends.
@@ -126,7 +118,7 @@ export const AboutUs = () => {
       </section>
 
       {/* 3. THREE-PILLAR GRID (BRAND VALUES) */}
-      <section className="w-full bg-[#F5F5F0] py-10 md:py-14 border-y border-neutral-200/80 mb-10 md:mb-14 overflow-hidden">
+      <section className="w-full bg-[#F5F5F0] py-10 md:py-14 border-t border-neutral-200/80 mb-0 overflow-hidden">
         <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
           <div className="text-center mb-8 md:mb-10">
             <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-2 block">
@@ -198,37 +190,6 @@ export const AboutUs = () => {
         </div>
       </section>
 
-      {/* 4. ATELIER SIGN-OFF SECTION */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 text-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="flex flex-col items-center"
-        >
-          {/* Closing Quote */}
-          <blockquote className="text-base sm:text-xl md:text-2xl font-serif font-light text-neutral-800 leading-relaxed italic mb-5 max-w-2xl">
-            "Simplicity is not the absence of clutter, but the mastery of proportion, poise, and purpose."
-          </blockquote>
-
-          {/* Founder / Atelier Signature Lockup */}
-          <div className="text-2xl sm:text-3xl text-[#111111] my-2">
-            <span
-              className="font-script lowercase text-2xl sm:text-3xl mr-2 inline-block font-['Parfumerie_Script']"
-              style={{ fontFamily: "'Parfumerie Script', cursive" }}
-            >
-              house of
-            </span>
-            <span className="font-serif uppercase tracking-widest">URVAAH</span>
-          </div>
-
-          {/* Atelier & Design Studio Eyebrow */}
-          <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mt-2 block">
-            ATELIER & DESIGN STUDIO
-          </span>
-        </motion.div>
-      </section>
     </div>
   );
 };
