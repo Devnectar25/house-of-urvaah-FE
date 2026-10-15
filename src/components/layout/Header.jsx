@@ -186,7 +186,15 @@ export const Header = () => {
 
           {/* Column 2 (Center): house of URVAAH Logo Image */}
           <div className="flex items-center justify-center">
-            <Link to="/" aria-label="House of Urvaah Home" data-allow-guest="true" className="inline-flex items-center justify-center">
+            <Link
+              to="/"
+              aria-label="House of Urvaah Home"
+              data-allow-guest="true"
+              onClick={() => {
+                window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+              }}
+              className="inline-flex items-center justify-center"
+            >
               <Logo className="h-8 sm:h-12 md:h-16 lg:h-20" />
             </Link>
           </div>

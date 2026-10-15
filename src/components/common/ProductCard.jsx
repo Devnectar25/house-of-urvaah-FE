@@ -292,7 +292,11 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
             {/* Size options buttons */}
             <div className="flex flex-wrap items-center gap-1.5 justify-center">
               {availableSizes.map((sz) => {
+                const sizeStock = product.sizeStock || product.size_stock || {};
+                const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sz).trim().toUpperCase());
+                const isSizeOut = matchK !== undefined && (parseInt(sizeStock[matchK], 10) || 0) <= 0;
                 const isSelected = selectedSize === sz;
+
                 return (
                   <button
                     key={sz}
@@ -301,43 +305,73 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
                       e.stopPropagation();
                       setSelectedSize(sz);
                     }}
-                    className={`flex-1 min-w-[32px] max-w-[58px] h-8 sm:h-9 border text-[10px] sm:text-[11px] font-semibold tracking-wider transition-all duration-200 flex items-center justify-center cursor-pointer shadow-2xs ${
+                    className={`relative flex-1 min-w-[32px] max-w-[58px] h-8 sm:h-9 border text-[10px] sm:text-[11px] font-semibold tracking-wider transition-all duration-200 flex items-center justify-center cursor-pointer shadow-2xs overflow-hidden ${
                       isSelected
-                        ? 'bg-black text-white border-black'
-                        : 'bg-white text-brand-dark border-neutral-300 hover:border-black hover:bg-neutral-50'
+                        ? isSizeOut
+                          ? 'bg-neutral-800 text-neutral-300 border-neutral-900'
+                          : 'bg-black text-white border-black'
+                        : isSizeOut
+                          ? 'bg-neutral-100 text-neutral-400 border-neutral-200 hover:border-neutral-400'
+                          : 'bg-white text-brand-dark border-neutral-300 hover:border-black hover:bg-neutral-50'
                     }`}
-                    title={`Select size ${sz}`}
+                    title={isSizeOut ? `Size ${sz} (Out of Stock)` : `Select size ${sz}`}
                   >
-                    {sz}
+                    <span className={isSizeOut ? 'line-through opacity-70' : ''}>{sz}</span>
+                    {isSizeOut && (
+                      <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-rose-500" />
+                    )}
                   </button>
                 );
               })}
             </div>
 
-            {/* Add to Bag Action Button */}
-            <div className="w-full">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddSelectedSize();
-                }}
-                disabled={isAdding}
-                className="w-full bg-brand-dark hover:bg-black text-white text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[34px] sm:min-h-[36px] cursor-pointer disabled:opacity-75"
-              >
-                {isAdding ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Added to Bag</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>Add to Bag</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Add to Bag Action Button / Out of Stock for selected size */}
+            {(() => {
+              const sizeStock = product.sizeStock || product.size_stock || {};
+              const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+              const isSelectedSizeOut = matchK !== undefined && (parseInt(sizeStock[matchK], 10) || 0) <= 0;
+
+              return (
+                <div className="w-full">
+                  {isSelectedSizeOut ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsSelectingSize(false);
+                        setIsStockModalOpen(true);
+                      }}
+                      className="w-full bg-neutral-900 hover:bg-black text-white text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[34px] sm:min-h-[36px] cursor-pointer"
+                    >
+                      <Bell className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Notify Me ({selectedSize})</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddSelectedSize();
+                      }}
+                      disabled={isAdding}
+                      className="w-full bg-brand-dark hover:bg-black text-white text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[34px] sm:min-h-[36px] cursor-pointer disabled:opacity-75"
+                    >
+                      {isAdding ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Added to Bag</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Add to Bag</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -350,16 +384,31 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
           </h3>
         </div>
 
-        <div className="flex items-center gap-2 text-xs tracking-wide">
-          <span className="font-medium text-brand-dark font-sans tabular-nums">
-            {formatPrice(product.price)}
-          </span>
-          {!hideOriginalPrice && product.originalPrice && (
-            <span className="text-neutral-400 line-through text-[11px] font-sans tabular-nums">
-              {formatPrice(product.originalPrice)}
-            </span>
-          )}
-        </div>
+        {(() => {
+          const priceNum = typeof product.price === 'number'
+            ? product.price
+            : parseFloat(String(product.price || '').replace(/[^0-9.]/g, ''));
+          const origPriceNum = typeof product.originalPrice === 'number'
+            ? product.originalPrice
+            : parseFloat(String(product.originalPrice || '').replace(/[^0-9.]/g, ''));
+          const showOriginal = !hideOriginalPrice &&
+            !isNaN(origPriceNum) &&
+            !isNaN(priceNum) &&
+            origPriceNum > priceNum;
+
+          return (
+            <div className="flex items-center gap-2 text-xs tracking-wide">
+              <span className="font-medium text-brand-dark font-sans tabular-nums">
+                {formatPrice(product.price)}
+              </span>
+              {showOriginal && (
+                <span className="text-neutral-400 line-through text-[11px] font-sans tabular-nums">
+                  {formatPrice(product.originalPrice)}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Color swatches preview */}
         {!hideColorDots && product.colors && product.colors.length > 0 && (

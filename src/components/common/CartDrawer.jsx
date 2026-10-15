@@ -263,27 +263,73 @@ export const CartDrawer = () => {
                       </div>
 
                       {/* Quantity selector */}
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
-                        <div className="flex items-center border border-neutral-300 text-xs">
-                          <button
-                            onClick={() => updateQuantity(item.product.id, item.selectedSize, -1)}
-                            className="p-1.5 px-2 hover:bg-neutral-100 transition-colors"
-                          >
-                            <Minus className="w-3 h-3 stroke-[1.75]" />
-                          </button>
-                          <span className="px-3 font-semibold text-xs text-neutral-900">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.product.id, item.selectedSize, 1)}
-                            className="p-1.5 px-2 hover:bg-neutral-100 transition-colors"
-                          >
-                            <Plus className="w-3 h-3 stroke-[1.75]" />
-                          </button>
-                        </div>
+                      {(() => {
+                        const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
+                        let sizeSpecificStock = null;
+                        if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+                          const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(item.selectedSize).trim().toUpperCase());
+                          if (matchKey !== undefined) {
+                            sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+                          }
+                        }
 
-                        <span className="text-xs font-bold text-neutral-900">
-                          {formatPrice(item.product.price * item.quantity)}
-                        </span>
-                      </div>
+                        const maxStock = sizeSpecificStock !== null
+                          ? sizeSpecificStock
+                          : Number(
+                              item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
+                                ? item.product.stockQuantity
+                                : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
+                            );
+                        const isMaxStockReached = item.quantity >= maxStock;
+
+                        return (
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center border border-neutral-300 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.product.id, item.selectedSize, -1)}
+                                  className="p-1.5 px-2 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                  title="Decrease quantity"
+                                  aria-label="Decrease quantity"
+                                >
+                                  <Minus className="w-3 h-3 stroke-[1.75]" />
+                                </button>
+                                <span className="px-3 font-semibold text-xs text-neutral-900">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.product.id, item.selectedSize, 1)}
+                                  disabled={isMaxStockReached}
+                                  className={`p-1.5 px-2 transition-colors ${
+                                    isMaxStockReached
+                                      ? 'opacity-30 cursor-not-allowed bg-neutral-100 text-neutral-400'
+                                      : 'hover:bg-neutral-100 cursor-pointer text-neutral-900'
+                                  }`}
+                                  title={isMaxStockReached ? `Maximum available stock reached (${maxStock} units)` : 'Increase quantity'}
+                                  aria-label="Increase quantity"
+                                >
+                                  <Plus className="w-3 h-3 stroke-[1.75]" />
+                                </button>
+                              </div>
+
+                              {isMaxStockReached && maxStock < 99 && (
+                                <span className="text-[10px] text-amber-700 font-medium tracking-tight bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                  Max stock ({maxStock})
+                                </span>
+                              )}
+                              {!isMaxStockReached && maxStock <= 5 && (
+                                <span className="text-[10px] text-amber-600 font-medium tracking-tight">
+                                  Only {maxStock} left
+                                </span>
+                              )}
+                            </div>
+
+                            <span className="text-xs font-bold text-neutral-900">
+                              {formatPrice(item.product.price * item.quantity)}
+                            </span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Buy only this item quick action if multiple items in cart */}
                       {cart.length > 1 && (

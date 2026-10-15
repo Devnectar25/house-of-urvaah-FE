@@ -31,6 +31,7 @@ const InstagramIcon = ({ className = "w-4 h-4" }) => (
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { getSupabaseMediaUrl } from '../../../lib/supabase';
+import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
 
 export const AdminTrendingGram = () => {
   const [posts, setPosts] = useState([]);
@@ -44,6 +45,13 @@ export const AdminTrendingGram = () => {
   const [editingPost, setEditingPost] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState(null);
+
+  // Lock background scroll when modal, delete confirmation, or preview lightbox is open
+  useModalScrollLock(Boolean(isModalOpen || deleteTargetId || previewMediaUrl), () => {
+    if (previewMediaUrl) setPreviewMediaUrl(null);
+    else if (isModalOpen) setIsModalOpen(false);
+    else if (deleteTargetId) setDeleteTargetId(null);
+  });
 
   // Drag and drop / Form states
   const [draggedIdx, setDraggedIdx] = useState(null);

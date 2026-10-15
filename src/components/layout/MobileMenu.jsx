@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Search, Heart, ShoppingBag, ArrowRight, ChevronDown } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { productApi } from '../../services/productApi';
+import { apiClient } from '../../lib/apiClient';
 import { Logo } from '../common/Logo';
 
 const TABS = ['WOMAN'];
@@ -44,13 +45,11 @@ export const MobileMenu = () => {
     wishlistCount,
     setIsCartOpen,
     setIsSearchOpen,
-    openAuthModal,
-    setPdpProduct
+    openAuthModal
   } = useCart();
 
   const [activeTab, setActiveTab] = useState('WOMAN');
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedSection, setExpandedSection] = useState(null);
 
@@ -59,23 +58,20 @@ export const MobileMenu = () => {
 
     const fetchMenuData = async () => {
       try {
-        const [catsRes, prodsRes] = await Promise.all([
-          productApi.getCategories().catch(() => []),
-          productApi.getProducts({ active: true }).catch(() => [])
-        ]);
+        const catsRes = await apiClient('/api/categories/active').catch(() =>
+          productApi.getCategories().catch(() => [])
+        );
 
         if (!isMounted) return;
 
-        const rawCats = Array.isArray(catsRes) ? catsRes : (catsRes?.data || []);
+        const rawCats = Array.isArray(catsRes) ? catsRes : (catsRes?.data || catsRes?.data?.data || []);
         const activeCats = rawCats.filter(
           (c) => c && c.is_active !== false && c.active !== false
         );
 
-        const rawProds = Array.isArray(prodsRes) ? prodsRes : (prodsRes?.data || []);
         setCategories(activeCats);
-        setProducts(rawProds);
       } catch (err) {
-        console.warn('[MobileMenu] Error loading categories/products:', err);
+        console.warn('[MobileMenu] Error loading categories:', err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -84,40 +80,16 @@ export const MobileMenu = () => {
     fetchMenuData();
 
     const handleUpdate = () => fetchMenuData();
-    window.addEventListener('urvaah_products_updated', handleUpdate);
     window.addEventListener('urvaah_categories_updated', handleUpdate);
 
     return () => {
       isMounted = false;
-      window.removeEventListener('urvaah_products_updated', handleUpdate);
       window.removeEventListener('urvaah_categories_updated', handleUpdate);
     };
   }, []);
 
   const toggleSection = (key) => {
     setExpandedSection((prev) => (prev === key ? null : key));
-  };
-
-  const getCategoryProducts = (cat) => {
-    if (!cat || !products.length) return [];
-    const catNameLower = (cat.name || '').toLowerCase().trim();
-    const catId = String(cat.id || cat.category_id || '');
-
-    return products.filter((p) => {
-      const pCatId = String(p.category_id || '');
-      const pCatName = (p.category || '').toLowerCase().trim();
-      if (catId && pCatId && pCatId === catId) return true;
-      if (catNameLower && pCatName && pCatName === catNameLower) return true;
-      if (catNameLower.includes('corset') && (p.name || '').toLowerCase().includes('corset')) return true;
-      return false;
-    });
-  };
-
-  const handleProductClick = (product) => {
-    setIsMobileMenuOpen(false);
-    if (product) {
-      setPdpProduct(product);
-    }
   };
 
   const scrollToTarget = (targetId) => {
@@ -184,7 +156,7 @@ export const MobileMenu = () => {
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             style={{ overscrollBehavior: 'contain' }}
-            className="fixed top-0 left-0 z-50 h-full w-full max-w-md bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200 overscroll-contain"
+            className="fixed top-0 left-0 z-50 h-full w-full max-w-[388px] bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200 overscroll-contain"
           >
             {/* 1. TOP BAR: Close (X) on Top-Left; Account, Search, Wishlist, Cart on Top-Right */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-neutral-100 bg-white">
@@ -307,18 +279,18 @@ export const MobileMenu = () => {
                   </span>
                 </div>
 
-                {/* DYNAMIC CATEGORIES ACCORDION FROM DATABASE */}
+                {/* DYNAMIC CATEGORIES LIST - DIRECT NAVIGATION TO CATEGORY PAGE */}
                 {categories.map((cat, idx) => {
-                  const sectionKey = `cat-${cat.id || idx}`;
-                  const isExpanded = expandedSection === sectionKey;
-                  const catProducts = getCategoryProducts(cat);
+                  const catSlug = (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
 
                   return (
-                    <div key={sectionKey} className="py-1">
-                      {/* Category Header */}
-                      <button
-                        type="button"
-                        onClick={() => toggleSection(sectionKey)}
+                    <div key={cat.id || idx} className="py-1">
+                      <Link
+                        to={`/category/${catSlug}`}
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          window.scrollTo({ top: 0, behavior: 'instant' });
+                        }}
                         className="w-full py-3.5 flex items-center justify-between text-left group cursor-pointer"
                       >
                         <div className="flex items-center min-w-0 pr-2">
@@ -326,81 +298,8 @@ export const MobileMenu = () => {
                             {cat.name}
                           </span>
                         </div>
-                        <ChevronDown
-                          className={`w-4 h-4 text-neutral-500 transition-transform duration-300 flex-shrink-0 ${
-                            isExpanded ? 'rotate-180 text-black' : ''
-                          }`}
-                        />
-                      </button>
-
-                      {/* Expandable Accordion Products */}
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: 'easeInOut' }}
-                            className="overflow-hidden pl-3 pr-1 pb-3 space-y-2"
-                          >
-                            {catProducts.length > 0 ? (
-                              catProducts.map((p) => {
-                                const priceStr = p.formattedPrice || (p.price ? `₹ ${Number(p.price).toLocaleString('en-IN')}` : '');
-                                const img = p.image_url || (Array.isArray(p.images) ? p.images[0] : null);
-
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => handleProductClick(p)}
-                                    className="group/prod flex items-center justify-between w-full py-1.5 px-2 rounded-xs hover:bg-neutral-50 text-left transition-colors cursor-pointer"
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                      {img && (
-                                        <img
-                                          src={img}
-                                          alt={p.name}
-                                          className="w-7 h-9 object-cover rounded-xs border border-neutral-200/60 flex-shrink-0"
-                                        />
-                                      )}
-                                      <div className="min-w-0">
-                                        <p className="text-xs text-neutral-800 group-hover/prod:text-black font-medium tracking-wide uppercase truncate">
-                                          {p.name}
-                                        </p>
-                                        {priceStr && (
-                                          <p className="text-[10px] font-mono text-neutral-500 mt-0.5">
-                                            {priceStr}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/prod:opacity-100 group-hover/prod:translate-x-0 transition-all text-black flex-shrink-0" />
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <p className="text-[11px] text-neutral-400 font-serif italic py-1">
-                                {cat.description || 'Curated Atelier collection.'}
-                              </p>
-                            )}
-
-                            {/* View All in this Category */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsMobileMenuOpen(false);
-                                const catSlug = (cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-                                navigate(`/category/${catSlug}`);
-                                window.scrollTo({ top: 0, behavior: 'instant' });
-                              }}
-                              className="w-full pt-2.5 mt-1 border-t border-neutral-100 flex items-center justify-between text-[11px] font-mono tracking-widest text-neutral-500 hover:text-black uppercase cursor-pointer"
-                            >
-                              <span>Explore All {cat.name}</span>
-                              <ArrowRight className="w-3 h-3 text-neutral-400 group-hover:text-black" />
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                        <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-black group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                      </Link>
                     </div>
                   );
                 })}
@@ -479,19 +378,18 @@ export const MobileMenu = () => {
             </div>
 
             {/* BOTTOM FOOTER INFO */}
-            <div className="py-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] text-[11px] text-neutral-500 tracking-widest flex items-center justify-between font-mono">
+            <div className="py-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] flex items-center justify-start">
               <Link
                 to="/"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   window.scrollTo({ top: 0, behavior: 'instant' });
                 }}
-                className="flex items-center hover:opacity-80 transition-opacity"
+                className="flex items-center justify-start hover:opacity-80 transition-opacity"
                 aria-label="House of Urvaah Home"
               >
                 <Logo className="h-14 sm:h-16" />
               </Link>
-              <span>INDIA (INR ₹)</span>
             </div>
           </motion.div>
         </>

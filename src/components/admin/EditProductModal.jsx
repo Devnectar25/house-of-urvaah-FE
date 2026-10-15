@@ -10,7 +10,8 @@ import {
   Sparkles,
   Flame,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Layers
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
@@ -69,6 +70,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     discountPercent: 0,
     price: 0,
     stockQuantity: 0,
+    sizeStock: {},
     active: true,
     promoted: false,
     is_recommended: false,
@@ -180,6 +182,31 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         const ratingVal = parseFloat(data.rating ?? product?.rating) || 0;
         const reviewsCount = parseInt(data.reviews ?? data.reviews_count ?? product?.reviews ?? product?.reviews_count) || 0;
 
+        let sizeStock = data.sizeStock || data.size_stock || {};
+        if (typeof sizeStock === 'string') {
+          try { sizeStock = JSON.parse(sizeStock); } catch (e) { sizeStock = {}; }
+        }
+        if (!sizeStock || typeof sizeStock !== 'object') sizeStock = {};
+
+        const validSizes = Array.isArray(data.sizes) && data.sizes.length > 0 ? (filterValidSizes(data.sizes).length > 0 ? filterValidSizes(data.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'];
+        const normalizedSizeStock = {};
+        const totalStock = Number(data.stockQuantity ?? data.quantity ?? 0);
+        validSizes.forEach(sz => {
+          if (sizeStock[sz] !== undefined) {
+            normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[sz], 10) || 0);
+          } else {
+            const found = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.toUpperCase());
+            if (found !== undefined) {
+              normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[found], 10) || 0);
+            } else {
+              normalizedSizeStock[sz] = totalStock > 0 ? Math.floor(totalStock / validSizes.length) : 0;
+            }
+          }
+        });
+        const computedTotalStock = Object.keys(normalizedSizeStock).length > 0
+          ? Object.values(normalizedSizeStock).reduce((acc, v) => acc + v, 0)
+          : totalStock;
+
         setFormData({
           name: data.name || data.title || '',
           category_id: data.categoryId || data.category_id || '',
@@ -192,13 +219,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           originalPrice: origPrice,
           discountPercent: calcDiscount,
           price: currPrice,
-          stockQuantity: data.stockQuantity ?? data.quantity ?? 0,
+          stockQuantity: computedTotalStock,
+          sizeStock: normalizedSizeStock,
           active: data.active !== false && data.is_active !== false,
           promoted: Boolean(data.promoted || data.is_featured),
           is_recommended: Boolean(data.is_recommended || data.isRecommended),
           rating: ratingVal,
           reviews: reviewsCount,
-          sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? (filterValidSizes(data.sizes).length > 0 ? filterValidSizes(data.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'],
+          sizes: validSizes,
           colors: Array.isArray(data.colors) && data.colors.length > 0 ? (filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
           specifications: specPairs,
           careInstructions: data.careInstructions || data.care_instructions || '',
@@ -223,6 +251,31 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         const fallbackRating = parseFloat(product?.rating) || 0;
         const fallbackReviews = parseInt(product?.reviews ?? product?.reviews_count) || 0;
 
+        let sizeStock = product?.sizeStock || product?.size_stock || {};
+        if (typeof sizeStock === 'string') {
+          try { sizeStock = JSON.parse(sizeStock); } catch (e) { sizeStock = {}; }
+        }
+        if (!sizeStock || typeof sizeStock !== 'object') sizeStock = {};
+
+        const validSizes = Array.isArray(product.sizes) ? (filterValidSizes(product.sizes).length > 0 ? filterValidSizes(product.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'];
+        const normalizedSizeStock = {};
+        const totalStock = Number(product.stockQuantity ?? product.quantity ?? 0);
+        validSizes.forEach(sz => {
+          if (sizeStock[sz] !== undefined) {
+            normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[sz], 10) || 0);
+          } else {
+            const found = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.toUpperCase());
+            if (found !== undefined) {
+              normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[found], 10) || 0);
+            } else {
+              normalizedSizeStock[sz] = totalStock > 0 ? Math.floor(totalStock / validSizes.length) : 0;
+            }
+          }
+        });
+        const computedTotalStock = Object.keys(normalizedSizeStock).length > 0
+          ? Object.values(normalizedSizeStock).reduce((acc, v) => acc + v, 0)
+          : totalStock;
+
         setFormData({
           name: product.name || '',
           category_id: product.categoryId || product.category_id || '',
@@ -235,13 +288,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           originalPrice: product.originalPrice || product.price || 0,
           discountPercent: product.discount || 0,
           price: product.price || 0,
-          stockQuantity: product.stockQuantity ?? 0,
+          stockQuantity: computedTotalStock,
+          sizeStock: normalizedSizeStock,
           active: product.active !== false,
           promoted: Boolean(product.promoted),
           is_recommended: Boolean(product.is_recommended || product.isRecommended),
           rating: fallbackRating,
           reviews: fallbackReviews,
-          sizes: Array.isArray(product.sizes) ? (filterValidSizes(product.sizes).length > 0 ? filterValidSizes(product.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'],
+          sizes: validSizes,
           colors: Array.isArray(product.colors) ? (filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
@@ -379,7 +433,17 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       return;
     }
 
-    setFormData(prev => ({ ...prev, sizes: [...prev.sizes, normalized] }));
+    setFormData(prev => {
+      const nextSizes = [...prev.sizes, normalized];
+      const nextSizeStock = { ...(prev.sizeStock || {}), [normalized]: 0 };
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+      };
+    });
     setSizeInput('');
     setSizeError(null);
   };
@@ -389,15 +453,33 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     if (formData.sizes.includes(sz)) {
       handleRemoveSize(sz);
     } else {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, sz] }));
+      setFormData(prev => {
+        const nextSizes = [...prev.sizes, sz];
+        const nextSizeStock = { ...(prev.sizeStock || {}), [sz]: 0 };
+        const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+        return {
+          ...prev,
+          sizes: nextSizes,
+          sizeStock: nextSizeStock,
+          stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+        };
+      });
     }
   };
 
   const handleRemoveSize = (sizeToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      sizes: prev.sizes.filter(s => s !== sizeToRemove)
-    }));
+    setFormData(prev => {
+      const nextSizes = prev.sizes.filter(s => s !== sizeToRemove);
+      const nextSizeStock = { ...(prev.sizeStock || {}) };
+      delete nextSizeStock[sizeToRemove];
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal
+      };
+    });
     setSizeError(null);
   };
 
@@ -656,6 +738,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         stock_quantity: Number(formData.stockQuantity) || 0,
         quantity: Number(formData.stockQuantity) || 0,
         instock: Number(formData.stockQuantity) > 0,
+        sizeStock: formData.sizeStock || {},
+        size_stock: formData.sizeStock || {},
         active: formData.active,
         is_active: formData.active,
         promoted: formData.promoted,
@@ -1267,7 +1351,25 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     type="number"
                     min="0"
                     value={formData.stockQuantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => {
+                      const total = Math.max(0, parseInt(e.target.value) || 0);
+                      setFormData(prev => {
+                        const sizes = prev.sizes || [];
+                        let nextSizeStock = { ...(prev.sizeStock || {}) };
+                        if (sizes.length > 0) {
+                          const base = Math.floor(total / sizes.length);
+                          const rem = total % sizes.length;
+                          sizes.forEach((sz, idx) => {
+                            nextSizeStock[sz] = base + (idx < rem ? 1 : 0);
+                          });
+                        }
+                        return {
+                          ...prev,
+                          stockQuantity: total,
+                          sizeStock: nextSizeStock
+                        };
+                      });
+                    }}
                     className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                   />
                 </div>
@@ -1458,6 +1560,80 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{sizeError}</span>
+                  </div>
+                )}
+
+                {/* 7b. Size-Wise Inventory & Stock Management */}
+                {formData.sizes.length > 0 && (
+                  <div className="mt-3 p-4 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2.5">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-neutral-700" />
+                          <h5 className="text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin">
+                            Size-Wise Inventory & Stock
+                          </h5>
+                        </div>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                          Set available stock per size. Sizes with 0 units will automatically show as <span className="font-semibold text-rose-600">Out of Stock</span> on the storefront.
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-800 self-start sm:self-auto">
+                        <span className="text-[10px] text-neutral-500 uppercase font-semibold">Total:</span>
+                        <span>{formData.stockQuantity} units</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {formData.sizes.map((sz) => {
+                        const qty = formData.sizeStock?.[sz] !== undefined ? formData.sizeStock[sz] : 0;
+                        const isOutOfStock = qty <= 0;
+
+                        return (
+                          <div
+                            key={sz}
+                            className={`p-2.5 rounded-lg border transition-all ${
+                              isOutOfStock
+                                ? 'bg-rose-50/50 border-rose-200'
+                                : 'bg-neutral-50/70 border-neutral-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-bold text-neutral-900">Size {sz}</span>
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  isOutOfStock
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                              >
+                                {isOutOfStock ? '0 (Out)' : `${qty} in stock`}
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                const nextSizeStock = { ...(formData.sizeStock || {}), [sz]: val };
+                                const newTotal = Object.values(nextSizeStock).reduce(
+                                  (acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0),
+                                  0
+                                );
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sizeStock: nextSizeStock,
+                                  stockQuantity: newTotal
+                                }));
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded text-xs font-bold text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black"
+                              placeholder="0"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

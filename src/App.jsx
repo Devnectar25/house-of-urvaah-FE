@@ -47,6 +47,7 @@ import { AdminHeroSection } from './pages/admin/modify-ui/AdminHeroSection';
 import { AdminDualCampaign } from './pages/admin/modify-ui/AdminDualCampaign';
 import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
 import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
+import { AdminBoutiquesConcierge } from './pages/admin/modify-ui/AdminBoutiquesConcierge';
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
 import { AdminErrorMonitoring } from './pages/admin/AdminErrorMonitoring';
 import { AdminEmailNotifications } from './pages/admin/AdminEmailNotifications';
@@ -230,6 +231,7 @@ export function AppContent() {
         <Route path="modify-ui/dual-campaign" element={<PermissionGuard moduleKey="modify-ui"><AdminDualCampaign /></PermissionGuard>} />
         <Route path="modify-ui/trending-gram" element={<PermissionGuard moduleKey="modify-ui"><AdminTrendingGram /></PermissionGuard>} />
         <Route path="modify-ui/fabric-video" element={<PermissionGuard moduleKey="modify-ui"><AdminFabricVideo /></PermissionGuard>} />
+        <Route path="modify-ui/boutiques-concierge" element={<PermissionGuard moduleKey="modify-ui"><AdminBoutiquesConcierge /></PermissionGuard>} />
 
         <Route path="*" element={<AdminDashboard />} />
 

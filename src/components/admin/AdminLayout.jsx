@@ -5,7 +5,6 @@ import {
   Package,
   FolderTree,
   ShoppingCart,
-  Ticket,
   Users,
   Banknote,
   Star,
@@ -27,7 +26,8 @@ import {
   Bell,
   ShieldAlert,
   Mail,
-  MailCheck
+  MailCheck,
+  Building2
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -67,6 +67,7 @@ const ALL_NAV_ITEMS = [
       { name: 'Dual Campaign Banner', path: '/admin/modify-ui/dual-campaign', icon: Columns },
       { name: 'Trending on the Gram', path: '/admin/modify-ui/trending-gram', icon: InstagramIcon },
       { name: 'Fabric Video', path: '/admin/modify-ui/fabric-video', icon: Video },
+      { name: 'Boutiques & Concierge', path: '/admin/modify-ui/boutiques-concierge', icon: Building2 },
     ]
   },
   { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },
@@ -184,6 +185,12 @@ export const AdminLayout = () => {
 
           <Link
             to="/admin/dashboard"
+            onClick={() => {
+              if (contentScrollRef.current) {
+                contentScrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+              }
+              window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+            }}
             className="flex items-center gap-3.5 select-none group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
             title="House of Urvaah Admin Dashboard"
           >

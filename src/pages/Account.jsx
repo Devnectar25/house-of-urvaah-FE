@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import apiClient from '../lib/apiClient';
@@ -363,6 +363,7 @@ export const Account = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
+  const [profileErrors, setProfileErrors] = useState({});
 
   // Sign out confirmation modal state
   const [showSignOutModal, setShowSignOutModal] = useState(false);
@@ -408,10 +409,25 @@ export const Account = () => {
   const [addressErrors, setAddressErrors] = useState({});
   const [addressSaving, setAddressSaving] = useState(false);
 
-  // Orders state
+  // Orders state & pagination (10 orders per page)
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
+  const [orderPage, setOrderPage] = useState(1);
+  const ordersPerPage = 10;
+
+  const totalOrderPages = Math.max(1, Math.ceil((orders?.length || 0) / ordersPerPage));
+  const paginatedOrders = useMemo(() => {
+    const list = Array.isArray(orders) ? orders : [];
+    const startIndex = (orderPage - 1) * ordersPerPage;
+    return list.slice(startIndex, startIndex + ordersPerPage);
+  }, [orders, orderPage, ordersPerPage]);
+
+  useModalScrollLock(Boolean(isAddressModalOpen || showSignOutModal || selectedOrderModal), () => {
+    if (!addressSaving && isAddressModalOpen) setIsAddressModalOpen(false);
+    if (!isSigningOut && showSignOutModal) setShowSignOutModal(false);
+    if (selectedOrderModal) setSelectedOrderModal(null);
+  });
 
   // Fetch real profile details and addresses on mount / user change
   const loadProfileAndAddresses = async () => {
@@ -624,23 +640,108 @@ export const Account = () => {
     navigate(`${targetPath}?${searchParams.toString()}`, { replace: true });
   };
 
+  const handleStartEditProfile = () => {
+    setFullNameInput(user?.name || '');
+    setPhoneInput((user?.phone || '').replace(/\D/g, '').slice(0, 10));
+    setProfileErrors({});
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setFullNameInput(user?.name || '');
+    setPhoneInput(user?.phone || '');
+    setProfileErrors({});
+    setIsEditingProfile(false);
+  };
+
+  const handlePhoneInputChange = (e) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length === 12 && val.startsWith('91')) {
+      val = val.slice(2);
+    }
+    val = val.slice(0, 10);
+    setPhoneInput(val);
+
+    if (profileErrors.phone) {
+      if (!val) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Phone number is required.' }));
+      } else if (val.length !== 10) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+      } else if (!/^[6-9]\d{9}$/.test(val)) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.' }));
+      } else {
+        setProfileErrors((prev) => ({ ...prev, phone: '' }));
+      }
+    }
+  };
+
+  const handleFullNameInputChange = (e) => {
+    const val = e.target.value;
+    setFullNameInput(val);
+
+    if (profileErrors.fullName) {
+      const trimmed = val.trim();
+      if (!trimmed) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name is required.' }));
+      } else if (trimmed.length < 2) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name must be at least 2 characters.' }));
+      } else if (!/^[a-zA-Z\s.'-]+$/.test(trimmed)) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name should only contain letters and spaces.' }));
+      } else {
+        setProfileErrors((prev) => ({ ...prev, fullName: '' }));
+      }
+    }
+  };
+
+  const validateProfileForm = () => {
+    const errors = {};
+    const cleanName = (fullNameInput || '').trim();
+    if (!cleanName) {
+      errors.fullName = 'Full name is required.';
+    } else if (cleanName.length < 2) {
+      errors.fullName = 'Full name must be at least 2 characters.';
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(cleanName)) {
+      errors.fullName = 'Full name should only contain letters and spaces.';
+    }
+
+    const cleanPhone = (phoneInput || '').replace(/\D/g, '');
+    if (!cleanPhone) {
+      errors.phone = 'Phone number is required.';
+    } else if (cleanPhone.length !== 10) {
+      errors.phone = 'Phone number must be exactly 10 digits.';
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.';
+    }
+
+    setProfileErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+    if (!validateProfileForm()) {
+      return;
+    }
+
     setProfileSaving(true);
     setProfileMessage('');
 
+    const cleanPhone = phoneInput.replace(/\D/g, '').slice(0, 10);
+    const cleanName = fullNameInput.trim();
+
     const res = await updateUserProfile({
-      fullName: fullNameInput.trim(),
-      phone: phoneInput.trim()
+      fullName: cleanName,
+      phone: cleanPhone
     });
 
     setProfileSaving(false);
     if (res.success) {
       setIsEditingProfile(false);
+      setProfileErrors({});
       setProfileMessage('Account details successfully updated.');
       setTimeout(() => setProfileMessage(''), 3000);
     } else {
-      setProfileMessage('Failed to update details. Please try again.');
+      setProfileMessage(res.error || 'Failed to update details. Please try again.');
     }
   };
 
@@ -691,6 +792,8 @@ export const Account = () => {
       errors.phone = 'Phone number is required.';
     } else if (cleanPhone.length !== 10) {
       errors.phone = 'Phone number must be a valid 10-digit mobile number.';
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.';
     }
 
     if (!addressForm.street || !addressForm.street.trim()) {
@@ -1525,7 +1628,7 @@ export const Account = () => {
                 </div>
                 {!isEditingProfile ? (
                   <button
-                    onClick={() => setIsEditingProfile(true)}
+                    onClick={handleStartEditProfile}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase font-sans text-brand-dark hover:opacity-75 cursor-pointer"
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -1533,7 +1636,7 @@ export const Account = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setIsEditingProfile(false)}
+                    onClick={handleCancelEditProfile}
                     className="text-xs font-semibold tracking-widest uppercase font-sans text-neutral-500 hover:text-black cursor-pointer"
                   >
                     CANCEL
@@ -1569,32 +1672,59 @@ export const Account = () => {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSaveProfile} className="space-y-6 font-sans">
+                <form onSubmit={handleSaveProfile} noValidate className="space-y-6 font-sans">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-semibold tracking-wider text-neutral-700 uppercase mb-2">
-                        FULL NAME
+                        FULL NAME <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={fullNameInput}
-                        onChange={(e) => setFullNameInput(e.target.value)}
-                        required
-                        className="w-full px-4 py-3 text-sm bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none font-sans"
+                        onChange={handleFullNameInputChange}
+                        className={`w-full px-4 py-3 text-sm bg-white border ${
+                          profileErrors.fullName
+                            ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                            : 'border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark'
+                        } outline-none font-sans transition-colors`}
                         placeholder="Enter full name"
                       />
+                      {profileErrors.fullName && (
+                        <p className="text-[11px] text-red-600 mt-1.5 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.fullName}</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold tracking-wider text-neutral-700 uppercase mb-2">
-                        PHONE NUMBER
+                        PHONE NUMBER <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="tel"
-                        value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value)}
-                        className="w-full px-4 py-3 text-sm bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none font-sans"
-                        placeholder="+91 98765 43210"
-                      />
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={phoneInput}
+                          onChange={handlePhoneInputChange}
+                          className={`w-full px-4 py-3 text-sm bg-white border ${
+                            profileErrors.phone
+                              ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                              : 'border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark'
+                          } outline-none font-sans transition-colors`}
+                          placeholder="10-digit mobile number"
+                        />
+                        {phoneInput && (
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-neutral-400 font-mono pointer-events-none">
+                            {phoneInput.length}/10
+                          </span>
+                        )}
+                      </div>
+                      {profileErrors.phone && (
+                        <p className="text-[11px] text-red-600 mt-1.5 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.phone}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1623,7 +1753,7 @@ export const Account = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsEditingProfile(false)}
+                      onClick={handleCancelEditProfile}
                       className="border border-neutral-300 hover:border-black text-neutral-700 hover:text-black text-xs font-semibold tracking-widest px-6 py-3 uppercase transition-colors cursor-pointer"
                     >
                       CANCEL
@@ -1732,7 +1862,7 @@ export const Account = () => {
                         <button
                           type="button"
                           onClick={() => handleSetDefaultAddress(idx)}
-                          className="mt-4 text-[11px] font-semibold text-brand-dark hover:underline tracking-wider uppercase block cursor-pointer"
+                          className="mt-4 text-[11px] font-semibold text-brand-dark hover:text-neutral-600 tracking-wider uppercase block cursor-pointer transition-colors"
                         >
                           SET AS DEFAULT
                         </button>
@@ -1779,8 +1909,9 @@ export const Account = () => {
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {orders.map((ord, idx) => {
+              <>
+                <div className="space-y-6">
+                {paginatedOrders.map((ord, idx) => {
                   const orderNum = ord.order_number || ord.orderNumber || `ORD-2026-${ord.id || Math.floor(100000 + Math.random() * 900000)}`;
                   const orderStatus = ord.status || 'Pending';
                   const statusLower = orderStatus.toLowerCase();
@@ -2545,29 +2676,48 @@ export const Account = () => {
                                 </div>
                               </div>
 
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
-                                isCancellationRequested
-                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                  : isCancelled 
-                                  ? 'bg-red-50 text-red-800 border-red-200' 
-                                  : isReturnRequested
-                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                  : isReturnApproved
-                                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200'
-                                  : isReceivedAtUrvaah
-                                  ? 'bg-blue-50 text-blue-900 border-blue-200'
-                                  : isReturned
-                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                                  : isDelivered 
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                  : isOutForDelivery 
-                                  ? 'bg-blue-50 text-blue-800 border-blue-200' 
-                                  : isShipped 
-                                  ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                                  : 'bg-neutral-100 text-neutral-800 border-neutral-200'
-                              }`}>
-                                {isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnApproved ? 'RETURN IN TRANSIT' : isReceivedAtUrvaah ? 'AT URVAAH HOUSE' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
-                              </span>
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
+                                  isCancellationRequested
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : isCancelled 
+                                    ? 'bg-red-50 text-red-800 border-red-200' 
+                                    : isReturnRequested
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : isReturnApproved
+                                    ? 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                    : isReceivedAtUrvaah
+                                    ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                    : isReturned
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    : isDelivered 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                    : isOutForDelivery 
+                                    ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                                    : isShipped 
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                    : 'bg-neutral-100 text-neutral-800 border-neutral-200'
+                                }`}>
+                                  {isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnApproved ? 'RETURN IN TRANSIT' : isReceivedAtUrvaah ? 'AT URVAAH HOUSE' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                </span>
+
+                                {isDelivered && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const prodId = item.product_id || item.productId || item.id;
+                                      if (prodId) {
+                                        navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                      }
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-lg border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-bold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                                    title="Rate and give feedback for this delivered product"
+                                  >
+                                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                    <span>Give Feedback</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -2615,6 +2765,25 @@ export const Account = () => {
                             <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
                             <span>Invoice</span>
                           </button>
+
+                          {/* Give Feedback Quick Action on Delivered Orders */}
+                          {isDelivered && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const firstItem = itemsList[0];
+                                const prodId = firstItem?.product_id || firstItem?.productId || firstItem?.id;
+                                if (prodId) {
+                                  navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                }
+                              }}
+                              className="px-5 py-2.5 rounded-xl border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              title="Give feedback for your delivered pieces"
+                            >
+                              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                              <span>Give Feedback</span>
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -2724,8 +2893,73 @@ export const Account = () => {
                   );
                 })}
               </div>
-            )}
-          </div>
+
+              {/* Customer Orders Pagination Bar */}
+              {totalOrderPages > 1 && (
+                <div className="pt-4 border-t border-neutral-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans text-xs">
+                  <div className="text-neutral-500 font-medium">
+                    Showing <span className="font-semibold text-brand-dark">{(orderPage - 1) * ordersPerPage + 1}</span>–
+                    <span className="font-semibold text-brand-dark">{Math.min(orderPage * ordersPerPage, orders.length)}</span> of{' '}
+                    <span className="font-semibold text-brand-dark">{orders.length}</span> orders
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderPage((prev) => Math.max(1, prev - 1));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={orderPage === 1}
+                      className="inline-flex items-center gap-1 px-3 py-2 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wider"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Prev</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalOrderPages }, (_, i) => i + 1).map((pageNum) => {
+                        const isActive = pageNum === orderPage;
+                        return (
+                          <button
+                            key={`order-page-${pageNum}`}
+                            type="button"
+                            onClick={() => {
+                              setOrderPage(pageNum);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-brand-dark text-white shadow-xs'
+                                : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-black'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderPage((prev) => Math.min(totalOrderPages, prev + 1));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={orderPage >= totalOrderPages}
+                      className="inline-flex items-center gap-1 px-3 py-2 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wider"
+                      title="Next Page"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
         )}
 
 
@@ -2836,7 +3070,7 @@ export const Account = () => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white p-6 sm:p-8 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto"
+              className="relative z-10 w-full max-w-lg bg-white p-6 sm:p-8 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none"
             >
               <div className="flex items-center justify-between pb-4 mb-6 border-b border-neutral-200">
                 <h3 className="font-serif text-lg tracking-[0.15em] uppercase text-black">
@@ -2879,15 +3113,19 @@ export const Account = () => {
                   </label>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={addressForm.phone}
                     onChange={(e) => {
-                      setAddressForm({ ...addressForm, phone: e.target.value });
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length === 12 && val.startsWith('91')) val = val.slice(2);
+                      val = val.slice(0, 10);
+                      setAddressForm((prev) => ({ ...prev, phone: val }));
                       if (addressErrors.phone) setAddressErrors((prev) => ({ ...prev, phone: '' }));
                     }}
                     className={`w-full px-3.5 py-2.5 bg-white border ${
                       addressErrors.phone ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
                     } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
-                    placeholder="+91 XXXXX XXXXX"
+                    placeholder="10-digit mobile number"
                   />
                   {addressErrors.phone && (
                     <p className="text-[11px] text-red-600 mt-1">{addressErrors.phone}</p>

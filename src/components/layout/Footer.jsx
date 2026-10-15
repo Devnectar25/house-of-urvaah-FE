@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { apiClient } from '../../lib/apiClient';
+
+let cachedPrimaryBoutique = null;
 
 export const Footer = () => {
   const [openSections, setOpenSections] = useState({
@@ -19,6 +21,31 @@ export const Footer = () => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterStatus, setNewsletterStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [newsletterMessage, setNewsletterMessage] = useState('');
+
+  const [primaryBoutique, setPrimaryBoutique] = useState(() => cachedPrimaryBoutique || {
+    name: 'House of Urvaah, Kala Ghoda Arts District,',
+    address: 'Colaba Causeway, Mumbai 400001, India'
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient('/api/ui/contact-info')
+      .then((res) => {
+        if (isMounted && res?.success && res.data?.primary_location) {
+          const prim = res.data.primary_location;
+          const formatted = {
+            name: prim.name || 'House of Urvaah, Kala Ghoda Arts District,',
+            address: prim.address || 'Colaba Causeway, Mumbai 400001, India'
+          };
+          cachedPrimaryBoutique = formatted;
+          setPrimaryBoutique(formatted);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -90,8 +117,8 @@ export const Footer = () => {
               <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-1">
                 FLAGSHIP ATELIER
               </p>
-              <p>House of Urvaah, Kala Ghoda Arts District,</p>
-              <p>Colaba Causeway, Mumbai 400001, India</p>
+              <p>{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
+              <p>{primaryBoutique.address}</p>
             </div>
           </div>
 
