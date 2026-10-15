@@ -187,7 +187,7 @@ export const EditorialBanner = () => {
   }, []);
 
   return (
-    <section id="editorial" className="my-16 py-12 bg-brand-sand text-brand-dark overflow-hidden font-serif scroll-mt-20">
+    <section id="editorial" className="mt-6 md:mt-8 mb-6 md:mb-8 py-10 md:py-12 bg-brand-sand text-brand-dark overflow-hidden font-serif scroll-mt-20">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
           {/* Left Editorial 3-Video Frame */}

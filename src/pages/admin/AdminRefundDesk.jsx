@@ -34,11 +34,11 @@ import * as XLSX from 'xlsx';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
-  { value: 'Requested', label: 'Requested' },
+  { value: 'Requested', label: 'Request' },
   { value: 'Processing', label: 'Processing' },
-  { value: 'Completed', label: 'Completed' },
-  { value: 'Failed', label: 'Failed' },
-  { value: 'On Hold', label: 'On Hold' }
+  { value: 'Completed', label: 'Completed / Paid' },
+  { value: 'On Hold', label: 'On Hold' },
+  { value: 'Failed', label: 'Failed / Rejected' }
 ];
 
 // Helper: Normalize displayed status for a refund record
@@ -777,20 +777,20 @@ export const AdminRefundDesk = () => {
           </div>
         )}
 
-        {/* Table Container - no-scrollbar removes ugly horizontal scrollbar */}
+        {/* Table Container */}
         <div className="overflow-x-auto no-scrollbar scrollbar-none">
-          <table className="w-full text-left border-collapse min-w-[940px]">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
-                <th className="py-2 px-3 w-40">Order Details</th>
-                <th className="py-2 px-3 w-28">Source</th>
-                <th className="py-2 px-3 w-48">Customer Info</th>
-                <th className="py-2 px-3 w-28 text-center">Transaction Method</th>
-                <th className="py-2 px-3 w-48">Payout Details</th>
-                <th className="py-2 px-3 w-24">Amount</th>
-                <th className="py-2 px-3 w-28">Request Date</th>
-                <th className="py-2 px-3 text-center w-28">Current Status</th>
-                <th className="py-2 px-3 text-right w-28">Actions</th>
+              <tr className="bg-neutral-50/80 text-[10px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80 whitespace-nowrap">
+                <th className="py-1.5 px-2">Order Details</th>
+                <th className="py-1.5 px-1.5">Source</th>
+                <th className="py-1.5 px-2">Customer Info</th>
+                <th className="py-1.5 px-1.5 text-center">Method</th>
+                <th className="py-1.5 px-1.5">Payout Details</th>
+                <th className="py-1.5 px-2">Amount</th>
+                <th className="py-1.5 px-1.5">Request Date</th>
+                <th className="py-1.5 px-1.5 text-center">Status</th>
+                <th className="py-1.5 px-2 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -799,35 +799,35 @@ export const AdminRefundDesk = () => {
               {loading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="py-2 px-3 space-y-1">
-                      <div className="h-3.5 bg-neutral-200 rounded w-20" />
-                      <div className="h-2.5 bg-neutral-200 rounded w-28" />
+                    <td className="py-1.5 px-2 space-y-1">
+                      <div className="h-3 bg-neutral-200 rounded w-16" />
+                      <div className="h-2 bg-neutral-200 rounded w-20" />
                     </td>
-                    <td className="py-2 px-3">
-                      <div className="h-5 w-20 bg-neutral-200 rounded-full" />
+                    <td className="py-1.5 px-1.5">
+                      <div className="h-4 w-14 bg-neutral-200 rounded-full" />
                     </td>
-                    <td className="py-2 px-3 space-y-1">
-                      <div className="h-3.5 bg-neutral-200 rounded w-24" />
-                      <div className="h-2.5 bg-neutral-200 rounded w-32" />
+                    <td className="py-1.5 px-2 space-y-1">
+                      <div className="h-3 bg-neutral-200 rounded w-20" />
+                      <div className="h-2 bg-neutral-200 rounded w-24" />
                     </td>
-                    <td className="py-2 px-3 text-center">
-                      <div className="h-5 w-16 bg-neutral-200 rounded-full mx-auto" />
+                    <td className="py-1.5 px-1.5 text-center">
+                      <div className="h-4 w-12 bg-neutral-200 rounded mx-auto" />
                     </td>
-                    <td className="py-2 px-3">
-                      <div className="h-4 bg-neutral-200 rounded w-36" />
+                    <td className="py-1.5 px-1.5">
+                      <div className="h-4 bg-neutral-200 rounded w-24" />
                     </td>
-                    <td className="py-2 px-3 space-y-1">
-                      <div className="h-3.5 bg-neutral-200 rounded w-16" />
-                      <div className="h-2.5 bg-neutral-200 rounded w-12" />
+                    <td className="py-1.5 px-2 space-y-1">
+                      <div className="h-3 bg-neutral-200 rounded w-14" />
+                      <div className="h-2 bg-neutral-200 rounded w-10" />
                     </td>
-                    <td className="py-2 px-3">
-                      <div className="h-3.5 bg-neutral-200 rounded w-16" />
+                    <td className="py-1.5 px-1.5">
+                      <div className="h-3 bg-neutral-200 rounded w-14" />
                     </td>
-                    <td className="py-2 px-3 text-center">
-                      <div className="h-5 w-20 bg-neutral-200 rounded-full mx-auto" />
+                    <td className="py-1.5 px-1.5 text-center">
+                      <div className="h-4 w-14 bg-neutral-200 rounded-full mx-auto" />
                     </td>
-                    <td className="py-2 px-3 text-right">
-                      <div className="h-6 w-18 bg-neutral-200 rounded-lg ml-auto" />
+                    <td className="py-1.5 px-2 text-right">
+                      <div className="h-5 w-14 bg-neutral-200 rounded ml-auto" />
                     </td>
                   </tr>
                 ))
@@ -889,93 +889,108 @@ export const AdminRefundDesk = () => {
                       key={row.id}
                       className="hover:bg-neutral-50/70 transition-colors group"
                     >
-                      {/* 1. ORDER DETAILS (Clickable to open Order Details Modal) */}
-                      <td className="py-2 px-3">
+                      {/* 1. ORDER DETAILS */}
+                      <td className="py-1.5 px-2 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenOrderDetail(row.id)}
-                          className="text-left group/ord cursor-pointer focus:outline-none"
+                          className="text-left group/ord cursor-pointer focus:outline-none block no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title="Open complete Order Details modal"
                         >
-                          <div className="font-admin font-bold text-xs text-brand-dark group-hover/ord:underline transition-colors flex items-center gap-1">
+                          <div
+                            className="font-admin font-bold text-[11px] text-brand-dark transition-colors flex items-center gap-1 leading-tight no-underline"
+                            style={{ textDecoration: 'none' }}
+                          >
                             <span>{row.order_number || row.id?.slice(0, 8)}</span>
-                            <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover/ord:opacity-100 transition-opacity" />
+                            <ExternalLink className="w-2.5 h-2.5 text-neutral-400 opacity-0 group-hover/ord:opacity-100 transition-opacity" />
                           </div>
-                          <div className="text-[11px] text-neutral-500 font-sans truncate max-w-[150px] mt-0.5">
+                          <div className="text-[10px] text-neutral-500 font-sans truncate max-w-[110px] mt-0.5 leading-tight no-underline">
                             {primaryItemName}
                             {additionalItemsCount > 0 && (
                               <span className="text-neutral-400">
-                                {' '}
-                                +{additionalItemsCount} more
+                                {' '}+{additionalItemsCount}
                               </span>
                             )}
                           </div>
                         </button>
                       </td>
 
-                      {/* 2. SOURCE PILL (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-2 px-3">
+                      {/* 2. SOURCE PILL */}
+                      <td className="py-1.5 px-1.5 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="inline-block text-left cursor-pointer group/src focus:outline-none"
+                          className="inline-block text-left cursor-pointer group/src focus:outline-none no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title="Review & Update Refund"
                         >
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all duration-150 group-hover/src:shadow-xs group-hover/src:brightness-95 ${source.badgeClass}`}
+                            className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-semibold border transition-all duration-150 leading-tight group-hover/src:shadow-2xs ${source.badgeClass}`}
                           >
                             {source.label}
                           </span>
                         </button>
                       </td>
 
-                      {/* 3. CUSTOMER INFO (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-2 px-3 w-48">
+                      {/* 3. CUSTOMER INFO */}
+                      <td className="py-1.5 px-2">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/cust focus:outline-none"
-                          title="Review & Update Refund"
+                          className="text-left cursor-pointer p-0.5 rounded hover:bg-neutral-100/60 transition-colors focus:outline-none block max-w-[130px] no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
+                          title={`${row.customer_name || 'Customer'} • ${row.customer_phone || ''} • ${row.customer_email || ''}`}
                         >
-                          <div className="font-semibold text-brand-dark truncate max-w-[180px] group-hover/cust:underline transition-colors">
+                          <div
+                            className="font-semibold text-[11px] text-brand-dark truncate leading-tight transition-colors no-underline hover:no-underline"
+                            style={{ textDecoration: 'none' }}
+                          >
                             {row.customer_name || row.user_id || 'Customer'}
                           </div>
                           {row.customer_phone && (
-                            <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
+                            <div
+                              className="text-[10px] text-neutral-500 font-mono leading-tight mt-0.5 truncate no-underline"
+                              style={{ textDecoration: 'none' }}
+                            >
                               Ph: {row.customer_phone}
                             </div>
                           )}
                           {row.customer_email && (
-                            <div className="text-[11px] text-neutral-400 truncate max-w-[180px]">
+                            <div
+                              className="text-[9px] text-neutral-400 truncate leading-tight no-underline"
+                              style={{ textDecoration: 'none' }}
+                            >
                               {row.customer_email}
                             </div>
                           )}
                         </button>
                       </td>
 
-                      {/* 4. TRANSACTION METHOD (Clickable -> Opens Transaction / Refund Details Modal) */}
-                      <td className="py-2 px-3 text-center">
+                      {/* 4. TRANSACTION METHOD */}
+                      <td className="py-1.5 px-1.5 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenTransactionDetails(row)}
-                          className="inline-block px-2.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 hover:text-brand-dark rounded-md text-[11px] font-semibold border border-neutral-200 hover:border-neutral-300 uppercase transition-all duration-150 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
+                          className="inline-block px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-brand-dark rounded text-[9px] font-semibold border border-neutral-200/90 uppercase transition-all duration-150 cursor-pointer shadow-2xs leading-tight no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title={`View transaction details for Order #${row.order_number || row.id?.slice(0, 8)}`}
-                          aria-label={`View transaction details for Order #${row.order_number || row.id?.slice(0, 8)}`}
                         >
                           {row.payment_method || 'Online'}
                         </button>
                       </td>
 
-                      {/* 5. PAYOUT DETAILS (Clicking text opens Update Refund Modal; clicking Eye toggles whole number in this space with NO popup) */}
-                      <td className="py-2 px-3 w-48">
-                        <div className="flex items-center justify-between gap-1.5 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded-lg px-2 py-1 text-[11px] transition-colors group/payout">
+                      {/* 5. PAYOUT DETAILS */}
+                      <td className="py-1.5 px-1.5 whitespace-nowrap">
+                        <div className="inline-flex items-center justify-between gap-1 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded px-1.5 py-0.5 text-[10px] transition-colors max-w-[125px]">
                           <button
                             type="button"
                             onClick={() => handleOpenReviewModal(row)}
-                            className="font-mono text-neutral-700 hover:text-brand-dark group-hover/payout:text-brand-dark truncate text-left cursor-pointer focus:outline-none flex-1"
-                            title={isRevealed ? `Click to review refund • ${payout.full}` : `Click to review refund • ${payout.masked}`}
+                            className="font-mono text-neutral-700 hover:text-brand-dark truncate text-left cursor-pointer focus:outline-none leading-tight no-underline hover:no-underline"
+                            style={{ textDecoration: 'none' }}
+                            title={isRevealed ? payout.full : payout.masked}
                           >
-                            <span className="hover:underline">
+                            <span style={{ textDecoration: 'none' }}>
                               {isRevealed ? payout.full : payout.masked}
                             </span>
                           </button>
@@ -983,37 +998,40 @@ export const AdminRefundDesk = () => {
                           <button
                             type="button"
                             onClick={(e) => handleToggleRevealPayout(row.id, e)}
-                            className="p-0.5 text-neutral-400 hover:text-brand-dark hover:bg-neutral-200/60 rounded transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark"
-                            title={isRevealed ? 'Hide full number' : 'Show full number'}
-                            aria-label={isRevealed ? 'Hide full number' : 'Show full number'}
+                            className="p-0.5 text-neutral-400 hover:text-brand-dark rounded transition-colors cursor-pointer shrink-0"
+                            title={isRevealed ? 'Hide number' : 'Show number'}
                           >
                             {isRevealed ? (
-                              <EyeOff className="w-3.5 h-3.5 text-brand-dark" />
+                              <EyeOff className="w-3 h-3 text-brand-dark" />
                             ) : (
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3 h-3" />
                             )}
                           </button>
                         </div>
                       </td>
 
-                      {/* 6. AMOUNT (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-2 px-3">
+                      {/* 6. AMOUNT */}
+                      <td className="py-1.5 px-2 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/amt focus:outline-none"
+                          className="text-left cursor-pointer p-0.5 rounded hover:bg-neutral-100/60 transition-colors focus:outline-none leading-tight block no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
                           title="Review & Update Refund"
                         >
-                          <div className="font-admin font-bold text-xs text-brand-dark group-hover/amt:underline transition-colors">
+                          <div
+                            className="font-admin font-bold text-[11px] text-brand-dark transition-colors no-underline"
+                            style={{ textDecoration: 'none' }}
+                          >
                             ₹{eligibleAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
-                          <div className="text-[10px] font-medium mt-0.5">
+                          <div className="text-[9px] font-medium mt-0.5 leading-tight">
                             {isPartial ? (
-                              <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              <span className="text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
                                 Partial
                               </span>
                             ) : (
-                              <span className="text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
+                              <span className="text-neutral-500 bg-neutral-100 px-1 py-0.2 rounded border border-neutral-200">
                                 Full
                               </span>
                             )}
@@ -1021,28 +1039,32 @@ export const AdminRefundDesk = () => {
                         </button>
                       </td>
 
-                      {/* 7. REQUEST DATE (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-2 px-3 text-neutral-600 whitespace-nowrap">
+                      {/* 7. REQUEST DATE */}
+                      <td className="py-1.5 px-1.5 text-neutral-600 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
-                          className="text-left w-full cursor-pointer p-1 -m-1 rounded-lg hover:bg-neutral-100/60 transition-colors group/date focus:outline-none"
-                          title={`Review & Update Refund (Requested: ${dateFormatted})`}
+                          className="text-left cursor-pointer p-0.5 rounded hover:bg-neutral-100/60 transition-colors focus:outline-none block leading-tight no-underline hover:no-underline"
+                          style={{ textDecoration: 'none' }}
+                          title={`Requested: ${dateFormatted}`}
                         >
-                          <div className="font-medium text-brand-dark group-hover/date:underline transition-colors">
+                          <div
+                            className="font-medium text-[10px] text-brand-dark transition-colors no-underline"
+                            style={{ textDecoration: 'none' }}
+                          >
                             {dateFormatted}
                           </div>
                           {relativeTime && (
-                            <div className="text-[10px] text-neutral-400 font-sans mt-0.5 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-neutral-400" />
+                            <div className="text-[9px] text-neutral-400 font-sans mt-0.5 flex items-center gap-0.5">
+                              <Clock className="w-2.5 h-2.5 text-neutral-400" />
                               <span>{relativeTime}</span>
                             </div>
                           )}
                         </button>
                       </td>
 
-                      {/* 8. CURRENT STATUS PILL (Clickable -> Opens Update Refund Modal) */}
-                      <td className="py-2 px-3 text-center">
+                      {/* 8. CURRENT STATUS */}
+                      <td className="py-1.5 px-1.5 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(row)}
@@ -1050,7 +1072,7 @@ export const AdminRefundDesk = () => {
                           title="Review & Update Refund"
                         >
                           <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all duration-150 group-hover/stat:shadow-xs group-hover/stat:brightness-95 ${
+                            className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold border transition-all duration-150 leading-tight group-hover/stat:shadow-2xs ${
                               status === 'Completed'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : status === 'Processing'
@@ -1067,14 +1089,14 @@ export const AdminRefundDesk = () => {
                         </button>
                       </td>
 
-                      {/* 9. ADMIN ACTIONS (Opens Update Refund Modal with target status) */}
-                      <td className="py-2 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* 9. ADMIN ACTIONS */}
+                      <td className="py-1.5 px-2 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
                           {status === 'Requested' && (
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-2.5 py-1 bg-brand-dark text-white hover:bg-black rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                              className="px-2 py-0.5 bg-brand-dark text-white hover:bg-black rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs leading-tight"
                               title="Begin processing refund"
                             >
                               Process
@@ -1082,23 +1104,22 @@ export const AdminRefundDesk = () => {
                           )}
 
                           {status === 'Processing' && (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleOpenReviewModal(row, 'Completed')}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                                title="Mark as Paid and complete refund"
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs leading-tight"
+                                title="Mark as Paid"
                               >
-                                Mark Paid
+                                Paid
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleOpenReviewModal(row, 'Failed')}
-                                className="p-1 text-neutral-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-                                title="Mark as Failed / Dispute"
-                                aria-label="Mark failed"
+                                className="p-0.5 text-neutral-400 hover:text-stone-700 hover:bg-stone-100 rounded transition-colors cursor-pointer"
+                                title="Mark Failed"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3 h-3" />
                               </button>
                             </div>
                           )}
@@ -1107,10 +1128,10 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row)}
-                              className="inline-flex items-center gap-1 px-2.5 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 rounded-lg text-xs font-semibold border border-emerald-200 cursor-pointer transition-colors"
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 rounded text-[10px] font-semibold border border-emerald-200 cursor-pointer transition-colors leading-tight"
                               title="Review completed refund"
                             >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               <span>Paid</span>
                             </button>
                           )}
@@ -1119,7 +1140,7 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-brand-dark rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                              className="px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-brand-dark rounded text-[10px] font-semibold transition-colors cursor-pointer leading-tight"
                               title="Retry processing refund"
                             >
                               Retry
@@ -1130,7 +1151,7 @@ export const AdminRefundDesk = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReviewModal(row, 'Processing')}
-                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                              className="px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-2xs leading-tight"
                               title="Resume processing refund"
                             >
                               Resume

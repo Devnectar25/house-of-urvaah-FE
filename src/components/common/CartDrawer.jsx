@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Heart } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
@@ -10,6 +10,9 @@ import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 export const CartDrawer = () => {
   const navigate = useNavigate();
   const [isProceeding, setIsProceeding] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState('');
+  const feedbackTimerRef = useRef(null);
+
   const {
     cart,
     isCartOpen,
@@ -21,10 +24,37 @@ export const CartDrawer = () => {
     user,
     openAuthModal,
     setPendingAction,
+    toggleWishlist,
+    isInWishlist,
+    selectOnlyCartItem,
+    getCartItemKey,
   } = useCart();
 
   // Lock background screen scroll while Cart Drawer is open
   useModalScrollLock(isCartOpen, () => setIsCartOpen(false));
+
+  const handleMoveToWishlist = (product, selectedSize) => {
+    if (!isInWishlist(product.id)) {
+      toggleWishlist(product.id);
+    }
+    removeFromCart(product.id, selectedSize);
+
+    const productName = product.name ? `"${product.name.slice(0, 22)}${product.name.length > 22 ? '...' : ''}"` : 'Item';
+    setFeedbackMsg(`${productName} moved to wishlist`);
+
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackMsg('');
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    };
+  }, []);
 
   const handleProceedToCheckout = () => {
     if (isProceeding) return;
@@ -128,10 +158,36 @@ export const CartDrawer = () => {
               </div>
             </div>
 
+            {/* Move to Wishlist feedback notification */}
+            <AnimatePresence>
+              {feedbackMsg && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-neutral-900 text-white text-[11px] px-5 py-2 flex items-center justify-between tracking-wide font-medium overflow-hidden border-b border-neutral-800"
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Heart className="w-3 h-3 fill-red-500 text-red-500 shrink-0" />
+                    <span className="truncate">{feedbackMsg}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackMsg('')}
+                    className="text-neutral-400 hover:text-white p-0.5 ml-2 cursor-pointer shrink-0"
+                    aria-label="Dismiss message"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Cart Items List */}
             <div
-              style={{ overscrollBehavior: 'contain' }}
-              className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 divide-y divide-neutral-100"
+              style={{ overscrollBehavior: 'contain', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 divide-y divide-neutral-100 no-scrollbar scrollbar-none"
             >
               {cart.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center text-neutral-400">
@@ -166,13 +222,37 @@ export const CartDrawer = () => {
                           <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 line-clamp-1">
                             {item.product.name}
                           </h4>
-                          <button
-                            onClick={() => removeFromCart(item.product.id, item.selectedSize)}
-                            className="text-neutral-400 hover:text-red-700 transition-colors p-1"
-                            title="Remove item"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 stroke-[1.75]" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {/* Move to Wishlist button */}
+                            <button
+                              type="button"
+                              onClick={() => handleMoveToWishlist(item.product, item.selectedSize)}
+                              className={`p-1 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer ${
+                                isInWishlist(item.product.id)
+                                  ? 'text-red-600'
+                                  : 'text-neutral-400 hover:text-neutral-900'
+                              }`}
+                              title="Move to Wishlist"
+                              aria-label="Move to Wishlist"
+                            >
+                              <Heart
+                                className={`w-3.5 h-3.5 transition-colors ${
+                                  isInWishlist(item.product.id) ? 'fill-red-600 text-red-600' : ''
+                                }`}
+                              />
+                            </button>
+
+                            {/* Remove from cart button */}
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.product.id, item.selectedSize)}
+                              className="text-neutral-400 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-neutral-100 cursor-pointer"
+                              title="Remove item"
+                              aria-label="Remove item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 stroke-[1.75]" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-[11px] text-neutral-600 tracking-wider mt-1 font-medium">
                           SIZE: <span className="font-bold text-neutral-900">{item.selectedSize}</span>
@@ -183,27 +263,91 @@ export const CartDrawer = () => {
                       </div>
 
                       {/* Quantity selector */}
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
-                        <div className="flex items-center border border-neutral-300 text-xs">
+                      {(() => {
+                        const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
+                        let sizeSpecificStock = null;
+                        if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+                          const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(item.selectedSize).trim().toUpperCase());
+                          if (matchKey !== undefined) {
+                            sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+                          }
+                        }
+
+                        const maxStock = sizeSpecificStock !== null
+                          ? sizeSpecificStock
+                          : Number(
+                              item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
+                                ? item.product.stockQuantity
+                                : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
+                            );
+                        const isMaxStockReached = item.quantity >= maxStock;
+
+                        return (
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center border border-neutral-300 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.product.id, item.selectedSize, -1)}
+                                  className="p-1.5 px-2 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                  title="Decrease quantity"
+                                  aria-label="Decrease quantity"
+                                >
+                                  <Minus className="w-3 h-3 stroke-[1.75]" />
+                                </button>
+                                <span className="px-3 font-semibold text-xs text-neutral-900">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.product.id, item.selectedSize, 1)}
+                                  disabled={isMaxStockReached}
+                                  className={`p-1.5 px-2 transition-colors ${
+                                    isMaxStockReached
+                                      ? 'opacity-30 cursor-not-allowed bg-neutral-100 text-neutral-400'
+                                      : 'hover:bg-neutral-100 cursor-pointer text-neutral-900'
+                                  }`}
+                                  title={isMaxStockReached ? `Maximum available stock reached (${maxStock} units)` : 'Increase quantity'}
+                                  aria-label="Increase quantity"
+                                >
+                                  <Plus className="w-3 h-3 stroke-[1.75]" />
+                                </button>
+                              </div>
+
+                              {isMaxStockReached && maxStock < 99 && (
+                                <span className="text-[10px] text-amber-700 font-medium tracking-tight bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                  Max stock ({maxStock})
+                                </span>
+                              )}
+                              {!isMaxStockReached && maxStock <= 5 && (
+                                <span className="text-[10px] text-amber-600 font-medium tracking-tight">
+                                  Only {maxStock} left
+                                </span>
+                              )}
+                            </div>
+
+                            <span className="text-xs font-bold text-neutral-900">
+                              {formatPrice(item.product.price * item.quantity)}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Buy only this item quick action if multiple items in cart */}
+                      {cart.length > 1 && (
+                        <div className="mt-2.5 pt-1.5 border-t border-neutral-100 flex items-center justify-end">
                           <button
-                            onClick={() => updateQuantity(item.product.id, item.selectedSize, -1)}
-                            className="p-1.5 px-2 hover:bg-neutral-100 transition-colors"
+                            type="button"
+                            onClick={() => {
+                              const key = getCartItemKey(item);
+                              selectOnlyCartItem(key);
+                              handleProceedToCheckout();
+                            }}
+                            className="text-[10px] font-sans font-bold tracking-[0.14em] text-neutral-600 hover:text-black uppercase flex items-center gap-1 transition-colors cursor-pointer group"
                           >
-                            <Minus className="w-3 h-3 stroke-[1.75]" />
-                          </button>
-                          <span className="px-3 font-semibold text-xs text-neutral-900">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.product.id, item.selectedSize, 1)}
-                            className="p-1.5 px-2 hover:bg-neutral-100 transition-colors"
-                          >
-                            <Plus className="w-3 h-3 stroke-[1.75]" />
+                            <span>Buy This Item Only</span>
+                            <ArrowRight className="w-2.5 h-2.5 group-hover:translate-x-0.5 transition-transform" />
                           </button>
                         </div>
-
-                        <span className="text-xs font-bold text-neutral-900">
-                          {formatPrice(item.product.price * item.quantity)}
-                        </span>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ))

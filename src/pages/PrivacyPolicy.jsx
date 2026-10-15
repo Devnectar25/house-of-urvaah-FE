@@ -21,7 +21,7 @@ export const PrivacyPolicy = () => {
         keywords="House of Urvaah privacy policy, data security, customer privacy, legal terms"
       />
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-6 md:mb-8">
+      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-3 md:mb-4">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

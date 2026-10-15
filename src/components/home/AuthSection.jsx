@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles, User, Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import apiClient from '../../lib/apiClient';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { validateEmailClient } from '../../utils/emailValidator';
 
 export const AuthSection = () => {
   const navigate = useNavigate();
@@ -20,8 +19,9 @@ export const AuthSection = () => {
     setError('');
 
     const cleanEmail = email.trim();
-    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
-      setError('Please enter a valid email address');
+    const validation = validateEmailClient(cleanEmail);
+    if (!validation.isValid) {
+      setError(validation.message);
       return;
     }
 
@@ -30,7 +30,7 @@ export const AuthSection = () => {
   };
 
   return (
-    <section id="account-section" className="w-full bg-[#FAF8F3] pt-12 md:pt-16 pb-8 md:pb-10 border-y border-neutral-200/80 font-serif select-none overflow-hidden">
+    <section id="account-section" className="w-full bg-[#FAF8F3] pt-6 md:pt-8 pb-8 md:pb-10 border-b border-neutral-200/80 font-serif select-none overflow-hidden">
       <div className="w-full max-w-[1500px] mx-auto px-6 sm:px-10 lg:px-16">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12">

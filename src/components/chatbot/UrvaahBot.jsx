@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bot,
@@ -35,6 +36,7 @@ const INITIAL_MESSAGE = {
 
 export const UrvaahBot = ({ isOpen, onClose }) => {
   const { setPdpProduct, setQuickViewProduct } = useCart();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState(() => {
     try {
       const saved = sessionStorage.getItem('urvaah_bot_messages');
@@ -329,7 +331,10 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
       // fire-and-forget
     }
 
-    if (setPdpProduct) {
+    if (product?.id) {
+      navigate(`/product/${product.id}`);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    } else if (setPdpProduct) {
       setPdpProduct(product);
     }
   };
@@ -351,9 +356,10 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed bottom-[30px] right-2 sm:right-4 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
+          className="fixed bottom-0 sm:bottom-0 right-0 sm:right-0 z-50 w-[94vw] sm:w-[410px] h-[590px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden font-sans select-text overscroll-contain"
           style={{
-            bottom: '30px',
+            bottom: '0px',
+            right: '0px',
             boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25)',
             overscrollBehavior: 'contain',
             overscrollBehaviorY: 'contain'
@@ -518,15 +524,13 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                                     <span>Details</span>
                                     <ChevronRight className="w-2.5 h-2.5" />
                                   </button>
-                                  {setQuickViewProduct && (
-                                    <button
-                                      onClick={() => setQuickViewProduct(prod)}
-                                      title="Quick View"
-                                      className="p-1 border border-stone-300 hover:bg-stone-200 rounded text-stone-700 transition-colors"
-                                    >
-                                      <Eye className="w-3 h-3" />
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => handleProductClick(prod)}
+                                    title="View Product Details"
+                                    className="p-1 border border-stone-300 hover:bg-stone-200 rounded text-stone-700 transition-colors cursor-pointer"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
                                 </div>
                               </div>
                             ))}

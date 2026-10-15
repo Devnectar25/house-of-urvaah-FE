@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Shield, AlertCircle, RefreshCw, ArrowRight, CheckCircle2, User as UserIcon, Phone, Edit3 } from 'lucide-react';
+import { X, Mail, Shield, AlertCircle, RefreshCw, ArrowRight, CheckCircle2, User as UserIcon, Phone, Pencil } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Logo } from '../common/Logo';
 import apiClient from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { validateEmailClient } from '../../utils/emailValidator';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[6-9]\d{9}$/; // 10-digit Indian mobile number format
 const NAME_REGEX = /^[A-Za-z\s'-]{2,}$/; // Letters, spaces, hyphens, apostrophes (at least 2 chars)
 
@@ -145,12 +145,9 @@ export const AuthModal = () => {
     setFieldErrors({});
 
     const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setFieldErrors({ email: 'Please enter a valid email address' });
-      return;
-    }
-    if (!EMAIL_REGEX.test(cleanEmail)) {
-      setFieldErrors({ email: 'Please enter a valid email address' });
+    const validation = validateEmailClient(cleanEmail);
+    if (!validation.isValid) {
+      setFieldErrors({ email: validation.message });
       return;
     }
 
@@ -158,7 +155,7 @@ export const AuthModal = () => {
     try {
       const res = await apiClient('/api/auth/send-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: cleanEmail }),
+        body: JSON.stringify({ email: validation.cleanEmail }),
       });
 
       if (res.success) {
@@ -222,6 +219,11 @@ export const AuthModal = () => {
     setServerError('');
     setFieldErrors({});
 
+    if (canResend || resendCountdown === 0) {
+      setServerError('This verification code has expired. Please click "RESEND OTP CODE" below to request a fresh code.');
+      return;
+    }
+
     const otpString = otpDigits.join('');
     if (otpString.length !== 6) {
       setServerError('Please enter the complete 6-digit verification code');
@@ -261,12 +263,19 @@ export const AuthModal = () => {
   const handleResendOtp = async () => {
     if (!canResend || isSubmitting) return;
     setServerError('');
+
+    const validation = validateEmailClient(email.trim());
+    if (!validation.isValid) {
+      setServerError(validation.message);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const res = await apiClient('/api/auth/send-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: validation.cleanEmail }),
       });
 
       if (res.success) {
@@ -535,9 +544,9 @@ export const AuthModal = () => {
                             setStep('email');
                             setServerError('');
                           }}
-                          className="text-[11px] underline text-neutral-500 hover:text-black flex items-center gap-1 cursor-pointer"
+                          className="text-[11px] text-neutral-500 hover:text-black hover:opacity-75 flex items-center gap-1 cursor-pointer transition-colors"
                         >
-                          <Edit3 className="w-3 h-3" /> Change
+                          <Pencil className="w-3 h-3" /> Change
                         </button>
                       </div>
                     </div>
@@ -565,13 +574,15 @@ export const AuthModal = () => {
 
                       <button
                         type="submit"
-                        disabled={isSubmitting || otpDigits.join('').length !== 6}
+                        disabled={isSubmitting || otpDigits.join('').length !== 6 || canResend || resendCountdown === 0}
                         className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
                           <span className="animate-pulse flex items-center gap-2">
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" /> VERIFYING...
                           </span>
+                        ) : (canResend || resendCountdown === 0) ? (
+                          'OTP EXPIRED - RESEND CODE'
                         ) : (
                           'VERIFY & CONTINUE'
                         )}
@@ -579,18 +590,23 @@ export const AuthModal = () => {
 
                       {/* Resend OTP Link with 60s Countdown */}
                       <div className="text-center pt-2">
-                        {canResend ? (
-                          <button
-                            type="button"
-                            onClick={handleResendOtp}
-                            disabled={isSubmitting}
-                            className="text-xs tracking-wider uppercase font-semibold text-neutral-900 hover:underline cursor-pointer"
-                          >
-                            RESEND OTP CODE
-                          </button>
+                        {canResend || resendCountdown === 0 ? (
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] text-red-600 font-medium tracking-wider uppercase">
+                              Verification code expired
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleResendOtp}
+                              disabled={isSubmitting}
+                              className="text-xs tracking-wider uppercase font-semibold text-neutral-900 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3 h-3" /> RESEND OTP CODE
+                            </button>
+                          </div>
                         ) : (
                           <p className="text-xs text-neutral-400 font-light tracking-wider uppercase">
-                            Resend code in <span className="font-semibold text-neutral-700">{resendCountdown}s</span>
+                            Code expires in <span className="font-semibold text-neutral-900">{resendCountdown}s</span>
                           </p>
                         )}
                       </div>

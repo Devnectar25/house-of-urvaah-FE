@@ -10,16 +10,40 @@ import {
   Sparkles,
   Flame,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Layers
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import {
+  normalizeSize,
+  isValidSize,
+  filterValidSizes,
+  STANDARD_QUICK_SIZES
+} from '../../utils/sizeValidator';
+import {
+  validateColorInput,
+  normalizeColor,
+  getSwatchCss,
+  filterValidColors,
+  POPULAR_FASHION_COLORS
+} from '../../utils/colorValidator';
+import RichDescriptionEditor from './RichDescriptionEditor';
+
 
 const DEFAULT_CATEGORIES = [
   { id: 1, category_id: 1, name: 'CORSET TOPS' },
   { id: 2, category_id: 2, name: 'CO-ORD SETS' },
   { id: 3, category_id: 3, name: 'KURTI' },
   { id: 4, category_id: 4, name: 'PARTY WEAR' }
+];
+
+const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
+  { label: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
+  { label: 'Skirt hem', value: 'Hand-finished potli trim' },
+  { label: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
+  { label: 'Lining', value: 'Fully lined (top and skirt)' },
+  { label: 'Top', value: 'Lightly Padded' }
 ];
 
 export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, onProductDeleted }) => {
@@ -30,6 +54,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const categoryRef = useRef(null);
   const priceRef = useRef(null);
   const discountRef = useRef(null);
+  const imagesRef = useRef(null);
 
   // Form State initialized from product prop
   const [formData, setFormData] = useState({
@@ -38,12 +63,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     subCategory: '',
     shortDescription: '',
     description: '',
+    fullDescription: '',
     nameOptions: [],
     productDetails: [],
     originalPrice: 0,
     discountPercent: 0,
     price: 0,
     stockQuantity: 0,
+    sizeStock: {},
     active: true,
     promoted: false,
     is_recommended: false,
@@ -69,7 +96,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Size & Color input buffers for tag creation
   const [sizeInput, setSizeInput] = useState('');
+  const [sizeError, setSizeError] = useState(null);
   const [colorInput, setColorInput] = useState('');
+  const [colorError, setColorError] = useState(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
 
@@ -101,6 +130,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       setFetchingDetail(true);
       setSubmitError(null);
       setShowDeleteConfirm(false);
+      setColorInput('');
+      setColorError(null);
       try {
         const res = await apiClient(`/api/products/${product.id}`);
         const data = res?.data || res || product;
@@ -114,10 +145,23 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         // Map specifications array or object
         let specPairs = [];
-        if (Array.isArray(data.specifications)) {
-          specPairs = data.specifications;
+        if (Array.isArray(data.specifications) && data.specifications.length > 0) {
+          specPairs = data.specifications.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
+        } else if (Array.isArray(data.productDetails) && data.productDetails.length > 0) {
+          specPairs = data.productDetails.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
+        } else if (Array.isArray(data.product_details) && data.product_details.length > 0) {
+          specPairs = data.product_details.map(s => ({
+            label: s.label || s.title || '',
+            value: s.value || ''
+          }));
         } else if (data.specifications && typeof data.specifications === 'object') {
-          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value }));
+          specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value: String(value || '') }));
         } else if (data.fabric || data.fitType) {
           if (data.fabric) specPairs.push({ label: 'Fabric', value: data.fabric });
           if (data.fitType) specPairs.push({ label: 'Fit Type', value: data.fitType });
@@ -138,25 +182,52 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         const ratingVal = parseFloat(data.rating ?? product?.rating) || 0;
         const reviewsCount = parseInt(data.reviews ?? data.reviews_count ?? product?.reviews ?? product?.reviews_count) || 0;
 
+        let sizeStock = data.sizeStock || data.size_stock || {};
+        if (typeof sizeStock === 'string') {
+          try { sizeStock = JSON.parse(sizeStock); } catch (e) { sizeStock = {}; }
+        }
+        if (!sizeStock || typeof sizeStock !== 'object') sizeStock = {};
+
+        const validSizes = Array.isArray(data.sizes) && data.sizes.length > 0 ? (filterValidSizes(data.sizes).length > 0 ? filterValidSizes(data.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'];
+        const normalizedSizeStock = {};
+        const totalStock = Number(data.stockQuantity ?? data.quantity ?? 0);
+        validSizes.forEach(sz => {
+          if (sizeStock[sz] !== undefined) {
+            normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[sz], 10) || 0);
+          } else {
+            const found = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.toUpperCase());
+            if (found !== undefined) {
+              normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[found], 10) || 0);
+            } else {
+              normalizedSizeStock[sz] = totalStock > 0 ? Math.floor(totalStock / validSizes.length) : 0;
+            }
+          }
+        });
+        const computedTotalStock = Object.keys(normalizedSizeStock).length > 0
+          ? Object.values(normalizedSizeStock).reduce((acc, v) => acc + v, 0)
+          : totalStock;
+
         setFormData({
           name: data.name || data.title || '',
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
           description: data.description || '',
+          fullDescription: data.fullDescription || data.full_description || data.fulldescription || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: origPrice,
           discountPercent: calcDiscount,
           price: currPrice,
-          stockQuantity: data.stockQuantity ?? data.quantity ?? 0,
+          stockQuantity: computedTotalStock,
+          sizeStock: normalizedSizeStock,
           active: data.active !== false && data.is_active !== false,
           promoted: Boolean(data.promoted || data.is_featured),
           is_recommended: Boolean(data.is_recommended || data.isRecommended),
           rating: ratingVal,
           reviews: reviewsCount,
-          sizes: Array.isArray(data.sizes) && data.sizes.length > 0 ? data.sizes : ['XS', 'S', 'M', 'L'],
-          colors: Array.isArray(data.colors) && data.colors.length > 0 ? data.colors : ['Default'],
+          sizes: validSizes,
+          colors: Array.isArray(data.colors) && data.colors.length > 0 ? (filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
           specifications: specPairs,
           careInstructions: data.careInstructions || data.care_instructions || '',
           images: Array.isArray(data.images) && data.images.length > 0
@@ -180,25 +251,52 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         const fallbackRating = parseFloat(product?.rating) || 0;
         const fallbackReviews = parseInt(product?.reviews ?? product?.reviews_count) || 0;
 
+        let sizeStock = product?.sizeStock || product?.size_stock || {};
+        if (typeof sizeStock === 'string') {
+          try { sizeStock = JSON.parse(sizeStock); } catch (e) { sizeStock = {}; }
+        }
+        if (!sizeStock || typeof sizeStock !== 'object') sizeStock = {};
+
+        const validSizes = Array.isArray(product.sizes) ? (filterValidSizes(product.sizes).length > 0 ? filterValidSizes(product.sizes) : ['XS', 'S', 'M', 'L']) : ['XS', 'S', 'M', 'L'];
+        const normalizedSizeStock = {};
+        const totalStock = Number(product.stockQuantity ?? product.quantity ?? 0);
+        validSizes.forEach(sz => {
+          if (sizeStock[sz] !== undefined) {
+            normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[sz], 10) || 0);
+          } else {
+            const found = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.toUpperCase());
+            if (found !== undefined) {
+              normalizedSizeStock[sz] = Math.max(0, parseInt(sizeStock[found], 10) || 0);
+            } else {
+              normalizedSizeStock[sz] = totalStock > 0 ? Math.floor(totalStock / validSizes.length) : 0;
+            }
+          }
+        });
+        const computedTotalStock = Object.keys(normalizedSizeStock).length > 0
+          ? Object.values(normalizedSizeStock).reduce((acc, v) => acc + v, 0)
+          : totalStock;
+
         setFormData({
           name: product.name || '',
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.description || '',
+          fullDescription: product.fullDescription || product.full_description || product.fulldescription || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: product.originalPrice || product.price || 0,
           discountPercent: product.discount || 0,
           price: product.price || 0,
-          stockQuantity: product.stockQuantity ?? 0,
+          stockQuantity: computedTotalStock,
+          sizeStock: normalizedSizeStock,
           active: product.active !== false,
           promoted: Boolean(product.promoted),
           is_recommended: Boolean(product.is_recommended || product.isRecommended),
           rating: fallbackRating,
           reviews: fallbackReviews,
-          sizes: Array.isArray(product.sizes) ? product.sizes : ['XS', 'S', 'M', 'L'],
-          colors: Array.isArray(product.colors) ? product.colors : ['Default'],
+          sizes: validSizes,
+          colors: Array.isArray(product.colors) ? (filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
           images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : [])
@@ -226,6 +324,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       const num = Number(value);
       if (isNaN(num) || num < 0 || num > 100) {
         err = 'Discount % must be between 0 and 100';
+      }
+    } else if (field === 'images') {
+      const list = Array.isArray(value) ? value.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
+      if (list.length === 0) {
+        err = 'At least 1 product image is required';
       }
     }
     setErrors(prev => ({ ...prev, [field]: err }));
@@ -313,31 +416,110 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Size pill handlers
   const handleAddSize = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !sizeInput.trim()) return;
-    e.preventDefault();
-    const newSize = sizeInput.trim().toUpperCase();
-    if (!formData.sizes.includes(newSize)) {
-      setFormData(prev => ({ ...prev, sizes: [...prev.sizes, newSize] }));
+    if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') return;
+    if (e) e.preventDefault();
+
+    const raw = sizeInput.trim();
+    if (!raw) return;
+
+    const normalized = normalizeSize(raw);
+    if (!isValidSize(normalized)) {
+      setSizeError(`"${raw}" is not a recognized size. Please use standard apparel sizes (e.g. XS, S, M, L, XL, XXL, FREE SIZE or 26, 28, 30).`);
+      return;
     }
+
+    if (formData.sizes.includes(normalized)) {
+      setSizeError(`Size "${normalized}" is already added.`);
+      return;
+    }
+
+    setFormData(prev => {
+      const nextSizes = [...prev.sizes, normalized];
+      const nextSizeStock = { ...(prev.sizeStock || {}), [normalized]: 0 };
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+      };
+    });
     setSizeInput('');
+    setSizeError(null);
+  };
+
+  const handleTogglePresetSize = (sz) => {
+    setSizeError(null);
+    if (formData.sizes.includes(sz)) {
+      handleRemoveSize(sz);
+    } else {
+      setFormData(prev => {
+        const nextSizes = [...prev.sizes, sz];
+        const nextSizeStock = { ...(prev.sizeStock || {}), [sz]: 0 };
+        const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+        return {
+          ...prev,
+          sizes: nextSizes,
+          sizeStock: nextSizeStock,
+          stockQuantity: newTotal > 0 ? newTotal : prev.stockQuantity
+        };
+      });
+    }
   };
 
   const handleRemoveSize = (sizeToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      sizes: prev.sizes.filter(s => s !== sizeToRemove)
-    }));
+    setFormData(prev => {
+      const nextSizes = prev.sizes.filter(s => s !== sizeToRemove);
+      const nextSizeStock = { ...(prev.sizeStock || {}) };
+      delete nextSizeStock[sizeToRemove];
+      const newTotal = Object.values(nextSizeStock).reduce((acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0), 0);
+      return {
+        ...prev,
+        sizes: nextSizes,
+        sizeStock: nextSizeStock,
+        stockQuantity: newTotal
+      };
+    });
+    setSizeError(null);
   };
 
-  // Color pill handlers
-  const handleAddColor = (e) => {
-    if ((e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') || !colorInput.trim()) return;
-    e.preventDefault();
-    const newColor = colorInput.trim();
-    if (!formData.colors.includes(newColor)) {
-      setFormData(prev => ({ ...prev, colors: [...prev.colors, newColor] }));
+  // Color pill & preset handlers
+  const handleTogglePresetColor = (colorName) => {
+    const isSelected = formData.colors.some(
+      c => c.toLowerCase() === colorName.toLowerCase()
+    );
+    if (isSelected) {
+      setFormData(prev => ({
+        ...prev,
+        colors: prev.colors.filter(c => c.toLowerCase() !== colorName.toLowerCase())
+      }));
+    } else {
+      const result = validateColorInput(colorName, formData.colors);
+      if (result.valid) {
+        setFormData(prev => ({
+          ...prev,
+          colors: [...prev.colors, result.normalized]
+        }));
+      }
     }
+    setColorError(null);
+  };
+
+  const handleAddColor = (e) => {
+    if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ',') return;
+    if (e) e.preventDefault();
+    const raw = colorInput.trim();
+    if (!raw) return;
+
+    const result = validateColorInput(raw, formData.colors);
+    if (!result.valid) {
+      setColorError(result.error);
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, colors: [...prev.colors, result.normalized] }));
     setColorInput('');
+    setColorError(null);
   };
 
   const handleRemoveColor = (colorToRemove) => {
@@ -345,19 +527,20 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       ...prev,
       colors: prev.colors.filter(c => c !== colorToRemove)
     }));
+    setColorError(null);
   };
 
-  // Specification Key-Value Pair Handlers
+  // Specification / Additional Information Key-Value Pair Handlers
   const handleAddSpecification = () => {
     setFormData(prev => ({
       ...prev,
-      specifications: [...prev.specifications, { label: '', value: '' }]
+      specifications: [...(prev.specifications || []), { label: '', value: '' }]
     }));
   };
 
   const handleSpecChange = (index, key, val) => {
     setFormData(prev => {
-      const updated = [...prev.specifications];
+      const updated = [...(prev.specifications || [])];
       updated[index] = { ...updated[index], [key]: val };
       return { ...prev, specifications: updated };
     });
@@ -366,7 +549,21 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const handleRemoveSpecification = (index) => {
     setFormData(prev => ({
       ...prev,
-      specifications: prev.specifications.filter((_, i) => i !== index)
+      specifications: (prev.specifications || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleLoadAdditionalInfoTemplate = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: DEFAULT_ADDITIONAL_INFO_TEMPLATE.map(row => ({ ...row }))
+    }));
+  };
+
+  const handleClearAdditionalInfo = () => {
+    setFormData(prev => ({
+      ...prev,
+      specifications: []
     }));
   };
 
@@ -408,6 +605,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           ...prev,
           images: [...prev.images, uploadedUrl]
         }));
+        setErrors(prev => ({ ...prev, images: '' }));
+        setSubmitError(null);
       } else {
         throw new Error('No image URL returned by server');
       }
@@ -437,13 +636,21 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     }));
     setImageUrlInput('');
     setShowUrlInput(false);
+    setSubmitError(null);
+    setErrors(prev => ({ ...prev, images: '' }));
   };
 
   const handleRemoveImage = (indexToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, idx) => idx !== indexToRemove)
-    }));
+    setFormData(prev => {
+      const nextImages = prev.images.filter((_, idx) => idx !== indexToRemove);
+      if (nextImages.length === 0) {
+        setErrors(errs => ({ ...errs, images: 'At least 1 product image is required' }));
+      }
+      return {
+        ...prev,
+        images: nextImages
+      };
+    });
   };
 
   // Submit / Update Handler
@@ -458,9 +665,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     const isCategoryValid = validateField('category_id', formData.category_id);
     const isPriceValid = validateField('price', formData.price);
     const isDiscountValid = validateField('discountPercent', formData.discountPercent);
+    const isImagesValid = validateField('images', formData.images);
 
-    if (!isNameValid || !isCategoryValid || !isPriceValid || !isDiscountValid) {
-      setSubmitError('Please fix the highlighted required fields before saving.');
+    if (!isNameValid || !isCategoryValid || !isPriceValid || !isDiscountValid || !isImagesValid) {
+      if (!isImagesValid && isNameValid && isCategoryValid && isPriceValid && isDiscountValid) {
+        setSubmitError('At least 1 product image is required. Please upload or keep at least 1 image.');
+        imagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        setSubmitError('Please fix the highlighted required fields before saving.');
+      }
       if (!isNameValid) {
         nameRef.current?.focus();
       } else if (!isCategoryValid) {
@@ -479,11 +692,27 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       return;
     }
 
+    // If user has a pending color in the input field, validate and commit it
+    let currentColors = [...formData.colors];
+    if (colorInput.trim()) {
+      const check = validateColorInput(colorInput.trim(), currentColors);
+      if (!check.valid) {
+        setColorError(check.error);
+        setSubmitError(`Invalid color: ${check.error}`);
+        return;
+      }
+      currentColors.push(check.normalized);
+      setFormData(prev => ({ ...prev, colors: currentColors }));
+      setColorInput('');
+      setColorError(null);
+    }
+
     setUpdating(true);
     setSubmitError(null);
 
     try {
       const validNameOptions = (formData.nameOptions || []).map(n => n.trim()).filter(Boolean);
+      const validSpecs = (formData.specifications || []).filter(s => (s.label && s.label.trim()) || (s.value && s.value.trim()));
       const validProductDetails = (formData.productDetails || []).filter(d => d.label.trim() || d.value.trim());
 
       const payload = {
@@ -494,10 +723,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         shortDescription: formData.shortDescription.trim(),
         short_description: formData.shortDescription.trim(),
         description: formData.description.trim(),
+        fullDescription: formData.fullDescription.trim(),
+        full_description: formData.fullDescription.trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
-        productDetails: validProductDetails,
-        product_details: validProductDetails,
+        productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
+        product_details: validSpecs.length > 0 ? validSpecs : validProductDetails,
         originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
         discountPercent: Number(formData.discountPercent) || 0,
@@ -507,14 +738,18 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         stock_quantity: Number(formData.stockQuantity) || 0,
         quantity: Number(formData.stockQuantity) || 0,
         instock: Number(formData.stockQuantity) > 0,
+        sizeStock: formData.sizeStock || {},
+        size_stock: formData.sizeStock || {},
         active: formData.active,
         is_active: formData.active,
         promoted: formData.promoted,
         is_recommended: formData.is_recommended,
         isRecommended: formData.is_recommended,
-        sizes: formData.sizes,
-        colors: formData.colors,
-        specifications: formData.specifications,
+        sizes: filterValidSizes(formData.sizes).length > 0 ? filterValidSizes(formData.sizes) : ['XS', 'S', 'M', 'L'],
+        colors: filterValidColors(currentColors).length > 0 ? filterValidColors(currentColors) : ['Default'],
+        specifications: validSpecs,
+        additionalInfo: validSpecs,
+        additional_info: validSpecs,
         careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
@@ -758,7 +993,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       href={`/admin/reviews?search=${encodeURIComponent(formData.name || product.name || '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-dark hover:underline pt-2 border-t border-neutral-100"
+                      className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-dark hover:text-black no-underline hover:no-underline pt-2 border-t border-neutral-100 transition-colors"
+                      style={{ textDecoration: 'none' }}
                     >
                       <MessageSquare className="w-3 h-3 text-neutral-500" />
                       <span>Manage Reviews</span>
@@ -946,6 +1182,19 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 />
               </div>
 
+              {/* 4.1 Full Description with Rich Formatting Toolbar */}
+              <div className="space-y-1.5">
+                <RichDescriptionEditor
+                  value={formData.fullDescription}
+                  onChange={(val) => setFormData(prev => ({ ...prev, fullDescription: val }))}
+                  placeholder="Comprehensive product story, artisan detailing, styling ideas, and garment drape overview..."
+                  title="OVERVIEW DESCRIPTION & DETAILS"
+                  badgeText="STANDARD SECTION"
+                  rows={6}
+                />
+              </div>
+
+
               {/* 4.5 PRODUCT CONTENT SECTION */}
               <div className="space-y-4 pt-3 pb-1 border-t border-b border-neutral-200/60 my-2">
                 <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">Product Content</h3>
@@ -959,7 +1208,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={handleAddNameOption}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Name Option
                     </button>
@@ -1000,7 +1249,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={handleAddProductDetail}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
                     </button>
@@ -1102,7 +1351,25 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     type="number"
                     min="0"
                     value={formData.stockQuantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => {
+                      const total = Math.max(0, parseInt(e.target.value) || 0);
+                      setFormData(prev => {
+                        const sizes = prev.sizes || [];
+                        let nextSizeStock = { ...(prev.sizeStock || {}) };
+                        if (sizes.length > 0) {
+                          const base = Math.floor(total / sizes.length);
+                          const rem = total % sizes.length;
+                          sizes.forEach((sz, idx) => {
+                            nextSizeStock[sz] = base + (idx < rem ? 1 : 0);
+                          });
+                        }
+                        return {
+                          ...prev,
+                          stockQuantity: total,
+                          sizeStock: nextSizeStock
+                        };
+                      });
+                    }}
                     className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                   />
                 </div>
@@ -1214,12 +1481,42 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 </div>
               </div>
 
-              {/* 7. Available Sizes (Tag/Chip Input) */}
+              {/* 7. Available Sizes (Tag/Chip Input with Presets & Strict Validation) */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                  Sizes Available
-                </label>
-                <div className="flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl min-h-[44px]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                    Sizes Available
+                  </label>
+                  <span className="text-[11px] text-neutral-400">
+                    Quick-pick presets or enter custom size
+                  </span>
+                </div>
+
+                {/* Quick Add Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                  <span className="text-[10px] uppercase font-semibold text-neutral-400 mr-0.5">Presets:</span>
+                  {STANDARD_QUICK_SIZES.map((sz) => {
+                    const isSelected = formData.sizes.includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => handleTogglePresetSize(sz)}
+                        className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-brand-dark text-white border-brand-dark shadow-2xs'
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
+                        }`}
+                      >
+                        {isSelected ? `✓ ${sz}` : `+ ${sz}`}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={`flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border rounded-xl min-h-[44px] transition-colors ${
+                  sizeError ? 'border-rose-400 ring-1 ring-rose-400/20' : 'border-neutral-200 focus-within:border-neutral-400'
+                }`}>
                   {formData.sizes.map((sz) => (
                     <span
                       key={sz}
@@ -1235,88 +1532,305 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       </button>
                     </span>
                   ))}
-                  <input
-                    type="text"
-                    value={sizeInput}
-                    onChange={(e) => setSizeInput(e.target.value)}
-                    onKeyDown={handleAddSize}
-                    placeholder="Type size (e.g. XL) & press Enter..."
-                    className="flex-1 min-w-[140px] bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
-                  />
+                  <div className="flex-1 flex items-center min-w-[170px] gap-1.5">
+                    <input
+                      type="text"
+                      value={sizeInput}
+                      onChange={(e) => {
+                        setSizeInput(e.target.value);
+                        if (sizeError) setSizeError(null);
+                      }}
+                      onKeyDown={handleAddSize}
+                      placeholder="Type size (e.g. XL or 28) & press Enter..."
+                      className="flex-1 bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
+                    />
+                    {sizeInput.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleAddSize}
+                        className="shrink-0 px-2.5 py-1 text-xs font-semibold bg-brand-dark text-white rounded-md hover:bg-black transition-colors"
+                      >
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {sizeError && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{sizeError}</span>
+                  </div>
+                )}
+
+                {/* 7b. Size-Wise Inventory & Stock Management */}
+                {formData.sizes.length > 0 && (
+                  <div className="mt-3 p-4 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-2.5">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-neutral-700" />
+                          <h5 className="text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin">
+                            Size-Wise Inventory & Stock
+                          </h5>
+                        </div>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                          Set available stock per size. Sizes with 0 units will automatically show as <span className="font-semibold text-rose-600">Out of Stock</span> on the storefront.
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-800 self-start sm:self-auto">
+                        <span className="text-[10px] text-neutral-500 uppercase font-semibold">Total:</span>
+                        <span>{formData.stockQuantity} units</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {formData.sizes.map((sz) => {
+                        const qty = formData.sizeStock?.[sz] !== undefined ? formData.sizeStock[sz] : 0;
+                        const isOutOfStock = qty <= 0;
+
+                        return (
+                          <div
+                            key={sz}
+                            className={`p-2.5 rounded-lg border transition-all ${
+                              isOutOfStock
+                                ? 'bg-rose-50/50 border-rose-200'
+                                : 'bg-neutral-50/70 border-neutral-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-bold text-neutral-900">Size {sz}</span>
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  isOutOfStock
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}
+                              >
+                                {isOutOfStock ? '0 (Out)' : `${qty} in stock`}
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                const nextSizeStock = { ...(formData.sizeStock || {}), [sz]: val };
+                                const newTotal = Object.values(nextSizeStock).reduce(
+                                  (acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0),
+                                  0
+                                );
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sizeStock: nextSizeStock,
+                                  stockQuantity: newTotal
+                                }));
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded text-xs font-bold text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black"
+                              placeholder="0"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 8. Available Colors (Tag/Chip Input) */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                  Colors Available
-                </label>
-                <div className="flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border border-neutral-200 rounded-xl min-h-[44px]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                    Colors Available
+                  </label>
+                  <span className="text-[11px] text-neutral-400">
+                    HEX (e.g. #8B0000) or apparel color name
+                  </span>
+                </div>
+
+                {/* Quick Add Color Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                  <span className="text-[10px] uppercase font-semibold text-neutral-400 mr-0.5">Presets:</span>
+                  {POPULAR_FASHION_COLORS.map(({ name, hex }) => {
+                    const isSelected = formData.colors.some(
+                      c => c.toLowerCase() === name.toLowerCase() || c.toLowerCase() === hex.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => handleTogglePresetColor(name)}
+                        className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-brand-dark text-white border-brand-dark shadow-2xs'
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400 hover:text-black'
+                        }`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          style={{ background: hex }}
+                        />
+                        <span>{isSelected ? `✓ ${name}` : `+ ${name}`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  className={`flex flex-wrap items-center gap-2 p-2.5 bg-neutral-50 border rounded-xl min-h-[44px] transition-colors ${
+                    colorError
+                      ? 'border-rose-400 ring-1 ring-rose-400/20'
+                      : 'border-neutral-200 focus-within:border-neutral-400'
+                  }`}
+                >
                   {formData.colors.map((col) => (
                     <span
                       key={col}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-neutral-200 text-brand-dark text-xs font-semibold rounded-md shadow-2xs"
                     >
-                      {col}
+                      <span
+                        className="w-3 h-3 rounded-full border border-black/20 shrink-0 shadow-2xs"
+                        style={{ background: getSwatchCss(col) }}
+                        aria-hidden="true"
+                      />
+                      <span>{col}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveColor(col)}
-                        className="text-neutral-400 hover:text-rose-600 transition-colors"
+                        className="text-neutral-400 hover:text-rose-600 transition-colors ml-0.5"
+                        title={`Remove ${col}`}
                       >
                         <X className="w-3 h-3" />
                       </button>
                     </span>
                   ))}
-                  <input
-                    type="text"
-                    value={colorInput}
-                    onChange={(e) => setColorInput(e.target.value)}
-                    onKeyDown={handleAddColor}
-                    placeholder="Type color (e.g. Emerald Green) & press Enter..."
-                    className="flex-1 min-w-[160px] bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
-                  />
+                  <div className="flex-1 flex items-center min-w-[200px] gap-1.5">
+                    <input
+                      type="text"
+                      value={colorInput}
+                      onChange={(e) => {
+                        setColorInput(e.target.value);
+                        if (colorError) setColorError(null);
+                      }}
+                      onKeyDown={handleAddColor}
+                      placeholder="Type color (e.g. Emerald Green) & press Enter..."
+                      className="flex-1 bg-transparent text-xs text-brand-dark focus:outline-none placeholder-neutral-400"
+                    />
+                    {colorInput.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleAddColor}
+                        className="shrink-0 px-2.5 py-1 text-xs font-semibold bg-brand-dark text-white rounded-md hover:bg-black transition-colors"
+                      >
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {colorError && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5 animate-in fade-in">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{colorError}</span>
+                  </div>
+                )}
               </div>
 
-              {/* 9. Specifications (Repeatable Key-Value List) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Specifications (Optional)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddSpecification}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:underline"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Row
-                  </button>
+              {/* 9. Additional Information (Storefront Accordion) */}
+              <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                        Additional Information
+                      </label>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
+                        Storefront Accordion
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Dynamically customize rows displayed under the "ADDITIONAL INFORMATION" accordion on the product page.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={handleLoadAdditionalInfoTemplate}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                      title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
+                    >
+                      Load Preset
+                    </button>
+                    {(formData.specifications || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAdditionalInfo}
+                        className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
+                        title="Clear all rows"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddSpecification}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
+                    </button>
+                  </div>
                 </div>
-                {formData.specifications.length === 0 ? (
-                  <p className="text-xs text-neutral-400 italic">No specifications added yet. Click "+ Add Row" for key details like Fabric, Fit, or Length.</p>
+
+                {!formData.specifications || formData.specifications.length === 0 ? (
+                  <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
+                    <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleLoadAdditionalInfoTemplate}
+                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                      >
+                        Load Standard Preset Rows
+                      </button>
+                      <span className="text-neutral-300">•</span>
+                      <button
+                        type="button"
+                        onClick={handleAddSpecification}
+                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                      >
+                        + Add Custom Row
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-2">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                      <div className="col-span-4">Attribute / Title</div>
+                      <div className="col-span-7">Value / Specification Detail</div>
+                      <div className="col-span-1 text-center">Action</div>
+                    </div>
                     {formData.specifications.map((spec, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
                         <input
                           type="text"
                           value={spec.label}
                           onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
-                          placeholder="Label (e.g. Fabric)"
-                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          placeholder="e.g. Fabric, Closure, Lining, Care"
+                          className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
                         />
                         <input
                           type="text"
                           value={spec.value}
                           onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                          placeholder="Value (e.g. 100% Chanderi Silk)"
-                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                          placeholder="e.g. Embroidered fabric with sequin detailing"
+                          className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveSpecification(idx)}
-                          className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
-                          title="Remove specification"
+                          className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Remove row"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1341,23 +1855,32 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
               </div>
 
               {/* 11. Product Images */}
-              <div className="space-y-3">
+              <div ref={imagesRef} className="space-y-3 scroll-mt-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                      Product Images
+                      Product Images <span className="text-rose-600 font-bold">*</span>
                     </label>
                     <p className="text-[11px] text-neutral-400">
-                      Upload up to 5 images. The first image will be the main cover photo.
+                      At least 1 product image is required. Upload up to 5 images. The first image will be the main cover photo.
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-neutral-500 font-medium">
+                  <span className={`text-xs font-mono font-medium ${formData.images.length === 0 ? 'text-rose-600 font-semibold' : 'text-neutral-500'}`}>
                     {formData.images.length} / 5 selected
                   </span>
                 </div>
 
+                {errors.images && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{errors.images}</span>
+                  </div>
+                )}
+
                 {/* Images Thumbnail Grid */}
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                <div className={`grid grid-cols-3 sm:grid-cols-5 gap-3 p-1 rounded-xl transition-colors ${
+                  errors.images ? 'border border-dashed border-rose-400 bg-rose-50/10' : ''
+                }`}>
                   {formData.images.map((imgUrl, idx) => (
                     <div
                       key={idx}
@@ -1414,7 +1937,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <button
                       type="button"
                       onClick={() => setShowUrlInput(true)}
-                      className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark underline"
+                      className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark no-underline hover:no-underline transition-colors cursor-pointer"
+                      style={{ textDecoration: 'none' }}
                     >
                       + Or add image via direct URL
                     </button>

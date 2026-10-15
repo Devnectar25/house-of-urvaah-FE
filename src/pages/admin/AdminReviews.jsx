@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Star,
   Search,
@@ -10,12 +10,8 @@ import {
   Trash2,
   Package,
   User,
-  Calendar,
   ChevronLeft,
-  ChevronRight,
-  Filter,
-  X,
-  ExternalLink
+  ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
@@ -64,6 +60,21 @@ export const AdminReviews = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 10;
+
+  // Track expanded review IDs for Read More / Read Less
+  const [expandedReviewIds, setExpandedReviewIds] = useState(new Set());
+
+  const toggleExpandReview = (id) => {
+    setExpandedReviewIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -349,21 +360,14 @@ export const AdminReviews = () => {
 
                   return (
                     <tr key={rev.id} className="hover:bg-neutral-50/80 transition-colors">
-                      {/* Product Thumbnail & Direct Storefront Link */}
+                      {/* Product Thumbnail & Product Title */}
                       <td className="py-3.5 px-4 font-semibold text-brand-dark">
                         <div className="flex items-center gap-3">
                           <ReviewProductThumbnail src={rev.product_image} name={rev.product_name} />
                           <div className="min-w-0">
-                            <a
-                              href={`/product/${rev.productid}#customer-reviews`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-neutral-900 hover:text-black hover:underline flex items-center gap-1 group text-xs"
-                              title="View Customer Reviews for this garment on storefront"
-                            >
-                              <span className="truncate max-w-[190px]">{rev.product_name}</span>
-                              <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                            </a>
+                            <span className="font-medium text-neutral-900 truncate max-w-[190px] block text-xs">
+                              {rev.product_name}
+                            </span>
                             <span className="text-[10px] text-neutral-400 block font-mono mt-0.5">
                               Product #{rev.productid}
                             </span>
@@ -393,31 +397,65 @@ export const AdminReviews = () => {
                         </div>
                       </td>
 
-                      {/* Review Comment with Fit Badge Parsing */}
+                      {/* Review Comment with Fit Badge Parsing & Read More / Less Toggle */}
                       <td className="py-3.5 px-4 max-w-md">
-                        {rev.comment?.startsWith('[Fit:') ? (() => {
-                          const match = rev.comment.match(/^\[Fit:\s*([^\]]+)\]\s*(.*)$/);
-                          if (match) {
-                            return (
-                              <div className="space-y-1">
-                                <span className="inline-block px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 text-neutral-700 text-[10px] font-sans font-semibold uppercase tracking-wider rounded">
-                                  Fit: {match[1]}
-                                </span>
-                                <p className="text-neutral-700 leading-relaxed line-clamp-2">
-                                  "{match[2]}"
-                                </p>
-                              </div>
-                            );
+                        {(() => {
+                          let fitBadge = null;
+                          let commentBody = rev.comment || '';
+
+                          if (commentBody.startsWith('[Fit:')) {
+                            const match = commentBody.match(/^\[Fit:\s*([^\]]+)\]\s*(.*)$/);
+                            if (match) {
+                              fitBadge = match[1];
+                              commentBody = match[2];
+                            }
                           }
+
+                          const isExpanded = expandedReviewIds.has(rev.id);
+                          const isLongComment = commentBody.length > 80 || commentBody.includes('\n');
+
                           return (
-                            <p className="text-neutral-700 leading-relaxed line-clamp-2">
-                              "{rev.comment}"
-                            </p>
+                            <div className="space-y-1.5">
+                              {fitBadge && (
+                                <span className="inline-block px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 text-neutral-700 text-[10px] font-sans font-semibold uppercase tracking-wider rounded">
+                                  FIT: {fitBadge}
+                                </span>
+                              )}
+                              <p className={`text-neutral-700 leading-relaxed ${isExpanded ? 'whitespace-pre-line' : 'line-clamp-2'}`}>
+                                "{commentBody}"
+                              </p>
+                              {isLongComment && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandReview(rev.id)}
+                                  className="text-[11px] font-semibold text-brand-dark hover:text-neutral-500 no-underline hover:no-underline cursor-pointer transition-colors inline-block mt-0.5 select-none"
+                                >
+                                  {isExpanded ? 'Read less' : '... Read more'}
+                                </button>
+                              )}
+                            </div>
                           );
-                        })() : (
-                          <p className="text-neutral-700 leading-relaxed line-clamp-2">
-                            "{rev.comment}"
-                          </p>
+                        })()}
+
+                        {/* Patron Uploaded Review Photos */}
+                        {Array.isArray(rev.images) && rev.images.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            {rev.images.map((img, i) => (
+                              <a
+                                key={i}
+                                href={img}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-9 h-9 rounded-lg border border-neutral-200 overflow-hidden shrink-0 hover:border-black hover:shadow-xs transition-all bg-neutral-100"
+                                title="Click to view full patron review photo"
+                              >
+                                <img src={img} alt="review attachment" className="w-full h-full object-cover" />
+                              </a>
+                            ))}
+                            <span className="text-[10px] text-neutral-400 font-mono ml-1">
+                              {rev.images.length} photo{rev.images.length > 1 ? 's' : ''}
+                            </span>
+                          </div>
                         )}
                       </td>
 
@@ -429,15 +467,6 @@ export const AdminReviews = () => {
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <a
-                            href={`/product/${rev.productid}#customer-reviews`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
-                            title="Open Customer Reviews on product page"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
                           <button
                             type="button"
                             onClick={() => handleDeleteReview(rev.id)}

@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   ArrowRight,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
+import { apiClient } from '../../lib/apiClient';
+
+let cachedPrimaryBoutique = null;
 
 export const Footer = () => {
   const [openSections, setOpenSections] = useState({
@@ -15,24 +19,88 @@ export const Footer = () => {
   });
 
   const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterStatus, setNewsletterStatus] = useState('idle'); // 'idle' | 'success' | 'error'
+  const [newsletterStatus, setNewsletterStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [newsletterMessage, setNewsletterMessage] = useState('');
+
+  const [primaryBoutique, setPrimaryBoutique] = useState(() => cachedPrimaryBoutique || {
+    name: 'House of Urvaah, Kala Ghoda Arts District,',
+    address: 'Colaba Causeway, Mumbai 400001, India'
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient('/api/ui/contact-info')
+      .then((res) => {
+        if (isMounted && res?.success && res.data?.primary_location) {
+          const prim = res.data.primary_location;
+          const formatted = {
+            name: prim.name || 'House of Urvaah, Kala Ghoda Arts District,',
+            address: prim.address || 'Colaba Causeway, Mumbai 400001, India'
+          };
+          cachedPrimaryBoutique = formatted;
+          setPrimaryBoutique(formatted);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleNewsletterSubmit = (e) => {
+  const validateEmailFormat = (email) => {
+    if (!email || !email.trim()) return 'Email address is required.';
+    const trimmed = email.trim();
+    if (trimmed.length > 254) return 'Email address is too long.';
+    if (trimmed.includes('..')) return 'Email cannot contain consecutive dots.';
+    const parts = trimmed.split('@');
+    if (parts.length !== 2) return 'Please enter a valid email with a single @ symbol.';
+    const [local, domain] = parts;
+    if (!local) return 'Please enter the username portion before @.';
+    if (!domain || !domain.includes('.')) return 'Please provide a valid domain (e.g. domain.com).';
+    const domainParts = domain.split('.');
+    const tld = domainParts[domainParts.length - 1];
+    if (!tld || tld.length < 2) return 'Please provide a valid top-level domain (e.g. .com, .in).';
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!emailRegex.test(trimmed)) return 'Please enter a valid email address (e.g. name@domain.com).';
+    return null;
+  };
+
+  const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
-    if (!newsletterEmail || !newsletterEmail.includes('@') || !newsletterEmail.includes('.')) {
+    const valError = validateEmailFormat(newsletterEmail);
+    if (valError) {
       setNewsletterStatus('error');
-      setNewsletterMessage('Please enter a valid email address.');
+      setNewsletterMessage(valError);
       return;
     }
-    setNewsletterStatus('success');
-    setNewsletterEmail('');
+
+    setNewsletterStatus('loading');
     setNewsletterMessage('');
-    setTimeout(() => setNewsletterStatus('idle'), 4000);
+
+    try {
+      const data = await apiClient('/api/newsletter/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: newsletterEmail.trim().toLowerCase(),
+          source: 'footer'
+        })
+      });
+
+      setNewsletterStatus('success');
+      setNewsletterMessage(data?.message || 'Thank you for subscribing to House of Urvaah.');
+      setNewsletterEmail('');
+      setTimeout(() => {
+        setNewsletterStatus('idle');
+        setNewsletterMessage('');
+      }, 5000);
+    } catch (err) {
+      setNewsletterStatus('error');
+      setNewsletterMessage(err.message || 'Subscription failed. Please check your internet connection.');
+    }
   };
 
   return (
@@ -49,8 +117,8 @@ export const Footer = () => {
               <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-1">
                 FLAGSHIP ATELIER
               </p>
-              <p>House of Urvaah, Kala Ghoda Arts District,</p>
-              <p>Colaba Causeway, Mumbai 400001, India</p>
+              <p>{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
+              <p>{primaryBoutique.address}</p>
             </div>
           </div>
 
@@ -86,6 +154,7 @@ export const Footer = () => {
             <ul className={`space-y-3 text-xs tracking-wider text-neutral-500 uppercase ${openSections.policies ? 'block pt-2 pb-1' : 'hidden sm:block'}`}>
               <li><Link to="/privacy-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Privacy Policy</Link></li>
               <li><Link to="/shipping-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Shipping &amp; Delivery</Link></li>
+              <li><Link to="/return-refund-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Returns &amp; Refunds</Link></li>
               <li><Link to="/terms-and-conditions" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Terms and Conditions</Link></li>
               <li><Link to="/cookie-policy" data-allow-guest="true" className="hover:text-black transition-colors block py-1">Cookie Policy</Link></li>
             </ul>
@@ -162,10 +231,15 @@ export const Footer = () => {
                     />
                     <button
                       type="submit"
+                      disabled={newsletterStatus === 'loading'}
                       aria-label="Subscribe to newsletter"
-                      className="bg-black hover:bg-neutral-800 text-white px-3.5 flex items-center justify-center transition-colors cursor-pointer shrink-0 h-10 group"
+                      className="bg-black hover:bg-neutral-800 disabled:bg-neutral-700 text-white px-3.5 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0 h-10 group"
                     >
-                      <ArrowRight className="w-4 h-4 stroke-[1.75] group-hover:translate-x-0.5 transition-transform" />
+                      {newsletterStatus === 'loading' ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4 stroke-[1.75] group-hover:translate-x-0.5 transition-transform" />
+                      )}
                     </button>
                   </div>
 
@@ -178,7 +252,7 @@ export const Footer = () => {
                   {newsletterStatus === 'success' && (
                     <div className="p-2.5 bg-black text-white text-xs tracking-wider uppercase font-medium flex items-center gap-2 px-3 shadow-xs rounded-xs">
                       <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 stroke-[2.5]" />
-                      <span>Thank you for subscribing</span>
+                      <span>{newsletterMessage || 'Thank you for subscribing'}</span>
                     </div>
                   )}
                 </form>

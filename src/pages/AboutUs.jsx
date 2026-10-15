@@ -11,7 +11,7 @@ export const AboutUs = () => {
   }, []);
 
   return (
-    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden select-none">
+    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-28 sm:pt-32 md:pt-36 pb-0 overflow-x-hidden select-none">
       <SEOHead
         title="About Us | House of Urvaah — Contemporary Women's Fashion"
         description="Learn about House of Urvaah: our passion for refined editorial fashion, timeless craftsmanship, and our mission to empower women with elevated wardrobes."
@@ -19,7 +19,7 @@ export const AboutUs = () => {
         ogImage="/assets/Images/Corset01.png"
       />
       {/* 1. EDITORIAL HERO SECTION */}
-      <section className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 mb-12 md:mb-16">
+      <section className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 mb-8 md:mb-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -27,22 +27,22 @@ export const AboutUs = () => {
           className="text-center flex flex-col items-center"
         >
           {/* Page Title Heading */}
-          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-4">
             ABOUT HOUSE OF URVAAH
           </h1>
 
           {/* Divider Line */}
-          <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
+          <div className="w-16 h-[1px] bg-neutral-900/30 mb-4" />
 
           {/* Subtitle / Tagline */}
-          <p className="max-w-2xl text-base sm:text-lg md:text-xl font-serif leading-relaxed text-neutral-700 tracking-wide font-light text-center">
+          <p className="max-w-2xl text-sm sm:text-base md:text-lg font-serif leading-relaxed text-neutral-700 tracking-wide font-light text-center">
             Your trusted destination for contemporary women's fashion, crafted with timeless elegance
           </p>
         </motion.div>
       </section>
 
       {/* 2. TWO-COLUMN EDITORIAL STORY & MISSION BLOCK */}
-      <section className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 mb-14 md:mb-20">
+      <section className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 mb-10 md:mb-14">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           {/* Left: Official Narrative (Our Story & Our Mission) */}
           <motion.div
@@ -61,15 +61,7 @@ export const AboutUs = () => {
                 OUR STORY
               </h2>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light mb-4">
-                Founded with a passion for refined, editorial fashion,{' '}
-                <span
-                  className="font-script lowercase font-normal text-[1.15em] mx-1 inline-block"
-                  style={{ fontFamily: "'Parfumerie Script', cursive" }}
-                >
-                  house of
-                </span>{' '}
-                <span className="font-serif uppercase tracking-widest font-semibold">URVAAH</span>{' '}
-                brings together the artistry of thoughtful design with modern craftsmanship. We believe that true style lies in the balance of fluid silhouettes, fine fabrics, and understated detail.
+                Founded with a passion for refined, editorial fashion, House of Urvaah brings together the artistry of thoughtful design with modern craftsmanship. We believe that true style lies in the balance of fluid silhouettes, fine fabrics, and understated detail.
               </p>
               <p className="text-sm sm:text-base font-serif text-neutral-700 leading-relaxed font-light">
                 Our journey began with a simple mission: to make elevated, wardrobe-defining pieces accessible to every woman who seeks confidence through what she wears. Today, we serve style-conscious customers who trust us for genuine quality, considered design, and pieces that transcend passing trends.
@@ -126,10 +118,10 @@ export const AboutUs = () => {
       </section>
 
       {/* 3. THREE-PILLAR GRID (BRAND VALUES) */}
-      <section className="w-full bg-[#F5F5F0] py-14 md:py-20 border-y border-neutral-200/80 mb-14 md:mb-20 overflow-hidden">
+      <section className="w-full bg-[#F5F5F0] py-10 md:py-14 border-t border-neutral-200/80 mb-0 overflow-hidden">
         <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16">
-          <div className="text-center mb-10 md:mb-14">
-            <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
+          <div className="text-center mb-8 md:mb-10">
+            <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-2 block">
               CORE PILLARS
             </span>
             <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
@@ -137,19 +129,19 @@ export const AboutUs = () => {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-14">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
             {/* Pillar 1 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="flex flex-col items-center text-center p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
+              className="flex flex-col items-center text-center p-6 sm:p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="w-14 h-14 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-6 text-neutral-900 border border-neutral-300/60">
-                <Sparkles className="w-6 h-6 stroke-[1.5]" />
+              <div className="w-12 h-12 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-4 text-neutral-900 border border-neutral-300/60">
+                <Sparkles className="w-5 h-5 stroke-[1.5]" />
               </div>
-              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-3">
+              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-2">
                 CURATED EXCLUSIVITY
               </h3>
               <p className="text-xs sm:text-sm font-serif text-neutral-600 leading-relaxed font-light">
@@ -163,12 +155,12 @@ export const AboutUs = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="flex flex-col items-center text-center p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
+              className="flex flex-col items-center text-center p-6 sm:p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="w-14 h-14 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-6 text-neutral-900 border border-neutral-300/60">
-                <Scissors className="w-6 h-6 stroke-[1.5]" />
+              <div className="w-12 h-12 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-4 text-neutral-900 border border-neutral-300/60">
+                <Scissors className="w-5 h-5 stroke-[1.5]" />
               </div>
-              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-3">
+              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-2">
                 REFINED TAILORING
               </h3>
               <p className="text-xs sm:text-sm font-serif text-neutral-600 leading-relaxed font-light">
@@ -182,12 +174,12 @@ export const AboutUs = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="flex flex-col items-center text-center p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
+              className="flex flex-col items-center text-center p-6 sm:p-8 bg-white border border-neutral-200/80 rounded-xs shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="w-14 h-14 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-6 text-neutral-900 border border-neutral-300/60">
-                <ShieldCheck className="w-6 h-6 stroke-[1.5]" />
+              <div className="w-12 h-12 rounded-full bg-[#FAF4E8] flex items-center justify-center mb-4 text-neutral-900 border border-neutral-300/60">
+                <ShieldCheck className="w-5 h-5 stroke-[1.5]" />
               </div>
-              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-3">
+              <h3 className="text-base sm:text-lg font-serif tracking-[0.2em] uppercase font-medium text-[#111111] mb-2">
                 CONSCIOUS LUXURY
               </h3>
               <p className="text-xs sm:text-sm font-serif text-neutral-600 leading-relaxed font-light">
@@ -198,37 +190,6 @@ export const AboutUs = () => {
         </div>
       </section>
 
-      {/* 4. ATELIER SIGN-OFF SECTION */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 text-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="flex flex-col items-center"
-        >
-          {/* Closing Quote */}
-          <blockquote className="text-lg sm:text-2xl md:text-3xl font-serif font-light text-neutral-800 leading-relaxed italic mb-8 max-w-2xl">
-            "Simplicity is not the absence of clutter, but the mastery of proportion, poise, and purpose."
-          </blockquote>
-
-          {/* Founder / Atelier Signature Lockup */}
-          <div className="text-2xl sm:text-3xl text-[#111111] my-3">
-            <span
-              className="font-script lowercase text-3xl sm:text-4xl mr-2 inline-block font-['Parfumerie_Script']"
-              style={{ fontFamily: "'Parfumerie Script', cursive" }}
-            >
-              house of
-            </span>
-            <span className="font-serif uppercase tracking-widest">URVAAH</span>
-          </div>
-
-          {/* Atelier & Design Studio Eyebrow */}
-          <span className="text-[11px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mt-4 block">
-            ATELIER & DESIGN STUDIO
-          </span>
-        </motion.div>
-      </section>
     </div>
   );
 };

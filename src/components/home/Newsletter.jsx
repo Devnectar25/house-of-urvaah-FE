@@ -2,24 +2,64 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, ArrowRight } from 'lucide-react';
 import { Button } from '../common/Button';
+import { apiClient } from '../../lib/apiClient';
 
 export const Newsletter = () => {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('idle'); // 'idle', 'success', 'error'
+  const [status, setStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const validateEmailFormat = (input) => {
+    if (!input || !input.trim()) return 'Email address is required.';
+    const trimmed = input.trim();
+    if (trimmed.length > 254) return 'Email address is too long.';
+    if (trimmed.includes('..')) return 'Email cannot contain consecutive dots.';
+    const parts = trimmed.split('@');
+    if (parts.length !== 2) return 'Please enter a valid email with a single @ symbol.';
+    const [local, domain] = parts;
+    if (!local) return 'Please enter the username portion before @.';
+    if (!domain || !domain.includes('.')) return 'Please provide a valid domain (e.g. domain.com).';
+    const domainParts = domain.split('.');
+    const tld = domainParts[domainParts.length - 1];
+    if (!tld || tld.length < 2) return 'Please provide a valid top-level domain (e.g. .com, .in).';
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!emailRegex.test(trimmed)) return 'Please enter a valid email address (e.g. name@domain.com).';
+    return null;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
+    const valError = validateEmailFormat(email);
+    if (valError) {
       setStatus('error');
-      setErrorMessage('Please enter a valid email address.');
+      setErrorMessage(valError);
       return;
     }
 
-    setStatus('success');
-    setEmail('');
+    setStatus('loading');
     setErrorMessage('');
-    setTimeout(() => setStatus('idle'), 4000);
+
+    try {
+      const data = await apiClient('/api/newsletter/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          source: 'homepage'
+        })
+      });
+
+      setStatus('success');
+      setSuccessMessage(data?.message || 'THANK YOU FOR SUBSCRIBING TO HOUSE OF URVAAH');
+      setEmail('');
+      setTimeout(() => {
+        setStatus('idle');
+        setSuccessMessage('');
+      }, 5000);
+    } catch (err) {
+      setStatus('error');
+      setErrorMessage(err.message || 'Subscription failed. Please check your internet connection.');
+    }
   };
 
   return (
@@ -58,9 +98,10 @@ export const Newsletter = () => {
                 type="submit"
                 variant="primary"
                 size="sm"
-                className="group flex items-center justify-center gap-2 whitespace-nowrap min-h-[44px] w-full sm:w-auto cursor-pointer"
+                disabled={status === 'loading'}
+                className="group flex items-center justify-center gap-2 whitespace-nowrap min-h-[44px] w-full sm:w-auto cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                SUBSCRIBE
+                {status === 'loading' ? 'SUBSCRIBING...' : 'SUBSCRIBE'}
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
@@ -80,7 +121,7 @@ export const Newsletter = () => {
                 className="mt-4 p-3 bg-neutral-900 text-white text-xs tracking-wider uppercase font-medium flex items-center justify-center gap-2"
               >
                 <Check className="w-4 h-4 text-emerald-400" />
-                THANK YOU FOR SUBSCRIBING TO HOUSE OF URAAH
+                {successMessage || 'THANK YOU FOR SUBSCRIBING TO HOUSE OF URVAAH'}
               </motion.div>
             )}
 

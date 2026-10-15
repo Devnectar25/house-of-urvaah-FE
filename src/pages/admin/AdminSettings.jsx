@@ -1,23 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Settings,
-  ShieldCheck,
-  Database,
-  Globe,
-  Mail,
-  User,
   CheckCircle2,
-  AlertCircle,
   Save,
   RefreshCw,
   Sliders,
-  Server
+  Building2,
+  ExternalLink
 } from 'lucide-react';
-import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 export const AdminSettings = () => {
-  const currentUser = getStoredUser();
 
   const [storeName, setStoreName] = useState('House of Urvaah');
   const [supportEmail, setSupportEmail] = useState('support@houseofurvaah.com');
@@ -25,8 +18,6 @@ export const AdminSettings = () => {
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
-  const [dbStatus, setDbStatus] = useState('Healthy');
-  const [apiStatus, setApiStatus] = useState('Connected');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -61,50 +52,36 @@ export const AdminSettings = () => {
       {/* Header Banner */}
       <AdminPageHeader
         title="Admin Settings & Configuration"
-        subtitle="System diagnostics, active admin account privileges, and global store parameters."
+        subtitle="Active admin account privileges and global store parameters."
       />
 
-      {/* System Health Diagnostics */}
-      <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs">
-        <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Server className="w-4 h-4 text-neutral-500" />
-          <span>System & Backend Health Diagnostics</span>
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider">Database Link</span>
-              <div className="font-bold text-emerald-900 mt-0.5">{dbStatus}</div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">PostgreSQL Pool Online</div>
-            </div>
-            <Database className="w-5 h-5 text-emerald-600" />
-          </div>
-
-          <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-emerald-800 tracking-wider">API Server</span>
-              <div className="font-bold text-emerald-900 mt-0.5">{apiStatus}</div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">Vercel API Node v20.x</div>
-            </div>
-            <Globe className="w-5 h-5 text-emerald-600" />
-          </div>
-
-          <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-xl flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-semibold text-purple-800 tracking-wider">Security Guard</span>
-              <div className="font-bold text-purple-900 mt-0.5">JWT Auth Active</div>
-              <div className="text-[10px] text-purple-700 mt-0.5">Protected Admin Portal</div>
-            </div>
-            <ShieldCheck className="w-5 h-5 text-purple-600" />
-          </div>
+      {/* Quick Link to Boutiques & Concierge */}
+      <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Client Services & Store Locations</span>
+          </span>
+          <h3 className="text-base font-serif font-bold tracking-wide uppercase">
+            Boutiques & Atelier Concierge Settings
+          </h3>
+          <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
+            Dynamically update the Atelier Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
+          </p>
         </div>
+        <Link
+          to="/admin/modify-ui/boutiques-concierge"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors shrink-0 shadow-sm"
+        >
+          <span>Manage Boutiques & Concierge</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
-      {/* Admin Account & Store Settings Form */}
-      <form onSubmit={handleSaveSettings} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Admin Store Settings Form */}
+      <form onSubmit={handleSaveSettings} className="max-w-2xl">
         {/* Store Parameters */}
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs space-y-4">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-6 shadow-2xs space-y-4">
           <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider border-b border-neutral-100 pb-3 flex items-center gap-2">
             <Sliders className="w-4 h-4 text-neutral-500" />
             <span>Storefront Settings</span>
@@ -177,39 +154,6 @@ export const AdminSettings = () => {
                 }`}
               />
             </button>
-          </div>
-        </div>
-
-        {/* Administrator Profile Details */}
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-5 shadow-2xs space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
-            <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider border-b border-neutral-100 pb-3 flex items-center gap-2">
-              <User className="w-4 h-4 text-neutral-500" />
-              <span>Current Session Account</span>
-            </h3>
-
-            <div className="p-4 bg-neutral-50 border border-neutral-200/70 rounded-xl space-y-3">
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Administrator Name</span>
-                <span className="text-sm font-bold text-brand-dark font-admin">
-                  {currentUser?.name || currentUser?.username || 'Super Admin'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Admin Email / Username</span>
-                <span className="text-xs font-medium text-neutral-700 font-mono">
-                  {currentUser?.email || currentUser?.username || 'admin@houseofurvaah.com'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] text-neutral-400 uppercase tracking-wider block">Assigned Role</span>
-                <span className="inline-block mt-0.5 px-2.5 py-0.5 bg-brand-dark text-white text-[10px] font-bold rounded uppercase tracking-wider font-admin">
-                  {currentUser?.role || 'Super Admin'}
-                </span>
-              </div>
-            </div>
           </div>
 
           <div className="pt-4 border-t border-neutral-100 flex items-center justify-end">

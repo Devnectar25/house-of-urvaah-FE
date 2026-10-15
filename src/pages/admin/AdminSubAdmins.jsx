@@ -30,9 +30,10 @@ const PERMISSION_OPTIONS = [
   { id: 'products', label: 'Products' },
   { id: 'orders', label: 'Orders' },
   { id: 'refunds', label: 'Refund Desk' },
-  { id: 'coupons', label: 'Coupons' },
+  // { id: 'coupons', label: 'Coupons' },
   { id: 'customers', label: 'Customers' },
   { id: 'leads', label: 'Leads' },
+  { id: 'newsletter', label: 'Newsletter' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'settings', label: 'Settings' }
 ];

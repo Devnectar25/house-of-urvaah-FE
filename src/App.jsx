@@ -50,8 +50,11 @@ import { AdminHeroSection } from './pages/admin/modify-ui/AdminHeroSection';
 import { AdminDualCampaign } from './pages/admin/modify-ui/AdminDualCampaign';
 import { AdminTrendingGram } from './pages/admin/modify-ui/AdminTrendingGram';
 import { AdminFabricVideo } from './pages/admin/modify-ui/AdminFabricVideo';
+import { AdminBoutiquesConcierge } from './pages/admin/modify-ui/AdminBoutiquesConcierge';
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
+import { AdminErrorMonitoring } from './pages/admin/AdminErrorMonitoring';
 import { AdminEmailNotifications } from './pages/admin/AdminEmailNotifications';
+import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StockUnsubscribe } from './pages/StockUnsubscribe';
 import { getAdminStoredUser, getStoredUser } from './lib/apiClient';
 
@@ -66,7 +69,9 @@ function PermissionGuard({ moduleKey, children }) {
     moduleKey === 'modify-ui' ||
     moduleKey === 'faqs' ||
     moduleKey === 'stock-notifications' ||
+    moduleKey === 'error-monitoring' ||
     moduleKey === 'email-notifications' ||
+    moduleKey === 'newsletter' ||
     (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
 
   if (hasAccess) {
@@ -210,16 +215,18 @@ export function AppContent() {
         <Route path="orders" element={<PermissionGuard moduleKey="orders"><AdminOrders /></PermissionGuard>} />
         <Route path="shiprocket-order-desk" element={<PermissionGuard moduleKey="orders"><AdminShiprocketOrderDesk /></PermissionGuard>} />
         <Route path="cancellation-flow" element={<PermissionGuard moduleKey="orders"><AdminCancellationFlowDemo /></PermissionGuard>} />
-        <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} />
+        {/* <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} /> */}
         <Route path="customers" element={<PermissionGuard moduleKey="customers"><AdminCustomers /></PermissionGuard>} />
         <Route path="leads" element={<PermissionGuard moduleKey="leads"><AdminLeads /></PermissionGuard>} />
         <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="shiprocket-refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminShiprocketRefundDesk /></PermissionGuard>} />
         <Route path="email-notifications" element={<PermissionGuard moduleKey="email-notifications"><AdminEmailNotifications /></PermissionGuard>} />
+        <Route path="newsletter" element={<PermissionGuard moduleKey="newsletter"><AdminNewsletter /></PermissionGuard>} />
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
         <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />
+        <Route path="error-monitoring" element={<PermissionGuard moduleKey="error-monitoring"><AdminErrorMonitoring /></PermissionGuard>} />
         <Route path="analytics" element={<PermissionGuard moduleKey="analytics"><AdminAnalytics /></PermissionGuard>} />
         <Route path="settings" element={<PermissionGuard moduleKey="settings"><AdminSettings /></PermissionGuard>} />
         <Route path="subadmins" element={<PermissionGuard moduleKey="subadmins"><AdminSubAdmins /></PermissionGuard>} />
@@ -230,6 +237,7 @@ export function AppContent() {
         <Route path="modify-ui/dual-campaign" element={<PermissionGuard moduleKey="modify-ui"><AdminDualCampaign /></PermissionGuard>} />
         <Route path="modify-ui/trending-gram" element={<PermissionGuard moduleKey="modify-ui"><AdminTrendingGram /></PermissionGuard>} />
         <Route path="modify-ui/fabric-video" element={<PermissionGuard moduleKey="modify-ui"><AdminFabricVideo /></PermissionGuard>} />
+        <Route path="modify-ui/boutiques-concierge" element={<PermissionGuard moduleKey="modify-ui"><AdminBoutiquesConcierge /></PermissionGuard>} />
 
         <Route path="*" element={<AdminDashboard />} />
 

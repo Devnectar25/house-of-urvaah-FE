@@ -5,6 +5,13 @@ import { useModalScrollLock } from '../hooks/useModalScrollLock';
 
 const CartContext = createContext();
 
+export const getCartItemKey = (item) => {
+  if (!item) return '';
+  const prodId = item.product?.id || item.id || item.productId || '';
+  const size = item.selectedSize || item.size || 'M';
+  return `${String(prodId).trim()}_${String(size).trim()}`;
+};
+
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState(() => {
@@ -30,12 +37,53 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(null); // formatted user object
-  const [token, setTokenState] = useState(null);
+  const [user, setUser] = useState(() => getStoredUser()); // formatted user object
+  const [token, setTokenState] = useState(() => getAuthToken());
   const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(() => {
+    return !getAuthToken() && !getStoredUser();
+  });
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
+
+  // Selected cart items for checkout (Allows buying only chosen product while keeping other bag items separate)
+  const [selectedCartItemKeys, setSelectedCartItemKeys] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('urvaah_selected_cart_keys');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [];
+  });
+
+  const updateSelectedCartItemKeys = (keysOrFn) => {
+    setSelectedCartItemKeys((prev) => {
+      const next = typeof keysOrFn === 'function' ? keysOrFn(prev) : keysOrFn;
+      try {
+        sessionStorage.setItem('urvaah_selected_cart_keys', JSON.stringify(next || []));
+      } catch (e) {}
+      return next || [];
+    });
+  };
+
+  const toggleCartItemSelection = (itemKey) => {
+    updateSelectedCartItemKeys((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      if (current.includes(itemKey)) {
+        return current.filter((k) => k !== itemKey);
+      } else {
+        return [...current, itemKey];
+      }
+    });
+  };
+
+  const selectAllCartItems = () => {
+    const allKeys = cart.map(getCartItemKey);
+    updateSelectedCartItemKeys(allKeys);
+  };
+
+  const selectOnlyCartItem = (itemKey) => {
+    updateSelectedCartItemKeys([itemKey]);
+  };
 
   const formatUserData = (userData) => {
     if (!userData) return null;
@@ -59,7 +107,7 @@ export const CartProvider = ({ children }) => {
   const fetchUserProfile = async () => {
     try {
       const res = await apiClient('/api/users/profile');
-      if (res.success && res.user) {
+      if (res?.success && res?.user) {
         const formatted = formatUserData({
           ...res.user,
           addresses: res.addresses || []
@@ -67,16 +115,16 @@ export const CartProvider = ({ children }) => {
         if (formatted) {
           setUser(formatted);
           setStoredUser(formatted);
-        } else {
-          clearAuthSession();
-          setUser(null);
         }
       }
     } catch (err) {
       console.warn('Failed to fetch profile with stored JWT:', err.message);
-      if (err.status === 401 || err.status === 403 || err.status === 404) {
+      // ONLY clear session if server explicitly returned 401 Unauthorized (expired/invalid JWT)
+      // Never clear session on 404, 403, 500, network error, etc.!
+      if (err.status === 401) {
         clearAuthSession();
         setUser(null);
+        setTokenState(null);
       }
     }
   };
@@ -110,11 +158,13 @@ export const CartProvider = ({ children }) => {
 
     if (savedToken) {
       setTokenState(savedToken);
-      if (savedUser) {
+      if (savedUser && !user) {
         setUser(savedUser);
       }
-      // Refresh profile details in background
-      fetchUserProfile().finally(() => setAuthLoading(false));
+      // Re-fetch ground truth profile details in background without locking out the user
+      fetchUserProfile().finally(() => {
+        setAuthLoading(false);
+      });
     } else {
       // Fallback: check Supabase session
       supabase.auth.getSession().then(({ data: { session } }) => {
@@ -123,6 +173,8 @@ export const CartProvider = ({ children }) => {
           const formatted = formatUserData(session.user);
           setUser(formatted);
         }
+        setAuthLoading(false);
+      }).catch(() => {
         setAuthLoading(false);
       });
     }
@@ -134,10 +186,23 @@ export const CartProvider = ({ children }) => {
         const formatted = formatUserData(session.user);
         setUser(formatted);
       }
-      setAuthLoading(false);
+      if (!getAuthToken()) {
+        setAuthLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for global customer unauthorized event
+    const handleUnauthorized = () => {
+      setUser(null);
+      setTokenState(null);
+      setAuthLoading(false);
+    };
+    window.addEventListener('urvaah:auth:unauthorized', handleUnauthorized);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('urvaah:auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   // Lock background body scroll whenever any drawer or modal overlay is open
@@ -250,21 +315,29 @@ export const CartProvider = ({ children }) => {
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
           if (res.data.length > 0) {
-            const mappedBackendCart = res.data.map((item) => ({
-              product: {
-                id: String(item.productId || item.product_id || item.id),
-                name: item.name || item.productname || item.title || 'Product',
-                price: Number(item.price || 0),
-                originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
-                image: item.image || item.image_url || '/assets/Images/Brown01.png',
-                brand: item.brand || 'House of Urvaah',
-                category: item.category || 'CLOTHING',
-                inStock: item.inStock ?? true,
-                stockQuantity: item.stockQuantity ?? 10
-              },
-              selectedSize: item.selectedSize || 'M',
-              quantity: Number(item.quantity || 1)
-            }));
+            const mappedBackendCart = res.data.map((item) => {
+              const stock = (item.stockQuantity !== null && item.stockQuantity !== undefined)
+                ? Number(item.stockQuantity)
+                : ((item.stock_quantity !== null && item.stock_quantity !== undefined)
+                  ? Number(item.stock_quantity)
+                  : 10);
+              const clampedQty = Math.max(1, Math.min(Number(item.quantity || 1), Math.max(1, stock)));
+              return {
+                product: {
+                  id: String(item.productId || item.product_id || item.id),
+                  name: item.name || item.productname || item.title || 'Product',
+                  price: Number(item.price || 0),
+                  originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
+                  image: item.image || item.image_url || '/assets/Images/Brown01.png',
+                  brand: item.brand || 'House of Urvaah',
+                  category: item.category || 'CLOTHING',
+                  inStock: item.inStock ?? true,
+                  stockQuantity: stock
+                },
+                selectedSize: item.selectedSize || 'M',
+                quantity: clampedQty
+              };
+            });
 
             setCart(mappedBackendCart);
             localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
@@ -293,7 +366,98 @@ export const CartProvider = ({ children }) => {
       .catch((err) => {
         console.warn('Could not fetch backend cart, using cached:', err.message);
       });
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
+
+  // Live stock synchronization whenever shopping bag opens or cart changes
+  useEffect(() => {
+    if (!cart || cart.length === 0) return;
+
+    let isCancelled = false;
+
+    const syncLiveStock = async () => {
+      try {
+        let hasChanges = false;
+        const verifiedCart = await Promise.all(
+          cart.map(async (item) => {
+            const rawId = item.product?.id || item.productId || item.id;
+            const cleanId = String(rawId).replace(/\D/g, '');
+            if (!cleanId) return item;
+
+            try {
+              const res = await apiClient(`/api/products/${cleanId}`);
+              if (res && res.success && res.data) {
+                const prod = res.data;
+                const liveStock = Number(
+                  prod.stockQuantity !== undefined && prod.stockQuantity !== null
+                    ? prod.stockQuantity
+                    : (prod.stock_quantity ?? prod.quantity ?? prod.stock ?? 0)
+                );
+                const sizeStock = prod.sizeStock || prod.size_stock || item.product?.sizeStock || {};
+                const itemSize = (item.selectedSize || 'M').trim().toUpperCase();
+                let sizeMaxStock = null;
+                if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === itemSize);
+                  if (matchKey !== undefined) {
+                    sizeMaxStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+                  }
+                }
+                const effectiveStock = sizeMaxStock !== null ? sizeMaxStock : liveStock;
+                const isOutOfStock = Boolean(
+                  effectiveStock <= 0 ||
+                  liveStock <= 0 ||
+                  prod.inStock === false ||
+                  prod.instock === false ||
+                  prod.is_active === false
+                );
+
+                const currentStock = item.product?.stockQuantity;
+                const currentQty = item.quantity;
+                const clampedQty = effectiveStock > 0 ? Math.min(currentQty, effectiveStock) : currentQty;
+
+                if (currentStock !== liveStock || currentQty !== clampedQty || item.product?.inStock !== !isOutOfStock) {
+                  hasChanges = true;
+                  return {
+                    ...item,
+                    quantity: clampedQty,
+                    product: {
+                      ...item.product,
+                      stockQuantity: liveStock,
+                      stock_quantity: liveStock,
+                      sizeStock: sizeStock,
+                      size_stock: sizeStock,
+                      inStock: !isOutOfStock,
+                      instock: !isOutOfStock
+                    }
+                  };
+                }
+              }
+            } catch (err) {
+              // Ignore network error for single item check
+            }
+            return item;
+          })
+        );
+
+        if (!isCancelled && hasChanges) {
+          const isGuest = !user && !getAuthToken();
+          const userId = user?.id || getStoredUser()?.id || 'guest';
+          const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+          setCart(verifiedCart);
+          localStorage.setItem(cachedKey, JSON.stringify(verifiedCart));
+        }
+      } catch (err) {
+        console.warn('Live cart stock check error:', err);
+      }
+    };
+
+    if (isCartOpen) {
+      syncLiveStock();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isCartOpen]);
 
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -320,39 +484,52 @@ export const CartProvider = ({ children }) => {
       setAuthToken(jwtToken);
     }
 
-    // Merge guest cart items into logged-in user cart
+    // Merge guest cart items into logged-in user cart without accidental duplication
     const guestCartStr = localStorage.getItem('urvaah_guest_cart');
     if (guestCartStr) {
       try {
         const guestItems = JSON.parse(guestCartStr);
         if (Array.isArray(guestItems) && guestItems.length > 0) {
-          const userId = formatted.id || 'user';
-          setCart((prevUserCart) => {
-            const merged = [...prevUserCart];
-            for (const gItem of guestItems) {
-              const existingIdx = merged.findIndex(
-                (uItem) => String(uItem.product.id) === String(gItem.product.id) && uItem.selectedSize === gItem.selectedSize
-              );
-              if (existingIdx > -1) {
-                merged[existingIdx] = {
-                  ...merged[existingIdx],
-                  quantity: merged[existingIdx].quantity + gItem.quantity
-                };
-              } else {
-                merged.push(gItem);
-              }
-            }
-            localStorage.setItem(`urvaah_cart_${userId}`, JSON.stringify(merged));
-            return merged;
-          });
+          const userId = formatted.id || formatted.username || 'user';
+          const userCartKey = `urvaah_cart_${userId}`;
 
-          // Sync merged guest items to backend API
+          let userSavedCart = [];
+          try {
+            const rawUserCart = localStorage.getItem(userCartKey);
+            if (rawUserCart) {
+              const parsed = JSON.parse(rawUserCart);
+              if (Array.isArray(parsed)) userSavedCart = parsed;
+            }
+          } catch (e) {}
+
+          // Merge guest items into saved cart.
+          // For matching items, use gItem.quantity (the current active guest selection).
+          // NEVER compound quantity with (+ gItem.quantity) which previously doubled items on checkout!
+          const merged = [...userSavedCart];
+          for (const gItem of guestItems) {
+            const existingIdx = merged.findIndex(
+              (uItem) => String(uItem.product.id) === String(gItem.product.id) && uItem.selectedSize === gItem.selectedSize
+            );
+            if (existingIdx > -1) {
+              merged[existingIdx] = {
+                ...merged[existingIdx],
+                quantity: gItem.quantity
+              };
+            } else {
+              merged.push(gItem);
+            }
+          }
+
+          setCart(merged);
+          localStorage.setItem(userCartKey, JSON.stringify(merged));
+
+          // Sync merged guest items to backend API with setMode: true
           for (const gItem of guestItems) {
             const numericId = parseInt(String(gItem.product.id).replace(/\D/g, ''), 10);
             if (numericId && !isNaN(numericId)) {
               apiClient('/api/cart/add', {
                 method: 'POST',
-                body: JSON.stringify({ userId, productId: numericId, quantity: gItem.quantity })
+                body: JSON.stringify({ userId, productId: numericId, quantity: gItem.quantity, setMode: true })
               }).catch(() => {});
             }
           }
@@ -415,26 +592,99 @@ export const CartProvider = ({ children }) => {
     setIsAuthModalOpen(true);
   };
 
-  const addToCart = async (product, selectedSize = 'M') => {
+  const addToCart = async (product, selectedSize, options = {}) => {
     if (!product) return;
+
+    // Defensive check: Do not add out-of-stock items to cart
+    const itemQty = Number(
+      product.stockQuantity !== undefined && product.stockQuantity !== null
+        ? product.stockQuantity
+        : (product.stock_quantity ?? product.stock ?? product.quantity ?? 0)
+    );
+
+    const sizeToUse = (typeof selectedSize === 'string' && selectedSize) ? selectedSize : (product.selectedSize || 'M');
+    const sizeStock = product.sizeStock || product.size_stock || {};
+    let sizeSpecificStock = null;
+    if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+      const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
+      if (matchKey !== undefined) {
+        sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+      }
+    }
+    const effectiveStock = sizeSpecificStock !== null ? sizeSpecificStock : itemQty;
+
+    const isOutOfStock = Boolean(
+      effectiveStock <= 0 ||
+      itemQty <= 0 ||
+      (itemQty <= 0 && (product.inStock === false || product.instock === false)) ||
+      product.isOutOfStock === true ||
+      product.status === 'Out of Stock' ||
+      product.status === 'out_of_stock'
+    );
+    if (isOutOfStock) return;
 
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+    const targetItemKey = `${String(product.id).trim()}_${String(sizeToUse).trim()}`;
+
+    // Automatically set the newly chosen product as the single active purchase item by default!
+    if (options.selectOnlyThis !== false) {
+      updateSelectedCartItemKeys([targetItemKey]);
+    } else {
+      updateSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), targetItemKey])));
+    }
 
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
-        (item) => String(item.product.id) === String(product.id) && item.selectedSize === selectedSize
+        (item) => String(item.product.id) === String(product.id) && item.selectedSize === sizeToUse
       );
 
       let updated;
       if (existingIndex > -1) {
+        const existing = prevCart[existingIndex];
+        const existingSizeStock = existing.product?.sizeStock || existing.product?.size_stock || sizeStock || {};
+        let existingSizeSpecificStock = null;
+        if (existingSizeStock && typeof existingSizeStock === 'object' && Object.keys(existingSizeStock).length > 0) {
+          const matchKey = Object.keys(existingSizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
+          if (matchKey !== undefined) {
+            existingSizeSpecificStock = Math.max(0, parseInt(existingSizeStock[matchKey], 10) || 0);
+          }
+        }
+
+        const maxStock = existingSizeSpecificStock !== null
+          ? existingSizeSpecificStock
+          : Number(
+              (itemQty > 0 ? itemQty : null) ??
+              existing.product?.stockQuantity ??
+              existing.product?.stock_quantity ??
+              existing.product?.quantity ??
+              99
+            );
+
+        if (existing.quantity >= maxStock) {
+          // Max available stock already in cart!
+          return prevCart;
+        }
+
+        const qtyToAdd = options.quantity || 1;
+        const newQty = Math.min(existing.quantity + qtyToAdd, maxStock);
+
         updated = [...prevCart];
         updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + 1
+          ...existing,
+          product: {
+            ...existing.product,
+            stockQuantity: itemQty > 0 ? itemQty : existing.product?.stockQuantity,
+            sizeStock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.sizeStock,
+            size_stock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.size_stock,
+            inStock: !isOutOfStock
+          },
+          quantity: newQty
         };
       } else {
+        const maxStock = effectiveStock > 0 ? effectiveStock : 1;
+        const qtyToAdd = Math.min(options.quantity || 1, maxStock);
         updated = [
           ...prevCart,
           {
@@ -446,10 +696,14 @@ export const CartProvider = ({ children }) => {
               image: product.image || (product.gallery && product.gallery[0]) || '/assets/Images/Brown01.png',
               colors: product.colors || ['#111111'],
               brand: product.brand || 'House of Urvaah',
-              category: product.category || 'CLOTHING'
+              category: product.category || 'CLOTHING',
+              inStock: !isOutOfStock,
+              stockQuantity: itemQty,
+              sizeStock: sizeStock,
+              size_stock: sizeStock
             },
-            selectedSize,
-            quantity: 1
+            selectedSize: sizeToUse,
+            quantity: qtyToAdd
           }
         ];
       }
@@ -458,7 +712,9 @@ export const CartProvider = ({ children }) => {
       return updated;
     });
 
-    setIsCartOpen(true);
+    if (options.openDrawer !== false) {
+      setIsCartOpen(true);
+    }
 
     if (!isGuest) {
       const rawNum = parseInt(String(product.id).replace(/\D/g, ''), 10);
@@ -509,8 +765,11 @@ export const CartProvider = ({ children }) => {
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
     setCart([]);
     localStorage.removeItem(cachedKey);
+    localStorage.setItem(cachedKey, JSON.stringify([]));
+    localStorage.removeItem('urvaah_guest_cart');
     if (!isGuest) {
       try {
+        await apiClient('/api/cart/clear', { method: 'DELETE' });
         await apiClient(`/api/cart/${userId}`, { method: 'DELETE' });
       } catch (e) {}
     }
@@ -526,7 +785,29 @@ export const CartProvider = ({ children }) => {
       const updated = prevCart
         .map((item) => {
           if (String(item.product.id) === String(productId) && item.selectedSize === selectedSize) {
-            const calculated = item.quantity + delta;
+            const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
+            let sizeSpecificStock = null;
+            if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+              const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+              if (matchKey !== undefined) {
+                sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
+              }
+            }
+
+            const maxStock = sizeSpecificStock !== null
+              ? sizeSpecificStock
+              : Number(
+                  item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
+                    ? item.product.stockQuantity
+                    : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
+                );
+
+            if (delta > 0 && item.quantity >= maxStock) {
+              newQty = item.quantity;
+              return item;
+            }
+
+            const calculated = Math.min(maxStock, item.quantity + delta);
             newQty = calculated;
             return calculated > 0 ? { ...item, quantity: calculated } : null;
           }
@@ -690,6 +971,12 @@ export const CartProvider = ({ children }) => {
         cartCount,
         cartSubtotal,
         freeShippingProgress,
+        selectedCartItemKeys,
+        setSelectedCartItemKeys: updateSelectedCartItemKeys,
+        toggleCartItemSelection,
+        selectAllCartItems,
+        selectOnlyCartItem,
+        getCartItemKey,
       }}
     >
       {children}

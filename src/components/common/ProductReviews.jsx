@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, CheckCircle2, MessageSquare, Plus, X, Sparkles } from 'lucide-react';
+import { Star, CheckCircle2, Plus, X, Sparkles, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { useCart } from '../../context/CartContext';
 
-export const ProductReviews = ({ productId, productName }) => {
+export const ProductReviews = ({ productId, productName, autoOpenReview = false, allowPublicAdd = false }) => {
+  const [searchParams] = useSearchParams();
+  const { user } = useCart();
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState({
     average: '0.0',
@@ -27,8 +31,43 @@ export const ProductReviews = ({ productId, productName }) => {
   const [formError, setFormError] = useState('');
   const [successToast, setSuccessToast] = useState(false);
 
+  // Auto-open review modal when directed with ?openReview=true or ?feedback=true
+  const isDirectReviewRequested = autoOpenReview || 
+    searchParams.get('openReview') === 'true' || 
+    searchParams.get('feedback') === 'true' || 
+    searchParams.get('review') === 'true';
+
+  useEffect(() => {
+    if (isDirectReviewRequested) {
+      if (user?.fullname || user?.name || user?.username) {
+        setFormName(user.fullname || user.name || user.username);
+      }
+      setIsFormOpen(true);
+      // Smooth scroll to reviews section
+      setTimeout(() => {
+        const elem = document.getElementById('customer-reviews');
+        if (elem) {
+          elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+  }, [isDirectReviewRequested, user]);
+
+  // Lightbox Zoom state for patron photos (viewing past reviews)
+  const [lightboxData, setLightboxData] = useState(null);
+  const [activeLightboxIndex, setActiveLightboxIndex] = useState(0);
+  useModalScrollLock(Boolean(lightboxData), () => setLightboxData(null));
+
   // Product identifier (supports numeric ID or style alias)
   const cleanId = String(productId || '').trim();
+
+  const resetFormState = () => {
+    setFormComment('');
+    setFormName('');
+    setFormRating(0);
+    setFormHoverRating(0);
+    setFormError('');
+  };
 
   const fetchReviews = async () => {
     if (!cleanId) return;
@@ -76,7 +115,8 @@ export const ProductReviews = ({ productId, productName }) => {
         productId: cleanId,
         username: formName.trim() || 'Verified Patron',
         rating: formRating,
-        review: formFit ? `[Fit: ${formFit}] ${formComment.trim()}` : formComment.trim()
+        review: formFit ? `[Fit: ${formFit}] ${formComment.trim()}` : formComment.trim(),
+        images: []
       };
 
       const res = await apiClient('/api/reviews', {
@@ -85,11 +125,8 @@ export const ProductReviews = ({ productId, productName }) => {
       });
 
       if (res && res.success) {
+        resetFormState();
         setIsFormOpen(false);
-        setFormComment('');
-        setFormName('');
-        setFormRating(0);
-        setFormHoverRating(0);
         setSuccessToast(true);
         setTimeout(() => setSuccessToast(false), 4500);
         // Refresh reviews list
@@ -101,6 +138,7 @@ export const ProductReviews = ({ productId, productName }) => {
       setFormError(err.message || 'Error submitting review.');
     } finally {
       setSubmitting(false);
+      setUploadingStage('');
     }
   };
 
@@ -124,7 +162,7 @@ export const ProductReviews = ({ productId, productName }) => {
   // Calculate average rating
 
   return (
-    <section id="customer-reviews" className="w-full mt-12 sm:mt-16 pt-10 sm:pt-12 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
+    <section id="customer-reviews" className="w-full mt-4 sm:mt-5 pt-4 sm:pt-5 border-t border-neutral-200/80 font-serif text-brand-dark scroll-mt-24">
       {/* Header Row */}
       <div className={`flex flex-col md:flex-row md:items-end justify-between gap-6 ${reviews.length === 0 ? 'mb-6 pb-2 border-b-0' : 'mb-10 pb-6 border-b border-neutral-200/80'}`}>
         <div>
@@ -139,23 +177,21 @@ export const ProductReviews = ({ productId, productName }) => {
           </p>
         </div>
 
-        <div className="self-start md:self-end">
-          <button
-            type="button"
-            onClick={() => {
-              setFormRating(0); // All stars empty initially
-              setFormHoverRating(0);
-              setFormName(''); // Name empty initially, not default 1
-              setFormComment('');
-              setFormError('');
-              setIsFormOpen(true);
-            }}
-            className="px-7 py-3.5 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-none transition-colors flex items-center gap-2.5 shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2]" />
-            ADD REVIEW
-          </button>
-        </div>
+        {allowPublicAdd && (
+          <div className="self-start md:self-end">
+            <button
+              type="button"
+              onClick={() => {
+                resetFormState();
+                setIsFormOpen(true);
+              }}
+              className="px-7 py-3.5 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-none transition-colors flex items-center gap-2.5 shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[2]" />
+              ADD REVIEW
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Success Notification Toaster */}
@@ -169,7 +205,7 @@ export const ProductReviews = ({ productId, productName }) => {
           >
             <div className="flex items-center gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Thank you! Your verified review has been submitted and added to this garment.</span>
+              <span>Thank you! Your verified review and photos have been submitted and added to this garment.</span>
             </div>
             <button onClick={() => setSuccessToast(false)} className="text-neutral-400 hover:text-white p-1">
               <X className="w-4 h-4" />
@@ -305,14 +341,18 @@ export const ProductReviews = ({ productId, productName }) => {
                 .join('')
                 .toUpperCase();
 
+              const reviewImages = Array.isArray(rev.images) && rev.images.length > 0
+                ? rev.images
+                : (rev.imageUrl ? [rev.imageUrl] : []);
+
               return (
                 <div
                   key={rev.id}
                   className="bg-white border border-neutral-200/80 rounded-2xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col justify-between space-y-4 hover:border-neutral-300 transition-all text-left"
                 >
-                  <div>
+                  <div className="space-y-3">
                     {/* Top user row */}
-                    <div className="flex items-center justify-between gap-2.5 mb-3">
+                    <div className="flex items-center justify-between gap-2.5">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-8.5 h-8.5 rounded-full bg-[#FAF8F3] border border-[#E7E2D8] flex items-center justify-center font-serif text-xs font-semibold text-black shrink-0">
                           {userInitials}
@@ -333,7 +373,7 @@ export const ProductReviews = ({ productId, productName }) => {
                     </div>
 
                     {/* Stars */}
-                    <div className="flex items-center gap-1 mb-2.5">
+                    <div className="flex items-center gap-1">
                       {[1, 2, 3, 4, 5].map((s) => (
                         <Star
                           key={s}
@@ -371,6 +411,43 @@ export const ProductReviews = ({ productId, productName }) => {
                         {rev.comment}
                       </p>
                     )}
+
+                    {/* Customer Uploaded Photos */}
+                    {reviewImages.length > 0 && (
+                      <div className="pt-2">
+                        <span className="text-[10px] font-sans font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
+                          PATRON PHOTOS ({reviewImages.length})
+                        </span>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                          {reviewImages.map((imgSrc, imgIdx) => (
+                            <button
+                              key={imgIdx}
+                              type="button"
+                              onClick={() => {
+                                setLightboxData({
+                                  images: reviewImages,
+                                  user: rev.user,
+                                  rating: rev.rating
+                                });
+                                setActiveLightboxIndex(imgIdx);
+                              }}
+                              className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-neutral-200/90 hover:border-black hover:shadow-md transition-all shrink-0 cursor-pointer group bg-neutral-100"
+                              title="Click to view full photo"
+                            >
+                              <img
+                                src={imgSrc}
+                                alt={`${rev.user} review photo ${imgIdx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -405,7 +482,10 @@ export const ProductReviews = ({ productId, productName }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsFormOpen(false)}
+              onClick={() => {
+                resetFormState();
+                setIsFormOpen(false);
+              }}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
 
@@ -413,7 +493,7 @@ export const ProductReviews = ({ productId, productName }) => {
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              className="relative z-10 w-full max-w-lg bg-white rounded-2xl overflow-hidden shadow-2xl p-6 sm:p-8 space-y-5 text-left border border-neutral-200"
+              className="relative z-10 w-full max-w-lg bg-white rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5 text-left border border-neutral-200 max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none"
             >
               <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
                 <div>
@@ -426,7 +506,10 @@ export const ProductReviews = ({ productId, productName }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsFormOpen(false)}
+                  onClick={() => {
+                    resetFormState();
+                    setIsFormOpen(false);
+                  }}
                   className="p-1.5 text-neutral-400 hover:text-black rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5 stroke-[1.8]" />
@@ -528,10 +611,13 @@ export const ProductReviews = ({ productId, productName }) => {
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="pt-2 flex items-center justify-end gap-3">
+                <div className="pt-2 flex items-center justify-end gap-3 border-t border-neutral-100">
                   <button
                     type="button"
-                    onClick={() => setIsFormOpen(false)}
+                    onClick={() => {
+                      resetFormState();
+                      setIsFormOpen(false);
+                    }}
                     className="px-5 py-3 border border-neutral-300 text-neutral-700 hover:border-black hover:text-black uppercase tracking-[0.16em] font-semibold text-xs rounded-xl cursor-pointer"
                   >
                     CANCEL
@@ -539,12 +625,111 @@ export const ProductReviews = ({ productId, productName }) => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-6 py-3 bg-brand-dark hover:bg-neutral-800 text-white uppercase tracking-[0.16em] font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50"
+                    className="px-6 py-3 bg-brand-dark hover:bg-neutral-800 text-white uppercase tracking-[0.16em] font-semibold text-xs rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-2"
                   >
-                    {submitting ? 'SUBMITTING...' : 'PUBLISH REVIEW'}
+                    {submitting ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>SUBMITTING...</span>
+                      </>
+                    ) : (
+                      'PUBLISH REVIEW'
+                    )}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* LIGHTBOX MODAL FOR PATRON PHOTOS */}
+      <AnimatePresence>
+        {lightboxData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setLightboxData(null)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative z-10 max-w-2xl w-full bg-neutral-900 rounded-2xl overflow-hidden shadow-2xl border border-neutral-800"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-neutral-800 text-white">
+                <div className="min-w-0">
+                  <span className="text-xs font-serif font-semibold uppercase tracking-wider block truncate">
+                    {lightboxData.user} • Patron Photo {activeLightboxIndex + 1} of {lightboxData.images.length}
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-3 h-3 ${
+                          s <= Number(lightboxData.rating)
+                            ? 'fill-amber-400 text-amber-400'
+                            : 'text-neutral-600'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLightboxData(null)}
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5 stroke-[2]" />
+                </button>
+              </div>
+
+              <div className="relative bg-black flex items-center justify-center min-h-[300px] max-h-[70vh] p-3">
+                <img
+                  src={lightboxData.images[activeLightboxIndex]}
+                  alt="Patron review photo"
+                  className="max-h-[66vh] max-w-full object-contain rounded-lg"
+                />
+
+                {lightboxData.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveLightboxIndex((prev) => (prev > 0 ? prev - 1 : lightboxData.images.length - 1))}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/70 hover:bg-black text-white rounded-full transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveLightboxIndex((prev) => (prev < lightboxData.images.length - 1 ? prev + 1 : 0))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/70 hover:bg-black text-white rounded-full transition-colors cursor-pointer"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {lightboxData.images.length > 1 && (
+                <div className="flex items-center justify-center gap-2 p-3 bg-neutral-900 border-t border-neutral-800">
+                  {lightboxData.images.map((img, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setActiveLightboxIndex(i)}
+                      className={`w-11 h-11 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                        i === activeLightboxIndex ? 'border-white scale-105' : 'border-neutral-700 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={img} alt="thumbnail" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </div>
         )}

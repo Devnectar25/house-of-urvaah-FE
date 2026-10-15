@@ -160,38 +160,6 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
             RELATED PIECES
           </h2>
         </div>
-
-        <div className="flex items-center gap-4">
-          <p className="text-xs font-sans tracking-wide text-neutral-500 uppercase hidden sm:block">
-            Complementary silhouettes & styles
-          </p>
-
-          {totalBatches > 1 && (
-            <div className="flex items-center gap-2 font-sans text-xs">
-              <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-400 font-medium tabular-nums">
-                {String(batchIndex + 1).padStart(2, '0')} / {String(totalBatches).padStart(2, '0')}
-              </span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => setBatchIndex((prev) => (prev - 1 + totalBatches) % totalBatches)}
-                  className="p-1 rounded-full text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer"
-                  aria-label="Previous related pieces"
-                  title="Previous pieces"
-                >
-                  <ChevronLeft className="w-4 h-4 stroke-[1.5]" />
-                </button>
-                <button
-                  onClick={() => setBatchIndex((prev) => (prev + 1) % totalBatches)}
-                  className="p-1 rounded-full text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors cursor-pointer"
-                  aria-label="Next related pieces"
-                  title="Next pieces"
-                >
-                  <ChevronRight className="w-4 h-4 stroke-[1.5]" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Product Grid / Skeleton */}

@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Edit3, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { ProductCard } from '../components/common/ProductCard';
+import { InvoiceModal } from '../components/common/InvoiceModal';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
+import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -28,7 +31,7 @@ const findLocalProduct = (id) => {
   });
 };
 
-const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', 'MY COUPONS', 'ACCOUNT DETAILS'];
+const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', /* 'MY COUPONS', */ 'ACCOUNT DETAILS'];
 
 const normalizeTabName = (raw) => {
   if (!raw || typeof raw !== 'string') return null;
@@ -137,13 +140,23 @@ export const Account = () => {
 
   const isFormFilled = selectedCancelItems.length > 0 && cancelReason.trim().length > 0;
 
+  const isDeliveredModalOrder = Boolean(
+    cancelModalOrder && (
+      (cancelModalOrder.status || '').toLowerCase().includes('delivered') ||
+      (cancelModalOrder.status || '').toLowerCase().includes('completed')
+    )
+  );
+
   const handleSubmitCancellation = async () => {
     if (!cancelModalOrder || !isFormFilled) return;
     setIsSubmittingCancellation(true);
     const ord = cancelModalOrder;
     const orderNum = ord.order_number || ord.orderNumber || ord.id;
+    const endpoint = `/api/orders/${orderNum}/cancel`;
+    const targetStatus = 'Cancellation Requested';
+
     try {
-      await apiClient(`/api/orders/${orderNum}/cancel`, {
+      await apiClient(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           cancelReason,
@@ -151,19 +164,140 @@ export const Account = () => {
           itemIds: selectedCancelItems
         })
       });
+      setOrders((prev) =>
+        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: targetStatus, cancel_reason: cancelReason } : o))
+      );
+
+      // Broadcast update across admin panel and all tabs dynamically
+      broadcastOrderUpdate({
+        id: ord.id,
+        orderNumber: orderNum,
+        order_number: orderNum,
+        status: targetStatus,
+        cancel_reason: cancelReason
+      });
+
+      setToastMsg({
+        text: 'Cancellation request submitted for admin review.',
+        type: 'success'
+      });
     } catch (e) {
-      console.warn('Cancel order fallback:', e.message);
+      console.warn('Order action error:', e.message);
+      setToastMsg({ text: e.message || 'Failed to submit request.', type: 'error' });
+    } finally {
+      setIsSubmittingCancellation(false);
+      setCancelModalOrder(null);
+      setSelectedCancelItems([]);
+      setCancelReason('');
+      setCancelComments('');
+      setTimeout(() => setToastMsg(null), 4000);
     }
-    setOrders((prev) =>
-      prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: 'Cancelled' } : o))
+  };
+
+  // Product Replacement Modal State
+  const [replaceModalOrder, setReplaceModalOrder] = useState(null);
+  const [selectedReplaceItems, setSelectedReplaceItems] = useState([]);
+  const [replaceReason, setReplaceReason] = useState('Size or fit issue - need different size');
+  const [replacementSize, setReplacementSize] = useState('M');
+  const [replaceComments, setReplaceComments] = useState('');
+  const [isSubmittingReplacement, setIsSubmittingReplacement] = useState(false);
+
+  useModalScrollLock(Boolean(cancelModalOrder || replaceModalOrder), () => {
+    if (!isSubmittingCancellation && cancelModalOrder) handleCloseCancelModal();
+    if (!isSubmittingReplacement && replaceModalOrder) handleCloseReplaceModal();
+  });
+
+  const handleReplaceOrderInAccount = (ord) => {
+    setReplaceModalOrder(ord);
+    const items = ord.items && Array.isArray(ord.items) && ord.items.length > 0 ? ord.items : [];
+    const firstItemId = items.length > 0 ? (items[0].id || items[0]._id || items[0].productId || 'item-0') : 'item-0';
+    setSelectedReplaceItems([firstItemId]);
+    setReplaceReason('Size or fit issue - need different size');
+    setReplacementSize('M');
+    setReplaceComments('');
+  };
+
+  const handleCloseReplaceModal = () => {
+    if (isSubmittingReplacement) return;
+    setReplaceModalOrder(null);
+    setSelectedReplaceItems([]);
+    setReplaceReason('Size or fit issue - need different size');
+    setReplacementSize('M');
+    setReplaceComments('');
+  };
+
+  const handleToggleReplaceItem = (itemId) => {
+    setSelectedReplaceItems((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
     );
-    setIsSubmittingCancellation(false);
-    setCancelModalOrder(null);
-    setSelectedCancelItems([]);
-    setCancelReason('');
-    setCancelComments('');
-    setToastMsg({ text: 'Order cancelled successfully.', type: 'success' });
-    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  const replaceModalItems = replaceModalOrder
+    ? (replaceModalOrder.items && Array.isArray(replaceModalOrder.items) && replaceModalOrder.items.length > 0)
+      ? replaceModalOrder.items
+      : [
+          {
+            id: replaceModalOrder.product_id || replaceModalOrder.id || 'item-1',
+            name: replaceModalOrder.product_name || replaceModalOrder.name || 'Atelier Product',
+            price: replaceModalOrder.price || replaceModalOrder.total || 0,
+            quantity: replaceModalOrder.quantity || 1,
+            image: replaceModalOrder.image || replaceModalOrder.image_url || '/assets/Images/Brown01.png',
+            selectedSize: replaceModalOrder.selectedSize || 'M'
+          }
+        ]
+    : [];
+
+  const handleSubmitReplacement = async () => {
+    if (!replaceModalOrder || selectedReplaceItems.length === 0 || !replaceReason.trim()) return;
+    setIsSubmittingReplacement(true);
+    const ord = replaceModalOrder;
+    const orderNum = ord.order_number || ord.orderNumber || ord.id;
+    const endpoint = `/api/orders/${orderNum}/replace`;
+    const targetStatus = 'Replacement Request Processing';
+
+    const fullReason = `Replacement: ${replaceReason} (Preferred Size: ${replacementSize})${replaceComments.trim() ? ` - Notes: ${replaceComments.trim()}` : ''}`;
+
+    try {
+      await apiClient(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'Replacement',
+          cancelReason: fullReason,
+          reason: fullReason,
+          replacementSize,
+          comments: replaceComments,
+          itemIds: selectedReplaceItems
+        })
+      });
+      setOrders((prev) =>
+        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: targetStatus, cancel_reason: fullReason, return_type: 'Replacement' } : o))
+      );
+
+      // Broadcast update across admin panel and all tabs dynamically
+      broadcastOrderUpdate({
+        id: ord.id,
+        orderNumber: orderNum,
+        order_number: orderNum,
+        status: targetStatus,
+        cancel_reason: fullReason
+      });
+
+      setToastMsg({
+        text: 'Replacement request submitted for atelier review.',
+        type: 'success'
+      });
+    } catch (e) {
+      console.warn('Replacement action error:', e.message);
+      setToastMsg({ text: e.message || 'Failed to submit replacement request.', type: 'error' });
+    } finally {
+      setIsSubmittingReplacement(false);
+      setReplaceModalOrder(null);
+      setSelectedReplaceItems([]);
+      setReplaceReason('Size or fit issue - need different size');
+      setReplacementSize('M');
+      setReplaceComments('');
+      setTimeout(() => setToastMsg(null), 4000);
+    }
   };
 
   const getInitialTab = () => {
@@ -229,6 +363,7 @@ export const Account = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
+  const [profileErrors, setProfileErrors] = useState({});
 
   // Sign out confirmation modal state
   const [showSignOutModal, setShowSignOutModal] = useState(false);
@@ -274,9 +409,25 @@ export const Account = () => {
   const [addressErrors, setAddressErrors] = useState({});
   const [addressSaving, setAddressSaving] = useState(false);
 
-  // Orders state
+  // Orders state & pagination (10 orders per page)
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
+  const [orderPage, setOrderPage] = useState(1);
+  const ordersPerPage = 10;
+
+  const totalOrderPages = Math.max(1, Math.ceil((orders?.length || 0) / ordersPerPage));
+  const paginatedOrders = useMemo(() => {
+    const list = Array.isArray(orders) ? orders : [];
+    const startIndex = (orderPage - 1) * ordersPerPage;
+    return list.slice(startIndex, startIndex + ordersPerPage);
+  }, [orders, orderPage, ordersPerPage]);
+
+  useModalScrollLock(Boolean(isAddressModalOpen || showSignOutModal || selectedOrderModal), () => {
+    if (!addressSaving && isAddressModalOpen) setIsAddressModalOpen(false);
+    if (!isSigningOut && showSignOutModal) setShowSignOutModal(false);
+    if (selectedOrderModal) setSelectedOrderModal(null);
+  });
 
   // Fetch real profile details and addresses on mount / user change
   const loadProfileAndAddresses = async () => {
@@ -310,22 +461,83 @@ export const Account = () => {
     }
   }, [user]);
 
-  // Fetch orders when tab switches to VIEW ORDERS
+  // Fetch orders when user loads and when tab switches to VIEW ORDERS (supports silent mode)
+  const fetchUserOrders = async (silent = false) => {
+    if (!user) return;
+    if (!silent) {
+      setOrdersLoading(true);
+    }
+    try {
+      const res = await apiClient('/api/orders/my-orders');
+      if (res && res.success && Array.isArray(res.data)) {
+        setOrders(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch orders:', err.message);
+    } finally {
+      if (!silent) {
+        setOrdersLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchUserOrders();
+    }
+  }, [user]);
+
   useEffect(() => {
     if (activeTab === 'VIEW ORDERS' && user) {
-      setOrdersLoading(true);
-      apiClient('/api/orders/my-orders')
-        .then(res => {
-          if (res.success && res.data) {
-            setOrders(res.data);
-          }
-        })
-        .catch(err => {
-          console.warn('Could not fetch orders:', err.message);
-        })
-        .finally(() => setOrdersLoading(false));
+      fetchUserOrders();
     }
+  }, [activeTab]);
+
+  // Real-time synchronization: update orders dynamically when admin or other session updates status
+  useEffect(() => {
+    const unsubscribe = subscribeToOrderUpdates((payload) => {
+      if (!payload) return;
+      const targetId = payload.id;
+      const targetNum = payload.order_number || payload.orderNumber;
+
+      setOrders((prevOrders) =>
+        prevOrders.map((o) => {
+          const match =
+            (targetId && (o.id === targetId || o._id === targetId)) ||
+            (targetNum && (o.order_number === targetNum || o.orderNumber === targetNum));
+
+          if (match && payload.status) {
+            return {
+              ...o,
+              status: payload.status,
+              payment_status: payload.payment_status || payload.paymentStatus || o.payment_status,
+              paymentStatus: payload.payment_status || payload.paymentStatus || o.payment_status,
+              cancel_reason: payload.cancel_reason || payload.cancelReason || o.cancel_reason,
+              shipping_address: payload.shipping_address || o.shipping_address
+            };
+          }
+          return o;
+        })
+      );
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Window focus listener for silent real-time sync (NO automatic 5s/6s polling interval)
+  useEffect(() => {
+    if (activeTab !== 'VIEW ORDERS' || !user) return;
+
+    const handleFocus = () => {
+      fetchUserOrders(true);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [activeTab, user]);
+
 
   // Protect route
   useEffect(() => {
@@ -339,7 +551,7 @@ export const Account = () => {
   const tabConfig = [
     { name: 'VIEW ORDERS', icon: Package, badge: orders.length > 0 ? orders.length : null },
     { name: 'VIEW WISHLIST', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
-    { name: 'MY COUPONS', icon: Ticket },
+    // { name: 'MY COUPONS', icon: Ticket },
     { name: 'ACCOUNT DETAILS', icon: User }
   ];
 
@@ -428,27 +640,119 @@ export const Account = () => {
     navigate(`${targetPath}?${searchParams.toString()}`, { replace: true });
   };
 
+  const handleStartEditProfile = () => {
+    setFullNameInput(user?.name || '');
+    setPhoneInput((user?.phone || '').replace(/\D/g, '').slice(0, 10));
+    setProfileErrors({});
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setFullNameInput(user?.name || '');
+    setPhoneInput(user?.phone || '');
+    setProfileErrors({});
+    setIsEditingProfile(false);
+  };
+
+  const handlePhoneInputChange = (e) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length === 12 && val.startsWith('91')) {
+      val = val.slice(2);
+    }
+    val = val.slice(0, 10);
+    setPhoneInput(val);
+
+    if (profileErrors.phone) {
+      if (!val) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Phone number is required.' }));
+      } else if (val.length !== 10) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Phone number must be exactly 10 digits.' }));
+      } else if (!/^[6-9]\d{9}$/.test(val)) {
+        setProfileErrors((prev) => ({ ...prev, phone: 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.' }));
+      } else {
+        setProfileErrors((prev) => ({ ...prev, phone: '' }));
+      }
+    }
+  };
+
+  const handleFullNameInputChange = (e) => {
+    const val = e.target.value;
+    setFullNameInput(val);
+
+    if (profileErrors.fullName) {
+      const trimmed = val.trim();
+      if (!trimmed) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name is required.' }));
+      } else if (trimmed.length < 2) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name must be at least 2 characters.' }));
+      } else if (!/^[a-zA-Z\s.'-]+$/.test(trimmed)) {
+        setProfileErrors((prev) => ({ ...prev, fullName: 'Full name should only contain letters and spaces.' }));
+      } else {
+        setProfileErrors((prev) => ({ ...prev, fullName: '' }));
+      }
+    }
+  };
+
+  const validateProfileForm = () => {
+    const errors = {};
+    const cleanName = (fullNameInput || '').trim();
+    if (!cleanName) {
+      errors.fullName = 'Full name is required.';
+    } else if (cleanName.length < 2) {
+      errors.fullName = 'Full name must be at least 2 characters.';
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(cleanName)) {
+      errors.fullName = 'Full name should only contain letters and spaces.';
+    }
+
+    const cleanPhone = (phoneInput || '').replace(/\D/g, '');
+    if (!cleanPhone) {
+      errors.phone = 'Phone number is required.';
+    } else if (cleanPhone.length !== 10) {
+      errors.phone = 'Phone number must be exactly 10 digits.';
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.';
+    }
+
+    setProfileErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+    if (!validateProfileForm()) {
+      return;
+    }
+
     setProfileSaving(true);
     setProfileMessage('');
 
+    const cleanPhone = phoneInput.replace(/\D/g, '').slice(0, 10);
+    const cleanName = fullNameInput.trim();
+
     const res = await updateUserProfile({
-      fullName: fullNameInput.trim(),
-      phone: phoneInput.trim()
+      fullName: cleanName,
+      phone: cleanPhone
     });
 
     setProfileSaving(false);
     if (res.success) {
       setIsEditingProfile(false);
+      setProfileErrors({});
       setProfileMessage('Account details successfully updated.');
       setTimeout(() => setProfileMessage(''), 3000);
     } else {
-      setProfileMessage('Failed to update details. Please try again.');
+      setProfileMessage(res.error || 'Failed to update details. Please try again.');
     }
   };
 
   const openAddAddressModal = () => {
+    if (addresses.length >= 4) {
+      setToastMsg({
+        type: 'error',
+        text: 'Maximum 4 delivery addresses allowed. Please edit or delete an existing address.'
+      });
+      return;
+    }
     setEditingAddressIndex(null);
     setEditingAddressId(null);
     setAddressErrors({});
@@ -488,6 +792,8 @@ export const Account = () => {
       errors.phone = 'Phone number is required.';
     } else if (cleanPhone.length !== 10) {
       errors.phone = 'Phone number must be a valid 10-digit mobile number.';
+    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.';
     }
 
     if (!addressForm.street || !addressForm.street.trim()) {
@@ -512,6 +818,13 @@ export const Account = () => {
   const handleSaveAddress = async (e) => {
     e.preventDefault();
     if (!validateAddressForm()) {
+      return;
+    }
+    if (!editingAddressId && addresses.length >= 4) {
+      setToastMsg({
+        type: 'error',
+        text: 'Maximum 4 delivery addresses allowed. Please edit or delete an existing address.'
+      });
       return;
     }
     setAddressSaving(true);
@@ -600,20 +913,35 @@ export const Account = () => {
   };
 
   const handleDeleteAddress = async (idx) => {
+    if (addresses.length <= 1) {
+      setToastMsg({
+        type: 'error',
+        text: 'At least 1 delivery address is required. You cannot delete your only saved address.'
+      });
+      return;
+    }
     const item = addresses[idx];
     if (item?.id && !String(item.id).startsWith('local-')) {
       try {
-        await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
+        const res = await apiClient(`/api/addresses/${item.id}`, { method: 'DELETE' });
+        if (res && res.message && !res.success) {
+          setToastMsg({ type: 'error', text: res.message });
+          return;
+        }
         await loadProfileAndAddresses();
+        setToastMsg({ type: 'success', text: 'Address removed successfully.' });
         return;
       } catch (err) {
         console.error('Failed to delete address via backend API:', err);
+        setToastMsg({ type: 'error', text: err.message || 'Failed to delete address.' });
+        return;
       }
     }
     const updatedList = addresses.filter((_, i) => i !== idx);
     const res = await updateUserProfile({ addresses: updatedList });
     if (res.success) {
       setAddresses(updatedList);
+      setToastMsg({ type: 'success', text: 'Address removed successfully.' });
     }
   };
 
@@ -723,19 +1051,23 @@ export const Account = () => {
 
               {/* Header */}
               <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="w-7 h-7 rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-600 shrink-0 shadow-2xs">
-                  <X className="w-3.5 h-3.5 stroke-[2.2]" />
+                <div className={`w-7 h-7 rounded-full border flex items-center justify-center shrink-0 shadow-2xs ${
+                  isDeliveredModalOrder ? 'border-neutral-800 bg-neutral-900 text-white' : 'border-red-200 bg-red-50 text-red-600'
+                }`}>
+                  <XCircle className="w-4 h-4 stroke-[2.2]" />
                 </div>
                 <h3 className="text-xl font-serif tracking-[0.1em] uppercase text-black font-semibold">
-                  Cancel Order
+                  {isDeliveredModalOrder ? 'Cancel Order (Post-Delivery)' : 'Cancel Order'}
                 </h3>
               </div>
               <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
-                We're sorry to see you cancel. Please tell us why you're cancelling your order.
+                {isDeliveredModalOrder
+                  ? 'Request cancellation for your delivered atelier piece. Please select a reason below so our atelier team can arrange pickup and process your refund.'
+                  : "We're sorry to see you cancel. Please tell us why you're cancelling your order."}
               </p>
 
               <div className="space-y-4">
-                {/* Select Products to Cancel */}
+                {/* Select Products */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-serif tracking-[0.12em] uppercase text-black font-semibold">
@@ -775,7 +1107,7 @@ export const Account = () => {
                             <div
                               className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                                 isSelected
-                                  ? 'bg-red-600 text-white'
+                                  ? (isDeliveredModalOrder ? 'bg-black text-white' : 'bg-red-600 text-white')
                                   : 'border-2 border-neutral-300 bg-white'
                               }`}
                             >
@@ -806,10 +1138,14 @@ export const Account = () => {
                             </div>
                           </div>
 
-                          {/* Cancelling Badge when selected */}
+                          {/* Selected Badge */}
                           {isSelected && (
-                            <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-red-500 border border-red-200 bg-red-50">
-                              Cancelling
+                            <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              isDeliveredModalOrder
+                                ? 'text-neutral-800 border-neutral-300 bg-neutral-100'
+                                : 'text-red-500 border-red-200 bg-red-50'
+                            }`}>
+                              {isDeliveredModalOrder ? 'Returning' : 'Cancelling'}
                             </span>
                           )}
                         </div>
@@ -818,10 +1154,10 @@ export const Account = () => {
                   </div>
                 </div>
 
-                {/* Reason for Cancellation */}
+                {/* Reason for Return / Cancellation */}
                 <div>
                   <label className="block text-xs font-bold text-neutral-800 mb-1.5">
-                    Reason for Cancellation <span className="text-red-500">*</span>
+                    {isDeliveredModalOrder ? 'Reason for Return' : 'Reason for Cancellation'} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -830,13 +1166,27 @@ export const Account = () => {
                       className="w-full appearance-none px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 focus:outline-none focus:border-neutral-400 cursor-pointer pr-10"
                     >
                       <option value="" disabled>Select a reason</option>
-                      <option value="Ordered by mistake">Ordered by mistake</option>
-                      <option value="Found better price elsewhere">Found better price elsewhere</option>
-                      <option value="Delivery taking too long">Delivery taking too long</option>
-                      <option value="Changed my mind">Changed my mind</option>
-                      <option value="Item not needed anymore">Item not needed anymore</option>
-                      <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
-                      <option value="Other">Other</option>
+                      {isDeliveredModalOrder ? (
+                        <>
+                          <option value="Size or fit issue">Size or fit issue</option>
+                          <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                          <option value="Quality or fabric not as expected">Quality or fabric not as expected</option>
+                          <option value="Received incorrect item or color">Received incorrect item or color</option>
+                          <option value="Did not match online images">Did not match online images</option>
+                          <option value="Changed my mind">Changed my mind</option>
+                          <option value="Other">Other</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Ordered by mistake">Ordered by mistake</option>
+                          <option value="Found better price elsewhere">Found better price elsewhere</option>
+                          <option value="Delivery taking too long">Delivery taking too long</option>
+                          <option value="Changed my mind">Changed my mind</option>
+                          <option value="Item not needed anymore">Item not needed anymore</option>
+                          <option value="Incorrect size or color ordered">Incorrect size or color ordered</option>
+                          <option value="Other">Other</option>
+                        </>
+                      )}
                     </select>
                     <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -851,22 +1201,30 @@ export const Account = () => {
                     rows={3}
                     value={cancelComments}
                     onChange={(e) => setCancelComments(e.target.value)}
-                    placeholder="Any additional details?"
+                    placeholder={isDeliveredModalOrder ? "Provide any return or pickup notes..." : "Any additional details?"}
                     className="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-none"
                   />
                 </div>
 
-                {/* Cancellation Note */}
-                <div className="bg-red-50/60 border border-red-100 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                {/* Note Banner */}
+                <div className={`border rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 ${
+                  isDeliveredModalOrder ? 'bg-indigo-50/70 border-indigo-200' : 'bg-amber-50/70 border-amber-200'
+                }`}>
+                  {isDeliveredModalOrder ? (
+                    <Truck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  )}
                   <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 block">
-                      CANCELLATION NOTE
+                    <span className="text-[10px] font-bold uppercase tracking-wider block text-amber-800">
+                      CANCELLATION APPROVAL FLOW
                     </span>
-                    <p className="text-[11px] sm:text-xs text-red-600/90 leading-relaxed font-normal">
-                      {isCODOrder
-                        ? 'Since this is a Cash on Delivery (COD) order, no refund is required for the cancelled items. You will only need to pay for the remaining items in your order upon delivery.'
-                        : 'Since this is a prepaid order, the estimated refund will be processed and credited to your original payment method within 5-7 business days.'}
+                    <p className="text-[11px] sm:text-xs leading-relaxed font-normal text-amber-950">
+                      {isDeliveredModalOrder
+                        ? 'Your post-delivery cancellation request will be submitted to our atelier team for review. Upon approval, pickup back to House of Urvaah is scheduled and your refund will be processed via the Refund Desk.'
+                        : isCODOrder
+                        ? 'Your request will be submitted for admin review prior to delivery. Once approved, this Cash on Delivery order will be cancelled with no payment due.'
+                        : 'Your request will be submitted to our atelier team for approval. Upon approval, online/UPI payments will be routed directly to our Refund Desk for full disbursement.'}
                     </p>
                   </div>
                 </div>
@@ -878,7 +1236,7 @@ export const Account = () => {
                     onClick={handleCloseCancelModal}
                     className="px-5 py-3 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-xl transition-colors cursor-pointer"
                   >
-                    No, keep order
+                    Keep order
                   </button>
 
                   {isFormFilled ? (
@@ -886,19 +1244,235 @@ export const Account = () => {
                       type="button"
                       onClick={handleSubmitCancellation}
                       disabled={isSubmittingCancellation}
-                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                      className={`px-6 py-3 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDeliveredModalOrder ? 'bg-neutral-900 hover:bg-black' : 'bg-red-600 hover:bg-red-700'
+                      }`}
                     >
-                      {isSubmittingCancellation ? 'Cancelling...' : 'Submit Cancellation'}
+                      {isSubmittingCancellation
+                        ? 'Submitting...'
+                        : 'Submit Cancellation Request'}
                     </button>
                   ) : (
                     <button
                       type="button"
                       disabled
-                      className="px-6 py-3 bg-neutral-200 text-neutral-400 text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl cursor-not-allowed transition-all"
+                      className="px-6 py-3 bg-neutral-200 text-neutral-400 text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl cursor-not-allowed"
                     >
-                      Cancel {selectedCancelItems.length} Item(s)
+                      Submit Cancellation Request
                     </button>
                   )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Product Replacement Popup Modal */}
+      <AnimatePresence>
+        {replaceModalOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-purple-500 font-sans">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseReplaceModal}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative z-10 w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-9 border border-neutral-100 max-h-[90vh] overflow-y-auto text-left"
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={handleCloseReplaceModal}
+                className="absolute top-5 right-5 p-1 text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4 stroke-[2]" />
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="w-7 h-7 rounded-full border border-purple-200 bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 shadow-2xs">
+                  <RefreshCw className="w-3.5 h-3.5 stroke-[2.2]" />
+                </div>
+                <h3 className="text-xl font-serif tracking-[0.1em] uppercase text-black font-semibold">
+                  Request Product Replacement
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
+                Delivered pieces can be exchanged for a different size or replacement piece. Select the item, choose your preferred size, and our atelier concierge will coordinate reverse pickup and replacement delivery.
+              </p>
+
+              <div className="space-y-4">
+                {/* Select Item to Replace */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-serif tracking-[0.12em] uppercase text-black font-semibold">
+                      Select Item to Replace
+                    </span>
+                    <span className="text-[10px] font-sans font-bold text-neutral-400 uppercase tracking-widest">
+                      {selectedReplaceItems.length} OF {replaceModalItems.length} SELECTED
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {replaceModalItems.map((item, idx) => {
+                      const itemId = item.id || item._id || item.productId || `item-${idx}`;
+                      const isSelected = selectedReplaceItems.includes(itemId);
+                      const itemImg = getSupabaseMediaUrl(item.image || (item.product && item.product.image) || item.image_url);
+                      const itemPrice = Number(item.price || item.unit_price || 0);
+
+                      return (
+                        <div
+                          key={itemId}
+                          onClick={() => handleToggleReplaceItem(itemId)}
+                          className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-purple-300 bg-purple-50/50'
+                              : 'border-neutral-200/80 bg-white hover:border-neutral-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                                isSelected ? 'bg-purple-700 text-white' : 'border-2 border-neutral-300 bg-white'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+
+                            <div className="w-12 h-12 bg-white rounded-lg border border-neutral-100 p-1 shrink-0 overflow-hidden flex items-center justify-center">
+                              <img
+                                src={itemImg}
+                                alt={item.name || item.title || 'Product'}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                                }}
+                              />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-neutral-800 truncate">
+                                {item.name || item.title || 'Atelier Item'}
+                              </p>
+                              <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
+                                Current Size: {item.size || item.selectedSize || 'Standard'} • ₹{itemPrice.toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border text-purple-700 border-purple-200 bg-purple-100/70">
+                              Replacing
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Reason for Replacement */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                    Reason for Replacement <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={replaceReason}
+                      onChange={(e) => setReplaceReason(e.target.value)}
+                      className="w-full appearance-none px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 focus:outline-none focus:border-neutral-400 cursor-pointer pr-10"
+                    >
+                      <option value="Size or fit issue - need different size">Size or fit issue - need different size</option>
+                      <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                      <option value="Color or variant exchange">Color or variant exchange</option>
+                      <option value="Fabric or styling not as expected">Fabric or styling not as expected</option>
+                      <option value="Wrong piece delivered">Wrong piece delivered</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Preferred Replacement Size */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                    Preferred Replacement Size <span className="text-purple-600">*</span>
+                  </label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setReplacementSize(sz)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-sans font-semibold tracking-wider transition-all cursor-pointer ${
+                          replacementSize === sz
+                            ? 'bg-neutral-900 text-white shadow-xs'
+                            : 'bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-400'
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Additional Comments */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                    Notes for Atelier Concierge (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={replaceComments}
+                    onChange={(e) => setReplaceComments(e.target.value)}
+                    placeholder="Specify sizing specifics, preferred delivery times, or exchange details..."
+                    className="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-none"
+                  />
+                </div>
+
+                {/* Reverse Pickup & Replacement Notice */}
+                <div className="bg-purple-50/80 border border-purple-200 rounded-2xl p-3.5 sm:p-4 flex items-start gap-3">
+                  <Truck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider block text-purple-900">
+                      COMPLIMENTARY REVERSE PICKUP & EXCHANGE
+                    </span>
+                    <p className="text-[11px] sm:text-xs leading-relaxed font-normal text-purple-950">
+                      Our courier will collect the piece from your delivery address with zero return fee. Upon verification by our atelier, your requested size ({replacementSize}) will be dispatched immediately.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseReplaceModal}
+                    className="px-5 py-3 border border-neutral-300 hover:border-black bg-white text-neutral-700 hover:text-black text-xs font-sans font-semibold tracking-[0.2em] uppercase rounded-xl transition-colors cursor-pointer"
+                  >
+                    Keep Current Piece
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitReplacement}
+                    disabled={isSubmittingReplacement || selectedReplaceItems.length === 0}
+                    className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmittingReplacement ? 'Submitting...' : 'Request Replacement'}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -1054,15 +1628,15 @@ export const Account = () => {
                 </div>
                 {!isEditingProfile ? (
                   <button
-                    onClick={() => setIsEditingProfile(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase font-sans text-brand-dark hover:underline cursor-pointer"
+                    onClick={handleStartEditProfile}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase font-sans text-brand-dark hover:opacity-75 cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" />
                     <span>EDIT</span>
                   </button>
                 ) : (
                   <button
-                    onClick={() => setIsEditingProfile(false)}
+                    onClick={handleCancelEditProfile}
                     className="text-xs font-semibold tracking-widest uppercase font-sans text-neutral-500 hover:text-black cursor-pointer"
                   >
                     CANCEL
@@ -1098,32 +1672,59 @@ export const Account = () => {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSaveProfile} className="space-y-6 font-sans">
+                <form onSubmit={handleSaveProfile} noValidate className="space-y-6 font-sans">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-semibold tracking-wider text-neutral-700 uppercase mb-2">
-                        FULL NAME
+                        FULL NAME <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={fullNameInput}
-                        onChange={(e) => setFullNameInput(e.target.value)}
-                        required
-                        className="w-full px-4 py-3 text-sm bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none font-sans"
+                        onChange={handleFullNameInputChange}
+                        className={`w-full px-4 py-3 text-sm bg-white border ${
+                          profileErrors.fullName
+                            ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                            : 'border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark'
+                        } outline-none font-sans transition-colors`}
                         placeholder="Enter full name"
                       />
+                      {profileErrors.fullName && (
+                        <p className="text-[11px] text-red-600 mt-1.5 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.fullName}</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold tracking-wider text-neutral-700 uppercase mb-2">
-                        PHONE NUMBER
+                        PHONE NUMBER <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="tel"
-                        value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value)}
-                        className="w-full px-4 py-3 text-sm bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none font-sans"
-                        placeholder="+91 98765 43210"
-                      />
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={phoneInput}
+                          onChange={handlePhoneInputChange}
+                          className={`w-full px-4 py-3 text-sm bg-white border ${
+                            profileErrors.phone
+                              ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                              : 'border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark'
+                          } outline-none font-sans transition-colors`}
+                          placeholder="10-digit mobile number"
+                        />
+                        {phoneInput && (
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-neutral-400 font-mono pointer-events-none">
+                            {phoneInput.length}/10
+                          </span>
+                        )}
+                      </div>
+                      {profileErrors.phone && (
+                        <p className="text-[11px] text-red-600 mt-1.5 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{profileErrors.phone}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1152,7 +1753,7 @@ export const Account = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsEditingProfile(false)}
+                      onClick={handleCancelEditProfile}
                       className="border border-neutral-300 hover:border-black text-neutral-700 hover:text-black text-xs font-semibold tracking-widest px-6 py-3 uppercase transition-colors cursor-pointer"
                     >
                       CANCEL
@@ -1173,14 +1774,22 @@ export const Account = () => {
                     Manage your saved delivery addresses
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={openAddAddressModal}
-                  className="inline-flex items-center justify-center gap-2 bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-5 py-2.5 uppercase transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>ADD ADDRESS</span>
-                </button>
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={openAddAddressModal}
+                    disabled={addresses.length >= 4}
+                    className={`inline-flex items-center justify-center gap-2 text-xs font-semibold tracking-widest px-5 py-2.5 uppercase transition-colors ${
+                      addresses.length >= 4
+                        ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                        : 'bg-brand-dark hover:bg-neutral-800 text-white cursor-pointer'
+                    }`}
+                    title={addresses.length >= 4 ? 'Maximum 4 addresses reached' : 'Add Address'}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>ADD ADDRESS</span>
+                  </button>
+                </div>
               </div>
 
               {/* Saved Addresses List / Empty State */}
@@ -1221,16 +1830,20 @@ export const Account = () => {
                           <button
                             type="button"
                             onClick={() => openEditAddressModal(idx)}
-                            className="text-neutral-500 hover:text-black p-1 cursor-pointer"
+                            className="text-neutral-500 hover:text-black p-1 cursor-pointer transition-colors"
                             title="Edit Address"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteAddress(idx)}
-                            className="text-neutral-400 hover:text-red-600 p-1 cursor-pointer"
-                            title="Delete Address"
+                            className={`p-1 transition-colors ${
+                              addresses.length <= 1
+                                ? 'text-neutral-300 cursor-not-allowed opacity-40'
+                                : 'text-neutral-400 hover:text-red-600 cursor-pointer'
+                            }`}
+                            title={addresses.length <= 1 ? "At least 1 address is required" : "Delete Address"}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1249,7 +1862,7 @@ export const Account = () => {
                         <button
                           type="button"
                           onClick={() => handleSetDefaultAddress(idx)}
-                          className="mt-4 text-[11px] font-semibold text-brand-dark hover:underline tracking-wider uppercase block cursor-pointer"
+                          className="mt-4 text-[11px] font-semibold text-brand-dark hover:text-neutral-600 tracking-wider uppercase block cursor-pointer transition-colors"
                         >
                           SET AS DEFAULT
                         </button>
@@ -1296,16 +1909,47 @@ export const Account = () => {
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {orders.map((ord, idx) => {
+              <>
+                <div className="space-y-6">
+                {paginatedOrders.map((ord, idx) => {
                   const orderNum = ord.order_number || ord.orderNumber || `ORD-2026-${ord.id || Math.floor(100000 + Math.random() * 900000)}`;
                   const orderStatus = ord.status || 'Pending';
                   const statusLower = orderStatus.toLowerCase();
-                  const isCancelled = statusLower.includes('cancel');
-                  const isDelivered = statusLower.includes('delivered') || statusLower.includes('completed');
-                  const isOutForDelivery = isDelivered || statusLower.includes('out') || statusLower.includes('delivery');
-                  const isShipped = isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched');
-                  const isPaid = (ord.payment_status || ord.paymentStatus || 'Paid').toLowerCase() === 'paid';
+                  const isCancellationRequested = statusLower === 'cancellation requested' || statusLower === 'cancel_requested';
+                  const isCancelled = (statusLower === 'cancelled' || statusLower === 'canceled') && !isCancellationRequested;
+
+                  // Post-delivery Return Flow States
+                  const isReturnRequested = statusLower === 'return requested' || statusLower === 'return request processing';
+                  const isReturnApproved = statusLower === 'return approved';
+                  const isReceivedAtUrvaah = statusLower === 'received at house of urvaah' || statusLower === 'received at urvaah house';
+                  const isReturned = statusLower === 'returned' || statusLower === 'return completed';
+                  const isReturnRejected = statusLower === 'return rejected';
+                  const isInReturnFlow = isReturnRequested || isReturnApproved || isReceivedAtUrvaah || isReturned || isReturnRejected;
+
+                  // Post-delivery Replacement Flow States
+                  const isReplacementRequested = statusLower === 'replacement request processing' || statusLower === 'replace requested' || statusLower === 'replacement requested';
+                  const isReplacementApproved = statusLower === 'replace approved' || statusLower === 'replacement approved';
+                  const isReplacementInTransit = statusLower === 'replacement processing' || statusLower === 'replacement shipped' || statusLower === 'in reverse transit';
+                  const isReplacementOutForDelivery = statusLower === 'replacement out for delivery';
+                  const isReplaced = statusLower === 'replaced';
+                  const isReplacementRejected = statusLower === 'replace rejected';
+                  const isInReplacementFlow = isReplacementRequested || isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced || isReplacementRejected;
+
+                  // Pre-return & pre-replacement delivery status
+                  const isDelivered = (statusLower.includes('delivered') || statusLower.includes('completed')) && !isInReturnFlow && !isInReplacementFlow;
+                  const isOutForDelivery = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isDelivered || statusLower.includes('out') || statusLower.includes('delivery'));
+                  const isShipped = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched'));
+                  const isCod = (ord.payment_method || ord.paymentMethod || '').toLowerCase() === 'cod' || (ord.payment_method || ord.paymentMethod || '').toLowerCase().includes('cash');
+                  const isPaid = (isDelivered && isCod) || (ord.payment_status || ord.paymentStatus || 'Paid').toLowerCase() === 'paid';
+                  const isOnlinePayment = !isCod;
+
+                  // 24-hour shipping address editing eligibility
+                  const orderCreatedTime = ord.created_at || ord.createddate ? new Date(ord.created_at || ord.createddate).getTime() : Date.now();
+                  const diffHours = (Date.now() - orderCreatedTime) / (1000 * 60 * 60);
+                  const isWithin24Hours = diffHours <= 24;
+                  const hoursRemaining = Math.max(1, Math.ceil(24 - diffHours));
+                  const isAddressLocked = isShipped || isOutForDelivery || isDelivered || isCancelled || isCancellationRequested || isInReturnFlow || isInReplacementFlow;
+                  const canEditAddress = isWithin24Hours && !isAddressLocked;
 
                   let orderTotal = Number(ord.total || ord.total_amount || ord.grandTotal || ord.subtotal || 0);
                   if ((!orderTotal || orderTotal === 0) && ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
@@ -1351,28 +1995,69 @@ export const Account = () => {
                         <div className="flex items-center gap-2.5 flex-wrap">
                           {/* Status Badge */}
                           <span className={`px-3.5 py-1 text-[11px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 ${
-                            isCancelled 
-                              ? 'bg-red-50 text-red-800 border-red-200' 
-                              : isDelivered 
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-                              : isOutForDelivery 
-                              ? 'bg-blue-50 text-blue-900 border-blue-200' 
-                              : isShipped 
-                              ? 'bg-amber-50 text-amber-900 border-amber-200' 
+                            isCancellationRequested
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              : isCancelled
+                              ? 'bg-red-50 text-red-800 border-red-200'
+                              : isReplacementRequested
+                              ? 'bg-purple-100 text-purple-900 border-purple-300 font-bold'
+                              : isReplacementApproved
+                              ? 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold'
+                              : isReplacementInTransit
+                              ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
+                              : isReplaced
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                              : isReplacementRejected
+                              ? 'bg-rose-50 text-rose-900 border-rose-200'
+                              : isReturnRequested
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              : isReturnApproved
+                              ? 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold'
+                              : isReceivedAtUrvaah
+                              ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
+                              : isReturned
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                              : isReturnRejected
+                              ? 'bg-rose-50 text-rose-900 border-rose-200'
+                              : isDelivered
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                              : isOutForDelivery
+                              ? 'bg-blue-50 text-blue-900 border-blue-200'
+                              : isShipped
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
                               : 'bg-[#FAF8F3] text-neutral-800 border-[#E5E0D8]'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              isCancelled 
-                                ? 'bg-red-600' 
-                                : isDelivered 
-                                ? 'bg-emerald-600' 
-                                : isOutForDelivery 
-                                ? 'bg-blue-600' 
-                                : isShipped 
-                                ? 'bg-amber-600' 
+                              isCancellationRequested || isReturnRequested || isReplacementRequested
+                                ? 'bg-amber-600 animate-pulse'
+                                : isCancelled || isReturnRejected || isReplacementRejected
+                                ? 'bg-red-600'
+                                : isReturnApproved || isReplacementApproved
+                                ? 'bg-indigo-600 animate-pulse'
+                                : isReceivedAtUrvaah || isReplacementInTransit
+                                ? 'bg-blue-600 animate-pulse'
+                                : isReturned || isDelivered || isReplaced
+                                ? 'bg-emerald-600'
+                                : isOutForDelivery
+                                ? 'bg-blue-600'
+                                : isShipped
+                                ? 'bg-amber-600'
                                 : 'bg-amber-500 animate-pulse'
                             }`} />
-                            <span>{orderStatus}</span>
+                            <span>{
+                              isCancellationRequested ? 'CANCELLATION REQUESTED' :
+                              isReplacementRequested ? 'REPLACEMENT REQUESTED' :
+                              isReplacementApproved ? 'REPLACEMENT APPROVED' :
+                              isReplacementInTransit ? 'REPLACEMENT IN TRANSIT' :
+                              isReplaced ? 'REPLACED' :
+                              isReplacementRejected ? 'REPLACEMENT REJECTED' :
+                              isReturnRequested ? 'RETURN REQUESTED' :
+                              isReturnApproved ? 'RETURN IN TRANSIT' :
+                              isReceivedAtUrvaah ? 'RECEIVED AT URVAAH HOUSE' :
+                              isReturned ? 'RETURNED & REFUNDED' :
+                              isReturnRejected ? 'RETURN REJECTED' :
+                              orderStatus
+                            }</span>
                           </span>
 
                           {/* Shiprocket Logistics Badge for Cancelled Orders */}
@@ -1389,13 +2074,13 @@ export const Account = () => {
                               ? isPaid
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                 : 'bg-neutral-100 text-neutral-700 border-neutral-200'
-                              : isPaid 
-                              ? 'bg-neutral-900 text-white border-neutral-900' 
+                              : isPaid
+                              ? 'bg-neutral-900 text-white border-neutral-900'
                               : 'bg-neutral-100 text-neutral-700 border-neutral-200'
                           }`}>
                             {isCancelled
-                              ? (isPaid 
-                                  ? (['refunded', 'completed'].includes((ord.refund_status || '').toLowerCase()) ? 'REFUND SETTLED' : 'REFUND INITIATED') 
+                              ? (isPaid
+                                  ? (['refunded', 'completed'].includes((ord.refund_status || '').toLowerCase()) ? 'REFUND SETTLED' : 'REFUND INITIATED')
                                   : 'COD • ZERO DUE')
                               : (isPaid ? 'PAID' : 'PENDING')}
                           </span>
@@ -1507,8 +2192,8 @@ export const Account = () => {
                                   Financial Settlement
                                 </span>
                                 <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
-                                  isPaid 
-                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                                  isPaid
+                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                                     : 'text-neutral-700 bg-neutral-100 border-neutral-200'
                                 }`}>
                                   {isPaid ? '100% Refunded' : 'Zero Payment'}
@@ -1538,7 +2223,181 @@ export const Account = () => {
                             </div>
                           </div>
                         </div>
-                      ) : (
+                      ) : isInReplacementFlow ? (
+                        <div className="bg-[#FAF8F3] border border-purple-200/80 rounded-2xl p-5 sm:p-6 shadow-2xs">
+                          <div className="flex items-center justify-between mb-5">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-purple-950 uppercase font-semibold flex items-center gap-2">
+                              <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                              <span>REPLACEMENT & EXCHANGE JOURNEY</span>
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-purple-700 font-medium">
+                              STEP {isReplaced ? '4 OF 4' : (isReplacementOutForDelivery || isReplacementInTransit) ? '3 OF 4' : isReplacementApproved ? '2 OF 4' : '1 OF 4'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2 relative">
+                            {/* Background Line */}
+                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-purple-700 transition-all duration-500"
+                                style={{
+                                  width: isReplaced
+                                    ? '100%'
+                                    : (isReplacementOutForDelivery || isReplacementInTransit)
+                                    ? '66%'
+                                    : isReplacementApproved
+                                    ? '33%'
+                                    : '0%'
+                                }}
+                              />
+                            </div>
+
+                            {/* Step 1: REPLACEMENT REQUESTED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-purple-700 text-white ring-4 ring-purple-100">
+                                <Check className="w-4 h-4 stroke-[2.5]" />
+                              </div>
+                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-black">
+                                REQUESTED
+                              </span>
+                            </div>
+
+                            {/* Step 2: ATELIER APPROVED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced
+                                  ? 'bg-purple-700 text-white ring-4 ring-purple-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                APPROVED
+                              </span>
+                            </div>
+
+                            {/* Step 3: DISPATCH / IN TRANSIT */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReplacementInTransit || isReplacementOutForDelivery || isReplaced
+                                  ? 'bg-purple-700 text-white ring-4 ring-purple-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <Truck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                IN TRANSIT
+                              </span>
+                            </div>
+
+                            {/* Step 4: REPLACED & DELIVERED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReplaced
+                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <PackageCheck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReplaced ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
+                              }`}>
+                                REPLACED
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : isInReturnFlow ? (
+                        <div className="bg-[#FAF8F3] border border-indigo-200/60 rounded-2xl p-5 sm:p-6 shadow-2xs">
+                          <div className="flex items-center justify-between mb-5">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-indigo-900 uppercase font-semibold flex items-center gap-2">
+                              <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>RETURN & REFUND JOURNEY</span>
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-indigo-700 font-medium">
+                              STEP {isReceivedAtUrvaah || isReturned ? '4 OF 4' : isReturnApproved ? '3 OF 4' : '1 OF 4'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2 relative">
+                            {/* Background Line */}
+                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-700 transition-all duration-500"
+                                style={{
+                                  width: isReceivedAtUrvaah || isReturned
+                                    ? '100%'
+                                    : isReturnApproved
+                                    ? '66%'
+                                    : '0%'
+                                }}
+                              />
+                            </div>
+
+                            {/* Step 1: RETURN REQUESTED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-indigo-700 text-white ring-4 ring-indigo-100">
+                                <Check className="w-4 h-4 stroke-[2.5]" />
+                              </div>
+                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-black">
+                                REQUESTED
+                              </span>
+                            </div>
+
+                            {/* Step 2: ADMIN APPROVED */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned
+                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                APPROVED
+                              </span>
+                            </div>
+
+                            {/* Step 3: IN TRANSIT TO URVAAH */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned
+                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <Truck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReturnApproved || isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : 'font-medium text-neutral-400'
+                              }`}>
+                                IN TRANSIT
+                              </span>
+                            </div>
+
+                            {/* Step 4: ATELIER RECEIVED & REFUND */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                                isReceivedAtUrvaah || isReturned
+                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
+                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
+                              }`}>
+                                <PackageCheck className="w-4 h-4 stroke-[1.8]" />
+                              </div>
+                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
+                                isReceivedAtUrvaah || isReturned ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
+                              }`}>
+                                AT URVAAH / REFUND
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : !isCancelled && !isCancellationRequested ? (
                         <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs">
                           <div className="flex items-center justify-between mb-5">
                             <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-500 uppercase font-semibold">
@@ -1553,17 +2412,17 @@ export const Account = () => {
                           <div className="grid grid-cols-4 gap-2 relative">
                             {/* Background Line with Dynamic Fill */}
                             <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-brand-dark transition-all duration-500" 
-                                style={{ 
-                                  width: isDelivered 
-                                    ? '100%' 
-                                    : isOutForDelivery 
-                                    ? '66%' 
-                                    : isShipped 
-                                    ? '33%' 
-                                    : '0%' 
-                                }} 
+                              <div
+                                className="h-full bg-brand-dark transition-all duration-500"
+                                style={{
+                                  width: isDelivered
+                                    ? '100%'
+                                    : isOutForDelivery
+                                    ? '66%'
+                                    : isShipped
+                                    ? '33%'
+                                    : '0%'
+                                }}
                               />
                             </div>
 
@@ -1580,8 +2439,8 @@ export const Account = () => {
                             {/* Step 2: SHIPPED */}
                             <div className="flex flex-col items-center text-center z-10">
                               <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isShipped 
-                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                isShipped
+                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs'
                                   : 'bg-white border-2 border-neutral-300 text-neutral-400'
                               }`}>
                                 <Package className="w-4 h-4 stroke-[1.8]" />
@@ -1596,8 +2455,8 @@ export const Account = () => {
                             {/* Step 3: OUT FOR DELIVERY */}
                             <div className="flex flex-col items-center text-center z-10">
                               <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isOutForDelivery 
-                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs' 
+                                isOutForDelivery
+                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs'
                                   : 'bg-white border-2 border-neutral-300 text-neutral-400'
                               }`}>
                                 <Truck className="w-4 h-4 stroke-[1.8]" />
@@ -1612,8 +2471,8 @@ export const Account = () => {
                             {/* Step 4: DELIVERED */}
                             <div className="flex flex-col items-center text-center z-10">
                               <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isDelivered 
-                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs' 
+                                isDelivered
+                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
                                   : 'bg-white border-2 border-neutral-300 text-neutral-400'
                               }`}>
                                 <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
@@ -1624,6 +2483,301 @@ export const Account = () => {
                                 DELIVERED
                               </span>
                             </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {/* Replacement Flow Informational Banners */}
+                      {isReplacementRequested && (
+                        <div className="bg-purple-50/90 border border-purple-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-purple-100 rounded-xl text-purple-800 shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 text-purple-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-purple-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Replacement Request Pending Atelier Review
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/80 text-purple-900 border border-purple-300 uppercase">
+                                Under Review
+                              </span>
+                            </div>
+                            <p className="text-purple-900/90 leading-relaxed font-normal">
+                              Your product exchange request for this delivered order has been submitted to the House of Urvaah atelier concierge. Our team is verifying stock availability for your replacement size and will coordinate reverse pickup of the delivered item.
+                            </p>
+                            {(ord.cancel_reason || ord.return_reason) && (
+                              <p className="text-[11px] text-purple-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Exchange Details:</span> {ord.cancel_reason || ord.return_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {isReplacementApproved && (
+                        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-800 shrink-0 mt-0.5">
+                            <CheckCircle2 className="w-5 h-5 text-indigo-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-indigo-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Replacement Approved — Exchange In Motion
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 uppercase">
+                                Approved
+                              </span>
+                            </div>
+                            <p className="text-indigo-900/90 leading-relaxed font-normal">
+                              Your replacement has been authorized by our atelier team. Our logistics partner will pick up the existing item from your address, and your replacement piece is being prepared for immediate dispatch.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {(isReplacementInTransit || isReplacementOutForDelivery) && (
+                        <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-blue-100 rounded-xl text-blue-800 shrink-0 mt-0.5">
+                            <Truck className="w-5 h-5 text-blue-700 animate-pulse" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-blue-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Replacement Order In Transit
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200/80 text-blue-900 border border-blue-300 uppercase">
+                                In Transit
+                              </span>
+                            </div>
+                            <p className="text-blue-900/90 leading-relaxed font-normal">
+                              Your replacement piece has dispatched from House of Urvaah and is on its way to your destination address.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {isReplaced && (
+                        <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-emerald-100 rounded-xl text-emerald-800 shrink-0 mt-0.5">
+                            <PackageCheck className="w-5 h-5 text-emerald-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-emerald-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Product Replacement Completed
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300 uppercase">
+                                Delivered
+                              </span>
+                            </div>
+                            <p className="text-emerald-900/90 leading-relaxed font-normal">
+                              Your replacement piece has been successfully delivered and the exchange cycle is complete. Thank you for choosing House of Urvaah.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {isReplacementRejected && (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                              Replacement Request Not Approved
+                            </h4>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              Your replacement request could not be approved by the atelier team. For further assistance or alternate sizing options, please contact our concierge care.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Post-Delivery Return Requested Review Banner */}
+                      {isReturnRequested && (
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 text-amber-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Request Pending Admin Review
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                                Under Review
+                              </span>
+                            </div>
+                            <p className="text-amber-900/90 leading-relaxed font-normal">
+                              Your return request for this delivered order has been submitted to the House of Urvaah atelier team. Once approved by admin, reverse pickup will be initiated.
+                            </p>
+                            {ord.cancel_reason && (
+                              <p className="text-[11px] text-amber-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Return Reason:</span> {ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Return Approved Banner */}
+                      {isReturnApproved && (
+                        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-800 shrink-0 mt-0.5">
+                            <Truck className="w-5 h-5 text-indigo-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-indigo-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Approved — Package In Transit to House of Urvaah
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 uppercase">
+                                In Reverse Transit
+                              </span>
+                            </div>
+                            <p className="text-indigo-900/90 leading-relaxed font-normal">
+                              Your return request has been approved by admin! Reverse pickup is underway and the package is in transit back to House of Urvaah. Once delivered to our atelier, our Refund Desk will immediately initiate your refund.
+                            </p>
+                            <div className="pt-1 flex items-center gap-2 text-[11px] font-sans font-semibold text-indigo-800">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+                              <span>Destination: House of Urvaah Central Atelier</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Received at House of Urvaah Banner */}
+                      {isReceivedAtUrvaah && (
+                        <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-blue-100 rounded-xl text-blue-800 shrink-0 mt-0.5">
+                            <PackageCheck className="w-5 h-5 text-blue-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-blue-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Package Delivered to House of Urvaah — Refund Desk Initiated
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200/80 text-blue-900 border border-blue-300 uppercase">
+                                Received at Atelier
+                              </span>
+                            </div>
+                            <p className="text-blue-900/90 leading-relaxed font-normal">
+                              Your returned items have safely arrived at House of Urvaah! Inventory has been restocked and this order is now active at our Refund Desk for customer disbursement.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Returned & Refund Disbursed Banner */}
+                      {isReturned && (
+                        <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-emerald-100 rounded-xl text-emerald-800 shrink-0 mt-0.5">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-emerald-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Completed & Full Refund Disbursed
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300 uppercase">
+                                Refund Completed
+                              </span>
+                            </div>
+                            <p className="text-emerald-900/90 leading-relaxed font-normal">
+                              Full refund of ₹{Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed{ord.refund_method ? ` via ${ord.refund_method}` : ''}.
+                              {ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Transaction Reference / UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Return Rejected Banner */}
+                      {isReturnRejected && (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                              Return Request Not Approved
+                            </h4>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              Your return request could not be approved by the atelier team. For questions regarding atelier policies, please reach out to customer care.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pre-Delivery Cancellation Requested Review Banner */}
+                      {isCancellationRequested && (
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                            <Clock className="w-5 h-5 text-amber-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Cancellation Request Pending Admin Approval
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
+                                Review In Progress
+                              </span>
+                            </div>
+                            <p className="text-amber-900/90 leading-relaxed font-normal">
+                              Your cancellation request has been submitted to our atelier admin team for verification prior to delivery.
+                              {isOnlinePayment
+                                ? ' Once approved, the full amount will automatically be routed to the Refund Desk for customer disbursement.'
+                                : ' As this is a Cash on Delivery order, no payment was collected.'}
+                            </p>
+                            {ord.cancel_reason && (
+                              <p className="text-[11px] text-amber-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Reason:</span> {ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pre-Delivery Cancelled & Refund Status Banner */}
+                      {isCancelled && (
+                        <div className={`rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 border shadow-2xs ${
+                          !isOnlinePayment
+                            ? 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                            : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                            : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-950'
+                            : 'bg-amber-50 border-amber-200 text-amber-950'
+                        }`}>
+                          <div className="p-2 rounded-xl bg-white/90 border border-current shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold uppercase tracking-wide text-xs sm:text-sm">
+                                {!isOnlinePayment
+                                  ? 'Order Cancelled (Cash on Delivery)'
+                                  : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                                  ? 'Refund Completed'
+                                  : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                                  ? 'Refund In Processing'
+                                  : 'Order Cancelled — Sent to Refund Desk'}
+                              </h4>
+                              {isOnlinePayment && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-white/80">
+                                  {ord.refund_status || 'Pending'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="leading-relaxed font-normal">
+                              {!isOnlinePayment
+                                ? 'This order was cancelled prior to delivery. No payment was charged for Cash on Delivery.'
+                                : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
+                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed${ord.refund_method ? ` via ${ord.refund_method}` : ''}.${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Reference/UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}`
+                                : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
+                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} is being processed by the Refund Desk.`
+                                : `Full amount of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been approved and queued at the Refund Desk for customer disbursement.`}
+                            </p>
                           </div>
                         </div>
                       )}
@@ -1663,19 +2817,48 @@ export const Account = () => {
                                 </div>
                               </div>
 
-                              <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
-                                isCancelled 
-                                  ? 'bg-red-50 text-red-800 border-red-200' 
-                                  : isDelivered 
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                  : isOutForDelivery 
-                                  ? 'bg-blue-50 text-blue-800 border-blue-200' 
-                                  : isShipped 
-                                  ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                                  : 'bg-neutral-100 text-neutral-800 border-neutral-200'
-                              }`}>
-                                {isCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
-                              </span>
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
+                                  isCancellationRequested
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : isCancelled
+                                    ? 'bg-red-50 text-red-800 border-red-200'
+                                    : isReturnRequested
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : isReturnApproved
+                                    ? 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                    : isReceivedAtUrvaah
+                                    ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                    : isReturned
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    : isDelivered
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : isOutForDelivery
+                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : isShipped
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : 'bg-neutral-100 text-neutral-800 border-neutral-200'
+                                }`}>
+                                  {isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnApproved ? 'RETURN IN TRANSIT' : isReceivedAtUrvaah ? 'AT URVAAH HOUSE' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                </span>
+
+                                {isDelivered && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const prodId = item.product_id || item.productId || item.id;
+                                      if (prodId) {
+                                        navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                      }
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-lg border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-bold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                                    title="Rate and give feedback for this delivered product"
+                                  >
+                                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                    <span>Give Feedback</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -1701,6 +2884,48 @@ export const Account = () => {
                             View Details
                           </button>
 
+                          {/* Edit Address Quick Action (Available during 24-Hour Edit Window) */}
+                          {canEditAddress && (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/checkout', { state: { viewOrder: ord, openAddressEdit: true } })}
+                              className="px-5 py-2.5 rounded-xl border border-amber-300 hover:border-black bg-amber-50 hover:bg-amber-100/80 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-amber-950 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              title={`Edit shipping address within 24 hours (${hoursRemaining}h remaining)`}
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Edit Address ({hoursRemaining}h)</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForInvoice(ord)}
+                            className="px-5 py-2.5 rounded-xl border border-[#c5a880] hover:border-black bg-white hover:bg-[#faf8f5] text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                            title="View or download official tax invoice"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
+                            <span>Invoice</span>
+                          </button>
+
+                          {/* Give Feedback Quick Action on Delivered Orders */}
+                          {isDelivered && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const firstItem = itemsList[0];
+                                const prodId = firstItem?.product_id || firstItem?.productId || firstItem?.id;
+                                if (prodId) {
+                                  navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                }
+                              }}
+                              className="px-5 py-2.5 rounded-xl border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              title="Give feedback for your delivered pieces"
+                            >
+                              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                              <span>Give Feedback</span>
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleReorderOrder(ord)}
@@ -1710,14 +2935,98 @@ export const Account = () => {
                             <span>Reorder</span>
                           </button>
 
-                          {!isCancelled && !isDelivered && (
+                          {/* Cancel Order Button (Both Pre-Delivery and Post-Delivery) */}
+                          {!isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}
-                              className="px-5 py-2.5 rounded-xl border border-red-200 hover:border-red-500 bg-white hover:bg-red-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-red-600 hover:text-red-700 transition-all shadow-2xs cursor-pointer"
+                              className={`px-5 py-2.5 rounded-xl border text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 ${
+                                isDelivered
+                                  ? 'border-neutral-900 hover:bg-neutral-900 hover:text-white bg-white text-neutral-900'
+                                  : 'border-red-200 hover:border-red-500 bg-white hover:bg-red-50 text-red-600 hover:text-red-700'
+                              }`}
                             >
-                              Cancel Order
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Cancel Order</span>
                             </button>
+                          )}
+
+                          {/* Post-Delivery Replace Button */}
+                          {isDelivered && !isInReturnFlow && !isInReplacementFlow && (
+                            <button
+                              type="button"
+                              onClick={() => handleReplaceOrderInAccount(ord)}
+                              className="px-5 py-2.5 rounded-xl border border-purple-900/30 hover:border-purple-800 bg-purple-50/60 hover:bg-purple-900 hover:text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase text-purple-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Replace Product</span>
+                            </button>
+                          )}
+
+                          {/* Post-Delivery Replacement Flow Status Badges */}
+                          {isReplacementRequested && (
+                            <span className="px-4 py-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-purple-600" />
+                              <span>Replacement Pending Review</span>
+                            </span>
+                          )}
+
+                          {isReplacementApproved && (
+                            <span className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Replacement Approved</span>
+                            </span>
+                          )}
+
+                          {(isReplacementInTransit || isReplacementOutForDelivery) && (
+                            <span className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Truck className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                              <span>Replacement In Transit</span>
+                            </span>
+                          )}
+
+                          {isReplaced && (
+                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <PackageCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Product Replaced</span>
+                            </span>
+                          )}
+
+                          {/* Pre-Delivery Cancellation Pending Review */}
+                          {isCancellationRequested && (
+                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Cancellation Pending Review</span>
+                            </span>
+                          )}
+
+                          {/* Post-Delivery Return Flow Status Badges */}
+                          {isReturnRequested && (
+                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Return Pending Review</span>
+                            </span>
+                          )}
+
+                          {isReturnApproved && (
+                            <span className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Return In Transit</span>
+                            </span>
+                          )}
+
+                          {isReceivedAtUrvaah && (
+                            <span className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <PackageCheck className="w-3.5 h-3.5 text-blue-600" />
+                              <span>At Urvaah House • Refund Desk</span>
+                            </span>
+                          )}
+
+                          {isReturned && (
+                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Refund Completed</span>
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1725,8 +3034,73 @@ export const Account = () => {
                   );
                 })}
               </div>
-            )}
-          </div>
+
+              {/* Customer Orders Pagination Bar */}
+              {totalOrderPages > 1 && (
+                <div className="pt-4 border-t border-neutral-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans text-xs">
+                  <div className="text-neutral-500 font-medium">
+                    Showing <span className="font-semibold text-brand-dark">{(orderPage - 1) * ordersPerPage + 1}</span>–
+                    <span className="font-semibold text-brand-dark">{Math.min(orderPage * ordersPerPage, orders.length)}</span> of{' '}
+                    <span className="font-semibold text-brand-dark">{orders.length}</span> orders
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderPage((prev) => Math.max(1, prev - 1));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={orderPage === 1}
+                      className="inline-flex items-center gap-1 px-3 py-2 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wider"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Prev</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalOrderPages }, (_, i) => i + 1).map((pageNum) => {
+                        const isActive = pageNum === orderPage;
+                        return (
+                          <button
+                            key={`order-page-${pageNum}`}
+                            type="button"
+                            onClick={() => {
+                              setOrderPage(pageNum);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-brand-dark text-white shadow-xs'
+                                : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-black'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderPage((prev) => Math.min(totalOrderPages, prev + 1));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={orderPage >= totalOrderPages}
+                      className="inline-flex items-center gap-1 px-3 py-2 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:text-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wider"
+                      title="Next Page"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
         )}
 
 
@@ -1800,7 +3174,7 @@ export const Account = () => {
           </div>
         )}
 
-        {activeTab === 'MY COUPONS' && (
+        {/* {activeTab === 'MY COUPONS' && (
           <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
             <Ticket className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
             <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
@@ -1818,7 +3192,7 @@ export const Account = () => {
               <p className="text-xs text-neutral-600 mt-1">10% Off your inaugural House of Urvaah purchase.</p>
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* 3. ADD / EDIT ADDRESS MODAL */}
@@ -1837,7 +3211,7 @@ export const Account = () => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative z-10 w-full max-w-lg bg-white p-6 sm:p-8 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto"
+              className="relative z-10 w-full max-w-lg bg-white p-6 sm:p-8 shadow-2xl border border-neutral-200 max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none"
             >
               <div className="flex items-center justify-between pb-4 mb-6 border-b border-neutral-200">
                 <h3 className="font-serif text-lg tracking-[0.15em] uppercase text-black">
@@ -1880,15 +3254,19 @@ export const Account = () => {
                   </label>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={addressForm.phone}
                     onChange={(e) => {
-                      setAddressForm({ ...addressForm, phone: e.target.value });
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length === 12 && val.startsWith('91')) val = val.slice(2);
+                      val = val.slice(0, 10);
+                      setAddressForm((prev) => ({ ...prev, phone: val }));
                       if (addressErrors.phone) setAddressErrors((prev) => ({ ...prev, phone: '' }));
                     }}
                     className={`w-full px-3.5 py-2.5 bg-white border ${
                       addressErrors.phone ? 'border-red-500' : 'border-neutral-300 focus:border-brand-dark'
                     } focus:ring-1 focus:ring-brand-dark outline-none text-sm`}
-                    placeholder="+91 XXXXX XXXXX"
+                    placeholder="10-digit mobile number"
                   />
                   {addressErrors.phone && (
                     <p className="text-[11px] text-red-600 mt-1">{addressErrors.phone}</p>
@@ -2111,7 +3489,9 @@ export const Account = () => {
               {(() => {
                 const modalStatus = selectedOrderModal.status || 'Pending';
                 const isModalCancelled = modalStatus.toLowerCase().includes('cancel');
-                const isModalPaid = (selectedOrderModal.payment_status || selectedOrderModal.paymentStatus || 'Paid').toLowerCase() === 'paid';
+                const isModalCod = (selectedOrderModal.payment_method || selectedOrderModal.paymentMethod || '').toLowerCase() === 'cod' || (selectedOrderModal.payment_method || selectedOrderModal.paymentMethod || '').toLowerCase().includes('cash');
+                const isModalDelivered = modalStatus.toLowerCase() === 'delivered';
+                const modalIsPaid = (isModalDelivered && isModalCod) || (selectedOrderModal.payment_status || selectedOrderModal.paymentStatus || '').toLowerCase() === 'paid';
                 const modalTotal = Number(selectedOrderModal.total || selectedOrderModal.total_amount || 0);
 
                 return (
@@ -2127,6 +3507,18 @@ export const Account = () => {
                       <div>
                         <span className="text-neutral-400 block text-[10px] font-bold uppercase">PAYMENT METHOD</span>
                         <span className="font-bold text-neutral-900 mt-0.5 block">{selectedOrderModal.payment_method || selectedOrderModal.paymentMethod || 'Online Payment'}</span>
+                      </div>
+                      <div>
+                        <span className="text-neutral-400 block text-[10px] font-bold uppercase">PAYMENT STATUS</span>
+                        <div className="mt-0.5">
+                          {isModalCancelled && isModalCod && !modalIsPaid ? (
+                            <span className="font-bold text-neutral-400 uppercase text-xs">N/A (Cancelled COD)</span>
+                          ) : (
+                            <span className={`font-bold uppercase ${modalIsPaid ? 'text-emerald-700' : 'text-neutral-900'}`}>
+                              {modalIsPaid ? 'PAID' : (selectedOrderModal.payment_status || 'PENDING')}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span className="text-neutral-400 block text-[10px] font-bold uppercase">PLACED ON</span>
@@ -2153,7 +3545,7 @@ export const Account = () => {
                             Shiprocket Logistics & Refund Sync
                           </span>
                           <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 uppercase">
-                            {isModalPaid ? '100% Refund Initiated' : 'COD • Zero Due'}
+                            {modalIsPaid ? '100% Refund Initiated' : 'COD • Zero Due'}
                           </span>
                         </div>
 
@@ -2169,7 +3561,7 @@ export const Account = () => {
                           <div className="bg-white p-3 rounded-lg border border-neutral-200/70">
                             <span className="text-[10px] font-bold uppercase text-neutral-700 block mb-1">Financial Settlement</span>
                             <p className="text-[11px] text-neutral-600 leading-relaxed">
-                              {isModalPaid 
+                              {modalIsPaid
                                 ? `Full refund of ₹${modalTotal.toLocaleString('en-IN')} initiated to original payment source (3-5 business days).`
                                 : 'Cash on Delivery order — zero payment collected, no refund required.'}
                             </p>
@@ -2254,6 +3646,14 @@ export const Account = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Official Haute Couture Invoice Modal */}
+      <InvoiceModal
+        isOpen={Boolean(selectedOrderForInvoice)}
+        onClose={() => setSelectedOrderForInvoice(null)}
+        order={selectedOrderForInvoice}
+        orderId={selectedOrderForInvoice?.order_number || selectedOrderForInvoice?.id}
+      />
     </div>
   );
 };

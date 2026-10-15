@@ -1,12 +1,16 @@
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 
 export const getAuthToken = () => {
-  return localStorage.getItem('urvaah_token') || null;
+  const token = localStorage.getItem('urvaah_token');
+  if (!token || token === 'undefined' || token === 'null' || !token.trim()) {
+    return null;
+  }
+  return token.trim();
 };
 
 export const setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('urvaah_token', token);
+  if (token && token !== 'undefined' && token !== 'null') {
+    localStorage.setItem('urvaah_token', token.trim());
   } else {
     localStorage.removeItem('urvaah_token');
   }
@@ -15,8 +19,9 @@ export const setAuthToken = (token) => {
 export const getStoredUser = () => {
   try {
     const raw = localStorage.getItem('urvaah_user');
-    if (!raw) return null;
+    if (!raw || raw === 'undefined' || raw === 'null') return null;
     const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
     if (parsed?.id === '1' || parsed?.username === '1' || String(parsed?.email || '').includes('@urvaah.local')) {
       clearAuthSession();
       return null;
@@ -28,7 +33,7 @@ export const getStoredUser = () => {
 };
 
 export const setStoredUser = (user) => {
-  if (user) {
+  if (user && typeof user === 'object') {
     if (user.id === '1' || user.username === '1' || String(user.email || '').includes('@urvaah.local')) {
       console.warn('[apiClient] Blocked storing mock/invalid default user:', user);
       clearAuthSession();
@@ -151,15 +156,19 @@ export async function apiClient(endpoint, options = {}) {
 
   const adminToken = getAdminAuthToken();
   const customerToken = getAuthToken();
-  const token = isAdminContext ? (adminToken || customerToken) : (customerToken || adminToken);
+  const token = isAdminContext ? adminToken : customerToken;
 
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${cleanEndpoint}`;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {}),
   };
+
+  if (options.body instanceof FormData && headers['Content-Type']) {
+    delete headers['Content-Type'];
+  }
 
   if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;

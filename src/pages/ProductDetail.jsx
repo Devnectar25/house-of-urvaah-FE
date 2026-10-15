@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Heart,
@@ -38,6 +38,8 @@ import { RelatedProducts } from '../components/product/RelatedProducts';
 import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWidget';
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
+import RichTextRenderer from '../components/common/RichTextRenderer';
+
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -86,10 +88,81 @@ const findLocalProduct = (id) => {
   });
 };
 
+const formatAdditionalInfoRows = (product) => {
+  if (!product) return [];
+
+  // 1. Check if specifications array exists
+  if (Array.isArray(product.specifications) && product.specifications.length > 0) {
+    const valid = product.specifications
+      .filter((s) => s && ((s.label && s.label.trim()) || (s.value && s.value.trim()) || (s.title && s.title.trim())))
+      .map((s) => ({
+        title: (s.label || s.title || '').trim(),
+        value: (s.value || '').trim()
+      }));
+    if (valid.length > 0) return valid;
+  }
+
+  // 2. Check if productDetails or product_details array exists
+  const prodDetails = product.productDetails || product.product_details;
+  if (Array.isArray(prodDetails) && prodDetails.length > 0) {
+    const valid = prodDetails
+      .filter((s) => s && ((s.label && s.label.trim()) || (s.value && s.value.trim()) || (s.title && s.title.trim())))
+      .map((s) => ({
+        title: (s.label || s.title || '').trim(),
+        value: (s.value || '').trim()
+      }));
+    if (valid.length > 0) return valid;
+  }
+
+  // 3. Check if specifications object exists
+  if (product.specifications && typeof product.specifications === 'object') {
+    const entries = Object.entries(product.specifications)
+      .filter(([k, v]) => k || v)
+      .map(([k, v]) => ({
+        title: k.trim(),
+        value: String(v || '').trim()
+      }));
+    if (entries.length > 0) return entries;
+  }
+
+  // 4. Check additionalInfoText or additionalInfo string
+  const rawText = product.additionalInfoText || product.additionalInfo || product.additional_info;
+  if (typeof rawText === 'string' && rawText.trim()) {
+    const lines = rawText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length > 0) {
+      return lines.map((line) => {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx !== -1) {
+          return {
+            title: line.slice(0, colonIdx).trim(),
+            value: line.slice(colonIdx + 1).trim()
+          };
+        }
+        return {
+          title: '',
+          value: line
+        };
+      });
+    }
+  }
+
+  // 5. Default fallback specification table items
+  return [
+    { title: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
+    { title: 'Skirt hem', value: 'Hand-finished potli trim' },
+    { title: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
+    { title: 'Lining', value: 'Fully lined (top and skirt)' },
+    { title: 'Top', value: 'Lightly Padded' }
+  ];
+};
+
 export const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist, setIsCartOpen, openAuthModal, user } = useCart();
+  const { cart, addToCart, toggleWishlist, isInWishlist, setIsCartOpen, openAuthModal, user } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +193,7 @@ export const ProductDetail = () => {
   const [pincode, setPincode] = useState('');
   const [pincodeResult, setPincodeResult] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
-  const [openAccordion, setOpenAccordion] = useState('desc');
+  const [openAccordions, setOpenAccordions] = useState({ desc: true });
 
   const fallbackProduct = (productId) => {
     const found =
@@ -193,7 +266,18 @@ export const ProductDetail = () => {
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
               nameOptions: data.nameOptions || data.name_options || prev?.nameOptions || [],
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
-              careInstructions: data.careInstructions || data.care_instructions || prev?.careInstructions || ''
+              specifications: (Array.isArray(data.specifications) && data.specifications.length > 0)
+                ? data.specifications
+                : (Array.isArray(data.productDetails) && data.productDetails.length > 0)
+                  ? data.productDetails
+                  : (Array.isArray(data.product_details) && data.product_details.length > 0)
+                    ? data.product_details
+                    : prev?.specifications || [],
+              careInstructions: data.careInstructions || data.care_instructions || prev?.careInstructions || '',
+              description: (data.description !== undefined && data.description !== '') ? data.description : (prev?.description || ''),
+              fullDescription: (data.fullDescription !== undefined && data.fullDescription !== '') ? data.fullDescription : (data.full_description || prev?.fullDescription || ''),
+              full_description: (data.full_description !== undefined && data.full_description !== '') ? data.full_description : (data.fullDescription || prev?.full_description || ''),
+              additionalInfo: (data.additionalInfo !== undefined && data.additionalInfo !== '') ? data.additionalInfo : (data.additional_info || prev?.additionalInfo || '')
             }));
           } else if (isMounted && !local) {
             fallbackProduct(id);
@@ -282,11 +366,12 @@ export const ProductDetail = () => {
     };
   }, [loading, selectedImage, product?.id]);
 
-  // Reset scroll position of right details panel on product navigation
+  // Reset scroll position of right details panel and ensure product description is visible by default
   useEffect(() => {
     if (rightPanelRef.current) {
       rightPanelRef.current.scrollTop = 0;
     }
+    setOpenAccordions((prev) => ({ ...prev, desc: true }));
   }, [id]);
 
   const handleMobileScroll = () => {
@@ -492,10 +577,7 @@ export const ProductDetail = () => {
   const isWishlisted = isInWishlist(product.id);
 
   const handleAddToCart = () => {
-    addToCart({
-      ...product,
-      selectedSize
-    });
+    addToCart(product, selectedSize, { selectOnlyThis: true });
     setIsAdded(true);
     setIsCartOpen(true);
     setTimeout(() => setIsAdded(false), 2000);
@@ -685,14 +767,20 @@ export const ProductDetail = () => {
     }
   };
 
-  const toggleAccordion = (index) => {
-    setOpenAccordion(openAccordion === index ? null : index);
+  const toggleAccordion = (key) => {
+    setOpenAccordions((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   const formatPrice = (val) => {
     if (!val) return '₹ 0';
     return '₹ ' + Number(val).toLocaleString('en-IN');
   };
+
+  // Structured key-value rows for the Additional Information table
+  const additionalInfoList = formatAdditionalInfoRows(product);
 
   const accordionItems = [
     {
@@ -921,7 +1009,7 @@ export const ProductDetail = () => {
           {/* RIGHT SIDE: Product Info & Actions Panel (~45% Desktop Width) */}
           <div
             ref={rightPanelRef}
-            className="w-full lg:flex-1 flex flex-col text-left space-y-4 sm:space-y-5 pt-0 min-w-0 lg:overflow-y-auto no-scrollbar lg:pb-6"
+            className="w-full lg:flex-1 flex flex-col text-left space-y-4 sm:space-y-5 pt-0 min-w-0 lg:overflow-y-auto no-scrollbar lg:pb-1"
             style={desktopImageHeight ? { height: `${desktopImageHeight}px`, maxHeight: `${desktopImageHeight}px` } : undefined}
           >
             {/* 1. PRODUCT TITLE & BRAND */}
@@ -968,16 +1056,23 @@ export const ProductDetail = () => {
                 <span className="text-2xl sm:text-3xl font-normal tracking-wider text-brand-dark font-sans">
                   {formatPrice(product.price)}
                 </span>
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <>
-                    <span className="text-sm sm:text-base text-neutral-400 line-through font-sans">
-                      {formatPrice(product.originalPrice)}
-                    </span>
-                    <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
-                      {product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-                    </span>
-                  </>
-                )}
+                {(() => {
+                  const pNum = parseFloat(String(product.price || '').replace(/[^0-9.]/g, ''));
+                  const opNum = parseFloat(String(product.originalPrice || '').replace(/[^0-9.]/g, ''));
+                  if (!isNaN(pNum) && !isNaN(opNum) && opNum > pNum) {
+                    return (
+                      <>
+                        <span className="text-sm sm:text-base text-neutral-400 line-through font-sans">
+                          {formatPrice(product.originalPrice)}
+                        </span>
+                        <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-sans tracking-wide">
+                          {product.discount || Math.round(((opNum - pNum) / opNum) * 100)}% OFF
+                        </span>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <span className="text-xs text-neutral-400 font-normal tracking-wide block font-sans mt-1">
                 Inclusive of All Taxes
@@ -988,25 +1083,55 @@ export const ProductDetail = () => {
 
             {/* 5 & 6. SIZE SECTION & SIZE CHART */}
             <div className="space-y-2">
-              <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block font-sans">
-                SIZE: <span className="font-semibold text-black">{selectedSize}</span>
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold tracking-wider uppercase text-brand-dark block font-sans">
+                  SIZE: <span className="font-semibold text-black">{selectedSize}</span>
+                </span>
+                {(() => {
+                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+                  const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
+                  if (sizeQty !== null) {
+                    if (sizeQty <= 0) {
+                      return <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wide">Out of Stock in {selectedSize}</span>;
+                    } else if (sizeQty <= 3) {
+                      return <span className="text-[11px] font-semibold text-amber-700">Only {sizeQty} left in {selectedSize}</span>;
+                    }
+                  }
+                  return null;
+                })()}
+              </div>
 
               {/* Selectable Size Boxes */}
               <div className="flex flex-wrap gap-2 font-sans">
-                {availableSizes.map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setSelectedSize(sz)}
-                    className={`w-11 h-11 sm:w-12 sm:h-12 border flex items-center justify-center text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all cursor-pointer ${
-                      selectedSize === sz
-                        ? 'bg-black text-white border-black shadow-sm scale-105'
-                        : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
+                {availableSizes.map((sz) => {
+                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sz).trim().toUpperCase());
+                  const isSizeOut = matchKey !== undefined && (parseInt(sizeStock[matchKey], 10) || 0) <= 0;
+                  const isSelected = selectedSize === sz;
+
+                  return (
+                    <button
+                      key={sz}
+                      onClick={() => setSelectedSize(sz)}
+                      className={`relative w-11 h-11 sm:w-12 sm:h-12 border flex items-center justify-center text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all cursor-pointer overflow-hidden ${
+                        isSelected
+                          ? isSizeOut
+                            ? 'bg-neutral-800 text-neutral-300 border-neutral-900 shadow-sm scale-105'
+                            : 'bg-black text-white border-black shadow-sm scale-105'
+                          : isSizeOut
+                            ? 'bg-neutral-100 text-neutral-400 border-neutral-200 hover:border-neutral-400'
+                            : 'bg-white text-brand-dark border-neutral-300 hover:border-black'
+                      }`}
+                      title={isSizeOut ? `Size ${sz} (Out of Stock)` : `Size ${sz}`}
+                    >
+                      <span className={isSizeOut ? 'line-through opacity-70' : ''}>{sz}</span>
+                      {isSizeOut && (
+                        <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-bl-sm" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Size Chart Button (Positioned directly below size buttons) */}
@@ -1022,119 +1147,160 @@ export const ProductDetail = () => {
             </div>
 
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
-            {product.inStock === false || (product.stockQuantity !== undefined && product.stockQuantity <= 0) ? (
-              <div className="flex items-center gap-2.5 pt-1">
-                {hasSubscribedStock ? (
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
-                    title="Alert registered — you will be notified when this item is back in stock"
-                  >
-                    <span>OUT OF STOCK</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsStockModalOpen(true)}
-                    className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
-                  >
-                    <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
-                    <span>NOTIFY ME WHEN AVAILABLE</span>
-                  </button>
-                )}
+            {(() => {
+              const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
+              const sizeStock = product.sizeStock || product.size_stock || {};
+              const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+              const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
+              const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
 
-                {/* Wishlist Heart Icon Button */}
-                <button
-                  onClick={() => toggleWishlist(product.id)}
-                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                    isWishlisted
-                      ? 'border-red-600 bg-red-50 text-red-600'
-                      : 'border-neutral-300 text-brand-dark hover:border-black'
-                  }`}
-                  aria-label="Wishlist toggle"
-                  title="Save to Wishlist"
-                >
-                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
-                </button>
+              if (isSelectedSizeOut) {
+                return (
+                  <div className="flex items-center gap-2.5 pt-1">
+                    {hasSubscribedStock ? (
+                      <button
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
+                        title="Alert registered — you will be notified when this size is back in stock"
+                      >
+                        <span>OUT OF STOCK ({selectedSize})</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsStockModalOpen(true)}
+                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
+                      >
+                        <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                        <span>NOTIFY ME FOR SIZE {selectedSize}</span>
+                      </button>
+                    )}
 
-                {/* Share Icon Button */}
-                <button
-                  onClick={handleOpenShare}
-                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
-                  aria-label="Share product"
-                  title="Share product with friends"
-                >
-                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2.5 pt-1">
-                <button
-                  onClick={handleAddToCart}
-                  className="flex-1 h-11 sm:h-12.5 px-5 text-xs sm:text-sm font-bold tracking-[0.2em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer bg-black text-white hover:bg-neutral-800"
-                >
-                  <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                  {isAdded ? 'ADDED TO BAG ✓' : 'ADD TO BAG'}
-                </button>
+                    {/* Wishlist Heart Icon Button */}
+                    <button
+                      onClick={() => toggleWishlist(product.id)}
+                      className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isWishlisted
+                          ? 'border-red-600 bg-red-50 text-red-600'
+                          : 'border-neutral-300 text-brand-dark hover:border-black'
+                      }`}
+                      aria-label="Wishlist toggle"
+                      title="Save to Wishlist"
+                    >
+                      <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                    </button>
 
-                {/* Wishlist Heart Icon Button */}
-                <button
-                  onClick={() => toggleWishlist(product.id)}
-                  className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                    isWishlisted
-                      ? 'border-red-600 bg-red-50 text-red-600'
-                      : 'border-neutral-300 text-brand-dark hover:border-black'
-                  }`}
-                  aria-label="Wishlist toggle"
-                  title="Save to Wishlist"
-                >
-                  <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
-                </button>
+                    {/* Share Icon Button */}
+                    <button
+                      onClick={handleOpenShare}
+                      className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                      aria-label="Share product"
+                      title="Share product with friends"
+                    >
+                      <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                    </button>
+                  </div>
+                );
+              }
 
-                {/* Share Icon Button */}
-                <button
-                  onClick={handleOpenShare}
-                  className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
-                  aria-label="Share product"
-                  title="Share product with friends"
-                >
-                  <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
-                </button>
-              </div>
-            )}
+              const availableStock = sizeQty !== null ? sizeQty : (totalStock > 0 ? totalStock : 99);
+              const cartItem = (cart || []).find(
+                (it) => String(it.product?.id) === String(product.id) && String(it.selectedSize).trim().toUpperCase() === String(selectedSize).trim().toUpperCase()
+              );
+              const isMaxStockInCart = availableStock > 0 && (cartItem?.quantity || 0) >= availableStock;
+
+              return (
+                <div>
+                  <div className="flex items-center gap-2 sm:gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={isMaxStockInCart ? () => setIsCartOpen(true) : handleAddToCart}
+                      disabled={isMaxStockInCart}
+                      className={`flex-1 h-11 sm:h-12.5 px-4 sm:px-6 text-xs sm:text-sm font-bold tracking-[0.14em] uppercase transition-all shadow-sm flex items-center justify-center gap-2 font-sans ${
+                        isMaxStockInCart
+                          ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed border border-neutral-300'
+                          : 'cursor-pointer bg-neutral-950 text-white hover:bg-neutral-800'
+                      }`}
+                      title={isMaxStockInCart ? `All available stock (${availableStock} units) in size ${selectedSize} is already in your bag` : undefined}
+                    >
+                      <ShoppingBag className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
+                      <span className="truncate">
+                        {isAdded ? 'ADDED ✓' : isMaxStockInCart ? `MAX LIMIT IN BAG (${availableStock})` : 'ADD TO BAG'}
+                      </span>
+                    </button>
+
+                    {/* Wishlist Heart Icon Button */}
+                    <button
+                      onClick={() => toggleWishlist(product.id)}
+                      className={`w-11 h-11 sm:w-12.5 sm:h-12.5 border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isWishlisted
+                          ? 'border-red-600 bg-red-50 text-red-600'
+                          : 'border-neutral-300 text-brand-dark hover:border-black'
+                      }`}
+                      aria-label="Wishlist toggle"
+                      title="Save to Wishlist"
+                    >
+                      <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-red-600 text-red-600' : 'stroke-[1.5]'}`} />
+                    </button>
+
+                    {/* Share Icon Button */}
+                    <button
+                      onClick={handleOpenShare}
+                      className="w-11 h-11 sm:w-12.5 sm:h-12.5 border border-neutral-300 text-brand-dark flex items-center justify-center hover:border-black hover:bg-neutral-50 transition-all relative cursor-pointer shrink-0"
+                      aria-label="Share product"
+                      title="Share product with friends"
+                    >
+                      <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
+                    </button>
+                  </div>
+
+                  {availableStock > 0 && availableStock <= 5 && (
+                    <p className="text-xs text-amber-700 font-medium tracking-wide mt-2 flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      Only {availableStock} unit{availableStock > 1 ? 's' : ''} left in size {selectedSize} - order soon
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ACCORDION SECTIONS */}
             <div className="pt-3 border-t border-neutral-200 space-y-1">
-              {/* Product Description */}
-              {product.description && (
-                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                  <button
-                    onClick={() => toggleAccordion('desc')}
-                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                  >
-                    <span>PRODUCT DESCRIPTION</span>
-                    {openAccordion === 'desc' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                  </button>
-                  {openAccordion === 'desc' && (
-                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 whitespace-pre-line">
-                      {product.description}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Product Description - Always visible by default */}
+              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion('desc')}
+                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  aria-expanded={Boolean(openAccordions['desc'])}
+                >
+                  <span>PRODUCT DESCRIPTION</span>
+                  {openAccordions['desc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                </button>
+                {openAccordions['desc'] && (
+                  <RichTextRenderer
+                    content={product.description || product.fullDescription || product.full_description}
+                    fallback="Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams."
+                    className="mt-2 text-xs sm:text-sm pr-2"
+                  />
+                )}
+
+              </div>
 
               {/* Size Details */}
               <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                 <button
+                  type="button"
                   onClick={() => toggleAccordion('sizedetails')}
                   className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  aria-expanded={Boolean(openAccordions['sizedetails'])}
                 >
                   <span>SIZE DETAILS</span>
-                  {openAccordion === 'sizedetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                  {openAccordions['sizedetails'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                 </button>
-                {openAccordion === 'sizedetails' && (
+                {openAccordions['sizedetails'] && (
                   <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
                     {product.sizeDetailsText ? (
                       <div className="whitespace-pre-line">{product.sizeDetailsText}</div>
@@ -1154,39 +1320,65 @@ export const ProductDetail = () => {
               {/* Additional Information Accordion */}
               <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                 <button
+                  type="button"
                   onClick={() => toggleAccordion('info')}
                   className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  aria-expanded={Boolean(openAccordions['info'])}
                 >
                   <span>ADDITIONAL INFORMATION</span>
-                  {openAccordion === 'info' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                  {openAccordions['info'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                 </button>
-                {openAccordion === 'info' && (
-                  <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
-                    {product.additionalInfoText || product.additionalInfo ? (
-                      <div className="whitespace-pre-line">{product.additionalInfoText || product.additionalInfo}</div>
-                    ) : (
-                      <>
-                        <div>Fabric: Embroidered fabric with sequin detailing</div>
-                        <div>Skirt hem: Hand-finished potli trim</div>
-                        <div>Closure: Adjustable tie-back (top), side zip on left of skirt</div>
-                        <div>Lining: Fully lined (top and skirt)</div>
-                        <div>Top: Lightly Padded</div>
-                      </>
-                    )}
+                {openAccordions['info'] && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-2xs">
+                    <table className="w-full text-xs sm:text-sm font-sans text-left border-collapse">
+                      <tbody className="divide-y divide-neutral-200/70">
+                        {additionalInfoList.map((row, idx) => (
+                          <tr
+                            key={idx}
+                            className={`transition-colors hover:bg-neutral-50/80 ${
+                              idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'
+                            }`}
+                          >
+                            {row.title ? (
+                              <>
+                                <td className="py-2 px-3 sm:px-3.5 font-semibold text-neutral-900 w-28 sm:w-36 align-top border-r border-neutral-200/60 shrink-0 whitespace-nowrap">
+                                  {row.title}
+                                </td>
+                                <td className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                  {row.value}
+                                </td>
+                              </>
+                            ) : (
+                              <td colSpan={2} className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                {row.value}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
 
-              {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (After Size Details & Additional Information) */}
-              <div className="pt-3 pb-2">
-                <DeliveryReminderWidget
-                  pincode={pincode}
-                  setPincode={setPincode}
-                  handleCheckPincode={handleCheckPincode}
-                  checkingPincode={checkingPincode}
-                  pincodeResult={pincodeResult}
-                  setPincodeResult={setPincodeResult}
-                />
+              {/* Full Description Accordion (Under Additional Information) */}
+              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion('fulldesc')}
+                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                  aria-expanded={Boolean(openAccordions['fulldesc'])}
+                >
+                  <span>FULL DESCRIPTION</span>
+                  {openAccordions['fulldesc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                </button>
+                {openAccordions['fulldesc'] && (
+                  <RichTextRenderer
+                    content={product.fullDescription || product.full_description || product.description}
+                    fallback="Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams."
+                    className="mt-2 text-xs sm:text-sm pr-2"
+                  />
+                )}
               </div>
 
               {/* Product Details (Dynamic Bullet Points) */}
@@ -1194,13 +1386,15 @@ export const ProductDetail = () => {
                 (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
                   <div className="border-b border-neutral-200 pb-2.5 pt-1">
                     <button
+                      type="button"
                       onClick={() => toggleAccordion('pdetails')}
                       className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                      aria-expanded={Boolean(openAccordions['pdetails'])}
                     >
                       <span>PRODUCT DETAILS</span>
-                      {openAccordion === 'pdetails' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                      {openAccordions['pdetails'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                     </button>
-                    {openAccordion === 'pdetails' && (
+                    {openAccordions['pdetails'] && (
                       <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2">
                         <ul className="space-y-1.5">
                           {(product.productDetails || product.product_details)
@@ -1226,13 +1420,15 @@ export const ProductDetail = () => {
               {Array.isArray(product.specifications) && product.specifications.length > 0 && (
                 <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                   <button
+                    type="button"
                     onClick={() => toggleAccordion('specs')}
                     className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    aria-expanded={Boolean(openAccordions['specs'])}
                   >
                     <span>SPECIFICATIONS</span>
-                    {openAccordion === 'specs' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordions['specs'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
-                  {openAccordion === 'specs' && (
+                  {openAccordions['specs'] && (
                     <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
                       {product.specifications.map((sp, idx) => (
                         <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-0.5">
@@ -1249,19 +1445,33 @@ export const ProductDetail = () => {
               {(product.careInstructions || product.care_instructions) && (
                 <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
                   <button
+                    type="button"
                     onClick={() => toggleAccordion('care')}
                     className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
+                    aria-expanded={Boolean(openAccordions['care'])}
                   >
                     <span>CARE INSTRUCTIONS</span>
-                    {openAccordion === 'care' ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
+                    {openAccordions['care'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                   </button>
-                  {openAccordion === 'care' && (
+                  {openAccordions['care'] && (
                     <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
                       {product.careInstructions || product.care_instructions}
                     </div>
                   )}
                 </div>
               )}
+
+              {/* 8.5 COMBINED 3-5 DAY DELIVERY & PINCODE CHECK CARD (Positioned at the end of all product information) */}
+              <div className="pt-3.5 pb-2">
+                <DeliveryReminderWidget
+                  pincode={pincode}
+                  setPincode={setPincode}
+                  handleCheckPincode={handleCheckPincode}
+                  checkingPincode={checkingPincode}
+                  pincodeResult={pincodeResult}
+                  setPincodeResult={setPincodeResult}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1366,8 +1576,8 @@ export const ProductDetail = () => {
         </div>
       )}
 
-      {/* ALL COUPONS MODAL OVERLAY */}
-      {isCouponsModalOpen && (
+      {/* ALL COUPONS MODAL OVERLAY (Commented out) */}
+      {/* {isCouponsModalOpen && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto overscroll-contain select-none"
           onClick={(e) => {
@@ -1441,7 +1651,7 @@ export const ProductDetail = () => {
             </button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* FULLSCREEN LIGHTBOX ZOOM MODAL */}
       {isLightboxOpen && (

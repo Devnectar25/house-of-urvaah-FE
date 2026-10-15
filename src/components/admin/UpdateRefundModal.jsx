@@ -15,6 +15,8 @@ import {
   Check,
   Copy,
   ChevronDown,
+  ArrowRight,
+  Zap,
   Image as ImageIcon
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
@@ -25,32 +27,27 @@ import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 const REFUND_STATUS_OPTIONS = [
   {
     value: 'Requested',
-    label: 'Requested',
-    description: 'Customer requested a refund / cancellation',
+    label: 'Request',
     dotColor: 'bg-amber-500'
   },
   {
     value: 'Processing',
     label: 'Processing',
-    description: 'Refund is actively being reviewed or processed',
     dotColor: 'bg-indigo-500'
   },
   {
     value: 'Completed',
     label: 'Completed / Paid',
-    description: 'Refund has been successfully disbursed to the customer',
     dotColor: 'bg-emerald-500'
   },
   {
     value: 'On Hold',
     label: 'On Hold',
-    description: 'Refund is paused pending customer response or verification',
     dotColor: 'bg-purple-500'
   },
   {
     value: 'Failed',
     label: 'Failed / Rejected',
-    description: 'Refund request was declined or payment failed',
     dotColor: 'bg-stone-500'
   }
 ];
@@ -152,6 +149,7 @@ export const UpdateRefundModal = ({
   const [txnId, setTxnId] = useState('');
   const [refundAmountInput, setRefundAmountInput] = useState('');
   const [customerReasonInput, setCustomerReasonInput] = useState('');
+  const [refundMethod, setRefundMethod] = useState('auto'); // 'auto' (Razorpay) or 'manual' (Bank transfer)
 
   // Async data state
   const [fetchedItems, setFetchedItems] = useState(null);
@@ -166,6 +164,7 @@ export const UpdateRefundModal = ({
   // Initial confirmed values to track unsaved edits
   const initialRef = useRef({
     status: 'Requested',
+    method: 'auto',
     note: '',
     notify: true,
     txnId: '',
@@ -239,6 +238,9 @@ export const UpdateRefundModal = ({
         refundOrder.reason ||
         '';
 
+      const defaultMethod = (refundOrder.refund_bank_account || refundOrder.payout_bank_account) ? 'manual' : 'auto';
+      setRefundMethod(defaultMethod);
+
       setSelectedStatus(initStatus);
       setAdminNote(initNote);
       setTxnId(initTxn);
@@ -254,6 +256,7 @@ export const UpdateRefundModal = ({
 
       initialRef.current = {
         status: initStatus,
+        method: defaultMethod,
         note: initNote,
         notify: initNotify,
         txnId: initTxn,
@@ -381,6 +384,7 @@ export const UpdateRefundModal = ({
   // Check if form has unsaved modifications
   const hasUnsavedChanges =
     selectedStatus !== initialRef.current.status ||
+    refundMethod !== initialRef.current.method ||
     adminNote.trim() !== initialRef.current.note.trim() ||
     notifyCustomer !== initialRef.current.notify ||
     txnId.trim() !== initialRef.current.txnId.trim() ||
@@ -396,7 +400,7 @@ export const UpdateRefundModal = ({
   };
 
   // Form submission & backend persistence
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, overrideMethod = null) => {
     if (e && e.preventDefault) e.preventDefault();
     setErrorMsg(null);
 
@@ -430,10 +434,14 @@ export const UpdateRefundModal = ({
       return;
     }
 
+    const effectiveMethod = overrideMethod || refundMethod;
+
     setSubmitting(true);
     try {
       const payload = {
         refundStatus: selectedStatus,
+        refundMethod: effectiveMethod, // 'auto' | 'manual'
+        allowManualFallback: true,
         adminNote: adminNote.trim() || undefined,
         txnId: txnId.trim() || undefined,
         notifyCustomer: notifyCustomer,
@@ -565,9 +573,26 @@ export const UpdateRefundModal = ({
 
           {/* Error Alert Message */}
           {errorMsg && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2.5 shrink-0 animate-fadeIn">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="flex-1 font-sans leading-relaxed">{errorMsg}</div>
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-2.5 shrink-0 animate-fadeIn">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="flex-1 font-sans leading-relaxed">{errorMsg}</div>
+              </div>
+              {(errorMsg.toLowerCase().includes('razorpay') || errorMsg.toLowerCase().includes('auth') || errorMsg.toLowerCase().includes('failed')) && (
+                <div className="pt-1 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMethod('manual');
+                      handleSubmit(null, 'manual');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold font-admin hover:bg-black transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <span>Complete as Manual / Bank Transfer Refund</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -656,7 +681,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_type', requestType)}
-                  className="font-semibold text-brand-dark text-xs font-admin py-1 inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="font-semibold text-brand-dark hover:text-black text-xs font-admin py-1 inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Request Type"
                 >
                   <span>{requestType}</span>
@@ -676,7 +701,7 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('req_on', formatDateTime(requestDate))}
-                  className="text-neutral-700 text-xs py-1 font-sans inline-flex items-center gap-1.5 hover:underline cursor-pointer"
+                  className="text-neutral-700 hover:text-neutral-950 text-xs py-1 font-sans inline-flex items-center gap-1.5 no-underline hover:no-underline cursor-pointer transition-colors"
                   title="Click to copy Requested Date & Time"
                 >
                   <span>{formatDateTime(requestDate)}</span>
@@ -820,7 +845,8 @@ export const UpdateRefundModal = ({
                 <button
                   type="button"
                   onClick={() => handleCopy('order_ref', orderNumber)}
-                  className="font-admin font-bold text-brand-dark hover:text-black hover:underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  className="font-admin font-bold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer inline-flex items-center gap-1 focus-visible:outline-none py-0.5 px-1 rounded hover:bg-neutral-100 transition-colors"
+                  style={{ textDecoration: 'none' }}
                   title="Click to copy Order #"
                 >
                   <span>#{orderNumber}</span>
@@ -1013,6 +1039,52 @@ export const UpdateRefundModal = ({
             )}
           </div>
 
+          {/* REFUND METHOD PICKER FOR ONLINE ORDERS */}
+          {paymentMethod === 'ONLINE' && (
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider font-admin">
+                PAYOUT / REFUND DISPATCH METHOD
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRefundMethod('auto')}
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-admin font-semibold transition-all cursor-pointer text-left ${
+                    refundMethod === 'auto'
+                      ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 shrink-0 ${refundMethod === 'auto' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                  <div>
+                    <span className="block leading-tight">Razorpay Auto-Refund</span>
+                    <span className={`text-[10px] block font-normal font-sans ${refundMethod === 'auto' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      Automated reversal to customer payment method
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRefundMethod('manual')}
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-admin font-semibold transition-all cursor-pointer text-left ${
+                    refundMethod === 'manual'
+                      ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
+                      : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                  }`}
+                >
+                  <Building className={`w-3.5 h-3.5 shrink-0 ${refundMethod === 'manual' ? 'text-emerald-400' : 'text-neutral-400'}`} />
+                  <div>
+                    <span className="block leading-tight">Manual Bank Payout / NEFT</span>
+                    <span className={`text-[10px] block font-normal font-sans ${refundMethod === 'manual' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      Direct bank transfer to customer account details
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ======================================================================= */}
           {/* SECTION 4 — REFUND STAGE (Editable Dropdown)                            */}
           {/* ======================================================================= */}
@@ -1032,7 +1104,7 @@ export const UpdateRefundModal = ({
               >
                 {REFUND_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    ● {opt.label} — {opt.description}
+                    {opt.label}
                   </option>
                 ))}
               </select>
