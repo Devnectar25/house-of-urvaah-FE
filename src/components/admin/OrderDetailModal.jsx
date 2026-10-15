@@ -9,9 +9,19 @@ import {
   RefreshCw,
   Save,
   Lock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Truck,
+  FileText,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  RotateCcw,
+  Check,
+  XCircle
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { shippingApi } from '../../services/shippingApi';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
@@ -55,6 +65,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [savingStatus, setSavingStatus] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
+
+  // Logistics & Shiprocket Testing Suite State
+  const [logisticsLoading, setLogisticsLoading] = useState(false);
+  const [logisticsMsg, setLogisticsMsg] = useState(null);
+  const [trackingData, setTrackingData] = useState(null);
+  const [showTrackingScans, setShowTrackingScans] = useState(false);
+  const [loadingTracking, setLoadingTracking] = useState(false);
 
   // Synchronous Ref tracking confirmed status & payment status across async saves & modal closes
   const confirmedRef = React.useRef({ status: '', paymentStatus: '' });
@@ -261,6 +278,169 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       (selectedStatus !== confirmedRef.current.status ||
         selectedPaymentStatus !== confirmedRef.current.paymentStatus)
   );
+
+  // Logistics Action 1: Generate AWB & Dispatch Order
+  const handleGenerateAwb = async () => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const shipRes = await shippingApi.createShipment(order);
+      const shipmentId = shipRes.shipment_id || `SR-MOCK-SHP-${Date.now().toString().slice(-6)}`;
+      
+      const awbRes = await shippingApi.assignAwb(shipmentId);
+      const awbCode = awbRes?.response?.data?.awb_code || `URV${Date.now().toString().slice(-8)}IN`;
+      const courierName = awbRes?.response?.data?.courier_name || 'Delhivery Express';
+      
+      const newStatus = 'Shipped';
+      await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus, trackingNumber: awbCode })
+      });
+
+      const updated = { ...order, status: newStatus, tracking_number: awbCode, trackingNumber: awbCode };
+      setOrder(updated);
+      setSelectedStatus(newStatus);
+      confirmedRef.current.status = newStatus;
+      setConfirmedStatus(newStatus);
+
+      setLogisticsMsg({
+        type: 'success',
+        text: `AWB Generated: ${awbCode} (${courierName}). Order marked as Shipped!`
+      });
+      
+      if (onStatusUpdated || onOrderUpdated) {
+        (onStatusUpdated || onOrderUpdated)(updated);
+      }
+    } catch (err) {
+      console.error('Failed to generate AWB:', err);
+      setLogisticsMsg({ type: 'error', text: err.message || 'Failed to generate AWB with Shiprocket.' });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
+
+  // Logistics Action 2: Simulate Milestones via Webhook
+  const handleSimulateMilestone = async (milestoneStatus) => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const identifier = order.tracking_number || order.order_number || order.id;
+      const res = await shippingApi.simulateWebhookStatus(identifier, milestoneStatus);
+      
+      const newStatus = res.mapped_urvaah_status || (
+        milestoneStatus === 'IN TRANSIT' ? 'Shipped' :
+        milestoneStatus === 'OUT FOR DELIVERY' ? 'Out for Delivery' :
+        milestoneStatus === 'DELIVERED' ? 'Delivered' : 'Cancelled'
+      );
+
+      // Reload fresh order details
+      await fetchOrderDetail();
+
+      setLogisticsMsg({
+        type: 'success',
+        text: `Milestone Simulated: "${milestoneStatus}" ➔ Order status synced to "${newStatus}"!`
+      });
+
+      if (onStatusUpdated || onOrderUpdated) {
+        (onStatusUpdated || onOrderUpdated)({ ...order, status: newStatus });
+      }
+    } catch (err) {
+      console.error('Simulation error:', err);
+      setLogisticsMsg({ type: 'error', text: err.message || 'Failed to simulate milestone.' });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
+
+  // Logistics Action 3: Live Tracking Scans Toggle
+  const handleFetchTracking = async () => {
+    if (!order) return;
+    if (showTrackingScans) {
+      setShowTrackingScans(false);
+      return;
+    }
+    setLoadingTracking(true);
+    setShowTrackingScans(true);
+    try {
+      const awb = order.tracking_number || order.order_number;
+      const res = await shippingApi.trackShipment(awb);
+      setTrackingData(res?.tracking_data || null);
+    } catch (err) {
+      console.error('Tracking fetch error:', err);
+    } finally {
+      setLoadingTracking(false);
+    }
+  };
+
+  // Logistics Action 4: Download PDF Label
+  const handleDownloadLabel = async () => {
+    if (!order) return;
+    try {
+      const targetId = order.tracking_number || order.id;
+      const res = await shippingApi.generateLabel([targetId]);
+      if (res?.label_url) {
+        window.open(res.label_url, '_blank');
+      } else {
+        alert('Shipping label generated: ' + (res?.message || 'Ready'));
+      }
+    } catch (err) {
+      alert('Label generation failed: ' + err.message);
+    }
+  };
+
+  // Logistics Action 5: Download Manifest
+  const handleDownloadManifest = async () => {
+    if (!order) return;
+    try {
+      const targetId = order.tracking_number || order.id;
+      const res = await shippingApi.generateManifest([targetId]);
+      if (res?.manifest_url) {
+        window.open(res.manifest_url, '_blank');
+      } else {
+        alert('Courier manifest generated: ' + (res?.message || 'Ready'));
+      }
+    } catch (err) {
+      alert('Manifest generation failed: ' + err.message);
+    }
+  };
+
+  // Logistics Action 6: Reverse Pickup for Return/Exchange
+  const handleCreateReversePickup = async () => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const res = await shippingApi.createReturnOrder(order, order.items, 'Customer return approved by admin');
+      setLogisticsMsg({
+        type: 'success',
+        text: `Reverse Pickup Scheduled! AWB: ${res.awb_code} (Pickup from customer within 24-48 hrs).`
+      });
+    } catch (err) {
+      setLogisticsMsg({ type: 'error', text: err.message || 'Failed to schedule reverse pickup.' });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
+
+  // Logistics Action 7: Dispatch Replacement Forward Item
+  const handleDispatchReplacement = async () => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const res = await shippingApi.dispatchReplacement(order, order.items);
+      setLogisticsMsg({
+        type: 'success',
+        text: `Replacement Dispatched! Order: ${res.order_number}, AWB: ${res.awb_code} (${res.courier_name}).`
+      });
+    } catch (err) {
+      setLogisticsMsg({ type: 'error', text: err.message || 'Failed to dispatch replacement.' });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
 
   const subtotal = parseFloat(order?.subtotal || order?.original_total || 0);
   const shippingCost = parseFloat(order?.shipping_cost || order?.shipping || 0);
@@ -510,6 +690,210 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </button>
                   </div>
                 </form>
+              </div>
+
+              {/* Shiprocket Logistics & Testing Hub */}
+              <div className="bg-neutral-50/70 border border-neutral-200/90 rounded-xl p-4 sm:p-5 space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-neutral-200/70 pb-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-brand-dark uppercase tracking-wider font-admin">
+                    <Truck className="w-4 h-4 text-brand-dark" />
+                    <span>Shiprocket Logistics & Testing Hub</span>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-amber-100/90 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-700" />
+                    Simulation Mode
+                  </span>
+                </div>
+
+                {/* Feedback Notification Message */}
+                {logisticsMsg && (
+                  <div className={`p-3 rounded-lg text-xs flex items-center justify-between gap-2 ${
+                    logisticsMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {logisticsMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+                      <span>{logisticsMsg.text}</span>
+                    </div>
+                    <button type="button" onClick={() => setLogisticsMsg(null)} className="text-neutral-400 hover:text-black">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Current Logistics Status Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-3 rounded-lg border border-neutral-200/70 text-xs">
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] uppercase font-semibold">AWB / Tracking Number</span>
+                    <span className="font-mono font-bold text-brand-dark mt-0.5 block">
+                      {order.tracking_number || order.trackingNumber || 'Not Generated Yet'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Courier Partner</span>
+                    <span className="font-medium text-brand-dark mt-0.5 block">
+                      {order.tracking_number ? 'Delhivery Express (Air)' : 'Pending Assignment'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Fulfillment Stage</span>
+                    <span className="font-bold text-brand-dark mt-0.5 block uppercase">
+                      {order.status || 'Pending'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Forward Logistics Actions */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(!order.tracking_number && !order.trackingNumber) || ['placed', 'confirmed', 'pending', 'processing'].includes((order.status || '').toLowerCase()) ? (
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={handleGenerateAwb}
+                      className="px-3.5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                    >
+                      {logisticsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
+                      <span>Generate AWB & Mark Shipped</span>
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadLabel}
+                    className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Shipping Label (PDF)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadManifest}
+                    className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Pickup Manifest</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleFetchTracking}
+                    className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ml-auto shadow-2xs"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-neutral-700" />
+                    <span>{showTrackingScans ? 'Hide Scans' : 'Live Courier Scans'}</span>
+                    {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {/* Live Scans Timeline Drawer */}
+                {showTrackingScans && (
+                  <div className="bg-white border border-neutral-200 rounded-lg p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-neutral-100">
+                      <span className="font-semibold text-brand-dark uppercase text-[11px] tracking-wider">Courier Transit Milestones</span>
+                      <span className="text-[10px] text-neutral-400 font-mono">Simulated Scans (Real-Time)</span>
+                    </div>
+                    {loadingTracking ? (
+                      <div className="p-4 text-center text-neutral-400 flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Fetching tracking scans...</span>
+                      </div>
+                    ) : trackingData?.scans?.length ? (
+                      <div className="space-y-2.5 pt-1">
+                        {trackingData.scans.map((scan, i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <div className="w-2 h-2 rounded-full bg-brand-dark mt-1.5 shrink-0" />
+                            <div className="flex-1">
+                              <p className="font-semibold text-brand-dark text-xs">{scan.activity}</p>
+                              <p className="text-[10px] text-neutral-500">{scan.location} • {scan.date}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-neutral-500 italic text-[11px]">No scans recorded yet. Package is awaiting courier pickup.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 1-Click Milestone Testing Strip */}
+                <div className="pt-2 border-t border-neutral-200/60">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+                    Testing Suite: Simulate Shiprocket Webhook Milestones
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={() => handleSimulateMilestone('IN TRANSIT')}
+                      className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
+                      title="Simulates package reaching transit hub"
+                    >
+                      <Package className="w-3.5 h-3.5 text-neutral-600" />
+                      <span>In Transit (Shipped)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
+                      className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
+                      title="Simulates local rider out for delivery"
+                    >
+                      <Truck className="w-3.5 h-3.5 text-neutral-600" />
+                      <span>Out for Delivery</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={() => handleSimulateMilestone('DELIVERED')}
+                      className="px-2.5 py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
+                      title="Simulates customer doorstep handover"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Mark Delivered</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={() => handleSimulateMilestone('CANCELLED')}
+                      className="px-2.5 py-2 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-rose-600"
+                      title="Simulates shipment cancellation"
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Void / Cancel</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reverse Logistics Actions (Returns & Exchanges) */}
+                {['delivered', 'returned', 'exchanged', 'return approved', 'replace approved'].includes((order.status || '').toLowerCase()) && (
+                  <div className="pt-2 border-t border-neutral-200/60 flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block w-full mb-1">
+                      Reverse Logistics (URVAAH-RR-05 Returns & Exchanges)
+                    </span>
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={handleCreateReversePickup}
+                      className="px-3 py-1.5 bg-neutral-900 text-white hover:bg-black text-[11px] font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Schedule Reverse Pickup</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={handleDispatchReplacement}
+                      className="px-3 py-1.5 bg-white border border-neutral-300 text-neutral-900 hover:bg-neutral-100 text-[11px] font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>Dispatch Replacement</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Order Items Section */}

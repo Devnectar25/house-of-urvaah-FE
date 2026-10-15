@@ -829,9 +829,10 @@ export const Checkout = () => {
     };
 
     const currentStatusStr = (details.status || 'Confirmed').toLowerCase();
-    const isDelivered = currentStatusStr.includes('delivered') || currentStatusStr.includes('completed');
-    const isOutForDelivery = isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery');
-    const isShipped = isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched');
+    const isOrderCancelled = orderCancelled || currentStatusStr.includes('cancel');
+    const isDelivered = !isOrderCancelled && (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed'));
+    const isOutForDelivery = !isOrderCancelled && (isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery'));
+    const isShipped = !isOrderCancelled && (isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched'));
 
     const handleReorder = () => {
       if (details && details.items) {
@@ -963,19 +964,37 @@ export const Checkout = () => {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4 }}
-              className="w-16 h-16 bg-brand-dark text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm"
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm ${
+                isOrderCancelled ? 'bg-red-600 text-white' : 'bg-brand-dark text-white'
+              }`}
             >
-              <Check className="w-8 h-8 stroke-[2.5]" />
+              {isOrderCancelled ? (
+                <X className="w-8 h-8 stroke-[2.5]" />
+              ) : (
+                <Check className="w-8 h-8 stroke-[2.5]" />
+              )}
             </motion.div>
 
             <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-500 block mb-1.5 font-serif font-semibold">
-              {isDelivered ? 'ORDER DELIVERED & COMPLETED' : 'ORDER CONFIRMED & PROCESSING'}
+              {isOrderCancelled 
+                ? 'ORDER CANCELLED & SHIPROCKET SHIPMENT VOIDED' 
+                : isDelivered 
+                ? 'ORDER DELIVERED & COMPLETED' 
+                : 'ORDER CONFIRMED & PROCESSING'}
             </span>
             <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-2">
-              {isDelivered ? 'THANK YOU! YOUR ORDER HAS BEEN DELIVERED' : 'THANK YOU FOR YOUR ORDER'}
+              {isOrderCancelled 
+                ? 'THIS ORDER HAS BEEN CANCELLED' 
+                : isDelivered 
+                ? 'THANK YOU! YOUR ORDER HAS BEEN DELIVERED' 
+                : 'THANK YOU FOR YOUR ORDER'}
             </h1>
             <p className="text-xs font-sans text-neutral-500 tracking-wider uppercase">
-              We'll send you an order confirmation email shortly to <strong className="text-black font-medium">{details.customerEmail || user?.email}</strong>.
+              {isOrderCancelled ? (
+                'Shiprocket courier pickup was voided prior to dispatch. 100% full refund has been initiated to your original payment method.'
+              ) : (
+                <>We'll send you an order confirmation email shortly to <strong className="text-black font-medium">{details.customerEmail || user?.email}</strong>.</>
+              )}
             </p>
           </div>
 
@@ -996,32 +1015,38 @@ export const Checkout = () => {
               </div>
             </div>
 
-            {/* Card 2: Tracking Number */}
+            {/* Card 2: Tracking Number / Shiprocket Status */}
             <div className="bg-[#FAF8F3] border border-neutral-200/80 p-5 sm:p-6 flex items-center gap-4 text-left">
-              <div className="w-11 h-11 bg-brand-dark text-white rounded-full flex items-center justify-center flex-shrink-0">
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-white ${
+                isOrderCancelled ? 'bg-red-700' : 'bg-brand-dark'
+              }`}>
                 <Truck className="w-5 h-5 stroke-[1.8]" />
               </div>
               <div className="font-sans">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  Tracking Number
+                  {isOrderCancelled ? 'Shiprocket Logistics' : 'Tracking Number'}
                 </span>
-                <span className="text-sm sm:text-base font-semibold text-black font-serif tracking-[0.06em]">
-                  {details.trackingNumber}
+                <span className={`text-sm sm:text-base font-semibold font-serif tracking-[0.06em] ${
+                  isOrderCancelled ? 'text-red-700' : 'text-black'
+                }`}>
+                  {isOrderCancelled ? 'Pickup Voided • ₹0 Freight' : details.trackingNumber}
                 </span>
               </div>
             </div>
 
-            {/* Card 3: Estimated Delivery */}
+            {/* Card 3: Estimated Delivery / Settlement */}
             <div className="bg-[#FAF8F3] border border-neutral-200/80 p-5 sm:p-6 flex items-center gap-4 text-left">
-              <div className="w-11 h-11 bg-brand-dark text-white rounded-full flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-5 h-5 stroke-[1.8]" />
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-white ${
+                isOrderCancelled ? 'bg-emerald-700' : 'bg-brand-dark'
+              }`}>
+                {isOrderCancelled ? <RotateCcw className="w-5 h-5 stroke-[1.8]" /> : <Calendar className="w-5 h-5 stroke-[1.8]" />}
               </div>
               <div className="font-sans">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  Estimated Delivery
+                  {isOrderCancelled ? 'Financial Settlement' : 'Estimated Delivery'}
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-black font-sans tracking-tight">
-                  {details.estimatedDelivery}
+                  {isOrderCancelled ? 'Full Refund Initiated (3-5 Days)' : details.estimatedDelivery}
                 </span>
               </div>
             </div>
@@ -1162,65 +1187,126 @@ export const Checkout = () => {
               {/* Card 1: ORDER JOURNEY Timeline */}
               <div className="bg-white border border-neutral-200/80 p-6 sm:p-8">
                 <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-neutral-500 block mb-6 font-semibold pb-3 border-b border-neutral-200">
-                  ORDER JOURNEY
+                  {isOrderCancelled ? 'CANCELLATION & SHIPROCKET LIFECYCLE' : 'ORDER JOURNEY'}
                 </h3>
 
-                <div className="space-y-6 relative pl-1">
-                  {/* Connected Vertical Line */}
-                  <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
+                {isOrderCancelled ? (
+                  <div className="space-y-6 relative pl-1">
+                    {/* Connected Vertical Line */}
+                    <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
 
-                  {/* Step 1: ORDER PLACED */}
-                  <div className="relative flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs ${orderCancelled ? 'bg-red-700 text-white' : 'bg-yellow-400 text-black shadow-xs'}`}>
-                      <Check className="w-4 h-4 stroke-[2.5]" />
+                    {/* Step 1: ORDER PLACED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-neutral-900 text-white shadow-xs">
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
+                        <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-neutral-500">
+                          PAYMENT CONFIRMED
+                        </span>
+                      </div>
                     </div>
-                    <div className="font-sans pt-0.5">
-                      <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
-                      <span className={`text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 ${orderCancelled ? 'text-red-700' : 'text-yellow-700'}`}>
-                        {orderCancelled ? 'CANCELLED' : isShipped ? 'COMPLETED' : 'IN PROGRESS'}
-                      </span>
+
+                    {/* Step 2: CANCELLED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-red-600 text-white shadow-xs">
+                        <X className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-red-700 uppercase">ORDER CANCELLED</h4>
+                        <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-red-600">
+                          PRE-DISPATCH VOID
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 3: SHIPROCKET VOIDED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-neutral-900 text-white shadow-xs">
+                        <Package className="w-4 h-4 stroke-[2]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">SHIPROCKET VOIDED</h4>
+                        <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-neutral-500">
+                          PICKUP CANCELLED • ₹0 FREIGHT
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 4: REFUND COMPLETED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-emerald-700 text-white shadow-xs">
+                        <CheckCircle2 className="w-4 h-4 stroke-[2.2]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-emerald-800 uppercase">
+                          {(details.paymentMethod || '').toLowerCase().includes('cod') ? 'COD SETTLED' : 'REFUND ISSUED'}
+                        </h4>
+                        <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-emerald-700">
+                          {(details.paymentMethod || '').toLowerCase().includes('cod') ? 'ZERO PAYMENT COLLECTED' : '100% REFUND INITIATED'}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="space-y-6 relative pl-1">
+                    {/* Connected Vertical Line */}
+                    <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
 
-                  {/* Step 2: SHIPPED */}
-                  <div className="relative flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isShipped ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                      <Package className="w-4 h-4" />
+                    {/* Step 1: ORDER PLACED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs ${isShipped ? 'bg-brand-dark text-white' : 'bg-yellow-400 text-black shadow-xs'}`}>
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">ORDER PLACED</h4>
+                        <span className={`text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 ${isShipped ? 'text-black' : 'text-yellow-700'}`}>
+                          {isShipped ? 'COMPLETED' : 'IN PROGRESS'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="font-sans pt-0.5">
-                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isShipped ? 'text-black font-bold' : 'text-neutral-400'}`}>SHIPPED</h4>
-                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isShipped ? 'text-yellow-700 font-bold' : 'text-neutral-400'}`}>
-                        {isShipped ? 'COMPLETED' : 'PENDING'}
-                      </span>
+
+                    {/* Step 2: SHIPPED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isShipped ? 'bg-brand-dark text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isShipped ? 'text-black font-bold' : 'text-neutral-400'}`}>SHIPPED</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isShipped ? 'text-black font-bold' : 'text-neutral-400'}`}>
+                          {isShipped ? 'COMPLETED' : 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 3: OUT FOR DELIVERY */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isOutForDelivery ? 'bg-brand-dark text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isOutForDelivery ? 'text-black font-bold' : 'text-neutral-400'}`}>OUT FOR DELIVERY</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}`}>
+                          {isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 4: DELIVERED */}
+                    <div className="relative flex items-start gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isDelivered ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div className="font-sans pt-0.5">
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>DELIVERED</h4>
+                        <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
+                          {isDelivered ? 'DELIVERED' : 'PENDING'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Step 3: OUT FOR DELIVERY */}
-                  <div className="relative flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isOutForDelivery ? 'bg-yellow-400 text-black shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <div className="font-sans pt-0.5">
-                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isOutForDelivery ? 'text-black font-bold' : 'text-neutral-400'}`}>OUT FOR DELIVERY</h4>
-                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}`}>
-                        {isOutForDelivery ? (isDelivered ? 'COMPLETED' : 'IN PROGRESS') : 'PENDING'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Step 4: DELIVERED */}
-                  <div className="relative flex items-start gap-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isDelivered ? 'bg-emerald-500 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                    <div className="font-sans pt-0.5">
-                      <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>DELIVERED</h4>
-                      <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isDelivered ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
-                        {isDelivered ? 'DELIVERED' : 'PENDING'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Card 2: Order Status & Actions */}
@@ -1241,19 +1327,26 @@ export const Checkout = () => {
 
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-xs font-bold tracking-wider uppercase text-neutral-500">Current Status</span>
-                  <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase ${
-                    orderCancelled 
-                      ? 'bg-red-900 text-white' 
-                      : isDelivered 
-                      ? 'bg-emerald-600 text-white' 
-                      : isOutForDelivery 
-                      ? 'bg-blue-600 text-white' 
-                      : isShipped 
-                      ? 'bg-amber-500 text-black' 
-                      : 'bg-yellow-400 text-black'
-                  }`}>
-                    {orderCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : (details.status || 'PROCESSING').toUpperCase()}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isOrderCancelled && (
+                      <span className="px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase bg-neutral-900 text-white">
+                        SHIPROCKET VOIDED
+                      </span>
+                    )}
+                    <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase ${
+                      isOrderCancelled 
+                        ? 'bg-red-600 text-white' 
+                        : isDelivered 
+                        ? 'bg-emerald-600 text-white' 
+                        : isOutForDelivery 
+                        ? 'bg-blue-600 text-white' 
+                        : isShipped 
+                        ? 'bg-amber-500 text-black' 
+                        : 'bg-yellow-400 text-black'
+                    }`}>
+                      {isOrderCancelled ? 'CANCELLED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : (details.status || 'PROCESSING').toUpperCase()}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Payment Method Container */}

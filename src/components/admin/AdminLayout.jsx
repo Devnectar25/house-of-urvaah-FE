@@ -26,7 +26,10 @@ import {
   HelpCircle,
   Inbox,
   Bell,
-  Mail
+  Mail,
+  RotateCcw,
+  Truck,
+  XCircle
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -45,7 +48,10 @@ const ALL_NAV_ITEMS = [
   { name: 'Products', path: '/admin/products', icon: Package, key: 'products' },
   { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
+  { name: 'Shiprocket Order Desk', path: '/admin/shiprocket-order-desk', icon: Truck, key: 'orders' },
+  { name: 'Cancellation Demo', path: '/admin/cancellation-flow', icon: XCircle, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
+  { name: 'Shiprocket Refund Desk', path: '/admin/shiprocket-refund-desk', icon: RotateCcw, key: 'refunds' },
   { name: 'Email Notifications', path: '/admin/email-notifications', icon: Mail, key: 'email-notifications' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
   { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
