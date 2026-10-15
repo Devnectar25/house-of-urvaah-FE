@@ -403,14 +403,7 @@ export const ContactUs = () => {
                   ENQUIRY RECEIVED
                 </h3>
                 <p className="text-xs sm:text-sm font-serif text-neutral-800 max-w-md font-normal">
-                  Thank you for reaching out to{' '}
-                  <span
-                    className="font-script lowercase text-[1.1em] mx-1"
-                    style={{ fontFamily: "'Parfumerie Script', cursive" }}
-                  >
-                    house of
-                  </span>{' '}
-                  <span className="font-serif uppercase tracking-widest font-semibold">URVAAH</span>.
+                  Thank you for reaching out to House of Urvaah.
                   Our Atelier Concierge will respond to your enquiry within 24 hours.
                 </p>
               </motion.div>
