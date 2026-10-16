@@ -186,14 +186,14 @@ export const ContactUs = () => {
         {
           id: 1,
           name: 'MUMBAI FLAGSHIP & STYLING SALON',
-          address: 'Kala Ghoda Arts District, Colaba Causeway, Mumbai 400001',
+          address: 'Kala Ghoda Arts District,\nColaba Causeway, Mumbai 400001',
           phone: '+91 22 4900 8800',
           is_active: true
         },
         {
           id: 2,
           name: 'NEW DELHI CONCIERGE & SHOWROOM',
-          address: 'Mehrauli Heritage District, Style Mile, New Delhi 110030',
+          address: 'Mehrauli Heritage District,\nStyle Mile, New Delhi 110030',
           phone: '+91 11 4800 7700',
           is_active: true
         }
@@ -626,8 +626,8 @@ export const ContactUs = () => {
                       <h4 className="font-semibold uppercase text-neutral-900 tracking-wider text-sm mb-1">
                         {loc.name}
                       </h4>
-                      <p className="leading-relaxed text-neutral-800">
-                        {loc.address}
+                      <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
+                        {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>
                       {loc.phone && (
                         <span className="text-neutral-700 font-medium block mt-1">{loc.phone}</span>

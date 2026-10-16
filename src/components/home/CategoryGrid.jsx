@@ -194,7 +194,7 @@ export const CategoryGrid = () => {
       {/* Section Heading matching Trending on the gram typography */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <h2 className="text-2xl sm:text-3xl md:text-4xl text-black flex items-baseline flex-wrap">
-          <span className="font-parfumerie capitalize inline-block mr-2">Recommended</span>
+          <span className="font-parfumerie capitalize inline-block mr-3.5 sm:mr-4">Recommended</span>
           <span className="font-le-jour lowercase">for you</span>
         </h2>
       </div>

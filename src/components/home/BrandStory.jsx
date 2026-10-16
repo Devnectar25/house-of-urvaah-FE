@@ -43,7 +43,7 @@ export const BrandStory = () => {
             REFINED WITH CONSCIENCE
           </h2>
           <p className="text-xs md:text-sm text-neutral-600 tracking-wider font-light leading-relaxed">
-            House of Uraah stands at the intersection of modern architectural fashion and responsible environmental stewardship. Every collection is produced in small, intentional batches.
+            House of Urvaah stands at the intersection of modern architectural fashion and responsible environmental stewardship. Every collection is produced in small, intentional batches.
           </p>
         </motion.div>
 

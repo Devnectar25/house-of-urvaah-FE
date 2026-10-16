@@ -670,8 +670,8 @@ export const AdminBoutiquesConcierge = () => {
                           )}
                         </div>
 
-                        <p className="text-xs text-neutral-700 leading-relaxed font-sans">
-                          {loc.address}
+                        <p className="text-xs text-neutral-700 leading-relaxed font-sans whitespace-pre-line">
+                          {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                         </p>
 
                         {loc.phone && (
@@ -775,8 +775,8 @@ export const AdminBoutiquesConcierge = () => {
                       <h4 className="font-semibold uppercase text-neutral-900 tracking-wider text-sm mb-1">
                         {loc.name}
                       </h4>
-                      <p className="leading-relaxed text-neutral-800">
-                        {loc.address}
+                      <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
+                        {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>
                       {loc.phone && (
                         <span className="text-neutral-700 font-medium block mt-1">{loc.phone}</span>
@@ -850,7 +850,7 @@ export const AdminBoutiquesConcierge = () => {
                   rows={3}
                   value={locationForm.address}
                   onChange={(e) => setLocationForm({ ...locationForm, address: e.target.value })}
-                  placeholder="e.g. Kala Ghoda Arts District, Colaba Causeway, Mumbai 400001"
+                  placeholder={"e.g. Kala Ghoda Arts District,\nColaba Causeway, Mumbai 400001"}
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>

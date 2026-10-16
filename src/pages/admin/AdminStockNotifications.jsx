@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import Swal from 'sweetalert2';
 
 export const AdminStockNotifications = () => {
   const [metrics, setMetrics] = useState(null);
@@ -140,9 +141,26 @@ export const AdminStockNotifications = () => {
 
   // Directly dispatch notification to user and remove from waitlist
   const handleDirectNotify = async (sub) => {
-    if (!window.confirm(`Send back-in-stock email to ${sub.contactEmail} and remove from the waitlist?`)) {
-      return;
-    }
+    const confirmResult = await Swal.fire({
+      title: 'Dispatch Stock Alert?',
+      text: `Send back-in-stock notification email to ${sub.contactEmail} and remove them from the waitlist?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#171717',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Send Alert',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base font-bold text-neutral-900',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     setActionLoadingId(`notify-${sub.id}`);
     try {
       const res = await apiClient(`/api/stock-notifications/admin/subscriptions/${sub.id}/notify`, {
@@ -191,9 +209,26 @@ export const AdminStockNotifications = () => {
 
   // Cancel subscription
   const handleCancelSubscription = async (id) => {
-    if (!window.confirm('Are you sure you want to cancel this customer restock alert request?')) {
-      return;
-    }
+    const confirmResult = await Swal.fire({
+      title: 'Cancel Waitlist Alert?',
+      text: 'Are you sure you want to cancel this customer restock alert request?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Cancel Alert',
+      cancelButtonText: 'Keep Active',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base font-bold text-neutral-900',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     setActionLoadingId(`cancel-${id}`);
     try {
       const res = await apiClient(`/api/stock-notifications/admin/subscriptions/${id}/cancel`, {

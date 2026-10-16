@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -42,6 +43,7 @@ const InstagramIcon = ({ className = "w-4 h-4" }) => (
 );
 import { Logo } from '../common/Logo';
 import { getAdminStoredUser, setAdminStoredUser, clearAdminAuthSession, apiClient } from '../../lib/apiClient';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, exact: true, key: 'dashboard' },
@@ -88,6 +90,9 @@ export const AdminLayout = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getAdminStoredUser());
   const [modifyUiOpen, setModifyUiOpen] = useState(() => location.pathname.startsWith('/admin/modify-ui'));
+
+  // Lock background scroll when logout confirmation modal is open
+  useModalScrollLock(showLogoutModal, () => setShowLogoutModal(false));
 
   const contentScrollRef = useRef(null);
 
@@ -173,7 +178,7 @@ export const AdminLayout = () => {
   });
 
   return (
-    <div className="admin-panel-container h-screen bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
+    <div className="admin-panel-container min-h-screen h-[100dvh] w-full bg-[#FDFDFD] flex flex-col overflow-hidden antialiased selection:bg-brand-dark selection:text-white font-admin text-brand-dark">
       {/* ========================================================================= */}
       {/* TOP HEADER: Crisp high-contrast top bar with House of Urvaah branding     */}
       {/* ========================================================================= */}
@@ -370,16 +375,21 @@ export const AdminLayout = () => {
             </nav>
           </div>
 
-          {/* Bottom helper card */}
+          {/* Logged in Admin Profile Card */}
           <div className="p-4 border-t border-neutral-100 bg-neutral-50/70 shrink-0">
-            <div className="px-4 py-3 rounded-xl bg-white border border-neutral-200/80 text-xs font-admin text-neutral-600 flex items-center justify-between shadow-2xs">
-              <div>
-                <span className="font-bold text-neutral-900 block text-[11px] uppercase tracking-wider">
-                  Portal Status
-                </span>
-                <span className="text-[11px] text-emerald-700 font-semibold">Online • Authenticated</span>
+            <div className="px-3.5 py-3 rounded-xl bg-white border border-neutral-200/80 text-xs font-admin text-neutral-600 flex items-center gap-3 shadow-2xs">
+              <div className="w-8 h-8 rounded-full bg-neutral-950 text-white font-bold font-admin flex items-center justify-center text-xs shrink-0 shadow-xs uppercase">
+                {(currentUser?.username || currentUser?.name || 'A').charAt(0)}
               </div>
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider block leading-tight">
+                  Logged in as
+                </span>
+                <span className="font-bold text-neutral-950 text-xs sm:text-[13px] truncate block leading-snug">
+                  {currentUser?.username || currentUser?.name || 'Admin'}
+                </span>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active session" />
             </div>
           </div>
         </aside>
@@ -402,9 +412,20 @@ export const AdminLayout = () => {
       {/* ========================================================================= */}
       {/* LOGOUT CONFIRMATION MODAL (Perfect dimensions & high-contrast styling)    */}
       {/* ========================================================================= */}
-      {showLogoutModal && (
+      {showLogoutModal && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fadeIn font-admin"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-neutral-950/75 backdrop-blur-md animate-fadeIn font-admin overscroll-contain"
+          style={{
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            minHeight: '100dvh',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)'
+          }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="logout-dialog-title"
@@ -443,7 +464,8 @@ export const AdminLayout = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

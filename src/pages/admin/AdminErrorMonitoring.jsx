@@ -30,6 +30,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { sendErrorReport } from '../../services/errorTracker';
+import Swal from 'sweetalert2';
 
 export const AdminErrorMonitoring = () => {
   // Error list & pagination
@@ -191,7 +192,25 @@ export const AdminErrorMonitoring = () => {
       ? `Are you sure you want to delete all ${groupedIds.length} occurrences of this error?`
       : `Are you sure you want to delete error record #${errId}?`;
 
-    if (!window.confirm(confirmPrompt)) return;
+    const confirmResult = await Swal.fire({
+      title: isMulti ? 'Delete Error Occurrences?' : 'Delete Error Record?',
+      text: confirmPrompt,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base font-bold text-neutral-900',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!confirmResult.isConfirmed) return;
     setDeletingId(errId);
     try {
       const url = groupedIds && groupedIds.length > 0

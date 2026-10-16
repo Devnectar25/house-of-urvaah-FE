@@ -11,6 +11,7 @@ let initialBodyHeight = '';
 export const forceUnlockScroll = () => {
   activeLocksCount = 0;
   if (typeof document !== 'undefined') {
+    document.body.removeAttribute('data-modal-open');
     document.documentElement.style.overflow = '';
     document.documentElement.style.height = '';
     document.documentElement.style.overscrollBehavior = '';
@@ -44,6 +45,11 @@ export const useModalScrollLock = (isOpen, onClose) => {
     if (!isOpen || typeof document === 'undefined') return;
 
     if (activeLocksCount === 0) {
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      document.body.setAttribute('data-modal-open', 'true');
+
       initialHtmlOverflow = document.documentElement.style.overflow || '';
       initialHtmlHeight = document.documentElement.style.height || '';
       initialBodyOverflow = document.body.style.overflow || '';
@@ -87,6 +93,7 @@ export const useModalScrollLock = (isOpen, onClose) => {
       activeLocksCount = Math.max(0, activeLocksCount - 1);
 
       if (activeLocksCount === 0) {
+        document.body.removeAttribute('data-modal-open');
         document.documentElement.style.overflow = initialHtmlOverflow;
         document.documentElement.style.height = initialHtmlHeight;
         document.documentElement.style.overscrollBehavior = '';

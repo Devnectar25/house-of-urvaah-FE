@@ -419,4 +419,30 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   color: #111827;
 }
 
+/* Global High-End Frosted Glass Backdrop Blur for Modals & Overlays */
+.swal2-container.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+div[class*="backdrop-blur-xs"],
+div[class*="backdrop-blur-sm"],
+.modal-backdrop-blur {
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* Seamless Full-Screen Dim & Blur for Admin Header during Modals */
+body[data-modal-open="true"] .admin-panel-container > header {
+  background-color: transparent !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+body[data-modal-open="true"] .admin-panel-container {
+  overflow: hidden !important;
+}
+
+
 

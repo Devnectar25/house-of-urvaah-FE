@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Inbox,
   Search,
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 export const AdminLeads = () => {
   const [leads, setLeads] = useState([]);
@@ -46,6 +48,15 @@ export const AdminLeads = () => {
   // Delete Modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Lock background scroll when Lead Detail modal or Delete modal is open
+  useModalScrollLock(Boolean(isDetailModalOpen || deleteTarget), () => {
+    if (isDetailModalOpen && !isSavingDetails) {
+      setIsDetailModalOpen(false);
+    } else if (deleteTarget && !isDeleting) {
+      setDeleteTarget(null);
+    }
+  });
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -400,14 +411,24 @@ export const AdminLeads = () => {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1 sm:w-72">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by name, email, phone, topic..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2 bg-white border border-neutral-200 rounded-xl text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all"
+                className="w-full pl-9 pr-9 py-2 bg-white border border-neutral-200 rounded-xl text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Status Filter */}
@@ -681,9 +702,30 @@ export const AdminLeads = () => {
       {/* ========================================================================= */}
       {/* LEAD DETAILS MODAL                                                        */}
       {/* ========================================================================= */}
-      {isDetailModalOpen && selectedLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-neutral-200 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+      {isDetailModalOpen && selectedLead && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingDetails) {
+              setIsDetailModalOpen(false);
+            }
+          }}
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-neutral-950/75 backdrop-blur-md animate-fadeIn overscroll-contain font-admin"
+          style={{
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            minHeight: '100dvh',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-neutral-200 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+          >
             {/* Modal Header */}
             <div className="px-6 py-4.5 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
               <div className="flex items-center gap-3">
@@ -711,7 +753,7 @@ export const AdminLeads = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-6 overflow-y-auto font-sans">
+            <div className="p-6 space-y-6 overflow-y-auto overscroll-contain font-sans">
               {/* Contact Channels */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
@@ -855,15 +897,37 @@ export const AdminLeads = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* DELETE CONFIRMATION MODAL                                                 */}
       {/* ========================================================================= */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-xs animate-fadeIn font-admin">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-200 text-center animate-in zoom-in-95 duration-200">
+      {deleteTarget && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeleting) {
+              setDeleteTarget(null);
+            }
+          }}
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-neutral-950/75 backdrop-blur-md animate-fadeIn font-admin overscroll-contain"
+          style={{
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            minHeight: '100dvh',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-neutral-200 text-center animate-in zoom-in-95 duration-200"
+          >
             <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 mx-auto mb-3 flex items-center justify-center border border-rose-200">
               <Trash2 className="w-6 h-6 stroke-[1.75]" />
             </div>
@@ -898,7 +962,8 @@ export const AdminLeads = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

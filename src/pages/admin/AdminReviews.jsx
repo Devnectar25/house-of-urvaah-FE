@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import Swal from 'sweetalert2';
 
 // Subcomponent for product review thumbnail with fallback handling
 const ReviewProductThumbnail = ({ src, name }) => {
@@ -112,7 +113,31 @@ export const AdminReviews = () => {
   }, [fetchReviews]);
 
   const handleDeleteReview = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this customer review?')) return;
+    const target = reviews.find((r) => r.id === id);
+    const reviewerName = target?.username || 'Customer';
+
+    const result = await Swal.fire({
+      title: 'Delete Review?',
+      text: `Are you sure you want to permanently delete the review from ${reviewerName}? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      focusCancel: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base sm:text-lg font-bold text-neutral-900',
+        htmlContainer: 'text-xs text-neutral-600 leading-relaxed font-sans',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
     setDeletingId(id);
 
     try {
@@ -120,8 +145,35 @@ export const AdminReviews = () => {
         method: 'DELETE',
       });
       setReviews((prev) => prev.filter((r) => r.id !== id));
+      Swal.fire({
+        title: 'Review Deleted',
+        text: 'The customer review has been removed successfully.',
+        icon: 'success',
+        confirmButtonColor: '#171717',
+        confirmButtonText: 'OK',
+        timer: 2000,
+        timerProgressBar: true,
+        customClass: {
+          popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+          title: 'text-base font-bold text-neutral-900',
+          htmlContainer: 'text-xs text-neutral-600',
+          confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5'
+        }
+      });
       showToast('success', 'Review deleted successfully.');
     } catch (err) {
+      Swal.fire({
+        title: 'Delete Failed',
+        text: err.message || 'Could not delete review. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#171717',
+        confirmButtonText: 'OK',
+        customClass: {
+          popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+          title: 'text-base font-bold text-rose-600',
+          confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5'
+        }
+      });
       showToast('error', `Failed to delete review: ${err.message}`);
     } finally {
       setDeletingId(null);

@@ -330,38 +330,14 @@ export const EditorialBanner = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
-              <a href={fabricConfig?.button_link || '/clothing'} className="w-full sm:w-auto">
-                <Button variant="primary" className="w-full justify-center uppercase">
-                  {fabricConfig?.button_text || 'EXPLORE FABRICS'}
-                </Button>
-              </a>
-              <a href={fabricConfig?.secondary_button_link || '#campaign'} className="inline-block w-full sm:w-auto">
-                <button
-                  type="button"
-                  data-no-hover="true"
-                  className="no-global-hover w-full relative inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase border border-brand-dark text-brand-dark group overflow-hidden transition-colors duration-400 select-none cursor-pointer"
-                >
-                  {/* Revealed background fill underneath */}
-                  <span className="absolute inset-0 bg-brand-dark pointer-events-none" />
-
-                  {/* Top-Left Triangular Curtain */}
-                  <span
-                    className="absolute inset-0 bg-[#F5F5F0] pointer-events-none transition-transform duration-400 ease-in-out group-hover:-translate-x-full group-hover:-translate-y-full"
-                    style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }}
-                  />
-
-                  {/* Bottom-Right Triangular Curtain */}
-                  <span
-                    className="absolute inset-0 bg-[#F5F5F0] pointer-events-none transition-transform duration-400 ease-in-out group-hover:translate-x-full group-hover:translate-y-full"
-                    style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
-                  />
-
-                  {/* Button Text Label */}
-                  <span className="relative z-10 text-brand-dark group-hover:text-white transition-colors duration-400 ease-in-out">
-                    {fabricConfig?.secondary_button_text || 'VIEW CAMPAIGN FILM'}
-                  </span>
-                </button>
-              </a>
+              <button
+                type="button"
+                data-no-hover="true"
+                disabled
+                className="no-global-hover w-full sm:w-auto inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase bg-brand-dark text-white border border-brand-dark cursor-default select-none pointer-events-none opacity-100"
+              >
+                {fabricConfig?.button_text || 'EXPLORE FABRICS'}
+              </button>
             </div>
           </motion.div>
         </div>

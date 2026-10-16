@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus,
   Trash2,
@@ -13,7 +14,9 @@ import {
   Eye,
   X,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
@@ -382,6 +385,29 @@ export const AdminHeroSection = () => {
           </>
         }
       />
+
+      {/* Boutiques & Concierge quick navigation banner */}
+      <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Client Services & Store Locations</span>
+          </span>
+          <h3 className="text-base font-serif font-bold tracking-wide uppercase">
+            Boutiques & Atelier Concierge Settings
+          </h3>
+          <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
+            Dynamically update the Atelier Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
+          </p>
+        </div>
+        <Link
+          to="/admin/modify-ui/boutiques-concierge"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors shrink-0 shadow-sm"
+        >
+          <span>Manage Boutiques & Concierge</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      </div>
 
       {/* Hero Slides List */}
       <div className="bg-white border border-neutral-200/90 rounded-2xl shadow-2xs overflow-hidden">
