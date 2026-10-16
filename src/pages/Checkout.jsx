@@ -317,6 +317,35 @@ export const Checkout = () => {
     codAvailable: true,
     pincode: ''
   });
+  const [isReordering, setIsReordering] = useState(false);
+
+  // Dynamic Store Settings (GST & Card Surcharge)
+  const [storeSettings, setStoreSettings] = useState({
+    gst_percentage: 18,
+    enable_tiered_gst: true,
+    gst_threshold: 2500,
+    gst_rate_below: 5,
+    gst_rate_above: 18,
+    card_charge_enabled: true,
+    card_charge_percentage: 2,
+    free_shipping_threshold: 2999
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient('/api/settings/public')
+      .then((res) => {
+        if (isMounted && res && res.success && res.data) {
+          setStoreSettings(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Checkout] Failed to load store settings:', err.message);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
@@ -709,17 +738,27 @@ export const Checkout = () => {
     }).format(val || 0);
   };
 
-  // Calculations (strictly computed on selected purchase items)
+  // Calculations (strictly computed on selected purchase items using live store settings)
   const shippingFee = 0; // Free express shipping
   const discountAmount = appliedCoupon
     ? Math.round((orderSubtotal * appliedCoupon.discountPercent) / 100)
     : 0;
   const taxableAmount = Math.max(0, orderSubtotal - discountAmount);
-  // GST Tax Rule: If order > 2500 then 18% tax, if <= 2500 then 5% tax
-  const taxRate = taxableAmount > 2500 ? 18 : 5;
+
+  // Dynamic GST Tax Rule from Admin Settings
+  let taxRate = Number(storeSettings.gst_percentage) || 18;
+  if (storeSettings.enable_tiered_gst) {
+    taxRate = taxableAmount > (Number(storeSettings.gst_threshold) || 2500)
+      ? (Number(storeSettings.gst_rate_above) || 18)
+      : (Number(storeSettings.gst_rate_below) || 5);
+  }
   const taxAmount = taxableAmount > 0 ? Math.round(taxableAmount * (taxRate / 100)) : 0;
   const basePayable = taxableAmount + taxAmount + shippingFee;
-  const cardSurcharge = paymentMethod === 'card' ? Math.round(basePayable * 0.02) : 0;
+
+  // Dynamic Card Surcharge from Admin Settings
+  const cardSurcharge = (paymentMethod === 'card' && storeSettings.card_charge_enabled)
+    ? Math.round(basePayable * ((Number(storeSettings.card_charge_percentage) || 2) / 100))
+    : 0;
   const grandTotal = basePayable + cardSurcharge;
 
   // Apply Coupon Handler
@@ -1289,20 +1328,86 @@ export const Checkout = () => {
         return;
       }
 
+      // Restrict payment methods inside Razorpay modal strictly according to user's selection on Checkout:
+      // If user selected "CREDIT / DEBIT CARDS":
+      //   - Display ONLY Credit & Debit Card payment block
+      //   - Hide UPI, Netbanking, Wallets, PayLater, EMI
+      //   - Auto-navigate to card method
+      // If user selected "UPI & NETBANKING":
+      //   - Display ONLY UPI & Netbanking payment block
+      //   - Hide Cards, Wallets, PayLater, EMI
+      //   - Auto-navigate to upi method
+      const rzpConfig = paymentMethod === 'card'
+        ? {
+            display: {
+              blocks: {
+                card_block: {
+                  name: 'Pay with Credit or Debit Card',
+                  instruments: [
+                    {
+                      method: 'card'
+                    }
+                  ]
+                }
+              },
+              sequence: ['block.card_block'],
+              preferences: {
+                show_default_blocks: false
+              },
+              hide: [
+                { method: 'upi' },
+                { method: 'netbanking' },
+                { method: 'wallet' },
+                { method: 'paylater' },
+                { method: 'emi' }
+              ]
+            }
+          }
+        : {
+            display: {
+              blocks: {
+                upi_nb_block: {
+                  name: 'Pay with UPI or Netbanking',
+                  instruments: [
+                    {
+                      method: 'upi'
+                    },
+                    {
+                      method: 'netbanking'
+                    }
+                  ]
+                }
+              },
+              sequence: ['block.upi_nb_block'],
+              preferences: {
+                show_default_blocks: false
+              },
+              hide: [
+                { method: 'card' },
+                { method: 'wallet' },
+                { method: 'paylater' },
+                { method: 'emi' }
+              ]
+            }
+          };
+
       const rzpOptions = {
         key: razorpayKey,
         amount: rzpOrderData?.amount || Math.round(grandTotal * 100),
         currency: rzpOrderData?.currency || 'INR',
         name: 'House of Urvaah',
-        description: paymentMethod === 'card' ? 'Credit / Debit Card Purchase (Incl. 2% Card Fee)' : 'UPI / QR Code Purchase',
+        description: paymentMethod === 'card'
+          ? (cardSurcharge > 0 ? `Credit / Debit Card Purchase (Incl. ₹${cardSurcharge} Card Fee)` : 'Credit / Debit Card Purchase')
+          : 'UPI & Netbanking Purchase (0% Extra Charge)',
         image: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? undefined : `${window.location.origin}/assets/Images/Brown01.png`,
         order_id: (rzpOrderData?.id && !rzpOrderData.id.startsWith('order_rzp_test_')) ? rzpOrderData.id : undefined,
         prefill: {
           name: selectedAddr.name || user?.name || '',
           email: user?.email || '',
           contact: selectedAddr.phone || user?.phone || '',
-          method: paymentMethod === 'card' ? 'card' : undefined
+          method: paymentMethod === 'card' ? 'card' : 'upi'
         },
+        config: rzpConfig,
         theme: {
           color: '#111111'
         },
@@ -1492,14 +1597,69 @@ export const Checkout = () => {
     const isAddressLockedStatus = isShipped || isOutForDelivery || isDelivered || isOrderCancelled || isCancellationRequested || isInReturnFlow || isInReplacementFlow;
     const canEditAddress = isWithin24Hours && !isAddressLockedStatus;
 
-    const handleReorder = () => {
-      if (details && details.items) {
-        details.items.forEach((item) => {
+    const handleReorder = async () => {
+      if (isReordering) return;
+      if (!details || !details.items || !Array.isArray(details.items) || details.items.length === 0) {
+        showToast('No items found in this order to reorder.', 'error');
+        return;
+      }
+
+      setIsReordering(true);
+      try {
+        const targetKeys = [];
+
+        for (let i = 0; i < details.items.length; i++) {
+          const item = details.items[i];
+          const rawId = item.product?.id || item.id || item.productId || '1';
+          const sizeToUse = item.selectedSize || item.size || 'M';
+          const qtyToUse = Math.max(1, Number(item.quantity || 1));
+
+          const prodObj = {
+            ...(item.product || {}),
+            id: String(rawId),
+            name: item.product?.name || item.name || item.title || 'Atelier Piece',
+            title: item.product?.title || item.name || 'Atelier Piece',
+            price: Number(item.product?.price || item.price || 0),
+            image: item.product?.image || item.image || '/assets/Images/Brown01.png',
+            stockQuantity: 99,
+            stock_quantity: 99,
+            stock: 99,
+            inStock: true,
+            instock: true,
+            is_active: true
+          };
+
+          targetKeys.push(`${String(rawId).trim()}_${String(sizeToUse).trim()}`);
+
           if (addToCart) {
-            addToCart(item.product || { id: item.id, name: item.name, price: item.price, image: item.image }, item.selectedSize || 'M');
+            await addToCart(prodObj, sizeToUse, {
+              quantity: qtyToUse,
+              selectOnlyThis: false,
+              openDrawer: false
+            });
           }
-        });
-        navigate('/checkout');
+        }
+
+        if (setSelectedCartItemKeys && targetKeys.length > 0) {
+          setSelectedCartItemKeys(targetKeys);
+        }
+
+        // Clear cached order data so customer exits the success screen and enters fresh active checkout
+        sessionStorage.removeItem(ORDER_SESSION_KEY);
+        sessionStorage.removeItem('hou_last_order_num');
+        sessionStorage.removeItem('hou_last_order_data');
+
+        setOrderPlaced(false);
+        setPlacedOrderDetails(null);
+        setPlacedOrderNumber('');
+        setConfirmedGrandTotal(0);
+
+        navigate('/checkout', { replace: true, state: {} });
+      } catch (err) {
+        console.error('Reorder error:', err);
+        showToast('Failed to reorder items. Please try again.', 'error');
+      } finally {
+        setIsReordering(false);
       }
     };
 
@@ -2076,10 +2236,15 @@ export const Checkout = () => {
                   <button
                     type="button"
                     onClick={handleReorder}
-                    className="inline-flex items-center gap-2 border border-neutral-300 hover:border-black text-brand-dark text-[10px] font-sans font-bold tracking-[0.2em] uppercase px-4 py-2.5 transition-colors cursor-pointer self-start sm:self-auto"
+                    disabled={isReordering}
+                    className="inline-flex items-center gap-2 border border-neutral-300 hover:border-black text-brand-dark text-[10px] font-sans font-bold tracking-[0.2em] uppercase px-4 py-2.5 transition-colors cursor-pointer self-start sm:self-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reorder This Entire Order</span>
+                    {isReordering ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isReordering ? 'Adding to Bag...' : 'Reorder This Entire Order'}</span>
                   </button>
                 </div>
 
@@ -3579,12 +3744,20 @@ export const Checkout = () => {
                           <span className="font-bold text-neutral-900 text-sm tracking-wide uppercase">
                             CREDIT / DEBIT CARDS
                           </span>
-                          <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            +2% Extra Charge (+{formatPrice(Math.round(basePayable * 0.02))})
-                          </span>
+                          {storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0 ? (
+                            <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              +{storeSettings.card_charge_percentage}% Extra Charge (+{formatPrice(cardSurcharge)})
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              0% Extra Charge
+                            </span>
+                          )}
                         </div>
                         <p className="text-neutral-500 text-[11px] mt-0.5">
-                          Pay securely using Visa, Mastercard, RuPay, or American Express. A 2% processing fee is applied.
+                          {storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0
+                            ? `Pay securely using Visa, Mastercard, RuPay, or American Express. A ${storeSettings.card_charge_percentage}% processing fee is applied.`
+                            : 'Pay securely using Visa, Mastercard, RuPay, or American Express. Zero extra surcharge.'}
                         </p>
                         <div className="flex items-center gap-2 mt-2.5">
                           <div className="px-1.5 py-0.5 border border-neutral-300 bg-white flex items-center justify-center h-6 min-w-[44px] rounded-xs shadow-2xs">
@@ -3923,12 +4096,12 @@ export const Checkout = () => {
                   </span>
                 </div>
 
-                {/* Card Surcharge Line Item (if card selected) */}
-                {paymentMethod === 'card' && (
+                {/* Card Surcharge Line Item (if card selected and enabled) */}
+                {paymentMethod === 'card' && storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0 && (
                   <div className="flex justify-between items-center text-amber-900 bg-amber-50/80 px-2.5 py-2 rounded-xs border border-amber-300/80 text-xs">
                     <span className="uppercase tracking-wider text-[11px] font-semibold flex items-center gap-1.5">
                       <CreditCard className="w-3.5 h-3.5 text-amber-800 shrink-0" />
-                      Card Processing Surcharge (2%)
+                      Card Processing Surcharge ({storeSettings.card_charge_percentage}%)
                     </span>
                     <span className="font-sans font-bold tabular-nums">
                       +{formatPrice(cardSurcharge)}

@@ -118,7 +118,9 @@ export const Footer = () => {
                 FLAGSHIP ATELIER
               </p>
               <p>{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
-              <p>{primaryBoutique.address}</p>
+              <p className="whitespace-pre-line">
+                {primaryBoutique.address ? primaryBoutique.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
+              </p>
             </div>
           </div>
 

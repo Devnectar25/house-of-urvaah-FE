@@ -312,7 +312,7 @@ const RAW_MOCK_PRODUCTS = [
     hoverImage: '/assets/Images/Peach01.png',
     colors: ['#111111', '#8B0000'],
     sizes: ['ONE SIZE'],
-    description: 'Full-grain calfskin leather shoulder bag with magnetic flap closure and embossed House of Uraah logo.'
+    description: 'Full-grain calfskin leather shoulder bag with magnetic flap closure and embossed House of Urvaah logo.'
   },
   {
     id: 'prod-107',

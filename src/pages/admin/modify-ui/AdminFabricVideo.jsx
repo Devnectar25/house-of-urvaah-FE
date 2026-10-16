@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import Swal from 'sweetalert2';
 
 // Helper to inspect video duration client-side before upload
 const getVideoDuration = (file) => {
@@ -100,7 +101,7 @@ export const AdminFabricVideo = () => {
     heading: 'LUXURY TEXTILE ARTISTRY',
     description: 'Discover the sensory elegance of our mastercrafted fabrics: mulberry silk, structured linens, and couture jacquards.',
     button_text: 'EXPLORE FABRICS',
-    button_link: '/clothing',
+    button_link: '/explore-fabrics',
     secondary_button_text: 'VIEW CAMPAIGN FILM',
     secondary_button_link: '#campaign',
     is_active: true
@@ -247,21 +248,39 @@ export const AdminFabricVideo = () => {
     });
   };
 
-  const handleResetToDefaults = () => {
-    if (window.confirm('Reset all 3 videos and editorial text to the default curated values?')) {
-      setVideos(DEFAULT_VIDEOS);
-      setEditorial({
-        subheading: 'EDITORIAL VISION',
-        heading: 'LUXURY TEXTILE ARTISTRY',
-        description: 'Discover the sensory elegance of our mastercrafted fabrics: mulberry silk, structured linens, and couture jacquards.',
-        button_text: 'EXPLORE FABRICS',
-        button_link: '/clothing',
-        secondary_button_text: 'VIEW CAMPAIGN FILM',
-        secondary_button_link: '#campaign',
-        is_active: true
-      });
-      showToast('success', 'Reset to defaults. Remember to click Save Changes to persist.');
-    }
+  const handleResetToDefaults = async () => {
+    const confirmResult = await Swal.fire({
+      title: 'Reset to Defaults?',
+      text: 'Reset all 3 videos and editorial text to the default curated values?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#171717',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Reset',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base font-bold text-neutral-900',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    setVideos(DEFAULT_VIDEOS);
+    setEditorial({
+      subheading: 'EDITORIAL VISION',
+      heading: 'LUXURY TEXTILE ARTISTRY',
+      description: 'Discover the sensory elegance of our mastercrafted fabrics: mulberry silk, structured linens, and couture jacquards.',
+      button_text: 'EXPLORE FABRICS',
+      button_link: '/explore-fabrics',
+      secondary_button_text: 'VIEW CAMPAIGN FILM',
+      secondary_button_link: '#campaign',
+      is_active: true
+    });
+    showToast('success', 'Reset to defaults. Remember to click Save Changes to persist.');
   };
 
   const handleSaveConfig = async (e) => {
@@ -487,9 +506,6 @@ export const AdminFabricVideo = () => {
                 <div className="flex items-center gap-2.5 pt-2 flex-wrap">
                   <span className="px-3.5 py-1.5 bg-neutral-950 text-white text-[10px] tracking-widest uppercase font-sans font-semibold">
                     {editorial.button_text || 'EXPLORE FABRICS'}
-                  </span>
-                  <span className="px-3 py-1.5 border border-neutral-950 text-neutral-950 text-[10px] tracking-widest uppercase font-sans font-semibold">
-                    {editorial.secondary_button_text || 'VIEW CAMPAIGN FILM'}
                   </span>
                 </div>
               </div>
@@ -746,11 +762,11 @@ export const AdminFabricVideo = () => {
               </div>
 
               {/* Buttons Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-neutral-100">
+              <div className="pt-2 border-t border-neutral-100 max-w-lg">
                 {/* Primary Button */}
                 <div className="space-y-3 p-4 bg-[#F8FAFC] border border-neutral-200/80 rounded-xl">
                   <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider block font-admin">
-                    Primary Button (Black Fill)
+                    Explore Fabrics Button
                   </span>
                   <div>
                     <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
@@ -772,38 +788,7 @@ export const AdminFabricVideo = () => {
                       type="text"
                       value={editorial.button_link}
                       onChange={(e) => setEditorial({ ...editorial, button_link: e.target.value })}
-                      placeholder="/clothing"
-                      className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Secondary Button */}
-                <div className="space-y-3 p-4 bg-[#F8FAFC] border border-neutral-200/80 rounded-xl">
-                  <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider block font-admin">
-                    Secondary Button (Curtain Reveal)
-                  </span>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
-                      Button Label
-                    </label>
-                    <input
-                      type="text"
-                      value={editorial.secondary_button_text}
-                      onChange={(e) => setEditorial({ ...editorial, secondary_button_text: e.target.value })}
-                      placeholder="VIEW CAMPAIGN FILM"
-                      className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 font-admin uppercase"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
-                      Destination Link
-                    </label>
-                    <input
-                      type="text"
-                      value={editorial.secondary_button_link}
-                      onChange={(e) => setEditorial({ ...editorial, secondary_button_link: e.target.value })}
-                      placeholder="#campaign"
+                      placeholder="/explore-fabrics"
                       className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 font-mono"
                     />
                   </div>

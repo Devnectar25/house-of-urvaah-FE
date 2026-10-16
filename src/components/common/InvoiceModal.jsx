@@ -230,14 +230,24 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >
-      {/* Dynamic print-isolation styles */}
+      {/* Dynamic print-isolation and Roboto font styles */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700&display=swap');
+
+        .invoice-font-roboto,
+        .invoice-font-roboto *,
+        #urvaah-invoice-print-area,
+        #urvaah-invoice-print-area * {
+          font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        }
+
         @media print {
           body * {
             visibility: hidden !important;
           }
           #urvaah-invoice-print-area, #urvaah-invoice-print-area * {
             visibility: visible !important;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
           }
           #urvaah-invoice-print-area {
             position: absolute !important;
@@ -253,16 +263,19 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         }
       `}</style>
 
-      <div className="relative w-full max-w-4xl bg-neutral-100 rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden my-auto max-h-[92vh] flex flex-col font-sans">
+      <div
+        className="relative w-full max-w-4xl bg-neutral-100 rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden my-auto max-h-[92vh] flex flex-col invoice-font-roboto"
+        style={{ fontFamily: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" }}
+      >
         
         {/* Top Control Bar */}
         <div className="bg-neutral-900 text-white px-5 py-3.5 flex items-center justify-between gap-4 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-serif font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-bold text-xs">
               U
             </div>
             <div>
-              <h3 className="font-serif text-xs sm:text-sm font-semibold tracking-[0.12em] uppercase text-white truncate">
+              <h3 className="text-xs sm:text-sm font-semibold tracking-[0.12em] uppercase text-white truncate">
                 House of Urvaah &bull; Official Tax Invoice
               </h3>
               <p className="text-[10px] text-neutral-400 tracking-wider">
@@ -323,14 +336,14 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
           {loading ? (
             <div className="py-24 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-neutral-700 mx-auto mb-3" />
-              <p className="text-xs uppercase tracking-widest text-neutral-500 font-serif">
+              <p className="text-xs uppercase tracking-widest text-neutral-500 font-medium">
                 Compiling Haute Couture Tax Invoice...
               </p>
             </div>
           ) : error && !invoiceData ? (
             <div className="py-20 text-center max-w-md">
               <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-3" />
-              <h4 className="font-serif text-base text-neutral-900 mb-1">Invoice Generation Notice</h4>
+              <h4 className="text-base font-semibold text-neutral-900 mb-1">Invoice Generation Notice</h4>
               <p className="text-xs text-neutral-600 mb-4">{error}</p>
               <button
                 type="button"
@@ -346,6 +359,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               id="urvaah-invoice-print-area"
               className="w-full max-w-[840px] bg-white border border-[#dfd7cb] p-6 sm:p-12 rounded-sm shadow-xl text-neutral-900 text-xs relative"
               style={{
+                fontFamily: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
                 boxShadow: '0 12px 40px rgba(0,0,0,0.06)'
               }}
             >
@@ -367,17 +381,17 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     }}
                   />
                   <div>
-                    <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-[0.18em] uppercase text-neutral-950 leading-tight">
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-[0.18em] uppercase text-neutral-950 leading-tight">
                       House of Urvaah
                     </h1>
-                    <p className="font-serif text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold mt-1">
+                    <p className="text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold mt-1">
                       Haute Couture &bull; Luxury Pret Atelier &bull; New Delhi
                     </p>
                   </div>
                 </div>
 
                 <div className="sm:text-right">
-                  <div className="font-serif text-2xl sm:text-3xl font-bold tracking-[0.14em] uppercase text-neutral-950 leading-tight">
+                  <div className="text-2xl sm:text-3xl font-bold tracking-[0.14em] uppercase text-neutral-950 leading-tight">
                     Tax Invoice
                   </div>
                   <div className="text-[10px] uppercase tracking-wider text-neutral-500 mt-1">
@@ -425,11 +439,11 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               {/* Dossier: Atelier Details vs Customer Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 relative z-10">
                 <div className="border border-[#eae3d8] rounded-md p-4 sm:p-5 bg-[#fcfbfa]">
-                  <div className="font-serif text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
+                  <div className="text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
                     <span>Sold By &bull; Registered Atelier</span>
                     <span>GSTIN / CIN</span>
                   </div>
-                  <div className="font-serif text-[13px] font-bold text-neutral-950 mb-1.5">
+                  <div className="text-[13px] font-bold text-neutral-950 mb-1.5">
                     House of Urvaah Private Limited
                   </div>
                   <div className="text-[10.5px] text-neutral-600 leading-relaxed">
@@ -444,11 +458,11 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                 </div>
 
                 <div className="border border-[#eae3d8] rounded-md p-4 sm:p-5 bg-[#fcfbfa]">
-                  <div className="font-serif text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
+                  <div className="text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
                     <span>Billed &amp; Shipped To &bull; Client</span>
                     <span>Order Dispatch</span>
                   </div>
-                  <div className="font-serif text-[13px] font-bold text-neutral-950 mb-1.5">
+                  <div className="text-[13px] font-bold text-neutral-950 mb-1.5">
                     {invoiceData?.userName || 'Valued Client'}
                   </div>
                   <div className="text-[10.5px] text-neutral-600 leading-relaxed">
@@ -475,7 +489,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               <div className="border border-[#141414] rounded-md overflow-hidden mb-6 relative z-10 shadow-xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-[#141414] text-[#f7f4ee] font-serif text-[9.5px] tracking-widest uppercase">
+                    <tr className="bg-[#141414] text-[#f7f4ee] text-[9.5px] tracking-widest uppercase font-bold">
                       <th className="py-3 px-4 text-center w-10">#</th>
                       <th className="py-3 px-4">Couture Item Description</th>
                       <th className="py-3 px-4 text-center w-28">Size / Specs</th>
@@ -491,7 +505,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                           {item.index}
                         </td>
                         <td className="py-3.5 px-4">
-                          <div className="font-serif font-bold text-xs sm:text-[12.5px] text-neutral-950 leading-snug">
+                          <div className="font-bold text-xs sm:text-[12.5px] text-neutral-950 leading-snug">
                             {item.name}
                           </div>
                         </td>
@@ -522,14 +536,14 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     <span className="text-[8.5px] font-bold uppercase tracking-widest text-[#8c734b] block mb-1">
                       Amount Chargeable (in words)
                     </span>
-                    <span className="font-serif italic font-bold text-neutral-950 text-xs sm:text-[13px] leading-relaxed block">
+                    <span className="italic font-semibold text-neutral-950 text-xs sm:text-[13px] leading-relaxed block">
                       {invoiceData?.amountInWords}
                     </span>
                   </div>
 
                   {/* Bank Details */}
                   <div className="border border-dashed border-[#ded6cb] rounded-md p-3.5 bg-[#fcfbfa] text-[10px] text-neutral-600 leading-relaxed">
-                    <span className="font-serif font-bold uppercase tracking-widest text-[#8c734b] block mb-1">
+                    <span className="font-bold uppercase tracking-widest text-[#8c734b] block mb-1">
                       Atelier Remittance &amp; Audit Reference
                     </span>
                     Beneficiary: <strong>HOUSE OF URVAAH PRIVATE LIMITED</strong> &bull; Bank: HDFC Bank Ltd<br />
@@ -569,14 +583,14 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                       {/* Grand Total Luxury Obsidian Card */}
                       <div className="bg-[#141414] text-white p-4 flex items-center justify-between">
                         <div>
-                          <span className="font-serif text-[11px] font-bold uppercase tracking-[0.18em] text-[#e5cfab] block">
+                          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#e5cfab] block">
                             Grand Total
                           </span>
                           <span className="text-[8px] uppercase tracking-wider text-neutral-400 block mt-0.5">
                             Total Payable (Incl. {invoiceData?.taxRate || 18}% GST)
                           </span>
                         </div>
-                        <div className="font-serif text-xl sm:text-2xl font-bold text-white tracking-wider">
+                        <div className="text-xl sm:text-2xl font-bold text-white tracking-wider">
                           ₹{Number(invoiceData?.grandTotal || 0).toLocaleString('en-IN')}
                         </div>
                       </div>
@@ -588,11 +602,11 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               {/* Digital Seal & Authorized Signatory Block */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-6 border-t border-[#eae3d8] items-center relative z-10">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full border-2 border-[#c5a880] flex items-center justify-center font-serif font-bold text-[#8c734b] text-base shrink-0 bg-[#faf8f5] shadow-xs">
+                  <div className="w-11 h-11 rounded-full border-2 border-[#c5a880] flex items-center justify-center font-bold text-[#8c734b] text-base shrink-0 bg-[#faf8f5] shadow-xs">
                     U
                   </div>
                   <div className="text-[10px] text-neutral-600 leading-snug">
-                    <strong className="text-neutral-950 font-serif uppercase tracking-wider block text-[10.5px]">
+                    <strong className="text-neutral-950 uppercase tracking-wider block text-[10.5px] font-bold">
                       Digitally Verified Atelier Invoice
                     </strong>
                     Issued under IT Act 2000 &amp; Central Goods and Services Tax Rules. No manual signature required.
@@ -600,10 +614,10 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                 </div>
 
                 <div className="sm:text-right">
-                  <span className="font-serif text-[9px] uppercase tracking-widest text-[#8c734b] font-semibold block mb-0.5">
+                  <span className="text-[9px] uppercase tracking-widest text-[#8c734b] font-semibold block mb-0.5">
                     For House of Urvaah Private Limited
                   </span>
-                  <div className="font-serif italic text-lg sm:text-xl text-neutral-950 leading-tight">
+                  <div className="italic font-semibold text-lg sm:text-xl text-neutral-950 leading-tight">
                     House of Urvaah Atelier
                   </div>
                   <span className="text-[8.5px] uppercase tracking-widest text-neutral-500 font-bold border-t border-[#ded6cb] pt-1 inline-block mt-1">

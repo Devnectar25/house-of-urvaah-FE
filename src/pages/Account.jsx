@@ -13,6 +13,7 @@ import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModa
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
+import Swal from 'sweetalert2';
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
 
@@ -54,26 +55,58 @@ const normalizeTabName = (raw) => {
 export const Account = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist, addToCart } = useCart();
+  const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist, addToCart, setSelectedCartItemKeys } = useCart();
   const [selectedOrderModal, setSelectedOrderModal] = useState(null);
   const [activeTrackingModal, setActiveTrackingModal] = useState(null);
 
-  const handleReorderOrder = (ord) => {
-    if (ord && ord.items && Array.isArray(ord.items)) {
-      ord.items.forEach((item) => {
+  const handleReorderOrder = async (ord) => {
+    if (!ord || !ord.items || !Array.isArray(ord.items) || ord.items.length === 0) {
+      return;
+    }
+
+    try {
+      const targetKeys = [];
+      for (const item of ord.items) {
+        const rawId = item.product?.id || item.id || item.productId || '1';
+        const sizeToUse = item.selectedSize || item.size || 'M';
+        const qtyToUse = Math.max(1, Number(item.quantity || 1));
+
+        const prodObj = {
+          ...(item.product || {}),
+          id: String(rawId),
+          name: item.name || item.title || item.product?.name || 'Product',
+          title: item.name || item.title || item.product?.title || 'Product',
+          price: Number(item.price || item.product?.price || 0),
+          image: item.image || item.product?.image || '/assets/Images/Brown01.png',
+          stockQuantity: 99,
+          stock_quantity: 99,
+          stock: 99,
+          inStock: true,
+          instock: true,
+          is_active: true
+        };
+
+        targetKeys.push(`${String(rawId).trim()}_${String(sizeToUse).trim()}`);
+
         if (addToCart) {
-          addToCart(
-            item.product || {
-              id: item.id || item.productId || 'reorder-prod',
-              name: item.name || item.title || 'Product',
-              price: item.price || 0,
-              image: item.image || '/assets/Images/Brown01.png',
-            },
-            item.selectedSize || 'M'
-          );
+          await addToCart(prodObj, sizeToUse, {
+            quantity: qtyToUse,
+            selectOnlyThis: false,
+            openDrawer: false
+          });
         }
-      });
+      }
+
+      if (setSelectedCartItemKeys && targetKeys.length > 0) {
+        setSelectedCartItemKeys(targetKeys);
+      }
+
+      sessionStorage.removeItem('urvaah_last_placed_order');
+      sessionStorage.removeItem('hou_last_order_num');
+
       navigate('/checkout');
+    } catch (err) {
+      console.error('Account reorder error:', err);
     }
   };
 

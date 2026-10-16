@@ -26,6 +26,7 @@ import { CookiePolicy } from './pages/CookiePolicy';
 import { TermsAndConditions } from './pages/TermsAndConditions';
 import { Sitemap } from './pages/Sitemap';
 import { CategoryPage } from './pages/CategoryPage';
+import { ExploreFabricsBlog } from './pages/ExploreFabricsBlog';
 
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -122,6 +123,10 @@ export function StorefrontLayout() {
       <div className="flex-1 w-full max-w-full">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/explore-fabrics" element={<ExploreFabricsBlog />} />
+          <Route path="/blog/explore-fabrics" element={<ExploreFabricsBlog />} />
+          <Route path="/fabric-guide" element={<ExploreFabricsBlog />} />
+          <Route path="/fabrics" element={<ExploreFabricsBlog />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/about-us" element={<AboutUs />} />
           <Route path="/contact" element={<ContactUs />} />

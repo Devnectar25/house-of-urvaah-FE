@@ -270,38 +270,54 @@ const VideoCard = ({ item, onOpenLook }) => {
     onOpenLook();
   };
 
+  const isVideo =
+    item.media_type === 'video' ||
+    (typeof item.src === 'string' &&
+      (item.src.endsWith('.mp4') ||
+        item.src.endsWith('.webm') ||
+        item.src.includes('/videos/') ||
+        item.src.includes('.mp4?')));
+
   return (
     <div
       onClick={handleVideoClick}
       className="group relative w-full aspect-[9/16] rounded-xl overflow-hidden bg-neutral-900 select-none transition-all duration-300 cursor-pointer hover:shadow-xl"
       title="Click video to view on Instagram"
     >
-      {/* Autoplaying Loop Video */}
-      <video
-        ref={(el) => {
-          videoRef.current = el;
-          if (el) {
-            el.muted = true;
-            el.defaultMuted = true;
-          }
-        }}
-        src={item.src}
-        autoPlay
-        muted
-        loop
-        playsInline
-        onPlay={(e) => {
-          if (e.currentTarget) {
-            e.currentTarget.muted = true;
-          }
-        }}
-        onLoadedMetadata={(e) => {
-          if (e.currentTarget) {
-            e.currentTarget.muted = true;
-          }
-        }}
-        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-      />
+      {/* Autoplaying Loop Video or High-Res Image */}
+      {isVideo ? (
+        <video
+          ref={(el) => {
+            videoRef.current = el;
+            if (el) {
+              el.muted = true;
+              el.defaultMuted = true;
+            }
+          }}
+          src={item.src}
+          autoPlay
+          muted
+          loop
+          playsInline
+          onPlay={(e) => {
+            if (e.currentTarget) {
+              e.currentTarget.muted = true;
+            }
+          }}
+          onLoadedMetadata={(e) => {
+            if (e.currentTarget) {
+              e.currentTarget.muted = true;
+            }
+          }}
+          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+        />
+      ) : (
+        <img
+          src={item.src}
+          alt={item.title || 'Trending Look'}
+          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+        />
+      )}
 
       {/* Top Bar Overlay: Brand Tag */}
       <div className="absolute top-3 left-3 z-10">
@@ -757,6 +773,25 @@ export const TrendingOnGram = () => {
     setActiveModalIndex((prev) => (prev + 1) % gramPosts.length);
   };
 
+  const getGridColsClass = (count) => {
+    switch (count) {
+      case 1:
+        return 'lg:grid-cols-1 max-w-md mx-auto';
+      case 2:
+        return 'lg:grid-cols-2 max-w-3xl mx-auto';
+      case 3:
+        return 'lg:grid-cols-3';
+      case 4:
+        return 'lg:grid-cols-4';
+      case 5:
+        return 'lg:grid-cols-5';
+      case 6:
+        return 'lg:grid-cols-3 xl:grid-cols-6';
+      default:
+        return 'lg:grid-cols-4';
+    }
+  };
+
   return (
     <section className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching BestSellers typography and left alignment */}
@@ -771,10 +806,10 @@ export const TrendingOnGram = () => {
       </div>
 
       {/* Responsive Video Cards:
-          - Desktop (lg): 4-column horizontal layout showing exactly the 4 primary videos
+          - Desktop (lg): Dynamic column grid (e.g. 4 columns for 4 videos) spanning the full container width
           - Mobile / Tablet (< lg): Smooth horizontal scroll carousel showing 1-2 cards at a time
       */}
-      <div className="flex lg:grid lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none">
+      <div className={`w-full flex lg:grid ${getGridColsClass(gramPosts.length)} gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none`}>
         {gramPosts.map((item, idx) => (
           <motion.div
             key={item.id}
@@ -782,7 +817,7 @@ export const TrendingOnGram = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
-            className="snap-center flex-shrink-0 w-[72vw] sm:w-[46vw] md:w-[36vw] lg:w-auto"
+            className="snap-center flex-shrink-0 w-[72vw] sm:w-[46vw] md:w-[36vw] lg:w-full"
           >
             <VideoCard
               item={item}

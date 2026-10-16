@@ -145,39 +145,67 @@ export const SearchOverlay = () => {
     return Array.from(map.values());
   }, [searchTerm, apiSearchResults, allCatalog]);
 
-  // Automatically close search overlay on page navigation
-  useEffect(() => {
+  // Comprehensive close handler that closes overlay and resets all search text and queries
+  const handleCloseSearch = () => {
     setIsSearchOpen(false);
-    if (isListening && recognitionRef.current) {
+    setSearchTerm('');
+    setApiSearchResults([]);
+    setIsSearching(false);
+    setVoiceNotice(null);
+    if (recognitionRef.current && isListening) {
       try {
         recognitionRef.current.stop();
       } catch {}
       setIsListening(false);
     }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setApiSearchResults([]);
+    setIsSearching(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  // Reset search state whenever isSearchOpen changes to false, or focus input on open
+  useEffect(() => {
+    if (!isSearchOpen) {
+      setSearchTerm('');
+      setApiSearchResults([]);
+      setIsSearching(false);
+      setVoiceNotice(null);
+      if (recognitionRef.current && isListening) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+        setIsListening(false);
+      }
+    } else {
+      const timer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isSearchOpen]);
+
+  // Automatically close and reset search overlay on page navigation
+  useEffect(() => {
+    handleCloseSearch();
   }, [location.pathname]);
 
   // Handle ESC key to dismiss search
   useEffect(() => {
     if (!isSearchOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setIsSearchOpen(false);
+      if (e.key === 'Escape') handleCloseSearch();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSearchOpen]);
-
-  // Cleanup speech recognition if overlay closes
-  useEffect(() => {
-    if (!isSearchOpen && isListening) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
-      setIsListening(false);
-      setVoiceNotice(null);
-    }
-  }, [isSearchOpen, isListening]);
 
   // Web Speech API Voice Search Handler
   const toggleVoiceSearch = () => {
@@ -258,7 +286,7 @@ export const SearchOverlay = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsSearchOpen(false)}
+            onClick={handleCloseSearch}
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs"
           />
 
@@ -292,7 +320,7 @@ export const SearchOverlay = () => {
                 {searchTerm && (
                   <button
                     type="button"
-                    onClick={() => setSearchTerm('')}
+                    onClick={handleClearSearch}
                     className="p-1 hover:text-black text-neutral-400 mr-2 text-xs uppercase cursor-pointer"
                   >
                     CLEAR
@@ -316,7 +344,7 @@ export const SearchOverlay = () => {
 
                 <button
                   type="button"
-                  onClick={() => setIsSearchOpen(false)}
+                  onClick={handleCloseSearch}
                   className="p-1.5 text-neutral-500 hover:text-black transition-colors cursor-pointer"
                   aria-label="Close search"
                 >
@@ -381,12 +409,12 @@ export const SearchOverlay = () => {
                       {filteredProducts.map((product) => (
                         <div
                           key={product.id || product.product_id}
-                          onClickCapture={() => setIsSearchOpen(false)}
+                          onClickCapture={handleCloseSearch}
                         >
                           <ProductCard
                             product={product}
                             onQuickView={(p) => {
-                              setIsSearchOpen(false);
+                              handleCloseSearch();
                               navigate(`/product/${p.id}`);
                               window.scrollTo({ top: 0, behavior: 'instant' });
                             }}
