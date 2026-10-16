@@ -97,7 +97,47 @@ export const shippingApi = {
     });
   },
 
-  // 12. Dispatch Replacement Item
+  // 12. Assign Return AWB
+  async assignReturnAwb(shipmentId) {
+    return apiFetch('/api/shipping/return/assign-awb', {
+      method: 'POST',
+      body: JSON.stringify({ shipment_id: shipmentId })
+    });
+  },
+
+  // 13. Schedule Reverse Pickup
+  async scheduleReversePickup(shipmentIds) {
+    return apiFetch('/api/shipping/return/pickup', {
+      method: 'POST',
+      body: JSON.stringify({ shipment_ids: Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds] })
+    });
+  },
+
+  // 14. Customer Notification (SMS / WhatsApp)
+  async notifyCustomer(order, status, trackingInfo = {}) {
+    return apiFetch('/api/shipping/notify', {
+      method: 'POST',
+      body: JSON.stringify({ order, status, tracking_info: trackingInfo })
+    });
+  },
+
+  // 15. Simulate Out for Delivery
+  async simulateOutForDelivery(awb) {
+    return apiFetch('/api/shipping/simulate/out-for-delivery', {
+      method: 'POST',
+      body: JSON.stringify({ awb })
+    });
+  },
+
+  // 16. Simulate Delivered
+  async simulateDelivered(awb, recipientName = null) {
+    return apiFetch('/api/shipping/simulate/delivered', {
+      method: 'POST',
+      body: JSON.stringify({ awb, recipient_name: recipientName })
+    });
+  },
+
+  // 17. Dispatch Replacement Item
   async dispatchReplacement(originalOrder, replacementItems = []) {
     return apiFetch('/api/shipping/replacement/dispatch', {
       method: 'POST',

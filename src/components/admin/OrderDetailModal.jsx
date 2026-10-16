@@ -21,7 +21,8 @@ import {
   ChevronUp,
   Zap,
   Check,
-  XCircle
+  XCircle,
+  Calendar
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
@@ -64,7 +65,7 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: 'Refunded', label: 'Refunded' }
 ];
 
-export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated }) => {
+export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false }) => {
   // Lock background scrolling on body and admin container when modal is open
   useModalScrollLock(isOpen, onClose);
 
@@ -886,6 +887,45 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  // Logistics Action 5b: Schedule Atelier Warehouse Courier Pickup
+  const handleSchedulePickup = async () => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const targetId = order.tracking_number || order.id;
+      const pickRes = await shippingApi.schedulePickup([targetId]);
+      const token = pickRes?.response?.pickup_token_number || pickRes?.pickup_token_number || 'PKP-CONFIRMED';
+      const pickupDate = pickRes?.response?.pickup_scheduled_date || 'Tomorrow 11:00 AM';
+
+      const updatedOrder = {
+        ...order,
+        logistics_status: 'Pickup Scheduled',
+        shipment_status: 'Pickup Scheduled',
+        pickup_token: token,
+        pickup_scheduled_date: pickupDate
+      };
+      setOrder(updatedOrder);
+
+      setLogisticsMsg({
+        type: 'success',
+        text: `Courier Pickup Scheduled! Token: ${token} (${pickupDate}). Courier driver dispatched to House of Urvaah atelier.`
+      });
+
+      if (onOrderUpdated || onStatusUpdated) {
+        (onOrderUpdated || onStatusUpdated)(updatedOrder);
+      }
+    } catch (err) {
+      console.error('Failed to schedule pickup:', err);
+      setLogisticsMsg({
+        type: 'error',
+        text: err.message || 'Failed to schedule courier pickup with Shiprocket.'
+      });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
+
   // Logistics Action 6: Reverse Pickup for Return/Exchange
   const handleCreateReversePickup = async () => {
     if (!order) return;
@@ -1489,120 +1529,122 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Status Management Section */}
-              <div className="bg-neutral-50/50 border border-neutral-200/80 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-neutral-200/60 pb-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-brand-dark uppercase tracking-wider">
-                    <RefreshCw className="w-4 h-4 text-neutral-500" />
-                    <span>Status Management</span>
+              {!hideStatusManagement && (
+                <div className="bg-neutral-50/50 border border-neutral-200/80 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-neutral-200/60 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-brand-dark uppercase tracking-wider">
+                      <RefreshCw className="w-4 h-4 text-neutral-500" />
+                      <span>Status Management</span>
+                    </div>
+
+                    {/* Unsaved indicator */}
+                    {hasUnsavedChanges && (
+                      <span className="text-[11px] text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full font-semibold border border-amber-200 animate-pulse">
+                        Unsaved Preview
+                      </span>
+                    )}
                   </div>
 
-                  {/* Unsaved indicator */}
-                  {hasUnsavedChanges && (
-                    <span className="text-[11px] text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full font-semibold border border-amber-200 animate-pulse">
-                      Unsaved Preview
-                    </span>
+                  {/* Save Feedback Messages */}
+                  {saveError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                      <span>{saveError}</span>
+                    </div>
                   )}
-                </div>
+                  {saveSuccessMsg && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span>{saveSuccessMsg}</span>
+                    </div>
+                  )}
 
-                {/* Save Feedback Messages */}
-                {saveError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                    <span>{saveError}</span>
-                  </div>
-                )}
-                {saveSuccessMsg && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span>{saveSuccessMsg}</span>
-                  </div>
-                )}
+                  <form onSubmit={handleSaveStatus} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-1">
+                    {/* Order Status Dropdown / Locked Stage Badge */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                        Order Status
+                      </label>
+                      {['cancelled', 'refunded', 'exchanged'].includes(
+                        (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+                      ) ? (
+                        <div className="w-full bg-neutral-100 border border-neutral-200/80 text-brand-dark text-xs rounded-xl px-3 py-2.5 font-semibold flex items-center justify-between">
+                          <span>{confirmedRef.current.status || confirmedStatus || order.status}</span>
+                          <span className="text-[10px] text-neutral-500 font-medium flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded-md border border-neutral-200">
+                            <Lock className="w-3 h-3 text-neutral-400" /> Locked Stage
+                          </span>
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedStatus}
+                          onChange={(e) => handleOrderStatusChange(e.target.value)}
+                          className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
+                        >
+                          {ORDER_STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
-                <form onSubmit={handleSaveStatus} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end pt-1">
-                  {/* Order Status Dropdown / Locked Stage Badge */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
-                      Order Status
-                    </label>
-                    {['cancelled', 'refunded', 'exchanged'].includes(
-                      (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-                    ) ? (
-                      <div className="w-full bg-neutral-100 border border-neutral-200/80 text-brand-dark text-xs rounded-xl px-3 py-2.5 font-semibold flex items-center justify-between">
-                        <span>{confirmedRef.current.status || confirmedStatus || order.status}</span>
-                        <span className="text-[10px] text-neutral-500 font-medium flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded-md border border-neutral-200">
-                          <Lock className="w-3 h-3 text-neutral-400" /> Locked Stage
-                        </span>
+                    {/* Payment Status Dropdown */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+                          Payment Status
+                        </label>
+                        {(() => {
+                          const isCod = (order?.payment_method || '').toLowerCase() === 'cod' ||
+                                        (order?.payment_type || '').toLowerCase() === 'cod' ||
+                                        (order?.payment_method || '').toLowerCase().includes('cash');
+                          if (selectedStatus === 'Delivered' && isCod) {
+                            return (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                COD Collected on Delivery
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
-                    ) : (
                       <select
-                        value={selectedStatus}
-                        onChange={(e) => handleOrderStatusChange(e.target.value)}
+                        value={selectedPaymentStatus}
+                        onChange={(e) => handlePaymentStatusChange(e.target.value)}
                         className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
                       >
-                        {ORDER_STATUS_OPTIONS.map((opt) => (
+                        {PAYMENT_STATUS_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
                       </select>
-                    )}
-                  </div>
-
-                  {/* Payment Status Dropdown */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                        Payment Status
-                      </label>
-                      {(() => {
-                        const isCod = (order?.payment_method || '').toLowerCase() === 'cod' ||
-                                      (order?.payment_type || '').toLowerCase() === 'cod' ||
-                                      (order?.payment_method || '').toLowerCase().includes('cash');
-                        if (selectedStatus === 'Delivered' && isCod) {
-                          return (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              COD Collected on Delivery
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
                     </div>
-                    <select
-                      value={selectedPaymentStatus}
-                      onChange={(e) => handlePaymentStatusChange(e.target.value)}
-                      className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
-                    >
-                      {PAYMENT_STATUS_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {/* Explicit Save Button (Does not auto-save on select!) */}
-                  <div className="sm:col-span-2 flex justify-end pt-2">
-                    <button
-                      type="submit"
-                      disabled={savingStatus || !hasUnsavedChanges}
-                      className="px-5 py-2.5 h-10 bg-neutral-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Saving Status...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-3.5 h-3.5" />
-                          <span>Save Status Changes</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
+                    {/* Explicit Save Button (Does not auto-save on select!) */}
+                    <div className="sm:col-span-2 flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={savingStatus || !hasUnsavedChanges}
+                        className="px-5 py-2.5 h-10 bg-neutral-950 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingStatus ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving Status...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>Save Status Changes</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Shiprocket Logistics & Testing Hub */}
               <div className="bg-neutral-50/70 border border-neutral-200/90 rounded-xl p-4 sm:p-5 space-y-4">
@@ -1644,16 +1686,44 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   <div>
                     <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Courier Partner</span>
                     <span className="font-medium text-brand-dark mt-0.5 block">
-                      {order.tracking_number ? 'Delhivery Express (Air)' : 'Pending Assignment'}
+                      {order.courier_name || (order.tracking_number ? 'Delhivery Express (Air)' : 'Pending Assignment')}
                     </span>
                   </div>
                   <div>
                     <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Fulfillment Stage</span>
-                    <span className="font-bold text-brand-dark mt-0.5 block uppercase">
-                      {order.status || 'Pending'}
+                    <span className={`font-bold mt-0.5 block uppercase ${
+                      order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled'
+                        ? 'text-emerald-700'
+                        : 'text-brand-dark'
+                    }`}>
+                      {order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled'
+                        ? 'Pickup Scheduled'
+                        : (order.logistics_status ? order.logistics_status.replace(/_/g, ' ') : (order.status || 'Pending'))}
                     </span>
                   </div>
                 </div>
+
+                {/* Dedicated Pickup Scheduled Status Banner */}
+                {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-emerald-50 border border-emerald-200/90 rounded-lg text-xs text-emerald-950">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-semibold text-emerald-950">Courier Pickup Confirmed: </span>
+                        <span>Token </span>
+                        <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-800">
+                          {order.pickup_token || 'PKP-CONFIRMED'}
+                        </span>
+                        <span className="text-emerald-700 ml-1.5 text-[11px]">
+                          {order.pickup_scheduled_date ? `• Scheduled: ${order.pickup_scheduled_date}` : '• Courier driver dispatched to House of Urvaah atelier'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full">
+                      Ready for Handover
+                    </span>
+                  </div>
+                )}
 
                 {/* Forward Logistics Actions */}
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -1685,6 +1755,31 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   >
                     <FileText className="w-3.5 h-3.5 text-neutral-600" />
                     <span>Pickup Manifest</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={logisticsLoading || (!order.tracking_number && !order.trackingNumber)}
+                    onClick={handleSchedulePickup}
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs ${
+                      order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled'
+                        ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                        : 'bg-neutral-900 hover:bg-black text-white'
+                    }`}
+                    title={(!order.tracking_number && !order.trackingNumber) ? "Generate AWB first before scheduling pickup" : (order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment")}
+                  >
+                    {logisticsLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                    ) : (
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    )}
+                    <span>
+                      {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
+                        ? `Pickup Scheduled${order.pickup_token ? ` (${order.pickup_token})` : ''}`
+                        : 'Schedule Courier Pickup'}
+                    </span>
                   </button>
 
                   <button

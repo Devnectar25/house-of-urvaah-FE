@@ -20,7 +20,7 @@ export const deliveryApi = {
     }
 
     try {
-      const data = await apiFetch(`/api/delivery/check?pincode=${cleanPin}`);
+      const data = await apiFetch(`/api/shipping/serviceability?pincode=${cleanPin}`);
       return data;
     } catch (error) {
       console.error('Delivery API check failed:', error);

@@ -31,7 +31,7 @@ import {
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
 import { productApi } from '../services/productApi';
-import { deliveryApi } from '../services/deliveryApi';
+import { shippingApi } from '../services/shippingApi';
 import { SEOHead } from '../components/common/SEOHead';
 import { ProductReviews } from '../components/common/ProductReviews';
 import { RelatedProducts } from '../components/product/RelatedProducts';
@@ -728,32 +728,65 @@ export const ProductDetail = () => {
       return;
     }
 
-    // 2. Call Express REST Backend API via deliveryApi
+    // 2. Call Shiprocket Express Serviceability API: /api/shipping/serviceability
     setCheckingPincode(true);
     setPincodeResult(null);
 
     try {
-      const data = await deliveryApi.checkPincode(cleanPin);
+      const data = await shippingApi.checkServiceability(cleanPin);
 
-      if (data.available) {
+      if (data && data.available !== false && data.success !== false) {
+        const minDays = Number(data.minDays || 2);
+        const maxDays = Number(data.maxDays || 4);
+
+        const getISTDate = (offsetDays) => {
+          const now = new Date();
+          const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+          const istNow = new Date(utcTime + 5.5 * 3600000);
+          istNow.setDate(istNow.getDate() + offsetDays);
+          return istNow;
+        };
+
+        const d1 = getISTDate(minDays);
+        const d2 = getISTDate(maxDays);
+
+        const getOrdinal = (n) => {
+          const s = ['th', 'st', 'nd', 'rd'];
+          const v = n % 100;
+          return s[(v - 20) % 10] || s[v] || s[0];
+        };
+
+        const day1 = d1.getDate();
+        const ord1 = getOrdinal(day1);
+        const day2 = d2.getDate();
+        const ord2 = getOrdinal(day2);
+        const monthStr = d1.toLocaleString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' });
+
+        const couriers = data.data?.available_courier_companies || [];
+        const topCourier = couriers[0];
+        const codAvailable = couriers.length > 0 ? couriers.some((c) => Number(c.cod) === 1) : true;
+
         setPincodeResult({
           status: 'success',
           pincode: cleanPin,
           zone: data.zone,
-          city: data.city,
-          dateObj: data.estimatedDelivery || {
-            day1: 8,
-            ord1: 'th',
-            day2: 9,
-            ord2: 'th',
-            month: 'Oct'
+          courierName: topCourier?.courier_name || (data.zone === 'METRO' ? 'Blue Dart Air / Delhivery' : 'Urvaah Express'),
+          codAvailable,
+          dateObj: {
+            day1,
+            ord1,
+            day2,
+            ord2,
+            month: monthStr,
+            minDays,
+            maxDays
           }
         });
       } else {
         setPincodeResult({
           status: 'unserviceable',
           pincode: cleanPin,
-          message: data.message || 'Sorry, delivery is currently unavailable for this PIN code.'
+          message: data?.message || 'Sorry, delivery is currently unavailable for this PIN code.'
         });
       }
     } catch (err) {

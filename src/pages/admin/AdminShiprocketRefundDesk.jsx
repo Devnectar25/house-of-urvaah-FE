@@ -28,7 +28,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
-import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
+import { ReturnOrderDetailModal } from '../../components/admin/ReturnOrderDetailModal';
 
 export const AdminShiprocketRefundDesk = () => {
   // State: Orders & Filters
@@ -747,8 +747,8 @@ export const AdminShiprocketRefundDesk = () => {
         </div>
       )}
 
-      {/* 7. Full Order Detail Modal Integration */}
-      <OrderDetailModal
+      {/* 7. Dedicated Reverse Return Order Detail Modal */}
+      <ReturnOrderDetailModal
         orderId={selectedOrderIdForDetail}
         isOpen={isDetailModalOpen}
         onClose={() => {

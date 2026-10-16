@@ -8,8 +8,8 @@ import apiClient from '../lib/apiClient';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { getSupabaseMediaUrl } from '../lib/supabase';
-import { ProductCard } from '../components/common/ProductCard';
 import { InvoiceModal } from '../components/common/InvoiceModal';
+import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModal';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
@@ -56,6 +56,7 @@ export const Account = () => {
   const location = useLocation();
   const { user, authLoading, logoutUser, updateUserProfile, openAuthModal, wishlist, addToCart } = useCart();
   const [selectedOrderModal, setSelectedOrderModal] = useState(null);
+  const [activeTrackingModal, setActiveTrackingModal] = useState(null);
 
   const handleReorderOrder = (ord) => {
     if (ord && ord.items && Array.isArray(ord.items)) {
@@ -2884,6 +2885,34 @@ export const Account = () => {
                             View Details
                           </button>
 
+                          {/* Live Track Shipment / Return Action */}
+                          {!isCancelled && (ord.tracking_number || ord.trackingNumber || isShipped || isOutForDelivery || isDelivered || isInReturnFlow || isInReplacementFlow) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActiveTrackingModal({
+                                  awb: ord.tracking_number || ord.trackingNumber || ord.order_number,
+                                  orderNumber: orderNum,
+                                  isReturn: isInReturnFlow,
+                                  fallbackStatus: orderStatus
+                                })
+                              }
+                              className={`px-5 py-2.5 rounded-xl border text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 ${
+                                isInReturnFlow
+                                  ? 'border-indigo-300 hover:border-black bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900'
+                                  : isInReplacementFlow
+                                  ? 'border-purple-300 hover:border-black bg-purple-50/70 hover:bg-purple-100 text-purple-900'
+                                  : isDelivered
+                                  ? 'border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-neutral-800'
+                                  : 'border-neutral-900 bg-neutral-900 hover:bg-black text-white'
+                              }`}
+                              title="Live parcel tracking milestones and carrier scans"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span>{isInReturnFlow ? 'Track Return' : isInReplacementFlow ? 'Track Exchange' : 'Track Shipment'}</span>
+                            </button>
+                          )}
+
                           {/* Edit Address Quick Action (Available during 24-Hour Edit Window) */}
                           {canEditAddress && (
                             <button
@@ -3653,6 +3682,16 @@ export const Account = () => {
         onClose={() => setSelectedOrderForInvoice(null)}
         order={selectedOrderForInvoice}
         orderId={selectedOrderForInvoice?.order_number || selectedOrderForInvoice?.id}
+      />
+
+      {/* Real-Time Shiprocket Live Tracking Modal */}
+      <ShipmentTrackingModal
+        isOpen={Boolean(activeTrackingModal)}
+        onClose={() => setActiveTrackingModal(null)}
+        awb={activeTrackingModal?.awb}
+        orderNumber={activeTrackingModal?.orderNumber}
+        isReturn={activeTrackingModal?.isReturn}
+        fallbackStatus={activeTrackingModal?.fallbackStatus}
       />
     </div>
   );
