@@ -34,8 +34,11 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminOrders } from './pages/admin/AdminOrders';
+import { AdminShiprocketOrderDesk } from './pages/admin/AdminShiprocketOrderDesk';
+import { AdminCancellationFlowDemo } from './pages/admin/AdminCancellationFlowDemo';
 import { AdminCoupons } from './pages/admin/AdminCoupons';
 import { AdminRefundDesk } from './pages/admin/AdminRefundDesk';
+import { AdminShiprocketRefundDesk } from './pages/admin/AdminShiprocketRefundDesk';
 import { AdminCustomers } from './pages/admin/AdminCustomers';
 import { AdminLeads } from './pages/admin/AdminLeads';
 import { AdminReviews } from './pages/admin/AdminReviews';
@@ -210,11 +213,14 @@ export function AppContent() {
 
         <Route path="categories" element={<PermissionGuard moduleKey="categories"><AdminCategories /></PermissionGuard>} />
         <Route path="orders" element={<PermissionGuard moduleKey="orders"><AdminOrders /></PermissionGuard>} />
+        <Route path="shiprocket-order-desk" element={<PermissionGuard moduleKey="orders"><AdminShiprocketOrderDesk /></PermissionGuard>} />
+        <Route path="cancellation-flow" element={<PermissionGuard moduleKey="orders"><AdminCancellationFlowDemo /></PermissionGuard>} />
         {/* <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} /> */}
         <Route path="customers" element={<PermissionGuard moduleKey="customers"><AdminCustomers /></PermissionGuard>} />
         <Route path="leads" element={<PermissionGuard moduleKey="leads"><AdminLeads /></PermissionGuard>} />
         <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
+        <Route path="shiprocket-refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminShiprocketRefundDesk /></PermissionGuard>} />
         <Route path="email-notifications" element={<PermissionGuard moduleKey="email-notifications"><AdminEmailNotifications /></PermissionGuard>} />
         <Route path="newsletter" element={<PermissionGuard moduleKey="newsletter"><AdminNewsletter /></PermissionGuard>} />
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />

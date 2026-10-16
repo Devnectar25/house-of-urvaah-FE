@@ -157,16 +157,33 @@ export const DeliveryReminderWidget = ({
           {pincodeResult?.status === 'success' && (() => {
             const d = pincodeResult.dateObj;
             return (
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-neutral-800 mt-2.5 pt-2.5 border-t border-neutral-200 font-sans text-left">
-                <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
-                  <Check className="w-3 h-3 stroke-[2.5]" />
-                </div>
-                <span>
-                  Delivery between{' '}
-                  <span className="font-semibold text-neutral-950">
-                    {d?.day1 || 8}<sup>{d?.ord1 || 'th'}</sup> and {d?.day2 || 9}<sup>{d?.ord2 || 'th'}</sup> {d?.month || 'Oct'}
+              <div className="mt-2.5 pt-2.5 border-t border-neutral-200 font-sans text-left space-y-1">
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm text-neutral-800">
+                  <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[2.5]" />
+                  </div>
+                  <span>
+                    Delivery between{' '}
+                    <span className="font-semibold text-neutral-950">
+                      {d?.day1 || 8}<sup>{d?.ord1 || 'th'}</sup> and {d?.day2 || 9}<sup>{d?.ord2 || 'th'}</sup> {d?.month || 'Oct'}
+                    </span>
                   </span>
-                </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-neutral-500 pl-7 flex-wrap">
+                  {pincodeResult.courierName && (
+                    <span>Via <strong className="text-neutral-700 font-medium">{pincodeResult.courierName}</strong></span>
+                  )}
+                  {pincodeResult.zone && (
+                    <>
+                      <span>•</span>
+                      <span className="px-1.5 py-0.2 rounded-xs bg-neutral-100 text-neutral-600 font-semibold text-[10px] uppercase">{pincodeResult.zone}</span>
+                    </>
+                  )}
+                  <span>•</span>
+                  <span className={pincodeResult.codAvailable !== false ? 'text-emerald-700 font-medium' : 'text-amber-700 font-medium'}>
+                    {pincodeResult.codAvailable !== false ? 'Cash on Delivery Available' : 'Prepaid Only'}
+                  </span>
+                </div>
               </div>
             );
           })()}

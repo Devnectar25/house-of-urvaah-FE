@@ -27,14 +27,17 @@ import {
   ShieldAlert,
   Mail,
   MailCheck,
-  Building2
+  Building2,
+  RotateCcw,
+  Truck,
+  XCircle
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
   </svg>
 );
 import { Logo } from '../common/Logo';
@@ -46,7 +49,10 @@ const ALL_NAV_ITEMS = [
   { name: 'Products', path: '/admin/products', icon: Package, key: 'products' },
   { name: 'Categories', path: '/admin/categories', icon: FolderTree, key: 'categories' },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart, key: 'orders' },
+  { name: 'Shiprocket Order Desk', path: '/admin/shiprocket-order-desk', icon: Truck, key: 'orders' },
+  //{ name: 'Cancellation Demo', path: '/admin/cancellation-flow', icon: XCircle, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
+  { name: 'Shiprocket Refund Desk', path: '/admin/shiprocket-refund-desk', icon: RotateCcw, key: 'refunds' },
   { name: 'Email Notifications', path: '/admin/email-notifications', icon: Mail, key: 'email-notifications' },
   { name: 'Newsletter', path: '/admin/newsletter', icon: MailCheck, key: 'newsletter' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
@@ -274,28 +280,25 @@ export const AdminLayout = () => {
                         }}
                         className={`
                           w-full group flex items-center justify-between px-4 py-3.5 rounded-xl text-[14px] font-semibold transition-all duration-200 cursor-pointer select-none text-left
-                          ${
-                            isParentActive
-                              ? 'bg-[#F4F1EA] text-neutral-950 border-l-[5px] border-neutral-950 shadow-2xs font-bold'
-                              : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80 border-l-[5px] border-transparent'
+                          ${isParentActive
+                            ? 'bg-[#F4F1EA] text-neutral-950 border-l-[5px] border-neutral-950 shadow-2xs font-bold'
+                            : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80 border-l-[5px] border-transparent'
                           }
                         `}
                       >
                         <div className="flex items-center gap-3.5">
                           <Icon
-                            className={`w-5 h-5 transition-colors ${
-                              isParentActive
+                            className={`w-5 h-5 transition-colors ${isParentActive
                                 ? 'text-neutral-950 stroke-[2.2]'
                                 : 'text-neutral-400 group-hover:text-neutral-900 stroke-[1.8]'
-                            }`}
+                              }`}
                           />
                           <span className="font-admin tracking-tight">{item.name}</span>
                         </div>
 
                         <ChevronDown
-                          className={`w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0 ${
-                            modifyUiOpen ? 'rotate-180 text-neutral-900' : ''
-                          }`}
+                          className={`w-4 h-4 text-neutral-500 transition-transform duration-200 shrink-0 ${modifyUiOpen ? 'rotate-180 text-neutral-900' : ''
+                            }`}
                         />
                       </button>
 
@@ -312,17 +315,15 @@ export const AdminLayout = () => {
                                 to={sub.path}
                                 className={`
                                   flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[12.5px] transition-all duration-150 cursor-pointer select-none
-                                  ${
-                                    isSubActive
-                                      ? 'bg-neutral-950 text-white font-bold shadow-xs'
-                                      : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 font-medium'
+                                  ${isSubActive
+                                    ? 'bg-neutral-950 text-white font-bold shadow-xs'
+                                    : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100 font-medium'
                                   }
                                 `}
                               >
                                 <SubIcon
-                                  className={`w-4 h-4 shrink-0 ${
-                                    isSubActive ? 'text-white' : 'text-neutral-400'
-                                  }`}
+                                  className={`w-4 h-4 shrink-0 ${isSubActive ? 'text-white' : 'text-neutral-400'
+                                    }`}
                                 />
                                 <span className="font-admin tracking-tight truncate">{sub.name}</span>
                               </NavLink>
@@ -344,20 +345,18 @@ export const AdminLayout = () => {
                     to={item.path}
                     className={`
                       group flex items-center justify-between px-4 py-3.5 rounded-xl text-[14px] font-semibold transition-all duration-200 cursor-pointer select-none
-                      ${
-                        isActive
-                          ? 'bg-[#F4F1EA] text-neutral-950 border-l-[5px] border-neutral-950 shadow-2xs font-bold'
-                          : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80 border-l-[5px] border-transparent'
+                      ${isActive
+                        ? 'bg-[#F4F1EA] text-neutral-950 border-l-[5px] border-neutral-950 shadow-2xs font-bold'
+                        : 'text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80 border-l-[5px] border-transparent'
                       }
                     `}
                   >
                     <div className="flex items-center gap-3.5">
                       <Icon
-                        className={`w-5 h-5 transition-colors ${
-                          isActive
+                        className={`w-5 h-5 transition-colors ${isActive
                             ? 'text-neutral-950 stroke-[2.2]'
                             : 'text-neutral-400 group-hover:text-neutral-900 stroke-[1.8]'
-                        }`}
+                          }`}
                       />
                       <span className="font-admin tracking-tight">{item.name}</span>
                     </div>
