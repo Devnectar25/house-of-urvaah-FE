@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star, Loader2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import apiClient from '../lib/apiClient';
@@ -83,7 +83,80 @@ export const Account = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelComments, setCancelComments] = useState('');
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // Direct Confirmation: Prompt confirmation and immediately call POST /api/shipping/order/cancel
+  const handleCancelOrderDirect = async (ord) => {
+    if (!ord) return;
+    const orderNum = ord.order_number || ord.orderNumber || ord.id;
+    const isDelivered = (ord.status || '').toLowerCase().includes('delivered');
+
+    const confirmMessage = isDelivered
+      ? `Are you sure you want to request cancellation for delivered Order #${orderNum}? Our atelier concierge will arrange reverse pickup.`
+      : `Are you sure you want to cancel Order #${orderNum} and void the shipment?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setCancellingOrderId(ord.id || orderNum);
+    const targetStatus = isDelivered ? 'Cancellation Requested' : 'Cancelled';
+
+    try {
+      // 1. Direct call to Shiprocket Cancel Order / Shipment API: POST /api/shipping/order/cancel
+      await apiClient('/api/shipping/order/cancel', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_ids: [orderNum],
+          order_id: orderNum,
+          reason: isDelivered ? 'Customer requested post-delivery return/cancellation' : 'Customer requested order cancellation'
+        })
+      });
+
+      // 2. Sync with order cancellation endpoint
+      await apiClient(`/api/orders/${orderNum}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({
+          cancelReason: isDelivered ? 'Customer requested post-delivery return/cancellation' : 'Customer requested order cancellation'
+        })
+      }).catch(e => console.warn('Order status sync notice:', e.message));
+
+      // Update local state in My Orders list
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === ord.id || o.order_number === orderNum
+            ? { ...o, status: targetStatus, cancel_reason: 'Customer requested order cancellation' }
+            : o
+        )
+      );
+
+      // Broadcast update across admin panel and all tabs dynamically
+      broadcastOrderUpdate({
+        id: ord.id,
+        orderNumber: orderNum,
+        order_number: orderNum,
+        status: targetStatus,
+        cancel_reason: 'Customer requested order cancellation'
+      });
+
+      setToastMsg({
+        text: isDelivered
+          ? `Cancellation request for Order #${orderNum} submitted successfully.`
+          : `Order #${orderNum} and shipment cancelled successfully.`,
+        type: 'success'
+      });
+    } catch (err) {
+      console.error('Cancel order error:', err);
+      setToastMsg({
+        text: err.message || 'Failed to cancel order. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setCancellingOrderId(null);
+      setTimeout(() => setToastMsg(null), 4000);
+    }
+  };
 
   const handleCancelOrderInAccount = (ord) => {
     setCancelModalOrder(ord);
@@ -157,6 +230,19 @@ export const Account = () => {
     const targetStatus = 'Cancellation Requested';
 
     try {
+      // 1. Direct call to Shiprocket Cancel Order / Shipment API: POST /api/shipping/order/cancel
+      await apiClient('/api/shipping/order/cancel', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_ids: [orderNum],
+          order_id: orderNum,
+          reason: cancelReason || 'Customer requested order cancellation',
+          comments: cancelComments,
+          item_ids: selectedCancelItems
+        })
+      });
+
+      // 2. Synchronize order status in database
       await apiClient(endpoint, {
         method: 'POST',
         body: JSON.stringify({
@@ -164,7 +250,8 @@ export const Account = () => {
           comments: cancelComments,
           itemIds: selectedCancelItems
         })
-      });
+      }).catch((e) => console.warn('Order status sync warning:', e.message));
+
       setOrders((prev) =>
         prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: targetStatus, cancel_reason: cancelReason } : o))
       );
@@ -179,7 +266,7 @@ export const Account = () => {
       });
 
       setToastMsg({
-        text: 'Cancellation request submitted for admin review.',
+        text: 'Cancellation request submitted successfully.',
         type: 'success'
       });
     } catch (e) {
@@ -1245,13 +1332,12 @@ export const Account = () => {
                       type="button"
                       onClick={handleSubmitCancellation}
                       disabled={isSubmittingCancellation}
-                      className={`px-6 py-3 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
+                      className={`px-6 py-3 text-white text-xs font-sans font-bold tracking-[0.2em] uppercase rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2 ${
                         isDeliveredModalOrder ? 'bg-neutral-900 hover:bg-black' : 'bg-red-600 hover:bg-red-700'
                       }`}
                     >
-                      {isSubmittingCancellation
-                        ? 'Submitting...'
-                        : 'Submit Cancellation Request'}
+                      {isSubmittingCancellation && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>{isSubmittingCancellation ? 'Submitting...' : 'Submit Cancellation Request'}</span>
                     </button>
                   ) : (
                     <button

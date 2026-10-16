@@ -1734,6 +1734,16 @@ export const Checkout = () => {
       const orderNum = details?.orderNumber || placedOrderNumber;
       if (orderNum) {
         try {
+          // Direct call to Shiprocket Cancel Order / Shipment API
+          await apiClient('/api/shipping/order/cancel', {
+            method: 'POST',
+            body: JSON.stringify({
+              order_ids: [orderNum],
+              order_id: orderNum,
+              reason: finalReason
+            })
+          }).catch((e) => console.warn('Shipping cancel API error:', e.message));
+
           const res = await apiClient(`/api/orders/${orderNum}/cancel`, {
             method: 'POST',
             body: JSON.stringify({ cancelReason: finalReason })

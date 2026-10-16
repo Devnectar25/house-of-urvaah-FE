@@ -29,6 +29,7 @@ import { shippingApi } from '../../services/shippingApi';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
+import { ShippingLabelModal } from '../common/ShippingLabelModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Status options matching House of Urvaah lifecycle and policy values
@@ -83,6 +84,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [isShippingLabelOpen, setIsShippingLabelOpen] = useState(false);
 
   // Logistics & Shiprocket Testing Suite State
   const [logisticsLoading, setLogisticsLoading] = useState(false);
@@ -321,6 +323,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSaveError(null);
     setSaveSuccessMsg(null);
     try {
+      // 1. Direct call to Shiprocket Cancel Order / Shipment API
+      await apiClient('/api/shipping/order/cancel', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_ids: [order.order_number || order.id],
+          order_id: order.order_number || order.id,
+          reason: order.cancel_reason || 'Admin approved cancellation request'
+        })
+      }).catch((e) => console.warn('Shipping cancel API error:', e.message));
+
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -855,20 +867,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
-  // Logistics Action 4: Download PDF Label
-  const handleDownloadLabel = async () => {
+  // Logistics Action 4: View & Print PDF Shipping Label
+  const handleDownloadLabel = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateLabel([targetId]);
-      if (res?.label_url) {
-        window.open(res.label_url, '_blank');
-      } else {
-        alert('Shipping label generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Label generation failed: ' + err.message);
-    }
+    setIsShippingLabelOpen(true);
   };
 
   // Logistics Action 5: Download Manifest
@@ -1000,6 +1002,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             >
               <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
               <span>Invoice</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsShippingLabelOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-900 hover:text-white text-neutral-800 text-xs font-admin font-semibold tracking-wide transition-colors cursor-pointer shadow-2xs"
+              title="View or Print Courier Shipping Label (PDF)"
+            >
+              <Truck className="w-3.5 h-3.5 text-neutral-600" />
+              <span>Shipping Label</span>
             </button>
             <button
               type="button"
@@ -2020,6 +2031,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         onClose={() => setIsInvoiceOpen(false)}
         order={order}
         orderId={order?.order_number || order?.id || orderId}
+      />
+
+      {/* Official Courier Shipping Label Modal */}
+      <ShippingLabelModal
+        isOpen={isShippingLabelOpen}
+        onClose={() => setIsShippingLabelOpen(false)}
+        order={order}
+        orderId={order?.tracking_number || order?.order_number || order?.id || orderId}
       />
     </div>
   );

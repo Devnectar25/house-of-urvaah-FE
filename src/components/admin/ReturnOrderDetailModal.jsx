@@ -28,6 +28,7 @@ import { shippingApi } from '../../services/shippingApi';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
+import { ShippingLabelModal } from '../common/ShippingLabelModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Reverse / Return lifecycle status options
@@ -78,6 +79,7 @@ export const ReturnOrderDetailModal = ({
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [isReturnLabelOpen, setIsReturnLabelOpen] = useState(false);
 
   // Reverse Logistics State
   const [logisticsLoading, setLogisticsLoading] = useState(false);
@@ -246,20 +248,10 @@ export const ReturnOrderDetailModal = ({
     }
   };
 
-  // Reverse Action 2: Download Return Label (PDF)
-  const handleDownloadReturnLabel = async () => {
+  // Reverse Action 2: View & Print Return Label (PDF)
+  const handleDownloadReturnLabel = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateLabel([targetId]);
-      if (res?.label_url) {
-        window.open(res.label_url, '_blank');
-      } else {
-        alert('Return shipping label generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Return label generation failed: ' + err.message);
-    }
+    setIsReturnLabelOpen(true);
   };
 
   // Reverse Action 3: Download Reverse Pickup Manifest
@@ -1025,6 +1017,17 @@ export const ReturnOrderDetailModal = ({
           orderId={order.id}
           isOpen={isInvoiceOpen}
           onClose={() => setIsInvoiceOpen(false)}
+        />
+      )}
+
+      {/* Return Shipping Label Modal */}
+      {isReturnLabelOpen && order && (
+        <ShippingLabelModal
+          order={order}
+          orderId={order.tracking_number || order.order_number || order.id}
+          isOpen={isReturnLabelOpen}
+          isReturn={true}
+          onClose={() => setIsReturnLabelOpen(false)}
         />
       )}
     </div>
