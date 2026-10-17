@@ -29,11 +29,13 @@ import {
   PackageCheck,
   ChevronDown,
   RefreshCw,
-  Star
+  Star,
+  Trash2
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { getSupabaseMediaUrl } from '../lib/supabase';
+import { checkItemStockStatus } from '../utils/stockValidator';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
@@ -167,6 +169,7 @@ export const Checkout = () => {
     addToCart,
     selectedCartItemKeys,
     setSelectedCartItemKeys,
+    syncCartStock,
   } = useCart();
 
   // Active selected purchase items vs other bag items
@@ -199,7 +202,87 @@ export const Checkout = () => {
     );
   }, [selectedItems]);
 
+  // Live stock verification for checkout items
+  const [liveStockMap, setLiveStockMap] = useState({});
+  const [, setIsValidatingStock] = useState(false);
+
+  useEffect(() => {
+    if (!cart || cart.length === 0) return;
+    let isCancelled = false;
+
+    if (typeof syncCartStock === 'function') {
+      syncCartStock().catch(() => {});
+    }
+
+    const fetchLiveStock = async () => {
+      setIsValidatingStock(true);
+      try {
+        const uniqueCleanIds = Array.from(new Set(
+          cart.map((item) => {
+            const rawId = item.product?.id || item.productId || item.id;
+            return String(rawId).replace(/\D/g, '');
+          }).filter(Boolean)
+        ));
+
+        const results = await Promise.all(
+          uniqueCleanIds.map(async (cleanId) => {
+            try {
+              const res = await apiClient(`/api/products/${cleanId}`);
+              if (res && res.success && res.data) {
+                return { cleanId, data: res.data };
+              }
+            } catch (e) {
+              // Non-blocking
+            }
+            return null;
+          })
+        );
+
+        if (!isCancelled) {
+          const map = {};
+          results.forEach((r) => {
+            if (r) map[r.cleanId] = r.data;
+          });
+          setLiveStockMap((prev) => ({ ...prev, ...map }));
+        }
+      } catch (err) {
+        console.warn('Live stock verification note:', err);
+      } finally {
+        if (!isCancelled) setIsValidatingStock(false);
+      }
+    };
+
+    fetchLiveStock();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [cart, syncCartStock]);
+
+  const getItemStockInfo = React.useCallback(
+    (item) => {
+      if (!item) return { isOutOfStock: false, availableStock: 99, insufficientStock: false, reason: '' };
+      const rawId = item.product?.id || item.productId || item.id;
+      const cleanId = String(rawId).replace(/\D/g, '');
+      const liveData = liveStockMap[cleanId] || null;
+      return checkItemStockStatus(item, liveData);
+    },
+    [liveStockMap]
+  );
+
+  const outOfStockSelectedItems = React.useMemo(() => {
+    return selectedItems.filter((item) => getItemStockInfo(item).isOutOfStock);
+  }, [selectedItems, getItemStockInfo]);
+
+  const hasOutOfStockSelected = outOfStockSelectedItems.length > 0;
+
   const handleIncludeItemInOrder = (item) => {
+    const stockInfo = getItemStockInfo(item);
+    if (stockInfo.isOutOfStock) {
+      const msg = stockInfo.reason || `Cannot add "${item.product?.name || item.name}" - currently out of stock.`;
+      showToast(msg, 'error');
+      return;
+    }
     const key = `${item.product?.id}_${item.selectedSize}`;
     setSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), key])));
   };
@@ -207,6 +290,12 @@ export const Checkout = () => {
   const handleExcludeItemFromOrder = (item) => {
     const key = `${item.product?.id}_${item.selectedSize}`;
     setSelectedCartItemKeys((prev) => (prev || []).filter((k) => k !== key));
+  };
+
+  const handleDeleteItem = (item) => {
+    const key = `${item.product?.id}_${item.selectedSize}`;
+    setSelectedCartItemKeys((prev) => (prev || []).filter((k) => k !== key));
+    removeFromCart(item.product?.id, item.selectedSize);
   };
 
   const initialCachedOrder = React.useMemo(() => {
@@ -1134,6 +1223,27 @@ export const Checkout = () => {
     setPaymentErrorMessage('');
     setConfirmedGrandTotal(grandTotal);
 
+    // 0. Stock Availability Pre-check: Do not proceed if stock is not available
+    if (selectedItems.length === 0) {
+      setIsPlacingOrder(false);
+      setPaymentErrorMessage('Please select at least one item to place an order.');
+      return;
+    }
+
+    const outOfStockItems = selectedItems.filter(
+      (item) => getItemStockInfo(item).isOutOfStock
+    );
+    if (outOfStockItems.length > 0) {
+      setIsPlacingOrder(false);
+      const names = outOfStockItems
+        .map((it) => `"${it.product?.name || it.name}" (${it.selectedSize})`)
+        .join(', ');
+      const msg = `Cannot proceed: ${names} is currently out of stock. Please remove from your order to proceed.`;
+      setPaymentErrorMessage(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
     try {
       const selectedAddr = (showNewAddressForm || addresses.length === 0)
         ? { name: newShippingForm.fullName, phone: newShippingForm.phone }
@@ -1398,7 +1508,7 @@ export const Checkout = () => {
         name: 'House of Urvaah',
         description: paymentMethod === 'card'
           ? (cardSurcharge > 0 ? `Credit / Debit Card Purchase (Incl. ₹${cardSurcharge} Card Fee)` : 'Credit / Debit Card Purchase')
-          : 'UPI & Netbanking Purchase (0% Extra Charge)',
+          : 'UPI & Netbanking Purchase',
         image: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? undefined : `${window.location.origin}/assets/Images/Brown01.png`,
         order_id: (rzpOrderData?.id && !rzpOrderData.id.startsWith('order_rzp_test_')) ? rzpOrderData.id : undefined,
         prefill: {
@@ -2070,11 +2180,11 @@ export const Checkout = () => {
         <AnimatePresence>
           {toast && (
             <motion.div
-              initial={{ opacity: 0, y: -24, scale: 0.96 }}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -24, scale: 0.96 }}
+              exit={{ opacity: 0, y: 24, scale: 0.96 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+              className={`fixed bottom-6 right-6 z-[100] max-w-sm sm:max-w-md w-[calc(100%-3rem)] sm:w-auto px-5 py-3.5 rounded-xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
                 toast.type === 'error'
                   ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
                   : toast.type === 'success'
@@ -2192,16 +2302,6 @@ export const Checkout = () => {
                 }`}>
                   {isOrderCancelled ? 'Pickup Voided • ₹0 Freight' : details.trackingNumber}
                 </span>
-                {!isOrderCancelled && (
-                  <button
-                    type="button"
-                    onClick={() => setLiveTrackingOpen(true)}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-black text-white hover:bg-neutral-800 text-[10px] font-sans font-bold tracking-[0.16em] uppercase rounded-md shadow-2xs transition-colors cursor-pointer"
-                  >
-                    <Truck className="w-3 h-3" />
-                    <span>Live Track Parcel</span>
-                  </button>
-                )}
               </div>
             </div>
 
@@ -3292,11 +3392,11 @@ export const Checkout = () => {
         <AnimatePresence>
           {toast && (
             <motion.div
-              initial={{ opacity: 0, y: -24, scale: 0.96 }}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -24, scale: 0.96 }}
+              exit={{ opacity: 0, y: 24, scale: 0.96 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+              className={`fixed bottom-6 right-6 z-[100] max-w-sm sm:max-w-md w-[calc(100%-3rem)] sm:w-auto px-5 py-3.5 rounded-xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
                 toast.type === 'error'
                   ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
                   : toast.type === 'success'
@@ -3702,9 +3802,6 @@ export const Checkout = () => {
                           <span className="font-bold text-neutral-900 text-sm tracking-wide uppercase">
                             UPI &amp; NETBANKING
                           </span>
-                          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            0% Extra Charge
-                          </span>
                         </div>
                         <p className="text-neutral-500 text-[11px] mt-0.5">
                           Pay instantly using GPay, PhonePe, Paytm, BHIM UPI, or Netbanking. Zero extra surcharge.
@@ -3744,13 +3841,9 @@ export const Checkout = () => {
                           <span className="font-bold text-neutral-900 text-sm tracking-wide uppercase">
                             CREDIT / DEBIT CARDS
                           </span>
-                          {storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0 ? (
+                          {storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0 && (
                             <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
                               +{storeSettings.card_charge_percentage}% Extra Charge (+{formatPrice(cardSurcharge)})
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                              0% Extra Charge
                             </span>
                           )}
                         </div>
@@ -3836,14 +3929,19 @@ export const Checkout = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isPlacingOrder || selectedItems.length === 0 || (shippingServiceability.checked && !shippingServiceability.available)}
-                className="w-full py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                disabled={isPlacingOrder || selectedItems.length === 0 || hasOutOfStockSelected || (shippingServiceability.checked && !shippingServiceability.available)}
+                className="w-full py-4 bg-[#111111] hover:bg-neutral-800 text-white text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPlacingOrder ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-white stroke-[2.25] shrink-0" />
                     <span>PROCESSING ORDER...</span>
                   </>
+                ) : hasOutOfStockSelected ? (
+                  <span className="flex items-center justify-center gap-1.5 text-rose-300">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>OUT OF STOCK • REMOVE TO CONTINUE</span>
+                  </span>
                 ) : selectedItems.length === 0 ? (
                   <span>SELECT ITEMS TO PLACE ORDER</span>
                 ) : shippingServiceability.checked && !shippingServiceability.available ? (
@@ -3859,9 +3957,15 @@ export const Checkout = () => {
                   </>
                 )}
               </button>
-              <p className="text-[11px] text-center text-neutral-400 mt-2 font-serif">
-                By clicking place order, you agree to House of Urvaah's Terms of Purchase & Privacy Policy.
-              </p>
+              {hasOutOfStockSelected ? (
+                <p className="text-[11px] text-center text-rose-600 font-medium mt-2">
+                  Please remove out-of-stock item{outOfStockSelectedItems.length > 1 ? 's' : ''} from your order to proceed.
+                </p>
+              ) : (
+                <p className="text-[11px] text-center text-neutral-400 mt-2 font-serif">
+                  By clicking place order, you agree to House of Urvaah's Terms of Purchase & Privacy Policy.
+                </p>
+              )}
             </div>
 
             {/* FOOTER POLICY LINKS */}
@@ -3909,6 +4013,20 @@ export const Checkout = () => {
                   )}
                 </div>
 
+                {hasOutOfStockSelected && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-200/90 rounded-xl text-xs text-rose-900 flex items-start gap-2.5 mb-3.5 shadow-2xs">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-rose-800 tracking-wide uppercase text-[11px]">
+                        Stock Unavailable for Selected Item{outOfStockSelectedItems.length > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                        {outOfStockSelectedItems.map((it) => `"${it.product?.name || it.name}" (${it.selectedSize})`).join(', ')} {outOfStockSelectedItems.length > 1 ? 'are' : 'is'} out of stock. Please remove {outOfStockSelectedItems.length > 1 ? 'them' : 'it'} from your order to proceed.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {selectedItems.length === 0 ? (
                   <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl text-center text-xs text-amber-900 space-y-1 my-3">
                     <p className="font-semibold">No items currently selected for this order.</p>
@@ -3921,38 +4039,79 @@ export const Checkout = () => {
                     className="divide-y divide-neutral-200/80 max-h-[300px] overflow-y-auto no-scrollbar scrollbar-none pt-1"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                   >
-                    {selectedItems.map((item, idx) => (
-                      <div key={`selected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-3.5 first:pt-2 last:pb-1 flex gap-3.5 items-center">
-                        <div className="relative flex-shrink-0 pt-1 pr-1">
-                          <img
-                            src={getSupabaseMediaUrl(item.product.image)}
-                            alt={item.product.name}
-                            className="w-16 h-20 object-cover object-top border border-neutral-200 bg-white"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
-                            }}
-                          />
-                          <span className="absolute top-0 right-0 w-5 h-5 bg-black text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums shadow-xs">
-                            {item.quantity}
-                          </span>
-                        </div>
+                    {selectedItems.map((item, idx) => {
+                      const stockInfo = getItemStockInfo(item);
+                      return (
+                        <div
+                          key={`selected-${item.product.id}-${item.selectedSize}-${idx}`}
+                          className={`py-3.5 first:pt-2 last:pb-1 flex gap-3.5 items-center justify-between transition-colors ${
+                            stockInfo.isOutOfStock ? 'bg-rose-50/50 border border-rose-200/90 px-2.5 py-3 rounded-lg my-1.5' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className="relative flex-shrink-0 pt-1 pr-1">
+                              <img
+                                src={getSupabaseMediaUrl(item.product.image)}
+                                alt={item.product.name}
+                                className={`w-16 h-20 object-cover object-top border ${
+                                  stockInfo.isOutOfStock ? 'border-rose-300 opacity-70' : 'border-neutral-200 bg-white'
+                                }`}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                                }}
+                              />
+                              <span
+                                className={`absolute top-0 right-0 w-5 h-5 ${
+                                  stockInfo.isOutOfStock ? 'bg-rose-600' : 'bg-black'
+                                } text-white text-[10px] font-sans font-semibold rounded-full flex items-center justify-center tabular-nums shadow-xs`}
+                              >
+                                {item.quantity}
+                              </span>
+                            </div>
 
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 truncate">
-                            {item.product.name}
-                          </h4>
-                          <p className="text-[11px] text-neutral-500 tracking-wider mt-0.5">
-                            SIZE: <span className="font-bold text-neutral-800">{item.selectedSize}</span>
-                          </p>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="text-xs font-bold text-neutral-900">
-                              {formatPrice(item.product.price * item.quantity)}
-                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 truncate">
+                                  {item.product.name}
+                                </h4>
+                                {stockInfo.isOutOfStock && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-rose-100 text-rose-700 rounded border border-rose-200 shrink-0">
+                                    OUT OF STOCK
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-neutral-500 tracking-wider mt-0.5">
+                                SIZE: <span className="font-bold text-neutral-800">{item.selectedSize}</span>
+                              </p>
+                              {stockInfo.isOutOfStock ? (
+                                <p className="text-[10px] text-rose-600 font-medium mt-1 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+                                  <span>{stockInfo.reason || 'This item is currently out of stock.'}</span>
+                                </p>
+                              ) : (
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-xs font-bold text-neutral-900">
+                                    {formatPrice(item.product.price * item.quantity)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Delete / Remove Item from Order */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item)}
+                            className="p-2 text-neutral-400 hover:text-rose-600 hover:bg-neutral-200/60 rounded-full transition-colors cursor-pointer shrink-0 ml-2"
+                            title="Remove item from order"
+                            aria-label="Remove item from order"
+                          >
+                            <Trash2 className="w-4 h-4 stroke-[1.75]" />
+                          </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -3976,41 +4135,76 @@ export const Checkout = () => {
                     className="divide-y divide-neutral-200/60 max-h-[260px] overflow-y-auto no-scrollbar scrollbar-none bg-white/70 border border-neutral-200/80 rounded-xl p-3"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                   >
-                    {unselectedItems.map((item, idx) => (
-                      <div key={`unselected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <img
-                            src={getSupabaseMediaUrl(item.product.image)}
-                            alt={item.product.name}
-                            className="w-11 h-14 object-cover object-top border border-neutral-200 bg-white shrink-0 rounded-xs"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
-                            }}
-                          />
-                          <div className="min-w-0">
-                            <h5 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-800 truncate">
-                              {item.product.name}
-                            </h5>
-                            <p className="text-[10px] text-neutral-500">
-                              Size: <strong className="text-neutral-700">{item.selectedSize}</strong> &bull; Qty: {item.quantity}
-                            </p>
-                            <p className="text-[11px] font-bold text-neutral-900">
-                              {formatPrice(item.product.price * item.quantity)}
-                            </p>
+                    {unselectedItems.map((item, idx) => {
+                      const stockInfo = getItemStockInfo(item);
+                      return (
+                        <div key={`unselected-${item.product.id}-${item.selectedSize}-${idx}`} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img
+                              src={getSupabaseMediaUrl(item.product.image)}
+                              alt={item.product.name}
+                              className={`w-11 h-14 object-cover object-top border ${
+                                stockInfo.isOutOfStock ? 'border-rose-300 opacity-60' : 'border-neutral-200 bg-white'
+                              } shrink-0 rounded-xs`}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h5 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-800 truncate">
+                                  {item.product.name}
+                                </h5>
+                                {stockInfo.isOutOfStock && (
+                                  <span className="px-1 py-0.2 text-[8px] font-bold tracking-wider uppercase bg-rose-100 text-rose-700 rounded border border-rose-200">
+                                    OUT OF STOCK
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-neutral-500">
+                                Size: <strong className="text-neutral-700">{item.selectedSize}</strong> &bull; Qty: {item.quantity}
+                              </p>
+                              <p className="text-[11px] font-bold text-neutral-900">
+                                {formatPrice(item.product.price * item.quantity)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              disabled={stockInfo.isOutOfStock}
+                              onClick={() => handleIncludeItemInOrder(item)}
+                              className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-sans font-bold tracking-[0.14em] uppercase transition flex items-center gap-1 shrink-0 ${
+                                stockInfo.isOutOfStock
+                                  ? 'border-neutral-200 bg-neutral-100 text-neutral-400 cursor-not-allowed shadow-none'
+                                  : 'border-[#c5a880] hover:border-black bg-white hover:bg-[#FAF8F3] text-neutral-900 cursor-pointer shadow-2xs'
+                              }`}
+                              title={stockInfo.isOutOfStock ? (stockInfo.reason || 'This item is out of stock') : 'Add to active order'}
+                            >
+                              {stockInfo.isOutOfStock ? (
+                                <span>OUT OF STOCK</span>
+                              ) : (
+                                <>
+                                  <Plus className="w-3 h-3 text-[#8c734b]" />
+                                  <span>ADD TO ORDER</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item)}
+                              className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-neutral-200/60 rounded-full transition-colors cursor-pointer"
+                              title="Remove item from bag"
+                              aria-label="Remove item from bag"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 stroke-[1.75]" />
+                            </button>
                           </div>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleIncludeItemInOrder(item)}
-                          className="px-2.5 py-1.5 rounded-lg border border-[#c5a880] hover:border-black bg-white hover:bg-[#FAF8F3] text-neutral-900 text-[10px] font-sans font-bold tracking-[0.14em] uppercase transition cursor-pointer flex items-center gap-1 shrink-0 shadow-2xs"
-                        >
-                          <Plus className="w-3 h-3 text-[#8c734b]" />
-                          <span>ADD TO ORDER</span>
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

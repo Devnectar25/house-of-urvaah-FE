@@ -26,7 +26,9 @@ import {
   Mail,
   Copy,
   Bell,
-  Star
+  Star,
+  Play,
+  Film
 } from 'lucide-react';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { useCart } from '../context/CartContext';
@@ -169,6 +171,8 @@ export const ProductDetail = () => {
 
   // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
+  const [selectedMediaType, setSelectedMediaType] = useState('image'); // 'image' | 'video'
+  const [lightboxSelectedMedia, setLightboxSelectedMedia] = useState('image'); // 'image' | 'video'
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomCoords, setZoomCoords] = useState({ x: 50, y: 50 });
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -231,6 +235,9 @@ export const ProductDetail = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     let isMounted = true;
     setLoading(true);
+    setSelectedMediaType('image');
+    setSelectedImage('');
+    setMobileSlideIndex(0);
 
     if (id) {
       // 1. Try local catalog first for instant response
@@ -263,6 +270,8 @@ export const ProductDetail = () => {
               image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
               hoverImage: isCorsetSet ? corsetGallery[1] : (data.hoverImage || prev?.hoverImage || data.image),
               gallery: isCorsetSet ? corsetGallery : (data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image])),
+              video_url: data.video_url || data.videoUrl || data.video || prev?.video_url || '',
+              videoUrl: data.video_url || data.videoUrl || data.video || prev?.videoUrl || '',
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
               nameOptions: data.nameOptions || data.name_options || prev?.nameOptions || [],
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
@@ -303,17 +312,23 @@ export const ProductDetail = () => {
     new Set(
       (product?.gallery && product.gallery.length > 0
         ? product.gallery
-        : [
-            product?.image,
-            product?.hoverImage,
-            '/assets/Images/Brown02.png',
-            '/assets/Images/Brown03.png',
-            '/assets/Images/Brown04.png',
-            '/assets/Images/Brown01.png'
-          ]
+        : (product?.images && product.images.length > 0
+            ? product.images
+            : [
+                product?.image,
+                product?.hoverImage,
+                '/assets/Images/Brown02.png',
+                '/assets/Images/Brown03.png',
+                '/assets/Images/Brown04.png',
+                '/assets/Images/Brown01.png'
+              ]
+          )
       ).filter(Boolean)
     )
-  ).slice(0, 4);
+  );
+
+  const productVideo = product?.video_url || product?.videoUrl || product?.video || null;
+  const totalMobileSlides = gallery.length + (productVideo ? 1 : 0);
 
   const availableSizes = product?.sizes || ['XS', 'S', 'M', 'L', 'XL'];
 
@@ -364,7 +379,7 @@ export const ProductDetail = () => {
       if (resizeObserver) resizeObserver.disconnect();
       window.removeEventListener('resize', measureHeight);
     };
-  }, [loading, selectedImage, product?.id]);
+  }, [loading, selectedImage, selectedMediaType, product?.id]);
 
   // Reset scroll position of right details panel and ensure product description is visible by default
   useEffect(() => {
@@ -399,7 +414,7 @@ export const ProductDetail = () => {
   };
 
   const handleNextMobileSlide = () => {
-    const nextIdx = Math.min(gallery.length - 1, mobileSlideIndex + 1);
+    const nextIdx = Math.min(totalMobileSlides - 1, mobileSlideIndex + 1);
     scrollToMobileSlide(nextIdx);
   };
 
@@ -425,6 +440,7 @@ export const ProductDetail = () => {
 
   const openLightbox = (imgUrl) => {
     if (imgUrl) setSelectedImage(imgUrl);
+    setLightboxSelectedMedia('image');
     setLightboxZoom(1);
     setLightboxPan({ x: 0, y: 0 });
     setIsLightboxOpen(true);
@@ -876,9 +892,10 @@ export const ProductDetail = () => {
                 onScroll={handleMobileScroll}
                 className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none w-full touch-pan-x"
               >
+                {/* Images first */}
                 {gallery.map((imgUrl, idx) => (
                   <div
-                    key={idx}
+                    key={`mobile-img-${idx}`}
                     onClick={() => openLightbox(imgUrl)}
                     className="w-full flex-shrink-0 snap-center relative bg-[#F5F5F0] border border-neutral-200/60 overflow-hidden p-2 flex items-center justify-center aspect-[3/4] cursor-pointer"
                   >
@@ -897,44 +914,63 @@ export const ProductDetail = () => {
                     )}
                   </div>
                 ))}
+
+                {/* Video at the end */}
+                {productVideo && (
+                  <div
+                    key="mobile-product-video"
+                    className="w-full flex-shrink-0 snap-center relative bg-white border border-neutral-200/60 overflow-hidden p-2 flex items-center justify-center aspect-[3/4]"
+                  >
+                    <video
+                      src={productVideo}
+                      controls
+                      playsInline
+                      className="w-full h-full object-contain bg-white"
+                    />
+                    <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 flex items-center gap-1">
+                      <Play className="w-2.5 h-2.5 fill-current" />
+                      <span>Video</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Mobile Zoom Trigger Badge */}
-              <button
-                type="button"
-                onClick={() => openLightbox(gallery[mobileSlideIndex] || gallery[0])}
-                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/80 hover:bg-black text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
-                aria-label="Zoom image"
-              >
-                <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
-                <span>Zoom</span>
-              </button>
+              {/* Mobile Zoom Trigger Badge (Only for images) */}
+              {mobileSlideIndex < gallery.length && (
+                <button
+                  type="button"
+                  onClick={() => openLightbox(gallery[mobileSlideIndex] || gallery[0])}
+                  className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/80 hover:bg-black text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
+                  aria-label="Zoom image"
+                >
+                  <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
+                  <span>Zoom</span>
+                </button>
+              )}
 
-              {/* Side Navigation Arrows (Matching second reference screenshot) */}
-              {gallery.length > 1 && (
+              {/* Side Navigation Arrows */}
+              {totalMobileSlides > 1 && (
                 <>
                   {mobileSlideIndex > 0 && (
                     <button
                       type="button"
                       onClick={handlePrevMobileSlide}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-black flex items-center justify-center shadow-md border border-neutral-200/80 cursor-pointer"
-                      aria-label="Previous image"
+                      aria-label="Previous slide"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                   )}
-                  {mobileSlideIndex < gallery.length - 1 && (
+                  {mobileSlideIndex < totalMobileSlides - 1 && (
                     <button
                       type="button"
                       onClick={handleNextMobileSlide}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-black flex items-center justify-center shadow-md border border-neutral-200/80 cursor-pointer"
-                      aria-label="Next image"
+                      aria-label="Next slide"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   )}
-
-                  {/* Indicator Dots at Bottom - REMOVED per user request */}
                 </>
               )}
             </div>
@@ -946,12 +982,14 @@ export const ProductDetail = () => {
                 {gallery.map((imgUrl, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => {
+                      setSelectedMediaType('image');
                       setSelectedImage(imgUrl);
                       setIsZoomed(false);
                     }}
-                    className={`w-16 h-20 flex-shrink-0 bg-neutral-100 overflow-hidden transition-all relative ${
-                      selectedImage === imgUrl
+                    className={`w-16 h-20 flex-shrink-0 bg-neutral-100 overflow-hidden transition-all relative cursor-pointer ${
+                      selectedMediaType === 'image' && (selectedImage === imgUrl || (!selectedImage && idx === 0))
                         ? 'ring-1.5 ring-black ring-offset-1 opacity-100 shadow-sm'
                         : 'border border-neutral-200 opacity-60 hover:opacity-100 hover:border-neutral-400'
                     }`}
@@ -966,76 +1004,123 @@ export const ProductDetail = () => {
                     />
                   </button>
                 ))}
+
+                {/* Video thumbnail rendered at the end */}
+                {productVideo && (
+                  <button
+                    key="desktop-video-thumb"
+                    type="button"
+                    onClick={() => {
+                      setSelectedMediaType('video');
+                      setIsZoomed(false);
+                    }}
+                    className={`w-16 h-20 flex-shrink-0 bg-white overflow-hidden transition-all relative group cursor-pointer ${
+                      selectedMediaType === 'video'
+                        ? 'ring-1.5 ring-black ring-offset-1 opacity-100 shadow-sm'
+                        : 'border border-neutral-200 opacity-70 hover:opacity-100 hover:border-neutral-400'
+                    }`}
+                    title="Watch product video"
+                  >
+                    <video
+                      src={productVideo}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover object-top pointer-events-none"
+                    />
+                  </button>
+                )}
               </div>
 
-              {/* Main Product Image Container with Interactive Click-to-Zoom */}
-              <div
-                ref={desktopImageContainerRef}
-                className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-colors ${
-                  isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
-                }`}
-                onMouseMove={handleMainMouseMove}
-                onMouseLeave={handleMainMouseLeave}
-                onClick={handleMainImageClick}
-                title={isZoomed ? 'Click to zoom out' : 'Click image to zoom in'}
-              >
-                <img
-                  src={selectedImage || gallery[0]}
-                  alt={product.name}
-                  className="w-full h-full object-contain object-center select-none pointer-events-none will-change-transform"
-                  style={{
-                    transformOrigin: `${zoomCoords.x}% ${zoomCoords.y}%`,
-                    transform: isZoomed ? 'scale(2.4)' : 'scale(1)',
-                    transition: isZoomed
-                      ? 'transform 0.12s ease-out'
-                      : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)'
-                  }}
-                />
-
-                {/* Tag Badge */}
-                {product.tag && (
-                  <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 pointer-events-none">
-                    {product.tag}
-                  </div>
-                )}
-
-                {/* Fullscreen Expand Action Button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openLightbox(selectedImage || gallery[0]);
-                  }}
-                  className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 hover:bg-white text-black text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all hover:scale-105 cursor-pointer border border-black/10"
-                  title="Fullscreen view"
-                  aria-label="Fullscreen view"
+              {/* Main Product Display: Video or Zoomable Image Container */}
+              {selectedMediaType === 'video' && productVideo ? (
+                <div
+                  ref={desktopImageContainerRef}
+                  className="flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-white overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group"
                 >
-                  <Maximize2 className="w-3.5 h-3.5 text-neutral-800" />
-                  <span>Fullscreen</span>
-                </button>
+                  <video
+                    src={productVideo}
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                    className="w-full h-full object-contain bg-white"
+                  />
+                  <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase rounded flex items-center gap-1.5 border border-black/10 pointer-events-none">
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Product Video</span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  ref={desktopImageContainerRef}
+                  className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-colors ${
+                    isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
+                  }`}
+                  onMouseMove={handleMainMouseMove}
+                  onMouseLeave={handleMainMouseLeave}
+                  onClick={handleMainImageClick}
+                  title={isZoomed ? 'Click to zoom out' : 'Click image to zoom in'}
+                >
+                  <img
+                    src={selectedImage || gallery[0]}
+                    alt={product.name}
+                    className="w-full h-full object-contain object-center select-none pointer-events-none will-change-transform"
+                    style={{
+                      transformOrigin: `${zoomCoords.x}% ${zoomCoords.y}%`,
+                      transform: isZoomed ? 'scale(2.4)' : 'scale(1)',
+                      transition: isZoomed
+                        ? 'transform 0.12s ease-out'
+                        : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    }}
+                  />
 
-                {/* Floating Zoom Action Badge */}
-                <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/85 text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all pointer-events-none">
-                  {isZoomed ? (
-                    <>
-                      <ZoomOut className="w-3.5 h-3.5 text-[#E6C687]" />
-                      <span>Click to Zoom Out</span>
-                    </>
-                  ) : (
-                    <>
-                      <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
-                      <span>Click to Zoom</span>
-                    </>
+                  {/* Tag Badge */}
+                  {product.tag && (
+                    <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 pointer-events-none">
+                      {product.tag}
+                    </div>
+                  )}
+
+                  {/* Fullscreen Expand Action Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openLightbox(selectedImage || gallery[0]);
+                    }}
+                    className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 hover:bg-white text-black text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all hover:scale-105 cursor-pointer border border-black/10"
+                    title="Fullscreen view"
+                    aria-label="Fullscreen view"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-neutral-800" />
+                    <span>Fullscreen</span>
+                  </button>
+
+                  {/* Floating Zoom Action Badge */}
+                  <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1.5 bg-black/85 text-white text-[10px] font-sans font-medium tracking-wider uppercase rounded shadow-md backdrop-blur-sm transition-all pointer-events-none">
+                    {isZoomed ? (
+                      <>
+                        <ZoomOut className="w-3.5 h-3.5 text-[#E6C687]" />
+                        <span>Click to Zoom Out</span>
+                      </>
+                    ) : (
+                      <>
+                        <ZoomIn className="w-3.5 h-3.5 text-[#E6C687]" />
+                        <span>Click to Zoom</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Magnification Level Indicator */}
+                  {isZoomed && (
+                    <div className="absolute top-3 right-3 z-10 bg-black/80 text-[#E6C687] text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none tracking-widest border border-white/10">
+                      2.4X ZOOM
+                    </div>
                   )}
                 </div>
-
-                {/* Magnification Level Indicator */}
-                {isZoomed && (
-                  <div className="absolute top-3 right-3 z-10 bg-black/80 text-[#E6C687] text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none tracking-widest border border-white/10">
-                    2.4X ZOOM
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
 
@@ -1394,25 +1479,6 @@ export const ProductDetail = () => {
                 )}
               </div>
 
-              {/* Full Description Accordion (Under Additional Information) */}
-              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => toggleAccordion('fulldesc')}
-                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                  aria-expanded={Boolean(openAccordions['fulldesc'])}
-                >
-                  <span>FULL DESCRIPTION</span>
-                  {openAccordions['fulldesc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                </button>
-                {openAccordions['fulldesc'] && (
-                  <RichTextRenderer
-                    content={product.fullDescription || product.full_description || product.description}
-                    fallback="Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams."
-                    className="mt-2 text-xs sm:text-sm pr-2"
-                  />
-                )}
-              </div>
 
               {/* Product Details (Dynamic Bullet Points) */}
               {Array.isArray(product.productDetails || product.product_details) &&
@@ -1783,20 +1849,30 @@ export const ProductDetail = () => {
               </button>
             )}
 
-            {/* Zoomable Image Container */}
+            {/* Zoomable Image or Video Container */}
             <div
               className="max-w-[85vw] max-h-[75vh] flex items-center justify-center transition-transform select-none"
               style={{
-                transform: `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom})`,
+                transform: lightboxSelectedMedia === 'video' ? 'none' : `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom})`,
                 transition: isDraggingLightbox ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
               }}
             >
-              <img
-                src={selectedImage || gallery[0]}
-                alt={product.name}
-                draggable={false}
-                className="max-w-full max-h-[75vh] object-contain drop-shadow-2xl pointer-events-none select-none"
-              />
+              {lightboxSelectedMedia === 'video' && productVideo ? (
+                <video
+                  src={productVideo}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-w-[85vw] max-h-[75vh] object-contain drop-shadow-2xl"
+                />
+              ) : (
+                <img
+                  src={selectedImage || gallery[0]}
+                  alt={product.name}
+                  draggable={false}
+                  className="max-w-full max-h-[75vh] object-contain drop-shadow-2xl pointer-events-none select-none"
+                />
+              )}
             </div>
 
             {/* Gallery Right Arrow */}
@@ -1815,7 +1891,7 @@ export const ProductDetail = () => {
             )}
 
             {/* Drag Hint Pill when Zoomed In */}
-            {lightboxZoom > 1 && (
+            {lightboxZoom > 1 && lightboxSelectedMedia !== 'video' && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/75 border border-white/20 text-[#E6C687] text-[11px] font-sans px-3 py-1 rounded-full backdrop-blur-sm pointer-events-none tracking-wide animate-pulse">
                 Click & drag to explore fabric details
               </div>
@@ -1831,10 +1907,11 @@ export const ProductDetail = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedImage(imgUrl);
+                  setLightboxSelectedMedia('image');
                   setLightboxPan({ x: 0, y: 0 });
                 }}
                 className={`w-12 h-14 sm:w-14 sm:h-16 overflow-hidden rounded border transition-all cursor-pointer ${
-                  (selectedImage || gallery[0]) === imgUrl
+                  lightboxSelectedMedia === 'image' && (selectedImage || gallery[0]) === imgUrl
                     ? 'border-[#E6C687] ring-2 ring-[#E6C687]/40 scale-105 opacity-100'
                     : 'border-white/20 opacity-50 hover:opacity-100 hover:border-white/50'
                 }`}
@@ -1846,6 +1923,33 @@ export const ProductDetail = () => {
                 />
               </button>
             ))}
+
+            {productVideo && (
+              <button
+                key="lightbox-video-thumb"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxSelectedMedia('video');
+                  setLightboxPan({ x: 0, y: 0 });
+                }}
+                className={`w-12 h-14 sm:w-14 sm:h-16 overflow-hidden rounded border transition-all cursor-pointer relative bg-neutral-900 ${
+                  lightboxSelectedMedia === 'video'
+                    ? 'border-[#E6C687] ring-2 ring-[#E6C687]/40 scale-105 opacity-100'
+                    : 'border-white/20 opacity-60 hover:opacity-100 hover:border-white/50'
+                }`}
+                title="Watch video"
+              >
+                <video
+                  src={productVideo}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover object-top pointer-events-none"
+                />
+              </button>
+            )}
           </div>
         </div>
       )}

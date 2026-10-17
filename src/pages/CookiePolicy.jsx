@@ -289,7 +289,7 @@ export const CookiePolicy = () => {
                 </div>
                 <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
                   <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Direct Inquiries</p>
-                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Email: [Insert Email Address]</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Email: houseofurvaah@gmail.com</p>
                 </div>
               </div>
               <div className="flex items-start sm:items-center gap-3.5 pt-4">
@@ -298,7 +298,7 @@ export const CookiePolicy = () => {
                 </div>
                 <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
                   <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Customer Support</p>
-                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Support: [support@houseofurvaah.com]</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">Support: houseofurvaah@gmail.com</p>
                 </div>
               </div>
             </div>

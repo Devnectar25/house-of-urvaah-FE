@@ -139,7 +139,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               userCityStatePin: cityStatePinFallback,
               userAddress: fullAddrFallback,
               userPhone: order.recipient_phone || order.customer_phone || order.phone || order.shippingAddress?.phone || 'N/A',
-              userEmail: order.customer_email || order.email || 'concierge@houseofurvaah.com',
+              userEmail: order.customer_email || order.email || 'houseofurvaah@gmail.com',
             paymentMethod: String(order.payment_method || 'Online').toUpperCase(),
             paymentStatus: String(order.payment_status || 'Paid').toUpperCase(),
             isPaid: String(order.payment_status || '').toLowerCase() === 'paid',
@@ -447,12 +447,12 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     House of Urvaah Private Limited
                   </div>
                   <div className="text-[10.5px] text-neutral-600 leading-relaxed">
-                    Ground Floor, Luxury Fashion Enclave, Mehrauli-Gurgaon Road<br />
-                    New Delhi, 110030, India<br />
-                    <strong>GSTIN:</strong> 07AAECH9988K1Z3 &bull; <strong>State:</strong> 07 (Delhi)<br />
+                    Eastern winds, 1402, E wing, Kurla East<br />
+                    Mumbai 400070, Maharashtra, India<br />
+                    <strong>GSTIN:</strong> 07AAECH9988K1Z3 &bull; <strong>State:</strong> 27 (Maharashtra)<br />
                     <strong>CIN:</strong> U18101DL2024PTC123456<br />
                     <span className="text-neutral-500 pt-1.5 block">
-                      <strong>Concierge:</strong> concierge@houseofurvaah.com
+                      <strong>Concierge:</strong> houseofurvaah@gmail.com
                     </span>
                   </div>
                 </div>
@@ -547,7 +547,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                       Atelier Remittance &amp; Audit Reference
                     </span>
                     Beneficiary: <strong>HOUSE OF URVAAH PRIVATE LIMITED</strong> &bull; Bank: HDFC Bank Ltd<br />
-                    Account: 50200088923412 &bull; IFSC: HDFC0000123 &bull; Branch: Mehrauli, New Delhi
+                    Account: 50200088923412 &bull; IFSC: HDFC0000123 &bull; Branch: Kurla East, Mumbai
                   </div>
                 </div>
 

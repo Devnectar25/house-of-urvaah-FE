@@ -453,7 +453,7 @@ export const ReturnRefundPolicy = () => {
                 </div>
                 <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
                   <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Email</p>
-                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">[Insert Email Address]</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">houseofurvaah@gmail.com</p>
                 </div>
               </div>
               <div className="flex items-start sm:items-center gap-3.5 py-4">
@@ -462,7 +462,7 @@ export const ReturnRefundPolicy = () => {
                 </div>
                 <div className="flex-1 sm:flex sm:items-center sm:justify-between gap-4">
                   <p className="text-[11px] sm:text-xs uppercase tracking-wider text-neutral-500 font-medium">Phone</p>
-                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">[Insert Phone Number]</p>
+                  <p className="font-semibold text-neutral-900 text-sm sm:text-base">+91 98333 25657</p>
                 </div>
               </div>
               <div className="flex items-start sm:items-center gap-3.5 pt-4">

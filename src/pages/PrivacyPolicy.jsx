@@ -248,11 +248,11 @@ export const PrivacyPolicy = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Grievance Inquiries</p>
-                <p className="font-semibold text-neutral-900">Email: [privacy@houseofurvaah.com]</p>
+                <p className="font-semibold text-neutral-900">Email: houseofurvaah@gmail.com</p>
               </div>
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Customer Support</p>
-                <p className="font-semibold text-neutral-900">Support: [support@houseofurvaah.com]</p>
+                <p className="font-semibold text-neutral-900">Support: houseofurvaah@gmail.com</p>
               </div>
             </div>
           </div>

@@ -86,7 +86,7 @@ export const WhatsHot = () => {
       {/* Section Heading matching CategoryGrid */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark">
-          WHAT'S HOT RN ?
+          THE HOT LIST
         </h2>
       </div>
 

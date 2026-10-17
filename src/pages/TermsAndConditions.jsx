@@ -86,7 +86,7 @@ export const TermsAndConditions = () => {
               </h2>
             </div>
             <p>
-              References to &quot;House of Urvaah&quot;, &quot;the Company&quot;, &quot;we&quot;, &quot;us&quot; or &quot;our&quot; mean [Insert Legal Name], the owner and operator of the Platform, with its registered office at [Insert Business Address]. References to &quot;you&quot;, &quot;your&quot;, &quot;User&quot; or &quot;Customer&quot; mean any person who accesses, browses or uses the Platform, including anyone who places an order.
+              References to &quot;House of Urvaah&quot;, &quot;the Company&quot;, &quot;we&quot;, &quot;us&quot; or &quot;our&quot; mean House of Urvaah, the owner and operator of the Platform, with its registered office at Eastern winds, 1402, E wing, Kurla East, Mumbai 400070. References to &quot;you&quot;, &quot;your&quot;, &quot;User&quot; or &quot;Customer&quot; mean any person who accesses, browses or uses the Platform, including anyone who places an order.
             </p>
             <p>
               House of Urvaah is an online fashion retailer offering women&apos;s clothing, apparel and accessories (&quot;Products&quot;) for sale through the Platform. Except where a product is expressly identified as being sold by a third-party seller, House of Urvaah is the seller of the Products listed on the Platform.
@@ -156,7 +156,7 @@ export const TermsAndConditions = () => {
                 You are responsible for keeping your login credentials confidential and for all activity that happens under your account. Please don&apos;t share your password with anyone.
               </li>
               <li>
-                If you believe your account has been accessed without your permission, contact us immediately at [Insert Email Address]. We are not responsible for losses caused by unauthorized use of your account that results from you not keeping your credentials secure.
+                If you believe your account has been accessed without your permission, contact us immediately at houseofurvaah@gmail.com. We are not responsible for losses caused by unauthorized use of your account that results from you not keeping your credentials secure.
               </li>
               <li>
                 Any data or connectivity charges from your mobile network or internet provider while using the Platform are your responsibility.
@@ -524,7 +524,7 @@ export const TermsAndConditions = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Email</p>
-                <p className="font-semibold text-neutral-900">[Insert Email Address]</p>
+                <p className="font-semibold text-neutral-900">houseofurvaah@gmail.com</p>
               </div>
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>
@@ -532,7 +532,7 @@ export const TermsAndConditions = () => {
               </div>
               <div className="sm:col-span-2">
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Address</p>
-                <p className="font-semibold text-neutral-900">[Insert Business Address]</p>
+                <p className="font-semibold text-neutral-900">Eastern winds, 1402, E wing, Kurla East, Mumbai 400070</p>
               </div>
             </div>
           </div>
@@ -580,11 +580,11 @@ export const TermsAndConditions = () => {
               </div>
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Email</p>
-                <p className="font-semibold text-neutral-900">[Insert Email Address]</p>
+                <p className="font-semibold text-neutral-900">houseofurvaah@gmail.com</p>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Registered Address</p>
-                <p className="font-semibold text-neutral-900">[Insert Business Address]</p>
+                <p className="font-semibold text-neutral-900">Eastern winds, 1402, E wing, Kurla East, Mumbai 400070</p>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>

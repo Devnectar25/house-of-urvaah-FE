@@ -23,8 +23,8 @@ export const getSupabaseMediaUrl = (path) => {
 
   let cleanPath = path.trim();
 
-  // If already absolute URL or data URL
-  if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://") || cleanPath.startsWith("data:")) {
+  // If already absolute URL, data URL, or local blob preview URL
+  if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://") || cleanPath.startsWith("data:") || cleanPath.startsWith("blob:")) {
     return cleanPath;
   }
 
@@ -51,6 +51,11 @@ export const getSupabaseMediaUrl = (path) => {
   // Handle HOU_desktop aliases
   if (cleanPath.includes("HOU_desktop")) {
     return `${CDN_BASE_URL}/videos/HOU_desktop%20video.mp4.mp4`;
+  }
+
+  // Handle HOU_mobile aliases
+  if (cleanPath.includes("HOU_mobile") || cleanPath.includes("HOU_Desktop_Video_916")) {
+    return `${CDN_BASE_URL}/videos/HOU_Desktop_Video_916.mp4`;
   }
 
   // Normalize "video/" to "videos/" to match Supabase bucket folder

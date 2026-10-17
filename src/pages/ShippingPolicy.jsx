@@ -259,7 +259,7 @@ export const ShippingPolicy = () => {
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>If an order cannot be delivered due to an incorrect, incomplete or unreachable address provided by you, it may be returned to our fulfilment center.</li>
               <li>In such cases, we will contact you to arrange re-shipment. Additional shipping charges may apply for re-shipping orders returned due to incorrect address details provided at checkout.</li>
-              <li>If you need to update your delivery address after placing an order, please contact our support team as soon as possible at [Insert Contact Email] — we&apos;ll try our best to accommodate the change if the order hasn&apos;t already been dispatched, though we cannot guarantee this.</li>
+              <li>If you need to update your delivery address after placing an order, please contact our support team as soon as possible at houseofurvaah@gmail.com — we&apos;ll try our best to accommodate the change if the order hasn&apos;t already been dispatched, though we cannot guarantee this.</li>
             </ul>
           </div>
 
@@ -322,7 +322,7 @@ export const ShippingPolicy = () => {
             </p>
             <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
               <li>We recommend inspecting the outer packaging at the time of delivery, and if it appears significantly damaged or tampered with, you may choose to refuse the delivery.</li>
-              <li>If you&apos;ve already accepted the package and later notice damage, please take clear photographs/videos of the packaging and the product, and reach out to us within [Insert Details, e.g. 48 hours] of delivery at [Insert Contact Email].</li>
+              <li>If you&apos;ve already accepted the package and later notice damage, please take clear photographs/videos of the packaging and the product, and reach out to us within [Insert Details, e.g. 48 hours] of delivery at houseofurvaah@gmail.com.</li>
               <li>Eligible damaged, defective or incorrect-item claims will be addressed through our Returns &amp; Exchanges Policy, which outlines the process for replacement, exchange or refund.</li>
             </ul>
           </div>
@@ -430,7 +430,7 @@ export const ShippingPolicy = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Customer Support</p>
-                <p className="font-semibold text-neutral-900">[Insert Contact Email]</p>
+                <p className="font-semibold text-neutral-900">houseofurvaah@gmail.com</p>
               </div>
               <div>
                 <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Support Hours</p>

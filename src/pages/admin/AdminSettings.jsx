@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS = {
   card_charge_enabled: true,
   card_charge_percentage: 2,
   store_name: 'House of Urvaah',
-  support_email: 'support@houseofurvaah.com',
+  support_email: 'houseofurvaah@gmail.com',
   free_shipping_threshold: 2999,
   currency_symbol: '₹',
   maintenance_mode: false
@@ -66,7 +66,7 @@ export const AdminSettings = () => {
           card_charge_enabled: Boolean(d.card_charge_enabled),
           card_charge_percentage: Number(d.card_charge_percentage) || 2,
           store_name: d.store_name || 'House of Urvaah',
-          support_email: d.support_email || 'support@houseofurvaah.com',
+          support_email: d.support_email || 'houseofurvaah@gmail.com',
           free_shipping_threshold: Number(d.free_shipping_threshold) || 2999,
           currency_symbol: d.currency_symbol || '₹',
           maintenance_mode: Boolean(d.maintenance_mode)
@@ -118,7 +118,7 @@ export const AdminSettings = () => {
           card_charge_enabled: Boolean(d.card_charge_enabled),
           card_charge_percentage: Number(d.card_charge_percentage) || 2,
           store_name: d.store_name || 'House of Urvaah',
-          support_email: d.support_email || 'support@houseofurvaah.com',
+          support_email: d.support_email || 'houseofurvaah@gmail.com',
           free_shipping_threshold: Number(d.free_shipping_threshold) || 2999,
           currency_symbol: d.currency_symbol || '₹',
           maintenance_mode: Boolean(d.maintenance_mode)

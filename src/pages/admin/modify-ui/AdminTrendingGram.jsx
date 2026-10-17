@@ -28,10 +28,90 @@ const InstagramIcon = ({ className = "w-4 h-4" }) => (
     <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
   </svg>
 );
-import { apiClient } from '../../../lib/apiClient';
+import { apiClient, getAdminAuthToken } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { getSupabaseMediaUrl } from '../../../lib/supabase';
 import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
+
+const isVideoMedia = (mediaType, url) => {
+  if (url && typeof url === 'string') {
+    const clean = url.split('?')[0].toLowerCase().trim();
+    if (
+      clean.endsWith('.jpg') ||
+      clean.endsWith('.jpeg') ||
+      clean.endsWith('.png') ||
+      clean.endsWith('.webp') ||
+      clean.endsWith('.gif') ||
+      clean.endsWith('.avif') ||
+      clean.endsWith('.svg')
+    ) {
+      return false;
+    }
+    if (
+      clean.endsWith('.mp4') ||
+      clean.endsWith('.webm') ||
+      clean.endsWith('.mov') ||
+      clean.endsWith('.m4v') ||
+      clean.endsWith('.ogg') ||
+      clean.includes('/videos/') ||
+      clean.includes('/video/')
+    ) {
+      return true;
+    }
+  }
+  return mediaType === 'video';
+};
+
+const DEFAULT_LOOK_PRODUCTS = {
+  1: {
+    product_image: '/assets/Images/Blue01.png',
+    product_name: 'TEAL EMBROIDERED FLORAL CO-ORD SET',
+    product_price: '₹ 10,990',
+    product_id: 'bs-102',
+    product_gallery: [
+      '/assets/Images/Blue01.png',
+      '/assets/Images/Blue02.png',
+      '/assets/Images/Blue03.png',
+      '/assets/Images/Blue04.png'
+    ]
+  },
+  2: {
+    product_image: '/assets/Images/Brown02.png',
+    product_name: 'BROWN FLORAL EMBROIDERED CO-ORD SET',
+    product_price: '₹ 6,999',
+    product_id: 'gram-prod-2',
+    product_gallery: [
+      '/assets/Images/Brown01.png',
+      '/assets/Images/Brown02.png',
+      '/assets/Images/Brown03.png',
+      '/assets/Images/Brown04.png'
+    ]
+  },
+  3: {
+    product_image: '/assets/Images/Peach03.png',
+    product_name: 'Blush Pink Embroidered Floral Co-Ord Set',
+    product_price: '₹ 4,990',
+    product_id: 'bs-104',
+    product_gallery: [
+      '/assets/Images/Peach01.png',
+      '/assets/Images/Peach02.png',
+      '/assets/Images/Peach03.png',
+      '/assets/Images/Peach04.png'
+    ]
+  },
+  4: {
+    product_image: '/assets/Images/Blue01.png',
+    product_name: 'BLUE FLORAL HALTER CO-ORD SET',
+    product_price: '₹ 3,999',
+    product_id: 'gram-prod-3',
+    product_gallery: [
+      '/assets/Images/Blue01.png',
+      '/assets/Images/Blue02.png',
+      '/assets/Images/Blue03.png',
+      '/assets/Images/Blue04.png'
+    ]
+  }
+};
 
 export const AdminTrendingGram = () => {
   const [posts, setPosts] = useState([]);
@@ -161,25 +241,24 @@ export const AdminTrendingGram = () => {
       } catch (_) {}
     }
 
-    const initialProductImage = post.product_image || '/assets/Images/Blue01.png';
-    const initialGallery = postGallery.length > 0 ? postGallery : [
-      initialProductImage,
-      '/assets/Images/Blue02.png',
-      '/assets/Images/Blue03.png',
-      '/assets/Images/Blue04.png'
-    ];
+    const orderIdx = post.display_order || 1;
+    const fallbackLook = DEFAULT_LOOK_PRODUCTS[orderIdx] || DEFAULT_LOOK_PRODUCTS[1];
+
+    const initialProductImage = post.product_image || fallbackLook.product_image;
+    const initialGallery = postGallery.length > 0 ? postGallery : fallbackLook.product_gallery;
+    const detectedType = isVideoMedia(post.media_type, post.image) ? 'video' : 'image';
 
     setFormData({
       title: post.title || 'CORSET DETAIL',
       image: post.image || '',
-      media_type: post.media_type || (post.image?.endsWith('.mp4') ? 'video' : 'image'),
+      media_type: detectedType,
       caption: post.caption || 'STUDIO EDIT • Artisan embroidered structured look',
       post_link: post.post_link || 'https://www.instagram.com/houseofurvaah/',
       is_active: post.is_active ?? true,
       product_image: post.product_image || initialProductImage,
-      product_name: post.product_name || 'TEAL EMBROIDERED FLORAL CO-ORD SET',
-      product_price: post.product_price || '₹ 10,990',
-      product_id: post.product_id || 'bs-102',
+      product_name: post.product_name || fallbackLook.product_name,
+      product_price: post.product_price || fallbackLook.product_price,
+      product_id: post.product_id || fallbackLook.product_id,
       product_gallery: initialGallery
     });
     setSelectedPreviewImg(initialProductImage);
@@ -195,8 +274,8 @@ export const AdminTrendingGram = () => {
     if (!file) return;
 
     setUploadError(null);
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/') || Boolean(file.name.match(/\.(mp4|webm|mov|m4v|ogg)$/i));
+    const isImage = file.type.startsWith('image/') || Boolean(file.name.match(/\.(jpeg|jpg|png|webp|gif|avif)$/i));
 
     if (type === 'video' && !isVideo) {
       setUploadError('Please select a valid video format (MP4, WebM, QuickTime).');
@@ -213,6 +292,14 @@ export const AdminTrendingGram = () => {
       return;
     }
 
+    // Instant local preview for zero-delay UI update
+    const localBlobUrl = URL.createObjectURL(file);
+    setFormData((prev) => ({
+      ...prev,
+      image: localBlobUrl,
+      media_type: isVideo ? 'video' : 'image'
+    }));
+
     setUploadingFile(true);
     try {
       const uploadData = new FormData();
@@ -220,7 +307,7 @@ export const AdminTrendingGram = () => {
       if (!isVideo) uploadData.append('folder', 'trending');
 
       const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
+      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
       const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
 
       const res = await fetch(endpoint, {
@@ -257,7 +344,8 @@ export const AdminTrendingGram = () => {
     if (!file) return;
 
     setProductUploadError(null);
-    if (!file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/') || Boolean(file.name.match(/\.(jpeg|jpg|png|webp|gif|avif)$/i));
+    if (!isImage) {
       setProductUploadError('Please select a valid image format (JPEG, PNG, WebP).');
       return;
     }
@@ -267,6 +355,19 @@ export const AdminTrendingGram = () => {
       return;
     }
 
+    // Instant local preview for zero-delay UI update
+    const localBlobUrl = URL.createObjectURL(file);
+    setFormData((prev) => {
+      const currentGallery = Array.isArray(prev.product_gallery) ? prev.product_gallery : [];
+      return {
+        ...prev,
+        product_image: localBlobUrl,
+        product_gallery: [localBlobUrl, ...currentGallery.filter((img) => img !== prev.product_image)]
+      };
+    });
+    setSelectedPreviewImg(localBlobUrl);
+    setSelectedGalleryIdx(0);
+
     setUploadingProductFile(true);
     try {
       const uploadData = new FormData();
@@ -274,7 +375,7 @@ export const AdminTrendingGram = () => {
       uploadData.append('folder', 'trending');
 
       const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
+      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
       const endpoint = `${API_BASE}/api/upload/upload-image`;
 
       const res = await fetch(endpoint, {
@@ -293,11 +394,12 @@ export const AdminTrendingGram = () => {
 
       setFormData((prev) => {
         const currentGallery = Array.isArray(prev.product_gallery) ? prev.product_gallery : [];
-        const newGallery = currentGallery.includes(uploadedUrl) ? currentGallery : [uploadedUrl, ...currentGallery];
+        const updatedGallery = currentGallery.map((img) => (img === localBlobUrl ? uploadedUrl : img));
+        if (!updatedGallery.includes(uploadedUrl)) updatedGallery.unshift(uploadedUrl);
         return {
           ...prev,
           product_image: uploadedUrl,
-          product_gallery: newGallery
+          product_gallery: updatedGallery
         };
       });
       setSelectedPreviewImg(uploadedUrl);
@@ -363,10 +465,21 @@ export const AdminTrendingGram = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/') || Boolean(file.name.match(/\.(jpeg|jpg|png|webp|gif|avif)$/i));
+    if (!isImage) {
       showToast('error', 'Please select an image file (JPEG, PNG, WebP)');
       return;
     }
+
+    const localBlobUrl = URL.createObjectURL(file);
+    setFormData((prev) => {
+      const currentGallery = Array.isArray(prev.product_gallery) ? prev.product_gallery : [];
+      return {
+        ...prev,
+        product_gallery: [...currentGallery, localBlobUrl]
+      };
+    });
+    setSelectedPreviewImg(localBlobUrl);
 
     setUploadingProductFile(true);
     try {
@@ -375,7 +488,7 @@ export const AdminTrendingGram = () => {
       uploadData.append('folder', 'trending');
 
       const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
+      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
       const endpoint = `${API_BASE}/api/upload/upload-image`;
 
       const res = await fetch(endpoint, {
@@ -390,9 +503,10 @@ export const AdminTrendingGram = () => {
 
       setFormData((prev) => {
         const currentGallery = Array.isArray(prev.product_gallery) ? prev.product_gallery : [];
+        const updated = currentGallery.map((img) => (img === localBlobUrl ? uploadedUrl : img));
         return {
           ...prev,
-          product_gallery: [...currentGallery, uploadedUrl]
+          product_gallery: updated
         };
       });
       setSelectedPreviewImg(uploadedUrl);
@@ -450,6 +564,8 @@ export const AdminTrendingGram = () => {
       }
       setIsModalOpen(false);
       fetchPosts();
+      window.dispatchEvent(new Event('urvaah_trending_gram_updated'));
+      try { localStorage.setItem('urvaah_trending_gram_last_sync', Date.now().toString()); } catch (_) {}
     } catch (err) {
       console.error('Error saving post:', err);
       showToast('error', err.message || 'Failed to save post');
@@ -468,6 +584,8 @@ export const AdminTrendingGram = () => {
       showToast('success', 'Post removed successfully!');
       setDeleteTargetId(null);
       fetchPosts();
+      window.dispatchEvent(new Event('urvaah_trending_gram_updated'));
+      try { localStorage.setItem('urvaah_trending_gram_last_sync', Date.now().toString()); } catch (_) {}
     } catch (err) {
       console.error('Error deleting post:', err);
       showToast('error', err.message || 'Failed to delete post');
@@ -496,6 +614,8 @@ export const AdminTrendingGram = () => {
         body: JSON.stringify({ items })
       });
       showToast('success', 'Posts reordered successfully!');
+      window.dispatchEvent(new Event('urvaah_trending_gram_updated'));
+      try { localStorage.setItem('urvaah_trending_gram_last_sync', Date.now().toString()); } catch (_) {}
     } catch (err) {
       console.error('Reorder error:', err);
       fetchPosts();
@@ -687,15 +807,21 @@ export const AdminTrendingGram = () => {
                   >
                     {isVideo ? (
                       <video
-                        src={post.image}
+                        src={post.image?.startsWith('http') || post.image?.startsWith('/') || post.image?.startsWith('blob:') ? post.image : getSupabaseMediaUrl(post.image)}
                         className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
+                        autoPlay
                         muted
                         loop
+                        playsInline
                       />
                     ) : (
                       <img
-                        src={post.image}
+                        src={post.image?.startsWith('http') || post.image?.startsWith('/') || post.image?.startsWith('blob:') ? post.image : getSupabaseMediaUrl(post.image)}
                         alt={post.title || 'Post'}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = '/assets/Images/Blue01.png';
+                        }}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     )}
@@ -723,8 +849,12 @@ export const AdminTrendingGram = () => {
                     <div className="w-10 h-12 rounded-lg bg-neutral-200 overflow-hidden shrink-0 border border-neutral-200 flex items-center justify-center">
                       {post.product_image ? (
                         <img
-                          src={post.product_image}
+                          src={post.product_image.startsWith('http') || post.product_image.startsWith('/') || post.product_image.startsWith('blob:') ? post.product_image : getSupabaseMediaUrl(post.product_image)}
                           alt={post.product_name || 'Product'}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/assets/Images/Blue01.png';
+                          }}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -823,21 +953,34 @@ export const AdminTrendingGram = () => {
               {/* Media Player */}
               <div className="absolute inset-0 z-0 bg-neutral-950">
                 {formData.image ? (
-                  formData.media_type === 'video' || formData.image.endsWith('.mp4') ? (
+                  isVideoMedia(formData.media_type, formData.image) ? (
                     <video
                       key={formData.image}
-                      src={formData.image.startsWith('http') || formData.image.startsWith('/') ? formData.image : getSupabaseMediaUrl(formData.image)}
+                      src={formData.image.startsWith('blob:') ? formData.image : getSupabaseMediaUrl(formData.image)}
                       autoPlay
                       muted
                       loop
                       playsInline
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.warn('Modal video playback error:', formData.image);
+                        if (formData.image && formData.image.startsWith('/assets/')) {
+                          e.currentTarget.src = formData.image;
+                        }
+                      }}
                     />
                   ) : (
                     <img
-                      src={formData.image.startsWith('http') || formData.image.startsWith('/') ? formData.image : getSupabaseMediaUrl(formData.image)}
+                      key={formData.image}
+                      src={formData.image.startsWith('blob:') ? formData.image : getSupabaseMediaUrl(formData.image)}
                       alt="Reel Media"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = formData.image && formData.image.startsWith('/')
+                          ? formData.image
+                          : '/assets/Images/Blue01.png';
+                      }}
                     />
                   )
                 ) : (
@@ -969,10 +1112,11 @@ export const AdminTrendingGram = () => {
                       value={formData.image}
                       onChange={(e) => {
                         const val = e.target.value;
+                        const detectedType = isVideoMedia(null, val) ? 'video' : 'image';
                         setFormData((prev) => ({
                           ...prev,
                           image: val,
-                          media_type: val.endsWith('.mp4') ? 'video' : prev.media_type
+                          media_type: detectedType
                         }));
                       }}
                       placeholder="/assets/video/video6.mp4"
@@ -1035,7 +1179,12 @@ export const AdminTrendingGram = () => {
                     alt={formData.product_name || 'Product'}
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = selectedPreviewImg || formData.product_image || '/assets/Images/Blue01.png';
+                      const rawFallback = selectedPreviewImg || formData.product_image;
+                      if (rawFallback && typeof rawFallback === 'string' && rawFallback.startsWith('/assets/')) {
+                        e.currentTarget.src = rawFallback;
+                      } else {
+                        e.currentTarget.src = '/assets/Images/Blue01.png';
+                      }
                     }}
                     className="w-full h-full object-contain object-center transition-all duration-300 p-1"
                   />
@@ -1092,8 +1241,17 @@ export const AdminTrendingGram = () => {
                     value={formData.product_image}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setFormData((prev) => ({ ...prev, product_image: val }));
+                      setFormData((prev) => {
+                        const currentGallery = Array.isArray(prev.product_gallery) ? prev.product_gallery : [];
+                        const updatedGallery = currentGallery.length > 0 ? [val, ...currentGallery.slice(1)] : [val];
+                        return {
+                          ...prev,
+                          product_image: val,
+                          product_gallery: updatedGallery
+                        };
+                      });
                       setSelectedPreviewImg(val);
+                      setSelectedGalleryIdx(0);
                     }}
                     placeholder="Or enter image URL (e.g. /assets/Images/Blue01.png)"
                     className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-mono text-neutral-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black transition-all"

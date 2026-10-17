@@ -36,8 +36,8 @@ export const AdminBoutiquesConcierge = () => {
   const [conciergeData, setConciergeData] = useState({
     section_badge: 'CLIENT SERVICES',
     section_title: 'ATELIER CONCIERGE',
-    email: 'concierge@houseofurvaah.com',
-    phone: '+91 22 4900 8800',
+    email: 'houseofurvaah@gmail.com',
+    phone: '+91 98333 25657',
     hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
   });
 
@@ -451,7 +451,7 @@ export const AdminBoutiquesConcierge = () => {
                   required
                   value={conciergeData.email}
                   onChange={(e) => setConciergeData({ ...conciergeData, email: e.target.value })}
-                  placeholder="e.g. concierge@houseofurvaah.com"
+                  placeholder="e.g. houseofurvaah@gmail.com"
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>
@@ -466,7 +466,7 @@ export const AdminBoutiquesConcierge = () => {
                   required
                   value={conciergeData.phone}
                   onChange={(e) => setConciergeData({ ...conciergeData, phone: e.target.value })}
-                  placeholder="e.g. +91 22 4900 8800"
+                  placeholder="e.g. +91 98333 25657"
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>
@@ -533,7 +533,7 @@ export const AdminBoutiquesConcierge = () => {
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CONCIERGE</span>
                     <a href={`mailto:${conciergeData.email}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      {conciergeData.email || 'concierge@houseofurvaah.com'}
+                      {conciergeData.email || 'houseofurvaah@gmail.com'}
                     </a>
                   </div>
                 </div>
@@ -543,7 +543,7 @@ export const AdminBoutiquesConcierge = () => {
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">DIRECT HOTLINE</span>
                     <a href={`tel:${conciergeData.phone}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      {conciergeData.phone || '+91 22 4900 8800'}
+                      {conciergeData.phone || '+91 98333 25657'}
                     </a>
                   </div>
                 </div>
@@ -671,7 +671,9 @@ export const AdminBoutiquesConcierge = () => {
                         </div>
 
                         <p className="text-xs text-neutral-700 leading-relaxed font-sans whitespace-pre-line">
-                          {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
+                          {loc.address ? loc.address
+                            .replace('Eastern winds, 1402, E wing, Kurla East', 'Eastern winds, 1402, E wing,\nKurla East')
+                            .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                         </p>
 
                         {loc.phone && (
@@ -776,7 +778,9 @@ export const AdminBoutiquesConcierge = () => {
                         {loc.name}
                       </h4>
                       <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
-                        {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
+                        {loc.address ? loc.address
+                          .replace('Eastern winds, 1402, E wing, Kurla East', 'Eastern winds, 1402, E wing,\nKurla East')
+                          .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>
                       {loc.phone && (
                         <span className="text-neutral-700 font-medium block mt-1">{loc.phone}</span>
@@ -795,7 +799,7 @@ export const AdminBoutiquesConcierge = () => {
                   Global Footer Sync:
                 </span>
                 <p>
-                  The location marked with <strong>Primary Flagship (Footer)</strong> will automatically appear in the footer under "FLAGSHIP ATELIER".
+                  The location marked with <strong>Primary Flagship (Footer)</strong> will automatically appear in the footer under "VISIT US".
                 </p>
               </div>
             </div>
@@ -850,7 +854,7 @@ export const AdminBoutiquesConcierge = () => {
                   rows={3}
                   value={locationForm.address}
                   onChange={(e) => setLocationForm({ ...locationForm, address: e.target.value })}
-                  placeholder={"e.g. Kala Ghoda Arts District,\nColaba Causeway, Mumbai 400001"}
+                  placeholder={"e.g. Eastern winds, 1402, E wing,\nKurla East, Mumbai 400070"}
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>
@@ -863,7 +867,7 @@ export const AdminBoutiquesConcierge = () => {
                   type="text"
                   value={locationForm.phone}
                   onChange={(e) => setLocationForm({ ...locationForm, phone: e.target.value })}
-                  placeholder="e.g. +91 22 4900 8800"
+                  placeholder="e.g. +91 98333 25657"
                   className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>

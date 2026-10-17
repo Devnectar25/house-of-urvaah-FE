@@ -43,7 +43,7 @@ export const Home = () => {
         <TrendingOnGram />
       </section>
 
-      {/* WHAT'S HOT RN Section */}
+      {/* THE HOT LIST Section */}
       <section id="whats-hot" className="scroll-mt-20">
         <WhatsHot />
       </section>
