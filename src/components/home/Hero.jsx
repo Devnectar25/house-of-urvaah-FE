@@ -4,12 +4,27 @@ import { apiClient } from '../../lib/apiClient';
 
 export const Hero = () => {
   const fallbackVideoSrc = getSupabaseMediaUrl('HOU_desktop');
+  const fallbackMobileVideoSrc = getSupabaseMediaUrl('HOU_mobile');
   const localFallbackSrc = '/assets/video/Hero-section-video-two.mp4';
   const videoRef = useRef(null);
 
   const [heroSlides, setHeroSlides] = useState([]);
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
-  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [activeSlideIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchHeroSlides = async () => {
     try {
@@ -40,21 +55,28 @@ export const Hero = () => {
 
   const activeSlide = heroSlides[activeSlideIndex] || null;
 
-  const currentMediaUrl = activeSlide?.desktop_image
+  const desktopMediaUrl = activeSlide?.desktop_image
     ? getSupabaseMediaUrl(activeSlide.desktop_image)
     : fallbackVideoSrc;
 
-  const isVideo = activeSlide
-    ? activeSlide.media_type === 'video' || (activeSlide.desktop_image && activeSlide.desktop_image.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i))
-    : true;
+  const mobileMediaUrl = activeSlide?.mobile_image
+    ? getSupabaseMediaUrl(activeSlide.mobile_image)
+    : fallbackMobileVideoSrc;
+
+  const currentMediaUrl = isMobile ? mobileMediaUrl : desktopMediaUrl;
+
+  const isVideo = isMobile
+    ? (activeSlide?.mobile_image ? (activeSlide.media_type === 'video' || activeSlide.mobile_image.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i)) : true)
+    : (activeSlide ? (activeSlide.media_type === 'video' || (activeSlide.desktop_image && activeSlide.desktop_image.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i))) : true);
 
   useEffect(() => {
-    setIsVideoLoading(true);
     if (videoRef.current) {
+      videoRef.current.defaultMuted = true;
       videoRef.current.muted = true;
+      videoRef.current.playsInline = true;
       videoRef.current.play().catch(() => {});
     }
-  }, [currentMediaUrl]);
+  }, [currentMediaUrl, isMobile]);
 
   return (
     <section className="relative w-full h-screen overflow-hidden bg-white text-brand-dark font-serif select-none">
@@ -63,22 +85,16 @@ export const Hero = () => {
         {isVideo ? (
           <video
             ref={videoRef}
-            key={currentMediaUrl}
+            key={`${currentMediaUrl}_${isMobile ? 'mobile' : 'desktop'}`}
             autoPlay
             muted
             loop
             playsInline
             preload="auto"
-            onLoadStart={() => setIsVideoLoading(true)}
-            onLoadedData={() => setIsVideoLoading(false)}
-            onCanPlay={() => setIsVideoLoading(false)}
-            onPlaying={() => setIsVideoLoading(false)}
-            onWaiting={() => setIsVideoLoading(true)}
-            onError={() => setIsVideoLoading(false)}
             className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
           >
             <source src={currentMediaUrl} type="video/mp4" />
-            <source src={localFallbackSrc} type="video/mp4" />
+            {!isMobile && <source src={localFallbackSrc} type="video/mp4" />}
           </video>
         ) : (
           <img
@@ -86,19 +102,6 @@ export const Hero = () => {
             alt={activeSlide?.heading || 'Hero Banner'}
             className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
           />
-        )}
-
-        {/* Luxury Video Loader while video buffers/loads */}
-        {isVideo && isVideoLoading && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-xs transition-opacity duration-300 pointer-events-none">
-            <div className="relative flex items-center justify-center">
-              <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-              <div className="absolute w-6 h-6 rounded-full border border-white/40 border-b-transparent animate-spin [animation-direction:reverse]" />
-            </div>
-            <span className="mt-4 text-[11px] tracking-[0.25em] text-white/90 uppercase font-serif">
-              Loading Video...
-            </span>
-          </div>
         )}
 
         {/* Subtle Scrim Gradient at top for header icon legibility */}

@@ -18,7 +18,13 @@ import {
   RotateCcw,
   Play,
   Pause,
-  Clock
+  Clock,
+  Plus,
+  Trash2,
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
@@ -124,20 +130,17 @@ export const AdminFabricVideo = () => {
       if (res && res.success && res.data) {
         const data = res.data;
 
-        // Populate 3 Videos
+        // Populate up to 10 Videos from backend
         if (Array.isArray(data.videos) && data.videos.length > 0) {
           setVideos(
-            DEFAULT_VIDEOS.map((def, idx) => {
-              const incoming = data.videos[idx] || {};
-              return {
-                id: incoming.id || def.id,
-                tag: incoming.tag !== undefined ? incoming.tag : def.tag,
-                title: incoming.title !== undefined ? incoming.title : (incoming.name !== undefined ? incoming.name : def.title),
-                video_url: incoming.video_url !== undefined ? incoming.video_url : (incoming.url !== undefined ? incoming.url : def.video_url),
-                badge: def.badge,
-                slotLabel: def.slotLabel
-              };
-            })
+            data.videos.slice(0, 10).map((incoming, idx) => ({
+              id: incoming.id || `video-${idx + 1}`,
+              tag: incoming.tag !== undefined ? incoming.tag : '',
+              title: incoming.title !== undefined ? incoming.title : (incoming.name !== undefined ? incoming.name : ''),
+              video_url: incoming.video_url !== undefined ? incoming.video_url : (incoming.url !== undefined ? incoming.url : ''),
+              badge: `Card ${idx + 1}`,
+              slotLabel: incoming.title || `Video Card ${idx + 1}`
+            }))
           );
         } else {
           setVideos(DEFAULT_VIDEOS);
@@ -187,18 +190,12 @@ export const AdminFabricVideo = () => {
 
     setUploadingIndex(index);
     try {
-      // Strict 7s video duration validation
+      // Inspect video duration for informative display (no blocking validation)
       try {
         const duration = await getVideoDuration(file);
-        if (duration > 7.5) {
-          const errMsg = `Video duration is ${duration.toFixed(1)}s. Video time must be only 7s only. Please upload a video of 7s or shorter.`;
-          setUploadError(errMsg);
-          showToast('error', `Video is ${duration.toFixed(1)}s. Video time will be only 7s only.`);
-          if (e.target) e.target.value = '';
-          setUploadingIndex(null);
-          return;
+        if (duration) {
+          setVideoDurations((prev) => ({ ...prev, [index]: duration }));
         }
-        setVideoDurations((prev) => ({ ...prev, [index]: duration }));
       } catch (durErr) {
         console.warn('Could not inspect video duration:', durErr);
       }
@@ -240,6 +237,99 @@ export const AdminFabricVideo = () => {
     }
   };
 
+  const previewCarouselRef = useRef(null);
+
+  const scrollPreviewPrev = () => {
+    const el = previewCarouselRef.current;
+    if (!el) return;
+    const card = el.querySelector('[data-preview-card]');
+    const cardWidth = card ? card.offsetWidth : 160;
+    const scrollAmount = cardWidth + 8;
+    if (el.scrollLeft <= 15) {
+      el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const scrollPreviewNext = () => {
+    const el = previewCarouselRef.current;
+    if (!el) return;
+    const card = el.querySelector('[data-preview-card]');
+    const cardWidth = card ? card.offsetWidth : 160;
+    const scrollAmount = cardWidth + 8;
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 20) {
+      el.scrollTo({ left: 0, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const handleAddVideo = () => {
+    if (videos.length >= 10) {
+      showToast('error', 'Maximum limit of 10 videos reached.');
+      return;
+    }
+    const nextNum = videos.length + 1;
+    const newVideo = {
+      id: `video-${Date.now()}-${nextNum}`,
+      tag: `COLLECTION ${nextNum}`,
+      title: `Fabric Showcase ${nextNum}`,
+      video_url: '',
+      badge: `Card ${nextNum}`,
+      slotLabel: `Video Card ${nextNum}`
+    };
+    setVideos((prev) => [...prev, newVideo]);
+    showToast('success', `Added Video Card ${nextNum}. Upload a video or enter a URL.`);
+  };
+
+  const handleRemoveVideo = async (index) => {
+    if (videos.length <= 1) {
+      showToast('error', 'You must keep at least 1 video card.');
+      return;
+    }
+    const cardTitle = videos[index]?.title || `Card ${index + 1}`;
+    const result = await Swal.fire({
+      title: 'Remove Video Card?',
+      text: `Are you sure you want to remove "${cardTitle}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#737373',
+      confirmButtonText: 'Yes, Remove',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'rounded-2xl shadow-2xl font-admin border border-neutral-200',
+        title: 'text-base font-bold text-neutral-900',
+        confirmButton: 'rounded-xl text-xs font-bold uppercase tracking-wider px-5 py-2.5 shadow-sm',
+        cancelButton: 'rounded-xl text-xs font-semibold px-4 py-2.5'
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    setVideos((prev) => prev.filter((_, idx) => idx !== index));
+    setVideoDurations((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+    showToast('success', `Removed video card. Remember to click 'Save All Changes'.`);
+  };
+
+  const handleMoveVideo = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= videos.length) return;
+    setVideos((prev) => {
+      const next = [...prev];
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next;
+    });
+  };
+
   const handleVideoFieldChange = (index, field, value) => {
     setVideos((prev) => {
       const next = [...prev];
@@ -251,7 +341,7 @@ export const AdminFabricVideo = () => {
   const handleResetToDefaults = async () => {
     const confirmResult = await Swal.fire({
       title: 'Reset to Defaults?',
-      text: 'Reset all 3 videos and editorial text to the default curated values?',
+      text: 'Reset all videos and editorial text to the default curated values?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#171717',
@@ -286,16 +376,6 @@ export const AdminFabricVideo = () => {
   const handleSaveConfig = async (e) => {
     if (e) e.preventDefault();
 
-    // Strict 7s video validation check across all 3 videos before saving
-    for (let i = 0; i < videos.length; i++) {
-      const dur = videoDurations[i];
-      if (dur && dur > 7.5) {
-        const errMsg = `Cannot save: Video ${i + 1} (${videos[i].tag || 'Card'}) is ${dur.toFixed(1)}s. Video time must be only 7s only.`;
-        setUploadError(errMsg);
-        showToast('error', errMsg);
-        return;
-      }
-    }
     setSaving(true);
     try {
       const payload = {
@@ -308,11 +388,11 @@ export const AdminFabricVideo = () => {
         secondary_button_link: editorial.secondary_button_link,
         is_active: editorial.is_active,
         video_url: videos[0]?.video_url || '',
-        videos: videos.map((v) => ({
-          id: v.id,
-          tag: v.tag,
-          title: v.title,
-          video_url: v.video_url
+        videos: videos.slice(0, 10).map((v, idx) => ({
+          id: v.id || `video-${idx + 1}`,
+          tag: v.tag || '',
+          title: v.title || '',
+          video_url: v.video_url || ''
         }))
       };
 
@@ -323,7 +403,7 @@ export const AdminFabricVideo = () => {
 
       if (!res?.success) throw new Error(res?.message || 'Update failed');
 
-      showToast('success', 'All 3 Fabric Videos & Editorial settings saved successfully!');
+      showToast('success', `${videos.length} Fabric Videos & Editorial settings saved successfully!`);
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('urvaah_fabric_video_updated'));
@@ -367,12 +447,12 @@ export const AdminFabricVideo = () => {
             <span className="text-xs text-neutral-400">•</span>
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-800 bg-neutral-100 border border-neutral-300 px-2 py-0.5 rounded-md">
               <Film className="w-3 h-3 text-neutral-700" />
-              <span>3-Video Triple Card Carousel</span>
+              <span>Up to 10 Videos Showcase Carousel</span>
             </span>
           </div>
         }
         title="Fabric Video Section"
-        subtitle="Manage the 3 vertical fabric showcase videos (Petal Threadwork, Heritage Weave, Ocean Bloom) and the editorial narrative & buttons."
+        subtitle="Manage up to 10 vertical fabric showcase videos and the editorial narrative & buttons."
         actions={
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
@@ -442,20 +522,50 @@ export const AdminFabricVideo = () => {
                 <h3 className="text-xs font-admin font-bold tracking-wider uppercase text-neutral-900">
                   Live Storefront Visual Preview
                 </h3>
+                <span className="text-[10px] font-mono text-neutral-500 bg-neutral-200/80 px-2 py-0.5 rounded-md">
+                  {videos.length} {videos.length === 1 ? 'Video' : 'Videos'}
+                </span>
               </div>
               <span className="text-[11px] font-medium text-neutral-500">
-                Exact replica of homepage Fabric Video section
+                Exact replica of homepage Fabric Video section (Use arrows to slide)
               </span>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              {/* Left 3 Videos Showcase */}
-              <div className="lg:col-span-8 bg-[#F5F5F0] p-1 sm:p-2 rounded-sm border border-[#EBEBE6]">
-                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+              {/* Left Videos Carousel Preview */}
+              <div className="lg:col-span-8 bg-[#F5F5F0] p-1.5 sm:p-2 rounded-sm border border-[#EBEBE6] relative group/preview overflow-hidden">
+                {/* Preview Navigation Arrows */}
+                {videos.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={scrollPreviewPrev}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                      title="Preview previous video"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-neutral-900" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={scrollPreviewNext}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                      title="Preview next video"
+                    >
+                      <ChevronRight className="w-4 h-4 text-neutral-900" />
+                    </button>
+                  </>
+                )}
+
+                <div
+                  ref={previewCarouselRef}
+                  className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none py-0.5"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
                   {videos.map((vid, idx) => (
                     <div
                       key={vid.id || idx}
-                      className="relative aspect-[9/14] overflow-hidden bg-neutral-900 rounded-sm shadow-xs group"
+                      data-preview-card="true"
+                      className="relative flex-shrink-0 w-[calc(33.333%-6px)] snap-start aspect-[9/14] overflow-hidden bg-neutral-900 rounded-sm shadow-xs group"
                     >
                       {/* Top Tag Badge */}
                       <div className="absolute top-2 left-2 z-20 bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[7px] sm:text-[8px] md:text-[9px] tracking-[0.2em] font-serif uppercase text-neutral-900 shadow-xs pointer-events-none select-none truncate max-w-[85%]">
@@ -512,19 +622,40 @@ export const AdminFabricVideo = () => {
             </div>
           </div>
 
-          {/* EDIT FORM GRID: 3 VIDEO CARDS */}
+          {/* EDIT FORM GRID: UP TO 10 VIDEO CARDS */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-admin font-bold text-neutral-950 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-neutral-700" />
-                <span>3 Editorial Fabric Videos</span>
-              </h3>
-              <span className="text-xs text-neutral-500">
-                Click 'Upload Video' or paste an MP4 URL for each card
-              </span>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xs sm:text-sm font-admin font-bold text-neutral-950 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-neutral-700" />
+                  <span>Fabric Showcase Videos</span>
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-neutral-200 text-neutral-800 text-xs font-bold font-mono">
+                  {videos.length} / 10 Max
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs text-neutral-500 hidden md:inline">
+                  Upload up to 10 showcase videos
+                </span>
+                {videos.length < 10 ? (
+                  <button
+                    type="button"
+                    onClick={handleAddVideo}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Video ({videos.length}/10)</span>
+                  </button>
+                ) : (
+                  <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+                    10/10 Videos (Limit Reached)
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {videos.map((vid, idx) => {
                 const isUploading = uploadingIndex === idx;
 
@@ -534,39 +665,70 @@ export const AdminFabricVideo = () => {
                       className="bg-white border border-neutral-200/90 rounded-2xl shadow-2xs overflow-hidden flex flex-col"
                     >
                       {/* Card Header Bar */}
-                      <div className="p-4 bg-[#F8FAFC] border-b border-neutral-200/80 flex items-center justify-between">
+                      <div className="p-4 bg-[#F8FAFC] border-b border-neutral-200/80 flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-lg bg-neutral-950 text-white text-xs font-bold flex items-center justify-center font-mono">
                             {idx + 1}
                           </span>
                           <div>
                             <span className="text-xs font-bold text-neutral-900 block leading-tight font-admin">
-                              {vid.slotLabel || `Video ${idx + 1}`}
+                              {vid.slotLabel || `Video Card ${idx + 1}`}
                             </span>
                             <span className="text-[10px] text-neutral-500 font-mono">
-                              Card {idx + 1} of 3
+                              Card {idx + 1} of {videos.length}
                             </span>
                           </div>
                         </div>
+
+                        <div className="flex items-center gap-1">
+                          {/* Reorder Buttons */}
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveVideo(idx, -1)}
+                              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 transition-colors cursor-pointer"
+                              title="Move left / earlier in carousel"
+                            >
+                              <ArrowLeft className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {idx < videos.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveVideo(idx, 1)}
+                              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 transition-colors cursor-pointer"
+                              title="Move right / later in carousel"
+                            >
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* Remove Button */}
+                          {videos.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVideo(idx)}
+                              className="p-1.5 hover:bg-rose-100 rounded-lg text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer ml-1"
+                              title="Remove this video card"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Video Duration Status Strip */}
+                      <div className="px-4 py-2 bg-neutral-50/70 border-b border-neutral-100 flex items-center justify-between">
+                        <span className="text-[10px] text-neutral-500 font-medium">Duration:</span>
                         {videoDurations[idx] !== undefined ? (
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
-                              videoDurations[idx] > 7.5
-                                ? 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>
-                              {videoDurations[idx] > 7.5
-                                ? `${videoDurations[idx].toFixed(1)}s (Exceeds 7s)`
-                                : `${videoDurations[idx].toFixed(1)}s • 7s Limit`}
-                            </span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 bg-neutral-100 text-neutral-700 border border-neutral-200">
+                            <Clock className="w-3 h-3 text-neutral-500" />
+                            <span>{videoDurations[idx].toFixed(1)}s</span>
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600 border border-neutral-200 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>Max 7s only</span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-500 border border-neutral-200 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-neutral-400" />
+                            <span>Auto-detected</span>
                           </span>
                         )}
                       </div>
@@ -595,7 +757,7 @@ export const AdminFabricVideo = () => {
                             <div className="text-center text-neutral-500 p-4 space-y-2">
                               <Video className="w-8 h-8 mx-auto text-neutral-500 stroke-[1.5]" />
                               <p className="text-xs font-semibold">No video loaded</p>
-                              <p className="text-[10px] text-neutral-400">Upload MP4 or paste link below (Max 7s)</p>
+                              <p className="text-[10px] text-neutral-400">Upload MP4 or paste link below</p>
                             </div>
                           )}
 
@@ -640,13 +802,13 @@ export const AdminFabricVideo = () => {
                           {/* Video Upload & URL */}
                           <div className="space-y-1.5 pt-2 border-t border-neutral-100">
                             <label className="block text-[11px] font-bold text-neutral-800 uppercase tracking-wider font-admin">
-                              Video Asset File / Link (7s Only)
+                              Video Asset File / Link
                             </label>
                             <div className="flex items-center gap-2">
                               <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-neutral-200 hover:border-neutral-900 rounded-xl cursor-pointer bg-neutral-50/70 hover:bg-neutral-50 transition-all text-neutral-800">
                                 <Upload className="w-3.5 h-3.5 text-neutral-700" />
                                 <span className="text-xs font-semibold">
-                                  {isUploading ? 'Uploading...' : 'Upload MP4 (Max 7s)'}
+                                  {isUploading ? 'Uploading...' : 'Upload MP4'}
                                 </span>
                                 <input
                                   type="file"
@@ -680,18 +842,11 @@ export const AdminFabricVideo = () => {
                             />
 
                             <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5">
-                              <span className="flex items-center gap-1 font-semibold text-neutral-700">
-                                <Clock className="w-3 h-3 text-neutral-500" />
-                                <span>Strict length: 7s only</span>
+                              <span className="flex items-center gap-1 font-medium text-neutral-600">
+                                <Clock className="w-3 h-3 text-neutral-400" />
+                                <span>{videoDurations[idx] !== undefined ? `${videoDurations[idx].toFixed(1)}s` : 'MP4, WebM'}</span>
                               </span>
-                              {videoDurations[idx] > 7.5 ? (
-                                <span className="text-rose-600 font-bold flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" />
-                                  <span>Exceeds 7s limit ({videoDurations[idx].toFixed(1)}s)</span>
-                                </span>
-                              ) : (
-                                <span className="text-neutral-400">MP4, WebM (Max 250MB)</span>
-                              )}
+                              <span className="text-neutral-400">Max 250MB</span>
                             </div>
                           </div>
                         </div>
@@ -805,7 +960,7 @@ export const AdminFabricVideo = () => {
                   Fabric Video Section Editor
                 </span>
                 <span className="text-[11px] text-neutral-400">
-                  All 3 videos and narrative changes sync live to the storefront homepage
+                  All {videos.length} videos and narrative changes sync live to the storefront homepage
                 </span>
               </div>
             </div>
@@ -830,7 +985,7 @@ export const AdminFabricVideo = () => {
                 ) : (
                   <Save className="w-4 h-4 text-neutral-950" />
                 )}
-                <span>Save All 3 Videos & Story</span>
+                <span>Save All {videos.length} Videos & Story</span>
               </button>
             </div>
           </div>

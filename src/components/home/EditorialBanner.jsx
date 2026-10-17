@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../common/Button';
 import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
@@ -62,9 +63,36 @@ export const EditorialBanner = () => {
   const [fabricConfig, setFabricConfig] = useState(null);
 
   const containerRef = useRef(null);
+  const carouselRef = useRef(null);
   const videoRefs = useRef([]);
   const [videoLoaded, setVideoLoaded] = useState({});
   const [videoErrors, setVideoErrors] = useState({});
+
+  const scrollPrev = () => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const card = el.querySelector('[data-video-card]');
+    const cardWidth = card ? card.offsetWidth : 280;
+    const scrollAmount = cardWidth + 10;
+    if (el.scrollLeft <= 15) {
+      el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const scrollNext = () => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const card = el.querySelector('[data-video-card]');
+    const cardWidth = card ? card.offsetWidth : 280;
+    const scrollAmount = cardWidth + 10;
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 25) {
+      el.scrollTo({ left: 0, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   const hasAdminConfiguredRef = useRef(false);
 
@@ -202,14 +230,41 @@ export const EditorialBanner = () => {
             {/* Unified Frame Container blending seamlessly into section background (bg-brand-sand) */}
             <div
               style={{ '--frame-color': 'var(--brand-sand, #F5F5F0)' }}
-              className="relative w-full bg-brand-sand rounded-sm overflow-hidden p-1.5 sm:p-2 border border-brand-sand shadow-none"
+              className="relative w-full bg-brand-sand rounded-sm overflow-hidden p-1.5 sm:p-2 border border-brand-sand shadow-none group/carousel"
             >
-              {/* 3 Videos side by side (horizontal scroll on small mobile, 3-col grid on sm+) */}
-              <div className="flex sm:grid sm:grid-cols-3 gap-2 sm:gap-2.5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory scrollbar-none">
+              {/* Carousel Navigation Arrows */}
+              {videos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={scrollPrev}
+                    aria-label="Previous fabric video"
+                    className="absolute left-2.5 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300/80 flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer opacity-90 hover:opacity-100"
+                  >
+                    <ChevronLeft className="w-5 h-5 stroke-[2] text-neutral-900 -ml-0.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={scrollNext}
+                    aria-label="Next fabric video"
+                    className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300/80 flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer opacity-90 hover:opacity-100"
+                  >
+                    <ChevronRight className="w-5 h-5 stroke-[2] text-neutral-900 -mr-0.5" />
+                  </button>
+                </>
+              )}
+
+              {/* Videos Carousel Container (Slides 1-10 videos smoothly) */}
+              <div
+                ref={carouselRef}
+                className="flex gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none py-0.5"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {videos.map((item, idx) => (
                   <div
-                    key={item.id}
-                    className="relative flex-shrink-0 w-[84vw] sm:w-auto snap-center aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none"
+                    key={item.id || idx}
+                    data-video-card="true"
+                    className="relative flex-shrink-0 w-[80vw] sm:w-[calc(50%-5px)] md:w-[calc(33.333%-7px)] snap-start aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none"
                   >
                     {/* Individual Video Tag */}
                     <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap">
@@ -308,6 +363,13 @@ export const EditorialBanner = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Slide Counter / Hint */}
+              {videos.length > 3 && (
+                <div className="absolute bottom-2.5 right-3 z-20 bg-neutral-950/75 backdrop-blur-md text-white/90 text-[8.5px] font-sans tracking-[0.2em] uppercase px-2.5 py-0.5 rounded-full pointer-events-none select-none shadow-sm">
+                  {videos.length} Fabric Videos &bull; Use Arrows
+                </div>
+              )}
             </div>
           </motion.div>
 

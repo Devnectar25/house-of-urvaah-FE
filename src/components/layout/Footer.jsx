@@ -4,7 +4,8 @@ import {
   ChevronDown,
   ArrowRight,
   Check,
-  Loader2
+  Loader2,
+  MapPin
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { apiClient } from '../../lib/apiClient';
@@ -23,8 +24,8 @@ export const Footer = () => {
   const [newsletterMessage, setNewsletterMessage] = useState('');
 
   const [primaryBoutique, setPrimaryBoutique] = useState(() => cachedPrimaryBoutique || {
-    name: 'House of Urvaah, Kala Ghoda Arts District,',
-    address: 'Colaba Causeway, Mumbai 400001, India'
+    name: 'House of Urvaah',
+    address: 'Mumbai - 400070'
   });
 
   useEffect(() => {
@@ -34,8 +35,8 @@ export const Footer = () => {
         if (isMounted && res?.success && res.data?.primary_location) {
           const prim = res.data.primary_location;
           const formatted = {
-            name: prim.name || 'House of Urvaah, Kala Ghoda Arts District,',
-            address: prim.address || 'Colaba Causeway, Mumbai 400001, India'
+            name: prim.name || 'House of Urvaah',
+            address: prim.address || 'Mumbai - 400070'
           };
           cachedPrimaryBoutique = formatted;
           setPrimaryBoutique(formatted);
@@ -106,26 +107,42 @@ export const Footer = () => {
   return (
     <footer id="footer" className="bg-white text-brand-dark border-t border-neutral-300 pt-8 sm:pt-10 pb-4 sm:pb-6 px-4 sm:px-8 md:px-10 lg:px-12 font-serif w-full">
       <div className="max-w-[1320px] mx-auto">
-        {/* 4-Column Grid Layout: Logo Block (Left) + 3 Link Columns */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-8 xl:gap-10 mb-5 sm:mb-6">
+        {/* 4-Column Balanced Grid Layout: Logo Block (Left) + 3 Link Columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-8 lg:gap-8 xl:gap-12 mb-5 sm:mb-6">
           {/* Column 1: LOGO & ATELIER ADDRESS */}
-          <div className="lg:col-span-4 flex flex-col items-start pr-0 lg:pr-6 pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200" data-allow-guest="true">
-            <Link to="/" data-allow-guest="true">
-              <Logo className="h-12 sm:h-18 md:h-20 lg:h-24" />
-            </Link>
-            <div className="mt-3.5 sm:mt-5 text-neutral-500 text-xs font-sans leading-relaxed tracking-wide text-left">
-              <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-1">
-                FLAGSHIP ATELIER
-              </p>
-              <p>{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
-              <p className="whitespace-pre-line">
-                {primaryBoutique.address ? primaryBoutique.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
-              </p>
+          <div className="flex flex-col items-center sm:items-start pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200" data-allow-guest="true">
+            <div className="inline-flex flex-col items-center text-center">
+              <Link to="/" data-allow-guest="true" className="inline-flex justify-center -mt-4 sm:-mt-6 lg:-mt-8">
+                <Logo className="h-12 sm:h-18 md:h-20 lg:h-24" />
+              </Link>
+              <div className="mt-2 sm:mt-3 text-neutral-500 text-xs font-sans leading-relaxed tracking-wide text-center">
+                <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-1 text-center">
+                  VISIT US
+                </p>
+                <p className="text-center">{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
+                <p className="whitespace-pre-line text-neutral-600 text-center">
+                  {primaryBoutique.address ? primaryBoutique.address
+                    .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai - 400070')
+                    .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : 'Mumbai - 400070'}
+                </p>
+                <div className="pt-2.5 flex justify-center">
+                  <a 
+                    href="https://maps.app.goo.gl/2DLR7CdZKmvpQWVq8"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View on Google Map"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-neutral-300 hover:border-black text-[10px] uppercase tracking-widest font-semibold text-neutral-800 hover:text-black transition-all hover:bg-neutral-50 shadow-2xs group cursor-pointer"
+                  >
+                    <MapPin className="w-3 h-3 text-neutral-500 group-hover:text-black transition-colors" />
+                    <span>View on Google Map</span>
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Column 2: QUICK LINKS */}
-          <div className="lg:col-span-2 border-b sm:border-b-0 border-neutral-200 pb-4 sm:pb-0">
+          <div className="border-b sm:border-b-0 border-neutral-200 pb-4 sm:pb-0">
             <button
               type="button"
               onClick={() => toggleSection('quickLinks')}
@@ -144,7 +161,7 @@ export const Footer = () => {
           </div>
 
           {/* Column 3: POLICIES */}
-          <div className="lg:col-span-3 border-b sm:border-b-0 border-neutral-200 pb-4 sm:pb-0">
+          <div className="border-b sm:border-b-0 border-neutral-200 pb-4 sm:pb-0">
             <button
               type="button"
               onClick={() => toggleSection('policies')}
@@ -162,8 +179,8 @@ export const Footer = () => {
             </ul>
           </div>
 
-          {/* Column 4: CONNECT & LOCATION */}
-          <div className="lg:col-span-3 sm:relative sm:-left-[50px]">
+          {/* Column 4: CONNECT & NEWSLETTER */}
+          <div className="pb-4 sm:pb-0">
             <button
               type="button"
               onClick={() => toggleSection('connect')}
@@ -186,7 +203,7 @@ export const Footer = () => {
                   </svg>
                 </a>
                 <a 
-                  href="https://facebook.com/houseofurvaah" 
+                  href="https://www.facebook.com/profile.php?id=61590208292411" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   aria-label="Facebook" 
@@ -197,7 +214,7 @@ export const Footer = () => {
                   </svg>
                 </a>
                 <a 
-                  href="https://pinterest.com/houseofurvaah" 
+                  href="https://in.pinterest.com/houseofurvaah/?actingBusinessId=1146518155045603369" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   aria-label="Pinterest" 
@@ -207,7 +224,17 @@ export const Footer = () => {
                     <path d="M12 0C5.373 0 0 5.372 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738.098.119.112.224.083.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.627 0 12-5.373 12-12C24 5.372 18.627 0 12 0z"/>
                   </svg>
                 </a>
-
+                <a 
+                  href="https://x.com/Houseofurvaah" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  aria-label="X (Twitter)" 
+                  className="hover:text-black hover:bg-neutral-200 transition-colors p-2.5 min-w-[44px] min-h-[44px] bg-neutral-100 rounded-full flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </a>
               </div>
 
               {/* Newsletter Subscription */}

@@ -6,6 +6,36 @@ import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 
+const isVideoMedia = (mediaType, url) => {
+  if (url && typeof url === 'string') {
+    const clean = url.split('?')[0].toLowerCase().trim();
+    if (
+      clean.endsWith('.jpg') ||
+      clean.endsWith('.jpeg') ||
+      clean.endsWith('.png') ||
+      clean.endsWith('.webp') ||
+      clean.endsWith('.gif') ||
+      clean.endsWith('.avif') ||
+      clean.endsWith('.svg')
+    ) {
+      return false;
+    }
+    if (
+      clean.endsWith('.mp4') ||
+      clean.endsWith('.webm') ||
+      clean.endsWith('.mov') ||
+      clean.endsWith('.m4v') ||
+      clean.endsWith('.ogg') ||
+      clean.includes('/videos/') ||
+      clean.includes('/video/')
+    ) {
+      return true;
+    }
+  }
+  return mediaType === 'video';
+};
+
+
 const GRAM_VIDEOS = [
   {
     id: 'gram-1',
@@ -250,16 +280,39 @@ const InstagramIcon = () => (
   </svg>
 );
 
-const VideoCard = ({ item, onOpenLook }) => {
+const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEnded }) => {
   const videoRef = useRef(null);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoError, setVideoError] = useState(false);
+  const isVideo = !videoError && isVideoMedia(item.media_type, item.src);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.defaultMuted = true;
-      videoRef.current.play().catch(() => { });
+    if (!videoRef.current || !isVideo) return;
+    const vid = videoRef.current;
+    if (isMobile) {
+      if (isActive && isSectionInView) {
+        vid.muted = true;
+        vid.defaultMuted = true;
+        vid.playsInline = true;
+        vid.play().catch(() => {});
+      } else {
+        vid.pause();
+        if (!isActive) {
+          vid.currentTime = 0;
+          setVideoProgress(0);
+        }
+      }
+    } else {
+      if (isSectionInView) {
+        vid.muted = true;
+        vid.defaultMuted = true;
+        vid.playsInline = true;
+        vid.play().catch(() => {});
+      } else {
+        vid.pause();
+      }
     }
-  }, []);
+  }, [isActive, isMobile, isVideo, isSectionInView]);
 
   const handleVideoClick = () => {
     window.open('https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
@@ -270,21 +323,23 @@ const VideoCard = ({ item, onOpenLook }) => {
     onOpenLook();
   };
 
-  const isVideo =
-    item.media_type === 'video' ||
-    (typeof item.src === 'string' &&
-      (item.src.endsWith('.mp4') ||
-        item.src.endsWith('.webm') ||
-        item.src.includes('/videos/') ||
-        item.src.includes('.mp4?')));
-
   return (
     <div
       onClick={handleVideoClick}
       className="group relative w-full aspect-[9/16] rounded-xl overflow-hidden bg-neutral-900 select-none transition-all duration-300 cursor-pointer hover:shadow-xl"
       title="Click video to view on Instagram"
     >
-      {/* Autoplaying Loop Video or High-Res Image */}
+      {/* Mobile Top Progress Bar for Active Reel */}
+      {isMobile && isVideo && isActive && (
+        <div className="absolute top-0 inset-x-0 h-1 bg-white/20 z-20 overflow-hidden">
+          <div
+            className="h-full bg-white transition-all duration-100 ease-linear"
+            style={{ width: `${videoProgress}%` }}
+          />
+        </div>
+      )}
+
+      {/* Controlled Video or High-Res Image */}
       {isVideo ? (
         <video
           ref={(el) => {
@@ -295,10 +350,24 @@ const VideoCard = ({ item, onOpenLook }) => {
             }
           }}
           src={item.src}
-          autoPlay
           muted
-          loop
+          loop={!isMobile}
           playsInline
+          onError={() => setVideoError(true)}
+          onTimeUpdate={(e) => {
+            if (isMobile && isActive) {
+              const vid = e.currentTarget;
+              if (vid.duration) {
+                setVideoProgress((vid.currentTime / vid.duration) * 100);
+              }
+            }
+          }}
+          onEnded={() => {
+            if (isMobile && isSectionInView && onEnded) {
+              setVideoProgress(100);
+              onEnded();
+            }
+          }}
           onPlay={(e) => {
             if (e.currentTarget) {
               e.currentTarget.muted = true;
@@ -315,6 +384,10 @@ const VideoCard = ({ item, onOpenLook }) => {
         <img
           src={item.src}
           alt={item.title || 'Trending Look'}
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/assets/Images/Blue01.png';
+          }}
           className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
         />
       )}
@@ -378,6 +451,23 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onPrev, onNext]);
 
+  // Lock background body scroll while modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    document.body.style.overflow = 'hidden';
+    if (scrollBarWidth > 0) {
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, []);
+
   const handleThumbnailClick = (img, index) => {
     setSelectedImage(img);
     setSelectedImgIndex(index);
@@ -426,7 +516,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 select-none overflow-hidden">
       {/* Darkened Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -478,38 +568,54 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
         onClick={(e) => e.stopPropagation()}
         className="relative z-40 w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-200/60 max-h-[92vh] md:h-[640px]"
       >
-        {/* Left Side: Vertical Fashion Video (Redirects to Instagram on click) */}
+        {/* Left Side: Vertical Fashion Video or Photo (Redirects to Instagram on click) */}
         <div
           onClick={handleInstagramRedirect}
           className="relative w-full md:w-[48%] h-[320px] sm:h-[400px] md:h-full bg-neutral-950 flex-shrink-0 overflow-hidden cursor-pointer group"
-          title="Click video to view on Instagram"
+          title="Click to view on Instagram"
         >
-          <video
-            ref={(el) => {
-              modalVideoRef.current = el;
-              if (el) {
-                el.muted = true;
-                el.defaultMuted = true;
-              }
-            }}
-            key={look.src}
-            src={look.src}
-            autoPlay
-            muted
-            loop
-            playsInline
-            onPlay={(e) => {
-              if (e.currentTarget) {
-                e.currentTarget.muted = true;
-              }
-            }}
-            onLoadedMetadata={(e) => {
-              if (e.currentTarget) {
-                e.currentTarget.muted = true;
-              }
-            }}
-            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-          />
+          {isVideoMedia(look.media_type, look.src) ? (
+            <video
+              ref={(el) => {
+                modalVideoRef.current = el;
+                if (el) {
+                  el.muted = true;
+                  el.defaultMuted = true;
+                }
+              }}
+              key={look.src}
+              src={look.src}
+              autoPlay
+              muted
+              loop
+              playsInline
+              onError={(e) => {
+                console.warn('Modal video playback error:', look.src);
+              }}
+              onPlay={(e) => {
+                if (e.currentTarget) {
+                  e.currentTarget.muted = true;
+                }
+              }}
+              onLoadedMetadata={(e) => {
+                if (e.currentTarget) {
+                  e.currentTarget.muted = true;
+                }
+              }}
+              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+            />
+          ) : (
+            <img
+              key={look.src}
+              src={look.src}
+              alt={look.title || 'Look'}
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = '/assets/Images/Blue01.png';
+              }}
+              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+            />
+          )}
 
           {/* Reel Tag Badge */}
           <div className="absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/70 transition-colors">
@@ -543,7 +649,10 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
         {/* Right Side: Product Details & Shoppable Panel (Scrollable) */}
         <div className="w-full md:w-[52%] flex flex-col h-full overflow-hidden bg-white text-neutral-900 font-sans">
           {/* Scrollable Content Area */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 md:p-7 space-y-4">
+          <div 
+            className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-5 sm:p-6 md:p-7 space-y-4"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {/* Main Product Image Viewer with Carousel Controls */}
             <div className="relative w-full h-[230px] sm:h-[260px] md:h-[280px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
               <img
@@ -727,6 +836,7 @@ export const TrendingOnGram = () => {
           return {
             id: item.id ? `gram-${item.id}` : fallback.id,
             src: finalSrc,
+            media_type: isVideoMedia(item.media_type, finalSrc) ? 'video' : 'image',
             title: (item.title || fallback.title).toUpperCase(),
             category: item.caption ? item.caption.split('•')[0].trim() : fallback.category,
             handle: '@houseofurvaah',
@@ -756,6 +866,99 @@ export const TrendingOnGram = () => {
       clearInterval(interval);
     };
   }, []);
+
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const carouselRef = useRef(null);
+  const sectionRef = useRef(null);
+  const [isSectionInView, setIsSectionInView] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Track whether the TrendingOnGram section is visible on screen
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setIsSectionInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setIsSectionInView(Boolean(entry && entry.isIntersecting));
+      },
+      {
+        threshold: 0.15,
+      }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const scrollToCard = (nextIndex) => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const cards = container.children;
+    if (cards && cards[nextIndex]) {
+      const card = cards[nextIndex];
+      const targetLeft = card.offsetLeft - (container.offsetWidth - card.offsetWidth) / 2;
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        behavior: 'smooth'
+      });
+      setActiveVideoIndex(nextIndex);
+    }
+  };
+
+  const handleVideoEnded = (idx) => {
+    // Only auto-advance if mobile, more than 1 post, and user is ACTUALLY viewing this section!
+    if (!isMobile || gramPosts.length <= 1 || !isSectionInView) return;
+    const nextIdx = (idx + 1) % gramPosts.length;
+    scrollToCard(nextIdx);
+  };
+
+  const handleCarouselScroll = () => {
+    if (!carouselRef.current || !isMobile) return;
+    const container = carouselRef.current;
+    const scrollLeft = container.scrollLeft;
+    const containerWidth = container.offsetWidth;
+    const cards = container.children;
+    if (!cards || cards.length === 0) return;
+
+    let closestIdx = 0;
+    let minDistance = Infinity;
+    const containerCenter = scrollLeft + containerWidth / 2;
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+      const distance = Math.abs(containerCenter - cardCenter);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIdx = i;
+      }
+    }
+
+    if (closestIdx !== activeVideoIndex) {
+      setActiveVideoIndex(closestIdx);
+    }
+  };
 
   const handleOpenModal = (index) => {
     setActiveModalIndex(index);
@@ -793,7 +996,7 @@ export const TrendingOnGram = () => {
   };
 
   return (
-    <section className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
+    <section ref={sectionRef} className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching BestSellers typography and left alignment */}
       <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7 text-left">
         <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 font-serif block mb-1">
@@ -806,10 +1009,14 @@ export const TrendingOnGram = () => {
       </div>
 
       {/* Responsive Video Cards:
-          - Desktop (lg): Dynamic column grid (e.g. 4 columns for 4 videos) spanning the full container width
-          - Mobile / Tablet (< lg): Smooth horizontal scroll carousel showing 1-2 cards at a time
+          - Desktop (lg): Dynamic column grid spanning full container width
+          - Mobile / Tablet (< lg): Full/focused card covering the mobile view with auto-advance on finish
       */}
-      <div className={`w-full flex lg:grid ${getGridColsClass(gramPosts.length)} gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none`}>
+      <div
+        ref={carouselRef}
+        onScroll={handleCarouselScroll}
+        className={`w-full flex lg:grid ${getGridColsClass(gramPosts.length)} gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none`}
+      >
         {gramPosts.map((item, idx) => (
           <motion.div
             key={item.id}
@@ -817,15 +1024,36 @@ export const TrendingOnGram = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
-            className="snap-center flex-shrink-0 w-[72vw] sm:w-[46vw] md:w-[36vw] lg:w-full"
+            className="snap-center flex-shrink-0 w-[88vw] sm:w-[48vw] md:w-[38vw] lg:w-full"
           >
             <VideoCard
               item={item}
+              isActive={idx === activeVideoIndex}
+              isMobile={isMobile}
+              isSectionInView={isSectionInView}
               onOpenLook={() => handleOpenModal(idx)}
+              onEnded={() => handleVideoEnded(idx)}
             />
           </motion.div>
         ))}
       </div>
+
+      {/* Mobile / Tablet Carousel Dot Indicators */}
+      {isMobile && gramPosts.length > 1 && (
+        <div className="flex justify-center items-center gap-1.5 mt-5 mb-2">
+          {gramPosts.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => scrollToCard(idx)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                idx === activeVideoIndex ? 'w-6 bg-neutral-900' : 'w-1.5 bg-neutral-300'
+              }`}
+              aria-label={`Go to look ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Shop The Look Modal */}
       <AnimatePresence>

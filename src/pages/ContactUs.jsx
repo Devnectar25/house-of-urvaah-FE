@@ -175,8 +175,8 @@ export const ContactUs = () => {
     concierge: {
       section_badge: 'CLIENT SERVICES',
       section_title: 'ATELIER CONCIERGE',
-      email: 'concierge@houseofurvaah.com',
-      phone: '+91 22 4900 8800',
+      email: 'houseofurvaah@gmail.com',
+      phone: '+91 98333 25657',
       hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
     },
     boutiques: {
@@ -185,16 +185,16 @@ export const ContactUs = () => {
       locations: [
         {
           id: 1,
-          name: 'MUMBAI FLAGSHIP & STYLING SALON',
-          address: 'Kala Ghoda Arts District,\nColaba Causeway, Mumbai 400001',
-          phone: '+91 22 4900 8800',
+          name: 'House of Urvaah',
+          address: 'Mumbai - 400070',
+          phone: '+91 98333 25657',
           is_active: true
         },
         {
           id: 2,
           name: 'NEW DELHI CONCIERGE & SHOWROOM',
           address: 'Mehrauli Heritage District,\nStyle Mile, New Delhi 110030',
-          phone: '+91 11 4800 7700',
+          phone: '+91 98333 25657',
           is_active: true
         }
       ]
@@ -581,8 +581,8 @@ export const ContactUs = () => {
                   <Mail className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CONCIERGE</span>
-                    <a href={`mailto:${contactInfo.concierge?.email || 'concierge@houseofurvaah.com'}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      {contactInfo.concierge?.email || 'concierge@houseofurvaah.com'}
+                    <a href={`mailto:${contactInfo.concierge?.email || 'houseofurvaah@gmail.com'}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
+                      {contactInfo.concierge?.email || 'houseofurvaah@gmail.com'}
                     </a>
                   </div>
                 </div>
@@ -591,8 +591,8 @@ export const ContactUs = () => {
                   <Phone className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
                     <span className="block font-semibold uppercase text-neutral-900 tracking-wider">DIRECT HOTLINE</span>
-                    <a href={`tel:${(contactInfo.concierge?.phone || '+91 22 4900 8800').replace(/\s+/g, '')}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
-                      {contactInfo.concierge?.phone || '+91 22 4900 8800'}
+                    <a href={`tel:${(contactInfo.concierge?.phone || '+91 98333 25657').replace(/\s+/g, '')}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
+                      {contactInfo.concierge?.phone || '+91 98333 25657'}
                     </a>
                   </div>
                 </div>
@@ -627,7 +627,10 @@ export const ContactUs = () => {
                         {loc.name}
                       </h4>
                       <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
-                        {loc.address ? loc.address.replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
+                        {loc.address ? loc.address
+                          .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai - 400070')
+                          .replace('Eastern winds, 1402, E wing, Kurla East', 'Eastern winds, 1402, E wing,\nKurla East')
+                          .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>
                       {loc.phone && (
                         <span className="text-neutral-700 font-medium block mt-1">{loc.phone}</span>

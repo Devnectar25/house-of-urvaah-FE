@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { checkItemStockStatus } from '../../utils/stockValidator';
 
 export const CartDrawer = () => {
   const navigate = useNavigate();
@@ -56,8 +57,18 @@ export const CartDrawer = () => {
     };
   }, []);
 
+  const allItemsOutOfStock = cart.length > 0 && cart.every(item => checkItemStockStatus(item).isOutOfStock);
+
   const handleProceedToCheckout = () => {
     if (isProceeding) return;
+    if (allItemsOutOfStock) {
+      setFeedbackMsg('Your bag contains out-of-stock items. Please remove them to proceed.');
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => {
+        setFeedbackMsg('');
+      }, 4000);
+      return;
+    }
     setIsProceeding(true);
 
     setTimeout(() => {
@@ -219,9 +230,16 @@ export const CartDrawer = () => {
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex justify-between items-start gap-2">
-                          <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 line-clamp-1">
-                            {item.product.name}
-                          </h4>
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 line-clamp-1">
+                              {item.product.name}
+                            </h4>
+                            {checkItemStockStatus(item).isOutOfStock && (
+                              <span className="px-1.5 py-0.5 text-[8px] font-bold tracking-wider uppercase bg-rose-100 text-rose-700 rounded border border-rose-200 shrink-0">
+                                OUT OF STOCK
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 shrink-0">
                             {/* Move to Wishlist button */}
                             <button
@@ -264,23 +282,27 @@ export const CartDrawer = () => {
 
                       {/* Quantity selector */}
                       {(() => {
-                        const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
-                        let sizeSpecificStock = null;
-                        if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
-                          const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(item.selectedSize).trim().toUpperCase());
-                          if (matchKey !== undefined) {
-                            sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
-                          }
-                        }
+                        const stockStatus = checkItemStockStatus(item);
+                        const isOutOfStock = stockStatus.isOutOfStock;
+                        const maxStock = stockStatus.availableStock;
+                        const isMaxStockReached = isOutOfStock || item.quantity >= maxStock;
 
-                        const maxStock = sizeSpecificStock !== null
-                          ? sizeSpecificStock
-                          : Number(
-                              item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
-                                ? item.product.stockQuantity
-                                : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
-                            );
-                        const isMaxStockReached = item.quantity >= maxStock;
+                        if (isOutOfStock) {
+                          return (
+                            <div className="flex items-center justify-between mt-3 pt-2 border-t border-rose-100">
+                              <span className="text-[10px] text-rose-700 font-semibold tracking-tight bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                {stockStatus.reason || 'Out of stock'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeFromCart(item.product.id, item.selectedSize)}
+                                className="text-[10px] text-neutral-400 hover:text-rose-600 transition-colors uppercase font-sans font-bold tracking-wider cursor-pointer"
+                              >
+                                REMOVE
+                              </button>
+                            </div>
+                          );
+                        }
 
                         return (
                           <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-100">
@@ -331,8 +353,8 @@ export const CartDrawer = () => {
                         );
                       })()}
 
-                      {/* Buy only this item quick action if multiple items in cart */}
-                      {cart.length > 1 && (
+                      {/* Buy only this item quick action if multiple items in cart and item is in stock */}
+                      {cart.length > 1 && !checkItemStockStatus(item).isOutOfStock && (
                         <div className="mt-2.5 pt-1.5 border-t border-neutral-100 flex items-center justify-end">
                           <button
                             type="button"
@@ -368,7 +390,7 @@ export const CartDrawer = () => {
                 <Button
                   fullWidth
                   variant="primary"
-                  disabled={isProceeding}
+                  disabled={isProceeding || allItemsOutOfStock}
                   className="group flex items-center justify-center gap-2.5 py-4 bg-[#111111] hover:bg-neutral-800 disabled:bg-neutral-700 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
                   onClick={handleProceedToCheckout}
                 >
@@ -377,6 +399,8 @@ export const CartDrawer = () => {
                       <Loader2 className="w-4 h-4 animate-spin text-white flex-shrink-0" />
                       <span>REDIRECTING TO CHECKOUT...</span>
                     </>
+                  ) : allItemsOutOfStock ? (
+                    <span>OUT OF STOCK — UPDATE BAG</span>
                   ) : (
                     <>
                       <span>PROCEED TO CHECKOUT</span>

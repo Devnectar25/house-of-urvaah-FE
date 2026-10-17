@@ -11,7 +11,9 @@ import {
   Flame,
   ExternalLink,
   MessageSquare,
-  Layers
+  Layers,
+  Film,
+  Play
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
@@ -80,7 +82,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     colors: ['Default'],
     specifications: [],
     careInstructions: '',
-    images: []
+    images: [],
+    video_url: ''
   });
 
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -88,19 +91,22 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const [fetchingDetail, setFetchingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
   // Delete confirmation step state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Size & Color input buffers for tag creation
+  // Size, Color, Image & Video input buffers
   const [sizeInput, setSizeInput] = useState('');
   const [sizeError, setSizeError] = useState(null);
   const [colorInput, setColorInput] = useState('');
   const [colorError, setColorError] = useState(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+  const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
 
   // Fetch available categories
   useEffect(() => {
@@ -232,7 +238,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           careInstructions: data.careInstructions || data.care_instructions || '',
           images: Array.isArray(data.images) && data.images.length > 0
             ? data.images
-            : (data.image ? [data.image] : [])
+            : (data.image ? [data.image] : []),
+          video_url: data.video_url || data.videoUrl || data.video || product?.video_url || product?.videoUrl || ''
         });
       } catch (err) {
         console.warn('Falling back to list row product data:', err);
@@ -299,7 +306,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           colors: Array.isArray(product.colors) ? (filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
-          images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : [])
+          images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : []),
+          video_url: product?.video_url || product?.videoUrl || product?.video || ''
         });
       } finally {
         setFetchingDetail(false);
@@ -653,6 +661,75 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     });
   };
 
+  // Video Upload Handlers (Only 1 video allowed)
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      setSubmitError('Please select a valid video file (e.g. MP4, WebM, MOV).');
+      return;
+    }
+
+    setUploadingVideo(true);
+    setSubmitError(null);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append('video', file);
+      uploadData.append('folderName', 'products/videos');
+
+      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+      const token = localStorage.getItem('urvaah_token');
+
+      const res = await fetch(`${API_BASE}/api/upload/upload-video`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: uploadData
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Video upload failed');
+      }
+
+      const uploadedUrl = data.url || data.data?.url || data.filePath;
+      if (uploadedUrl) {
+        setFormData(prev => ({ ...prev, video_url: uploadedUrl }));
+        setSubmitError(null);
+      } else {
+        throw new Error('No video URL returned from server.');
+      }
+    } catch (err) {
+      console.error('Video upload failed:', err);
+      setSubmitError(err.message || 'Video upload failed. Please try again or provide a direct video URL.');
+    } finally {
+      setUploadingVideo(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAddVideoUrl = () => {
+    const url = videoUrlInput.trim();
+    if (!url) return;
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      setSubmitError('Blob or Data URLs cannot be saved. Please enter a valid HTTP/HTTPS video URL.');
+      return;
+    }
+    if (!/^https?:\/\/.+/i.test(url)) {
+      setSubmitError('Please enter a valid HTTP/HTTPS video URL.');
+      return;
+    }
+    setFormData(prev => ({ ...prev, video_url: url }));
+    setVideoUrlInput('');
+    setShowVideoUrlInput(false);
+    setSubmitError(null);
+  };
+
+  const handleRemoveVideo = () => {
+    setFormData(prev => ({ ...prev, video_url: '' }));
+  };
+
   // Submit / Update Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -753,7 +830,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         careInstructions: formData.careInstructions,
         care_instructions: formData.careInstructions,
         images: formData.images,
-        image: formData.images[0] || ''
+        image: formData.images[0] || '',
+        video_url: formData.video_url || '',
+        videoUrl: formData.video_url || ''
       };
 
       const res = await apiClient(`/api/products/${product.id}`, {
@@ -1968,6 +2047,104 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 12. Product Video (Single Video) */}
+              <div className="space-y-3 pt-3 border-t border-neutral-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                      Product Video (Optional)
+                    </label>
+                    <p className="text-[11px] text-neutral-400">
+                      Upload 1 product showcase video. It will appear at the end of the image gallery.
+                    </p>
+                  </div>
+                  <span className={`text-xs font-mono font-medium ${formData.video_url ? 'text-emerald-600 font-semibold' : 'text-neutral-500'}`}>
+                    {formData.video_url ? '1 / 1 uploaded' : '0 / 1 selected'}
+                  </span>
+                </div>
+
+                {formData.video_url ? (
+                  <div className="relative w-full max-w-sm rounded-xl overflow-hidden border border-neutral-300 bg-black shadow-xs group">
+                    <video
+                      src={formData.video_url}
+                      controls
+                      playsInline
+                      className="w-full max-h-56 object-contain bg-black"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveVideo}
+                      className="absolute top-2 right-2 p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-md transition-all cursor-pointer"
+                      title="Remove video"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-sm">
+                    <label className="h-28 border-2 border-dashed border-neutral-300 hover:border-brand-dark rounded-xl flex flex-col items-center justify-center cursor-pointer bg-neutral-50 hover:bg-neutral-100/60 transition-all p-3 text-center">
+                      {uploadingVideo ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-brand-dark" />
+                      ) : (
+                        <>
+                          <Film className="w-6 h-6 text-neutral-400 mb-1.5" />
+                          <span className="text-[11px] font-semibold text-neutral-700 uppercase tracking-wide">
+                            + Upload Product Video
+                          </span>
+                          <span className="text-[10px] text-neutral-400 mt-0.5">
+                            MP4, WebM or MOV (Max 1 video)
+                          </span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleVideoUpload}
+                        disabled={uploadingVideo}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <div className="pt-2">
+                      {!showVideoUrlInput ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowVideoUrlInput(true)}
+                          className="text-[11px] font-semibold text-neutral-500 hover:text-brand-dark no-underline hover:no-underline transition-colors cursor-pointer"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          + Or add video via direct URL
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="url"
+                            value={videoUrlInput}
+                            onChange={(e) => setVideoUrlInput(e.target.value)}
+                            placeholder="https://example.com/product-video.mp4"
+                            className="flex-1 px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddVideoUrl}
+                            className="px-3 py-1.5 bg-brand-dark text-white text-xs font-semibold rounded-lg"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowVideoUrlInput(false)}
+                            className="text-xs text-neutral-400 hover:text-neutral-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           )}

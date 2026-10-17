@@ -118,6 +118,16 @@ export const Account = () => {
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
+  useEffect(() => {
+    if (toastMsg) {
+      const timer = setTimeout(() => {
+        setToastMsg(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMsg]);
+
+
   const handleCancelOrderInAccount = (ord) => {
     setCancelModalOrder(ord);
     setSelectedCancelItems([]);
@@ -1518,11 +1528,11 @@ export const Account = () => {
       <AnimatePresence>
         {toastMsg && (
           <motion.div
-            initial={{ opacity: 0, y: -24, scale: 0.96 }}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -24, scale: 0.96 }}
+            exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className={`fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-[100] max-w-lg w-[92%] sm:w-auto px-5 py-3.5 shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
+            className={`fixed bottom-6 right-6 z-[100] max-w-sm sm:max-w-md w-[calc(100%-3rem)] sm:w-auto px-5 py-3.5 rounded-xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 font-sans border text-white ${
               toastMsg.type === 'error'
                 ? 'bg-neutral-950/95 border-rose-900/60 shadow-rose-950/30'
                 : 'bg-neutral-950/95 border-emerald-900/60 shadow-emerald-950/30'
