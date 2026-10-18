@@ -22,13 +22,19 @@ import {
   Zap,
   Check,
   XCircle,
-  Calendar
+  Calendar,
+  Building,
+  PackagePlus,
+  Sparkles,
+  Banknote
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
+import { ShippingLabelModal } from './ShippingLabelModal';
+import { PickupManifestModal } from './PickupManifestModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Status options matching House of Urvaah lifecycle and policy values
@@ -45,9 +51,11 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Cancellation Requested', label: 'Cancellation Requested' },
   { value: 'Cancelled', label: 'Cancelled' },
   { value: 'Return Requested', label: 'Return Requested' },
-  { value: 'Return Approved', label: 'Return Approved' },
-  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
-  { value: 'Returned', label: 'Returned' },
+  { value: 'Return Approved', label: 'Return Approved (Pickup Scheduled)' },
+  { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah (Return In Transit)' },
+  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah (Atelier Restocked)' },
+  { value: 'Returned', label: 'Returned (Refund Completed)' },
+  { value: 'Return Rejected', label: 'Return Rejected' },
   { value: 'Replacement Request Processing', label: 'Replacement Request Processing' },
   { value: 'Replace Approved', label: 'Replace Approved' },
   { value: 'Replacement Processing', label: 'Replacement Processing' },
@@ -64,6 +72,17 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: 'Failed', label: 'Failed' },
   { value: 'Refunded', label: 'Refunded' }
 ];
+
+const getRequestedReplacementSize = (ord) => {
+  if (!ord) return 'M';
+  if (ord.replacement_size) return ord.replacement_size;
+  const combined = `${ord.cancel_reason || ''} ${ord.return_reason || ''}`;
+  const match = combined.match(/Preferred Size:\s*([A-Za-z0-9]+)/i) || 
+                combined.match(/Size:\s*([A-Za-z0-9]+)/i);
+  if (match && match[1]) return match[1].trim();
+  if (ord.items && ord.items[0] && ord.items[0].size) return ord.items[0].size;
+  return 'M';
+};
 
 export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false }) => {
   // Lock background scrolling on body and admin container when modal is open
@@ -83,6 +102,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
+  const [customReplacementSize, setCustomReplacementSize] = useState('M');
 
   // Logistics & Shiprocket Testing Suite State
   const [logisticsLoading, setLogisticsLoading] = useState(false);
@@ -107,6 +129,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       if (!data) throw new Error('Order details not found');
 
       setOrder(data);
+      setCustomReplacementSize(getRequestedReplacementSize(data));
       const isCod = (data.payment_method || '').toLowerCase() === 'cod' ||
                     (data.payment_type || '').toLowerCase() === 'cod' ||
                     (data.payment_method || '').toLowerCase().includes('cash');
@@ -699,6 +722,152 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  const handleMarkReplacementCollected = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'In Transit to House of Urvaah',
+          logisticsStatus: 'In Reverse Transit'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'In Transit to House of Urvaah',
+        logistics_status: 'In Reverse Transit'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('In Transit to House of Urvaah');
+      setSelectedStatus('In Transit to House of Urvaah');
+      confirmedRef.current.status = 'In Transit to House of Urvaah';
+      setSaveSuccessMsg('Parcel collected from customer! Piece is now in reverse transit to House of Urvaah atelier.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) notifyParent(updatedData);
+      broadcastOrderUpdate(updatedData);
+    } catch (err) {
+      console.error('Failed to mark replacement collected:', err);
+      setSaveError(err.message || 'Failed to update pickup status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleConfirmReplacementQCReceived = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Received at House of Urvaah',
+          logisticsStatus: 'Delivered to House of Urvaah'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Received at House of Urvaah',
+        logistics_status: 'Delivered to House of Urvaah',
+        is_product_received: true
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Received at House of Urvaah');
+      setSelectedStatus('Received at House of Urvaah');
+      confirmedRef.current.status = 'Received at House of Urvaah';
+      setSaveSuccessMsg('Original piece received & verified at atelier (QC Passed)! Ready to generate replacement dispatch order.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) notifyParent(updatedData);
+      broadcastOrderUpdate(updatedData);
+    } catch (err) {
+      console.error('Failed to confirm replacement arrival at atelier:', err);
+      setSaveError(err.message || 'Failed to confirm arrival at atelier.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleGenerateReplacementOrder = async (targetSize) => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    try {
+      const sizeToUse = targetSize || customReplacementSize || getRequestedReplacementSize(order);
+      const res = await shippingApi.dispatchReplacement(order, order.items || [], {
+        replacement_size: sizeToUse
+      });
+
+      if (res && (res.replacement_order_number || res.order_number)) {
+        const newOrderNum = res.replacement_order_number || res.order_number;
+        const newOrderId = res.replacement_order_id;
+
+        const updatedData = {
+          ...order,
+          status: 'Replaced',
+          logistics_status: 'Replacement Order Dispatched',
+          replacement_order_id: newOrderId,
+          replacement_order_number: newOrderNum,
+          replacement_size: sizeToUse
+        };
+
+        setOrder(updatedData);
+        setConfirmedStatus('Replaced');
+        setSelectedStatus('Replaced');
+        confirmedRef.current.status = 'Replaced';
+        setSaveSuccessMsg(`Replacement Order #${newOrderNum} generated and dispatched! Customer can now track their new order.`);
+        setTimeout(() => setSaveSuccessMsg(null), 4000);
+
+        const notifyParent = onStatusUpdated || onOrderUpdated;
+        if (notifyParent) notifyParent({ ...updatedData, isPreview: false });
+        broadcastOrderUpdate({
+          ...updatedData,
+          status: 'Replaced',
+          replacement_order_number: newOrderNum
+        });
+      } else {
+        throw new Error(res?.message || 'Could not generate replacement order.');
+      }
+    } catch (err) {
+      console.error('Failed to generate replacement order:', err);
+      setSaveError(err.message || 'Failed to generate replacement order.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleOpenReplacementOrder = async (repNum) => {
+    if (!repNum) return;
+    setLoading(true);
+    setSaveError(null);
+    try {
+      const res = await apiClient(`/api/orders/${encodeURIComponent(repNum)}`);
+      const newOrd = res.data || res.order;
+      if (newOrd) {
+        setOrder(newOrd);
+        setConfirmedStatus(newOrd.status || 'Confirmed');
+        setSelectedStatus(newOrd.status || 'Confirmed');
+        confirmedRef.current.status = newOrd.status || 'Confirmed';
+        setSaveSuccessMsg(`Switched to Replacement Order #${repNum}`);
+        setTimeout(() => setSaveSuccessMsg(null), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to open replacement order:', err);
+      setSaveError('Could not open replacement order.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMarkReceivedAtUrvaah = async () => {
     if (!order) return;
     setSavingStatus(true);
@@ -753,33 +922,141 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
-  // Check if status has unsaved changes compared to last confirmed state
+  const handleSimulateDoorstepHandover = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'In Transit to House of Urvaah',
+          logisticsStatus: 'In Transit'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'In Transit to House of Urvaah',
+        logistics_status: 'In Transit'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('In Transit to House of Urvaah');
+      setSelectedStatus('In Transit to House of Urvaah');
+      confirmedRef.current.status = 'In Transit to House of Urvaah';
+      setSaveSuccessMsg('Doorstep pickup verified! Parcel collected by courier and in transit back to Urvaah atelier.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent(updatedData);
+      }
+      broadcastOrderUpdate(updatedData);
+    } catch (err) {
+      console.error('Failed to simulate reverse pickup handover:', err);
+      setSaveError(err.message || 'Failed to update pickup status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleDisburseRefund = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Returned',
+          paymentStatus: 'Refunded',
+          refundStatus: 'Completed'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Returned',
+        payment_status: 'Refunded',
+        refund_status: 'Completed',
+        is_product_received: true
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Returned');
+      setSelectedStatus('Returned');
+      setSelectedPaymentStatus('Refunded');
+      confirmedRef.current.status = 'Returned';
+      confirmedRef.current.paymentStatus = 'Refunded';
+      setSaveSuccessMsg('Refund disbursed & return completed successfully!');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Returned',
+          payment_status: 'Refunded',
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Returned',
+          payment_status: 'Refunded',
+          isPreview: false
+        });
+      }
+      broadcastOrderUpdate(updatedData);
+    } catch (err) {
+      console.error('Failed to complete refund:', err);
+      setSaveError(err.message || 'Failed to complete refund.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
   const hasUnsavedChanges = Boolean(
     order &&
       (selectedStatus !== confirmedRef.current.status ||
         selectedPaymentStatus !== confirmedRef.current.paymentStatus)
   );
 
-  // Logistics Action 1: Generate AWB & Dispatch Order
+  // Logistics Action 1: Generate AWB & Allocate Courier
   const handleGenerateAwb = async () => {
     if (!order) return;
     setLogisticsLoading(true);
     setLogisticsMsg(null);
     try {
       const shipRes = await shippingApi.createShipment(order);
-      const shipmentId = shipRes.shipment_id || `SR-MOCK-SHP-${Date.now().toString().slice(-6)}`;
+      const shipmentId = shipRes.shipment_id || order.shipment_id || `SR-MOCK-SHP-${Date.now().toString().slice(-6)}`;
       
-      const awbRes = await shippingApi.assignAwb(shipmentId);
-      const awbCode = awbRes?.response?.data?.awb_code || `URV${Date.now().toString().slice(-8)}IN`;
-      const courierName = awbRes?.response?.data?.courier_name || 'Delhivery Express';
+      const awbRes = await shippingApi.assignAwb(shipmentId, null, order.id, order.order_number);
+      const awbCode = awbRes?.response?.data?.awb_code || awbRes?.awb_code || `URV${Date.now().toString().slice(-8)}IN`;
+      const courierName = awbRes?.response?.data?.courier_name || awbRes?.courier_name || 'Delhivery Express';
       
-      const newStatus = 'Shipped';
+      const newStatus = (order.status === 'Pending' || order.status === 'Placed') ? 'Processing' : order.status;
       await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: newStatus, trackingNumber: awbCode })
+        body: JSON.stringify({ 
+          status: newStatus, 
+          trackingNumber: awbCode,
+          logisticsStatus: 'AWB Assigned'
+        })
       });
 
-      const updated = { ...order, status: newStatus, tracking_number: awbCode, trackingNumber: awbCode };
+      const updated = { 
+        ...order, 
+        status: newStatus, 
+        tracking_number: awbCode, 
+        trackingNumber: awbCode,
+        courier_name: courierName,
+        logistics_status: 'AWB Assigned'
+      };
       setOrder(updated);
       setSelectedStatus(newStatus);
       confirmedRef.current.status = newStatus;
@@ -787,7 +1064,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
       setLogisticsMsg({
         type: 'success',
-        text: `AWB Generated: ${awbCode} (${courierName}). Order marked as Shipped!`
+        text: `AWB Allocated: ${awbCode} (${courierName}). Ready for Label Printing & Pickup Schedule.`
       });
       
       if (onStatusUpdated || onOrderUpdated) {
@@ -856,35 +1133,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   };
 
   // Logistics Action 4: Download PDF Label
-  const handleDownloadLabel = async () => {
+  const handleDownloadLabel = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateLabel([targetId]);
-      if (res?.label_url) {
-        window.open(res.label_url, '_blank');
-      } else {
-        alert('Shipping label generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Label generation failed: ' + err.message);
-    }
+    setIsLabelModalOpen(true);
   };
 
   // Logistics Action 5: Download Manifest
-  const handleDownloadManifest = async () => {
+  const handleDownloadManifest = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateManifest([targetId]);
-      if (res?.manifest_url) {
-        window.open(res.manifest_url, '_blank');
-      } else {
-        alert('Courier manifest generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Manifest generation failed: ' + err.message);
-    }
+    setIsManifestModalOpen(true);
   };
 
   // Logistics Action 5b: Schedule Atelier Warehouse Courier Pickup
@@ -933,10 +1190,23 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setLogisticsMsg(null);
     try {
       const res = await shippingApi.createReturnOrder(order, order.items, 'Customer return approved by admin');
+      const updated = {
+        ...order,
+        tracking_number: res.awb_code,
+        trackingNumber: res.awb_code,
+        courier_name: res.courier_name || 'Delhivery Reverse Logistics',
+        logistics_status: 'Return Pickup Scheduled',
+        shipment_status: 'Return Pickup Scheduled'
+      };
+      setOrder(updated);
       setLogisticsMsg({
         type: 'success',
         text: `Reverse Pickup Scheduled! AWB: ${res.awb_code} (Pickup from customer within 24-48 hrs).`
       });
+      if (onStatusUpdated || onOrderUpdated) {
+        (onStatusUpdated || onOrderUpdated)(updated);
+      }
+      broadcastOrderUpdate(updated);
     } catch (err) {
       setLogisticsMsg({ type: 'error', text: err.message || 'Failed to schedule reverse pickup.' });
     } finally {
@@ -1112,9 +1382,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         {order.address_label ? `${order.address_label}: ` : ''}
                         {order.full_address || order.address || 'Address registered on user profile'}
                       </p>
-                      {(order.city || order.state || order.postal_code) && (
+                      {(order.city || order.state || order.postal_code || order.pincode || order.shipping_address?.postal_code || order.shipping_address?.pincode) && (
                         <p className="text-neutral-500 text-[11px] mt-0.5">
-                          {[order.city, order.state, order.postal_code].filter(Boolean).join(', ')}
+                          {[
+                            order.city || order.shipping_address?.city, 
+                            order.state || order.shipping_address?.state, 
+                            (order.postal_code || order.pincode || order.shipping_address?.postal_code || order.shipping_address?.pincode)
+                          ].filter(Boolean).join(', ')}
                         </p>
                       )}
                     </div>
@@ -1352,150 +1626,699 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 </div>
               )}
 
-              {/* Replacement Approved & In Transit Banner */}
-              {(['replace approved', 'replacement processing', 'replacement shipped', 'replacement out for delivery'].includes(
-                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-              )) && (
-                <div className="bg-indigo-50 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-800 shrink-0 mt-0.5">
-                      <Truck className="w-5 h-5 text-indigo-700" />
+              {/* COMPREHENSIVE REPLACEMENT & EXCHANGE LIFECYCLE SECTION */}
+              {(() => {
+                const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+                const curLog = (order?.logistics_status || '').toLowerCase();
+                const returnType = (order?.return_type || '').toLowerCase();
+
+                // Only show Exchange Journey when the order is explicitly in an exchange/replacement lifecycle
+                const isReplacementRelated = (
+                  returnType === 'replacement' ||
+                  returnType === 'exchange' ||
+                  [
+                    'replacement request processing',
+                    'replace requested',
+                    'replacement requested',
+                    'replace approved',
+                    'replacement processing',
+                    'replacement shipped',
+                    'replacement out for delivery',
+                    'replaced',
+                    'exchanged'
+                  ].includes(curSt) ||
+                  Boolean(order?.replacement_order_number || order?.replacement_order_id) ||
+                  (Boolean(order?.replacement_size) && (curSt.includes('replace') || curSt === 'exchanged'))
+                ) && returnType !== 'return' && !curSt.includes('return') && curSt !== 'cancelled' && curSt !== 'refunded';
+
+                if (!isReplacementRelated) return null;
+
+                const repOrderNum = order?.replacement_order_number;
+                const isS2 = ['replace approved', 'in transit to house of urvaah', 'received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum) || (curLog.includes('reverse') && curLog.includes('pickup'));
+                const isS3 = ['in transit to house of urvaah', 'received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS3Active = (curSt === 'replace approved' || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3;
+                const isS4 = ['received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS4Active = (['in transit to house of urvaah'].includes(curSt)) && !isS4;
+                const isS5 = Boolean(repOrderNum) || curSt === 'replaced';
+                const isS5Active = ['received at house of urvaah'].includes(curSt) && !isS5;
+                const stepNum = isS5 ? 5 : isS5Active ? 4 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
+
+                const reqSize = customReplacementSize || getRequestedReplacementSize(order);
+
+                return (
+                  <div className="bg-purple-50/70 border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-xs">
+                    {/* Header with Step Tracker */}
+                    <div className="flex items-center justify-between border-b border-purple-200/80 pb-3">
+                      <div className="flex items-center gap-2 text-xs font-bold font-admin text-purple-950 uppercase tracking-wider">
+                        <RefreshCw className="w-4 h-4 text-purple-700" />
+                        <span>Exchange & Doorstep Reverse Pickup Journey</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
+                        Step {stepNum} of 5 Active
+                      </span>
+                    </div>
+
+                    {/* 5-Step Visual Stepper */}
+                    <div className="bg-white border border-purple-200/90 rounded-xl p-3 sm:p-4 shadow-2xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                        {/* Step 1: Requested */}
+                        <div className="p-2.5 rounded-lg border bg-purple-50/60 border-purple-300">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-purple-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                              ✓
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-950">1. Requested</span>
+                          </div>
+                          <p className="text-[10px] text-purple-800 mt-1 pl-6">Size: {reqSize}</p>
+                        </div>
+
+                        {/* Step 2: Approved */}
+                        <div className={`p-2.5 rounded-lg border ${isS2 ? 'bg-purple-50/60 border-purple-300' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS2 ? 'bg-purple-700 text-white' : 'bg-neutral-300 text-neutral-600'}`}>
+                              {isS2 ? '✓' : '2'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">2. Approved</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS2 ? 'Pickup Scheduled' : 'Pending Review'}</p>
+                        </div>
+
+                        {/* Step 3: Courier Pickup */}
+                        <div className={`p-2.5 rounded-lg border ${isS3 ? 'bg-purple-50/60 border-purple-300' : isS3Active ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS3 ? 'bg-purple-700 text-white' : isS3Active ? 'bg-amber-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>
+                              {isS3 ? '✓' : '3'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">3. Handover</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS3 ? 'Collected & In Transit' : isS3Active ? 'Awaiting Rider' : 'Doorstep Pickup'}</p>
+                        </div>
+
+                        {/* Step 4: Atelier QC */}
+                        <div className={`p-2.5 rounded-lg border ${isS4 ? 'bg-purple-50/60 border-purple-300' : isS4Active ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS4 ? 'bg-purple-700 text-white' : isS4Active ? 'bg-blue-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>
+                              {isS4 ? '✓' : '4'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Atelier QC</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS4 ? 'Piece Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}</p>
+                        </div>
+
+                        {/* Step 5: Replacement Dispatched */}
+                        <div className={`p-2.5 rounded-lg border ${isS5 ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : isS5Active ? 'bg-purple-100 border-purple-300 ring-1 ring-purple-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS5 ? 'bg-emerald-700 text-white' : isS5Active ? 'bg-purple-700 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>
+                              {isS5 ? '✓' : '5'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Dispatched</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS5 ? (repOrderNum || 'New Order Active') : isS5Active ? 'Ready to Dispatch' : 'New Order'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ACTION PANEL BASED ON CURRENT STEP */}
+                    {/* A. If Pickup Scheduled (Step 3 Active) */}
+                    {(curSt === 'replace approved' || isS3Active) && !isS3 && !repOrderNum && (
+                      <div className="bg-white border border-purple-200 rounded-xl p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <Truck className="w-4 h-4 text-purple-700" />
+                            <span>Doorstep Reverse Pickup Assigned</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            Delhivery reverse courier has been scheduled for customer address. Rider will arrive to collect the original item. When the customer hands over the parcel to the rider, click below:
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => handleGenerateReplacementOrder(reqSize)}
+                            className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            title="Generate and dispatch replacement order immediately without waiting for return delivery"
+                          >
+                            <Zap className="w-3.5 h-3.5 text-purple-700" />
+                            <span>Express: Dispatch Replacement Now</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleMarkReplacementCollected}
+                            className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <PackageCheck className="w-4 h-4 text-emerald-400" />
+                            <span>Mark Parcel Collected from Customer</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* B. If Parcel in Transit to Atelier (Step 4 Active) */}
+                    {(curSt === 'in transit to house of urvaah' || isS4Active) && !isS4 && !repOrderNum && (
+                      <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <Building className="w-4 h-4 text-blue-700" />
+                            <span>Parcel In Reverse Transit to Urvaah Atelier</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            Courier has collected the original piece from the customer doorstep. Once the parcel physically arrives at the atelier and passes quality inspection (QC), confirm receipt below:
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleConfirmReplacementQCReceived}
+                            className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                            <span>Confirm Parcel Received at Atelier & Verified (QC Passed)</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* C. If Piece Received at Atelier & Ready for Dispatch (Step 5 Active) */}
+                    {((curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active) && !repOrderNum) && (
+                      <div className="bg-white border border-purple-300 rounded-xl p-4 space-y-4">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>Original Piece Verified at Atelier • Ready to Dispatch Replacement Order</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            The returned piece has passed inspection. Generate the new replacement order below. This will create a linked forward order in the customer's account so they can track the full forward lifecycle!
+                          </p>
+                        </div>
+
+                        {/* Size Selection & Confirmation Box */}
+                        <div className="p-3.5 bg-purple-50/80 border border-purple-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">
+                              Replacement Garment Size:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                                <button
+                                  key={sz}
+                                  type="button"
+                                  onClick={() => setCustomReplacementSize(sz)}
+                                  className={`px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
+                                    customReplacementSize === sz
+                                      ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                                      : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                  }`}
+                                >
+                                  {sz}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                              Order Total:
+                            </span>
+                            <span className="font-bold text-emerald-700 text-sm">
+                              ₹0 (100% Exchange Credit)
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
+                            className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {savingStatus ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Generating Order...</span>
+                              </>
+                            ) : (
+                              <>
+                                <PackagePlus className="w-4 h-4 text-purple-300" />
+                                <span>Generate & Dispatch Replacement Order</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* D. If Replacement Order has been Generated */}
+                    {(repOrderNum || curSt === 'replaced') && (
+                      <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
+                            <PackageCheck className="w-5 h-5 text-emerald-700" />
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="text-xs sm:text-sm font-admin font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-2">
+                              <span>Replacement Order Generated: #{repOrderNum || `${order?.order_number}-REP`}</span>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-900 border border-emerald-300">
+                                ACTIVE
+                              </span>
+                            </h4>
+                            <p className="text-xs text-emerald-900/90 leading-relaxed">
+                              New forward exchange order is live in the system (Size: {reqSize}). The customer can track the forward fulfillment live from their account.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReplacementOrder(repOrderNum || `${order?.order_number}-REP`)}
+                            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open Replacement Order</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Pre-Delivery Cancelled & Refunded Banner */}
+              {(() => {
+                const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+                const isProductEverDelivered = Boolean(order?.delivered_at) || 
+                  (order?.original_status || '').toLowerCase() === 'delivered' || 
+                  Boolean(order?.is_product_received);
+                const isPreDeliveryCancellation = !isProductEverDelivered && (
+                  curSt === 'cancelled' || curSt === 'refunded' || curSt.includes('cancel') || Boolean(order?.cancel_reason)
+                );
+                if (!isPreDeliveryCancellation) return null;
+                const isRefundCompleted = (order?.refund_status && ['completed', 'refunded', 'success'].includes(String(order.refund_status).toLowerCase())) || 
+                  curSt === 'refunded' || 
+                  ((order?.payment_status || '').toLowerCase() === 'refunded');
+
+                return (
+                  <div className="bg-emerald-50/90 border-2 border-emerald-300 rounded-xl p-4 sm:p-5 flex items-start gap-3.5 shadow-xs">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-700" />
                     </div>
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <h4 className="text-xs sm:text-sm font-admin font-bold text-indigo-950 uppercase tracking-wide">
-                          Replacement In Progress
-                        </h4>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
-                          Replacement In Motion
-                        </span>
-                      </div>
-                      <p className="text-xs text-indigo-900/90 leading-relaxed">
-                        Replacement has been authorized. Reverse pickup for the original piece is scheduled, and the replacement piece is prepared for dispatch. When the exchange is delivered, click below to finalize.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-indigo-200">
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleCompleteReplacement}
-                      className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Updating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <PackageCheck className="w-4 h-4 text-white" />
-                          <span>Mark Replacement Completed & Delivered</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Replacement Completed Banner */}
-              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'replaced') && (
-                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xs">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
-                      <PackageCheck className="w-5 h-5 text-emerald-700" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-xs sm:text-sm font-admin font-bold text-emerald-950 uppercase tracking-wide">
-                        Replacement Order Completed
-                      </h4>
-                      <p className="text-xs text-emerald-900/90 leading-relaxed">
-                        The replacement piece has been delivered to the customer and the exchange cycle is completed.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Return Approved & In Transit to Urvaah House Banner */}
-              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'return approved') && (
-                <div className="bg-sky-50 border-2 border-sky-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-sky-100 rounded-lg text-sky-800 shrink-0 mt-0.5">
-                      <Truck className="w-5 h-5 text-sky-600" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <h4 className="text-xs sm:text-sm font-admin font-bold text-sky-950 uppercase tracking-wide">
-                          Return Flow Started: In Transit to House of Urvaah
-                        </h4>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 border border-sky-300 uppercase">
-                          Reverse Transit Active
-                        </span>
-                      </div>
-                      <p className="text-xs text-sky-900/90 leading-relaxed">
-                        Reverse pickup has been authorized. The package is currently in transit to House of Urvaah. Once delivered to our warehouse, confirm receipt below to automatically restock items and activate the Refund Desk.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-sky-200">
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleMarkReceivedAtUrvaah}
-                      className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Updating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <PackageCheck className="w-4 h-4 text-emerald-400" />
-                          <span>Mark Received at House of Urvaah</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Received at House of Urvaah / Refund Desk Active Banner */}
-              {(['received at house of urvaah', 'received at homved', 'returned'].includes(
-                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-              )) && (
-                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xs flex-wrap">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
                         <h4 className="text-xs sm:text-sm font-admin font-bold text-emerald-950 uppercase tracking-wide">
-                          Received at House of Urvaah — Refund Desk Active
+                          {isRefundCompleted ? 'Order Cancelled Prior to Dispatch & Full Refund Settled' : 'Order Cancelled Prior to Dispatch'}
                         </h4>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 uppercase">
-                          Restocked & In Refund Desk
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 uppercase">
+                          {isRefundCompleted ? 'Cancelled & Refunded' : 'Cancelled'}
                         </span>
                       </div>
                       <p className="text-xs text-emerald-900/90 leading-relaxed">
-                        Package verified and restocked into warehouse inventory. Order has been routed to the Refund Desk with ₹{(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} eligible for customer disbursement.
+                        This order was cancelled before courier dispatch. Shiprocket courier pickup was voided with ₹0 freight charge.
+                        {isRefundCompleted && ` Full 100% refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been disbursed.`}
+                        {order.refund_txn_id && ` Transaction Reference / UTR: ${order.refund_txn_id}`}
                       </p>
+                      {order.cancel_reason && (
+                        <p className="text-[11px] text-emerald-800 pt-1">
+                          <span className="font-semibold uppercase tracking-wider text-[10px]">Cancellation Reason:</span> {order.cancel_reason}
+                        </p>
+                      )}
                     </div>
                   </div>
+                );
+              })()}
 
-                  <a
-                    href="/admin/refund-desk"
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
-                  >
-                    <span>Open Refund Desk</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              )}
+              {/* Return & Doorstep Reverse Pickup Journey (5-Step Visual Hub) */}
+              {(() => {
+                const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+                const curLog = (order?.logistics_status || '').toLowerCase();
+                const returnType = (order?.return_type || '').toLowerCase();
+
+                // Mutually exclusive: If Exchange Journey is active or order is in replacement lifecycle, never show Return Journey
+                const isReplacementRelated = (
+                  returnType === 'replacement' ||
+                  returnType === 'exchange' ||
+                  [
+                    'replacement request processing',
+                    'replace requested',
+                    'replacement requested',
+                    'replace approved',
+                    'replacement processing',
+                    'replacement shipped',
+                    'replacement out for delivery',
+                    'replaced',
+                    'exchanged'
+                  ].includes(curSt) ||
+                  Boolean(order?.replacement_order_number || order?.replacement_order_id) ||
+                  (Boolean(order?.replacement_size) && (curSt.includes('replace') || curSt === 'exchanged'))
+                ) && returnType !== 'return' && !curSt.includes('return') && curSt !== 'cancelled' && curSt !== 'refunded';
+                if (isReplacementRelated) return null;
+
+                const isProductEverDelivered = Boolean(order?.delivered_at) || 
+                  (order?.original_status || '').toLowerCase() === 'delivered' || 
+                  Boolean(order?.is_product_received);
+                const isPreDeliveryCancellation = !isProductEverDelivered && (
+                  curSt === 'cancelled' || curSt === 'refunded' || curSt.includes('cancel') || Boolean(order?.cancel_reason)
+                );
+                if (isPreDeliveryCancellation) return null;
+
+                // Explicit Return & Refund Lifecycle check (never triggered by generic forward pickup or forward AWB)
+                const isReturnRelated = (
+                  returnType === 'return' ||
+                  order?.is_returned_order === true ||
+                  [
+                    'return requested',
+                    'return request processing',
+                    'return approved',
+                    'return collected',
+                    'in transit to house of urvaah',
+                    'received at house of urvaah',
+                    'received at homved',
+                    'returned',
+                    'return rejected'
+                  ].includes(curSt)
+                ) && curSt !== 'cancelled' && curSt !== 'refunded' && !curSt.includes('replace');
+
+                if (!isReturnRelated) return null;
+
+                const isS2 = ['return approved', 'return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && (curLog.includes('pickup') || curLog.includes('awb')));
+                const isS3 = ['return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('collected'));
+                const isS3Active = (curSt === 'return approved' || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3;
+                const isS4 = ['received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('delivered to'));
+                const isS4Active = (['return collected', 'in transit to house of urvaah'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('transit'))) && !isS4;
+                const isS5 = curSt === 'returned';
+                const isS5Active = ['received at house of urvaah', 'received at homved'].includes(curSt) && !isS5;
+                const stepNum = isS5 ? 5 : isS5Active ? 5 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
+
+                return (
+                  <div className="bg-sky-50/70 border-2 border-sky-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-xs">
+                    {/* Card Title & Step Indicator */}
+                    <div className="flex items-center justify-between border-b border-sky-200/80 pb-3">
+                      <div className="flex items-center gap-2 text-xs font-bold font-admin text-sky-950 uppercase tracking-wider">
+                        <RotateCcw className="w-4 h-4 text-sky-700" />
+                        <span>Return & Doorstep Reverse Pickup Journey</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 border border-sky-300 uppercase">
+                        Step {stepNum} of 5 Active
+                      </span>
+                    </div>
+
+                    {/* 5-Step Visual Stepper */}
+                    <div className="bg-white border border-sky-200/90 rounded-xl p-3 sm:p-4 shadow-2xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                          {/* Step 1: Return Requested */}
+                          <div className="p-2.5 rounded-lg border bg-sky-50/60 border-sky-300">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-5 h-5 rounded-full bg-sky-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                                ✓
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-950">1. Requested</span>
+                            </div>
+                            <p className="text-[10px] text-sky-800 mt-1 pl-6">Customer initiated</p>
+                          </div>
+
+                          {/* Step 2: Atelier Approved */}
+                          <div className={`p-2.5 rounded-lg border ${
+                            isS2 ? 'bg-sky-50/60 border-sky-300' : 'bg-neutral-50 border-neutral-200 opacity-60'
+                          }`}>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                isS2 ? 'bg-sky-700 text-white' : 'bg-neutral-300 text-neutral-600'
+                              }`}>
+                                {isS2 ? '✓' : '2'}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">2. Approved</span>
+                            </div>
+                            <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS2 ? 'Reverse AWB generated' : 'Pending review'}</p>
+                          </div>
+
+                          {/* Step 3: Doorstep Courier Pickup */}
+                          <div className={`p-2.5 rounded-lg border ${
+                            isS3
+                              ? 'bg-sky-50/60 border-sky-300'
+                              : isS3Active
+                              ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400'
+                              : 'bg-neutral-50 border-neutral-200 opacity-60'
+                          }`}>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                isS3
+                                  ? 'bg-sky-700 text-white'
+                                  : isS3Active
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-neutral-300 text-neutral-600'
+                              }`}>
+                                {isS3 ? '✓' : '3'}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">3. Doorstep Pickup</span>
+                            </div>
+                            <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                              {isS3 ? 'Collected from customer' : isS3Active ? 'Rider dispatched' : 'Pending'}
+                            </p>
+                          </div>
+
+                          {/* Step 4: In Transit to Atelier */}
+                          <div className={`p-2.5 rounded-lg border ${
+                            isS4
+                              ? 'bg-sky-50/60 border-sky-300'
+                              : isS4Active
+                              ? 'bg-sky-100 border-sky-400 ring-1 ring-sky-400'
+                              : 'bg-neutral-50 border-neutral-200 opacity-60'
+                          }`}>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                isS4
+                                  ? 'bg-sky-700 text-white'
+                                  : isS4Active
+                                  ? 'bg-sky-700 text-white'
+                                  : 'bg-neutral-300 text-neutral-600'
+                              }`}>
+                                {isS4 ? '✓' : '4'}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. In Transit</span>
+                            </div>
+                            <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                              {isS4 ? 'Arrived at warehouse' : isS4Active ? 'Traveling back' : 'Pending'}
+                            </p>
+                          </div>
+
+                          {/* Step 5: Received & Refund Settled */}
+                          <div className={`p-2.5 rounded-lg border ${
+                            isS5
+                              ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400'
+                              : isS5Active
+                              ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300'
+                              : 'bg-neutral-50 border-neutral-200 opacity-60'
+                          }`}>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                isS5 || isS5Active
+                                  ? 'bg-emerald-700 text-white'
+                                  : 'bg-neutral-300 text-neutral-600'
+                              }`}>
+                                {isS5 ? '✓' : '5'}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Refund Settled</span>
+                            </div>
+                            <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                              {isS5 ? '100% Disbursed' : isS5Active ? 'In Refund Desk' : 'Pending'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                    {/* Reverse Courier & Doorstep Pickup Metadata Card */}
+                    <div className="bg-white border border-sky-200/90 rounded-xl p-4 space-y-3 shadow-2xs text-xs">
+                      <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-neutral-100">
+                        <div className="flex items-center gap-2">
+                          <Truck className="w-4 h-4 text-sky-700" />
+                          <span className="font-bold text-sky-950 uppercase tracking-wide">
+                            Doorstep Courier Collection Details
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
+                            {order.tracking_number ? 'Reverse AWB Assigned' : 'Awaiting AWB'}
+                          </span>
+                          {(order.tracking_number || order.awb_code) && (
+                            <span className="font-mono font-bold text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[11px]">
+                              {order.tracking_number || order.awb_code}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Reverse Courier</span>
+                          <span className="font-medium text-neutral-900 mt-0.5 block">
+                            {order.courier_name || 'Delhivery Reverse Logistics (Doorstep QC)'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Customer Contact</span>
+                          <span className="font-medium text-neutral-900 mt-0.5 block">
+                            {order.shipping_name || order.recipient_name || order.customer_name || 'Customer'}
+                          </span>
+                          <span className="text-[11px] text-neutral-500">
+                            {order.shipping_phone || order.phone || 'Phone on file'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-neutral-400 block text-[10px] uppercase font-semibold">Doorstep Pickup Address</span>
+                          <span className="font-medium text-neutral-800 mt-0.5 block leading-tight text-[11px]">
+                            {order.shipping_address || order.address || 'Customer Delivery Address'}
+                            {order.shipping_city ? `, ${order.shipping_city}` : ''}
+                            {order.shipping_pincode || order.pincode ? ` - ${order.shipping_pincode || order.pincode}` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Explanatory Journey Status Text */}
+                      <div className="p-2.5 bg-sky-50 rounded-lg text-sky-900 text-[11px] leading-relaxed border border-sky-200/70">
+                        {(() => {
+                          const s = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+                          if (s === 'returned') return '100% full refund has been settled to the customer. Return and reverse courier journey complete.';
+                          if (s.includes('received')) return 'Package has arrived at House of Urvaah atelier, verified by QC team and auto-restocked. Ready for refund disbursement.';
+                          if (s.includes('transit') || s.includes('collected')) return 'Courier rider has collected the parcel from customer doorstep! Parcel is currently in transit to House of Urvaah atelier.';
+                          if (s === 'return approved') return 'Return request approved and reverse AWB allocated! Delhivery courier is dispatched to customer doorstep for collection within 24-48 hours.';
+                          return 'Customer has requested a return. Review and approve the request to dispatch reverse courier pickup.';
+                        })()}
+                      </div>
+
+                      {/* Action Bar inside Return Hub with Sequential Advance Options */}
+                      <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-sky-100">
+                        {/* Step 1 Actions: If Return Requested */}
+                        {curSt === 'return requested' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={handleRejectReturn}
+                              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Reject Return</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={handleApproveReturn}
+                              className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-sky-200" />
+                              <span>Approve Return & Schedule Pickup (Step 2/3)</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Step 3 Actions: If Return Approved (Awaiting Doorstep Handover) */}
+                        {(curSt === 'return approved' || isS3Active) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setIsLabelModalOpen(true)}
+                              className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                              <span>Return Label (PDF)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsManifestModalOpen(true)}
+                              className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                              <span>Pickup Manifest</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={handleSimulateDoorstepHandover}
+                              className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                              title="Advance to Step 4: Courier collected item at doorstep"
+                            >
+                              {savingStatus ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Truck className="w-3.5 h-3.5 text-sky-200" />
+                              )}
+                              <span>Confirm Doorstep Pickup ➔ In Transit (Step 4)</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Step 4 Actions: If In Transit */}
+                        {(curSt.includes('transit') || curSt.includes('collected') || isS4Active) && (
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleMarkReceivedAtUrvaah}
+                            className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                            title="Advance to Step 5: Item delivered back to atelier and restocked"
+                          >
+                            {savingStatus ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Updating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <PackageCheck className="w-4 h-4 text-emerald-400" />
+                                <span>Mark Received at Atelier & Restock (Step 5)</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Step 5 Actions: If Received at Atelier - Process exclusively via Refund Desk */}
+                        {(['received at house of urvaah', 'received at homved'].includes(curSt) || isS5Active) && (
+                          <a
+                            href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                            title="Open Refund Desk to settle payout"
+                          >
+                            <Banknote className="w-4 h-4 text-emerald-200" />
+                            <span>Process in Refund Desk (₹{(order.refund_eligible_amount || order.total || 0).toLocaleString('en-IN')})</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-300" />
+                          </a>
+                        )}
+
+                        {/* Completed State: If Returned */}
+                        {isS5 && (
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>✓ Return & 100% Refund Completed</span>
+                            </span>
+                            <a
+                              href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                              className="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-semibold flex items-center gap-1"
+                            >
+                              <span>View Refund Record</span>
+                              <ArrowUpRight className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Reverse Scans Toggle */}
+                        <button
+                          type="button"
+                          onClick={handleFetchTracking}
+                          className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ml-auto"
+                        >
+                          <Truck className="w-3.5 h-3.5 text-neutral-600" />
+                          <span>{showTrackingScans ? 'Hide Reverse Scans' : 'Live Reverse Scans'}</span>
+                          {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Cancelled & Refund Desk Status Banner */}
               {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'cancelled') && (
@@ -1524,6 +2347,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         ? `Full refund of ₹${(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been disbursed via Refund Desk${order.refund_transaction_id ? ` (UTR: ${order.refund_transaction_id})` : ''}.`
                         : `Full amount ₹${(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} has been sent to the Refund Desk for customer disbursement.`}
                     </p>
+                    {(order.payment_method || '').toLowerCase() !== 'cod' && (
+                      <div className="pt-1">
+                        <a
+                          href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                          className="inline-flex items-center gap-1 font-semibold text-[11px] text-indigo-700 hover:text-indigo-900 underline"
+                        >
+                          <span>Open this order in Refund Desk</span>
+                          <ArrowUpRight className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1565,28 +2399,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
                         Order Status
                       </label>
-                      {['cancelled', 'refunded', 'exchanged'].includes(
-                        (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-                      ) ? (
-                        <div className="w-full bg-neutral-100 border border-neutral-200/80 text-brand-dark text-xs rounded-xl px-3 py-2.5 font-semibold flex items-center justify-between">
-                          <span>{confirmedRef.current.status || confirmedStatus || order.status}</span>
-                          <span className="text-[10px] text-neutral-500 font-medium flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded-md border border-neutral-200">
-                            <Lock className="w-3 h-3 text-neutral-400" /> Locked Stage
-                          </span>
-                        </div>
-                      ) : (
-                        <select
-                          value={selectedStatus}
-                          onChange={(e) => handleOrderStatusChange(e.target.value)}
-                          className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
-                        >
-                          {ORDER_STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => handleOrderStatusChange(e.target.value)}
+                        className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
+                      >
+                        {ORDER_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Payment Status Dropdown */}
@@ -2020,6 +2843,20 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         onClose={() => setIsInvoiceOpen(false)}
         order={order}
         orderId={order?.order_number || order?.id || orderId}
+      />
+
+      {/* Official Shiprocket Shipping Label Modal */}
+      <ShippingLabelModal
+        isOpen={isLabelModalOpen}
+        onClose={() => setIsLabelModalOpen(false)}
+        order={order}
+      />
+
+      {/* Official Shiprocket Pickup Manifest Modal */}
+      <PickupManifestModal
+        isOpen={isManifestModalOpen}
+        onClose={() => setIsManifestModalOpen(false)}
+        order={order}
       />
     </div>
   );

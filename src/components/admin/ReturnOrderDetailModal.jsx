@@ -28,6 +28,8 @@ import { shippingApi } from '../../services/shippingApi';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
+import { ShippingLabelModal } from './ShippingLabelModal';
+import { PickupManifestModal } from './PickupManifestModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Reverse / Return lifecycle status options
@@ -78,6 +80,8 @@ export const ReturnOrderDetailModal = ({
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
 
   // Reverse Logistics State
   const [logisticsLoading, setLogisticsLoading] = useState(false);
@@ -247,35 +251,15 @@ export const ReturnOrderDetailModal = ({
   };
 
   // Reverse Action 2: Download Return Label (PDF)
-  const handleDownloadReturnLabel = async () => {
+  const handleDownloadReturnLabel = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateLabel([targetId]);
-      if (res?.label_url) {
-        window.open(res.label_url, '_blank');
-      } else {
-        alert('Return shipping label generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Return label generation failed: ' + err.message);
-    }
+    setIsLabelModalOpen(true);
   };
 
   // Reverse Action 3: Download Reverse Pickup Manifest
-  const handleDownloadReverseManifest = async () => {
+  const handleDownloadReverseManifest = () => {
     if (!order) return;
-    try {
-      const targetId = order.tracking_number || order.id;
-      const res = await shippingApi.generateManifest([targetId]);
-      if (res?.manifest_url) {
-        window.open(res.manifest_url, '_blank');
-      } else {
-        alert('Reverse courier pickup manifest generated: ' + (res?.message || 'Ready'));
-      }
-    } catch (err) {
-      alert('Manifest generation failed: ' + err.message);
-    }
+    setIsManifestModalOpen(true);
   };
 
   // Reverse Action 4: Toggle Live Reverse Courier Scans
@@ -635,6 +619,139 @@ export const ReturnOrderDetailModal = ({
                   </div>
                 )}
 
+                {/* 5-Step Return & Reverse Pickup Stepper */}
+                <div className="bg-white border border-neutral-200/90 rounded-xl p-3 sm:p-4 shadow-2xs">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-100">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-800 font-admin flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 text-neutral-700" />
+                      <span>Doorstep Return & Courier Pickup Journey</span>
+                    </span>
+                    {(() => {
+                      const curSt = (confirmedRef.current?.status || confirmedStatus || order?.status || '').toLowerCase();
+                      const stepNum = curSt === 'returned' ? 5 : (curSt.includes('received') ? 5 : (curSt.includes('transit') || curSt.includes('collected') ? 4 : (curSt === 'return approved' ? 3 : 1)));
+                      return (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200 uppercase">
+                          Step {stepNum} of 5 Active
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  {(() => {
+                    const st = (confirmedRef.current?.status || confirmedStatus || order?.status || '').toLowerCase();
+                    const isS2 = ['return approved', 'return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(st);
+                    const isS3 = ['return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(st);
+                    const isS3Active = st === 'return approved';
+                    const isS4 = ['received at house of urvaah', 'received at homved', 'returned'].includes(st);
+                    const isS4Active = ['return collected', 'in transit to house of urvaah'].includes(st);
+                    const isS5 = st === 'returned';
+                    const isS5Active = ['received at house of urvaah', 'received at homved'].includes(st);
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                        {/* Step 1: Return Requested */}
+                        <div className="p-2.5 rounded-lg border bg-sky-50/60 border-sky-300">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-sky-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                              ✓
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-950">1. Requested</span>
+                          </div>
+                          <p className="text-[10px] text-sky-800 mt-1 pl-6">Reason registered</p>
+                        </div>
+
+                        {/* Step 2: Atelier Approved */}
+                        <div className={`p-2.5 rounded-lg border ${
+                          isS2 ? 'bg-sky-50/60 border-sky-300' : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isS2 ? 'bg-sky-700 text-white' : 'bg-neutral-300 text-neutral-600'
+                            }`}>
+                              {isS2 ? '✓' : '2'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">2. Approved</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS2 ? 'Reverse AWB generated' : 'Pending review'}</p>
+                        </div>
+
+                        {/* Step 3: Doorstep Courier Pickup */}
+                        <div className={`p-2.5 rounded-lg border ${
+                          isS3
+                            ? 'bg-sky-50/60 border-sky-300'
+                            : isS3Active
+                            ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400'
+                            : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isS3
+                                ? 'bg-sky-700 text-white'
+                                : isS3Active
+                                ? 'bg-amber-600 text-white'
+                                : 'bg-neutral-300 text-neutral-600'
+                            }`}>
+                              {isS3 ? '✓' : '3'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">3. Doorstep Pickup</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                            {isS3 ? 'Collected from customer' : isS3Active ? 'Rider dispatched' : 'Pending'}
+                          </p>
+                        </div>
+
+                        {/* Step 4: In Transit to Atelier */}
+                        <div className={`p-2.5 rounded-lg border ${
+                          isS4
+                            ? 'bg-sky-50/60 border-sky-300'
+                            : isS4Active
+                            ? 'bg-sky-100 border-sky-400 ring-1 ring-sky-400'
+                            : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isS4
+                                ? 'bg-sky-700 text-white'
+                                : isS4Active
+                                ? 'bg-sky-700 text-white'
+                                : 'bg-neutral-300 text-neutral-600'
+                            }`}>
+                              {isS4 ? '✓' : '4'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. In Transit</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                            {isS4 ? 'Arrived at warehouse' : isS4Active ? 'Traveling back' : 'Pending'}
+                          </p>
+                        </div>
+
+                        {/* Step 5: Received & Refund Settled */}
+                        <div className={`p-2.5 rounded-lg border ${
+                          isS5
+                            ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400'
+                            : isS5Active
+                            ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300'
+                            : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isS5 || isS5Active
+                                ? 'bg-emerald-700 text-white'
+                                : 'bg-neutral-300 text-neutral-600'
+                            }`}>
+                              {isS5 ? '✓' : '5'}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Refund Settled</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                            {isS5 ? '100% Disbursed' : isS5Active ? 'In Refund Desk' : 'Pending'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* Reverse Status Summary Strip */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-3.5 rounded-lg border border-neutral-200/70 text-xs">
                   <div>
@@ -904,7 +1021,7 @@ export const ReturnOrderDetailModal = ({
                     <p className="text-neutral-700 leading-relaxed text-[11px]">
                       {order.shippingAddress?.address || order.full_address || order.shipping_address_line || 'Boutique Address'}
                       <br />
-                      {order.city || order.shippingAddress?.city}, {order.state || order.shippingAddress?.state} - {order.pincode || order.shippingAddress?.pincode}
+                      {order.city || order.shippingAddress?.city}, {order.state || order.shippingAddress?.state} - {order.postal_code || order.pincode || order.shippingAddress?.postal_code || order.shippingAddress?.pincode}
                     </p>
                   </div>
                 </div>
@@ -1027,6 +1144,20 @@ export const ReturnOrderDetailModal = ({
           onClose={() => setIsInvoiceOpen(false)}
         />
       )}
+
+      {/* Official Shiprocket Shipping Label Modal */}
+      <ShippingLabelModal
+        isOpen={isLabelModalOpen}
+        onClose={() => setIsLabelModalOpen(false)}
+        order={order}
+      />
+
+      {/* Official Shiprocket Pickup Manifest Modal */}
+      <PickupManifestModal
+        isOpen={isManifestModalOpen}
+        onClose={() => setIsManifestModalOpen(false)}
+        order={order}
+      />
     </div>
   );
 };

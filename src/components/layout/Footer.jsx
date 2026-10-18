@@ -295,14 +295,14 @@ export const Footer = () => {
           <span>© 2026 HOUSE OF URVAAH. ALL RIGHTS RESERVED.</span>
           <span className="hidden sm:inline text-neutral-300">|</span>
           <span>
-            POWERED BY{' '}
+            DESIGN AND DEVELOPED BY{' '}
             <a
               href="https://devnectar.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-neutral-600 hover:text-black font-semibold transition-colors underline decoration-neutral-300 underline-offset-2 hover:decoration-black"
+              className="text-neutral-600 hover:text-black font-semibold transition-colors underline decoration-neutral-300 underline-offset-2 hover:decoration-black normal-case"
             >
-              DEVNECTAR
+              devNectar
             </a>
           </span>
         </div>

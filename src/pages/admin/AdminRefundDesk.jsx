@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Banknote,
   RefreshCw,
@@ -22,7 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  RotateCcw,
+  Truck
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
@@ -30,6 +33,7 @@ import { UpdateRefundModal } from '../../components/admin/UpdateRefundModal';
 import { PaymentDetailsModal } from '../../components/admin/PaymentDetailsModal';
 import { CustomerBankDetailsModal } from '../../components/admin/CustomerBankDetailsModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { ShiprocketRefundDeskView } from '../../components/admin/ShiprocketRefundDeskView';
 import * as XLSX from 'xlsx';
 
 const STATUS_OPTIONS = [
@@ -66,7 +70,7 @@ function getSourceReason(order) {
   if (order.return_type === 'exchange' || order.status === 'Exchanged') {
     return { label: 'Exchange Refund', badgeClass: 'bg-teal-50 text-teal-700 border-teal-200' };
   }
-  if (order.is_returned_order || (order.status || '').toLowerCase().includes('return')) {
+  if (order.is_returned_order || (order.status || '').toLowerCase().includes('return') || (order.status || '').toLowerCase().includes('received')) {
     return { label: 'Returned Order', badgeClass: 'bg-orange-50 text-orange-700 border-orange-200' };
   }
   return { label: 'Cancelled Order', badgeClass: 'bg-stone-100 text-stone-700 border-stone-200' };
@@ -160,7 +164,7 @@ function getPayoutInfo(order) {
   }
 
   // 6. COD
-  if (method === 'cod') {
+  if (method === 'cod' || method.includes('cod') || method.includes('cash')) {
     return {
       type: 'Cash on Delivery',
       masked: 'Awaiting Bank/UPI',
@@ -220,9 +224,27 @@ function escapeXml(str) {
 }
 
 export const AdminRefundDesk = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Active View Tab: 'payouts' (default refunds desk) vs 'shiprocket' (live reverse logistics)
+  const activeViewTab = searchParams.get('view') === 'shiprocket' ? 'shiprocket' : 'payouts';
+
+  const handleTabChange = (tab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'shiprocket') {
+      next.set('view', 'shiprocket');
+    } else {
+      next.delete('view');
+    }
+    setSearchParams(next);
+  };
+
+  // Read search or orderNumber query params on mount
+  const querySearch = searchParams.get('search') || searchParams.get('order') || searchParams.get('orderNumber') || '';
+
   // Filters & Search State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState(querySearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(querySearch);
   const [selectedStatus, setSelectedStatus] = useState('all');
 
   // Pagination & List State
@@ -275,6 +297,16 @@ export const AdminRefundDesk = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Sync search input if query params change
+  useEffect(() => {
+    const q = searchParams.get('search') || searchParams.get('order') || searchParams.get('orderNumber');
+    if (q !== null && q !== undefined) {
+      setSearchQuery(q);
+      setDebouncedSearch(q.trim());
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+
   // Clean up all reveal timers on unmount
   useEffect(() => {
     const timers = revealTimers.current;
@@ -289,6 +321,7 @@ export const AdminRefundDesk = () => {
     setError(null);
     try {
       const params = new URLSearchParams();
+      params.append('page', String(currentPage));
       params.append('limit', String(limit));
       params.append('offset', String((currentPage - 1) * limit));
       params.append('refundStatusFilter', selectedStatus);
@@ -298,8 +331,26 @@ export const AdminRefundDesk = () => {
       }
 
       const response = await apiClient(`/api/admin/refund-desk?${params.toString()}`);
-      const data = response?.orders || response?.data || [];
-      const count = response?.totalCount !== undefined ? response.totalCount : data.length;
+      const rawData = response?.orders || response?.data || [];
+      // Exclude pre-delivery COD orders: customer paid nothing, so no refund is owed or shown
+      const data = rawData.filter((order) => {
+        const isCod = (order.payment_method || '').toLowerCase().includes('cod') ||
+                      (order.payment_method || '').toLowerCase().includes('cash') ||
+                      (order.payment_type || '').toLowerCase().includes('cod');
+        const isDeliveredOrPaid = (order.status || '').toLowerCase() === 'delivered' ||
+                                  (order.original_status || '').toLowerCase() === 'delivered' ||
+                                  (order.payment_status || '').toLowerCase() === 'paid' ||
+                                  Boolean(order.delivered_at) ||
+                                  order.is_returned_order === true ||
+                                  (order.return_type || '').toLowerCase() === 'return' ||
+                                  (order.status || '').toLowerCase().includes('return') ||
+                                  (order.status || '').toLowerCase().includes('received');
+        return !(isCod && !isDeliveredOrPaid);
+      });
+      const rawCount = response?.totalCount !== undefined
+        ? response.totalCount
+        : (response?.pagination?.totalOrders !== undefined ? response.pagination.totalOrders : rawData.length);
+      const count = Math.max(0, rawCount - (rawData.length - data.length));
 
       setRefunds(data);
       setTotalCount(count);
@@ -325,6 +376,11 @@ export const AdminRefundDesk = () => {
     setDebouncedSearch('');
     setSelectedStatus('all');
     setCurrentPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete('search');
+    next.delete('order');
+    next.delete('orderNumber');
+    setSearchParams(next);
   };
 
   // Toggle inline sensitive payout details reveal (Eye icon click)
@@ -637,31 +693,37 @@ export const AdminRefundDesk = () => {
       {/* 1. PAGE HEADER BANNER (Compact)                                           */}
       {/* ========================================================================= */}
       <AdminPageHeader
-        title="Refund Desk"
-        subtitle="Track and process customer refunds, cancellations, and return payouts."
+        title={activeViewTab === 'shiprocket' ? 'Return Logistics & Shiprocket Reverse Desk' : 'Refund Desk'}
+        subtitle={
+          activeViewTab === 'shiprocket'
+            ? 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements.'
+            : 'Track and process customer refunds, cancellations, and return payouts.'
+        }
         className="py-2.5 px-4 sm:py-3 sm:px-5 rounded-xl"
         actions={
           <div className="flex items-center gap-2">
-            {/* Export Excel Button */}
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              disabled={isExporting || loading || refunds.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200/90 rounded-lg text-xs font-semibold text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export filtered refund cases to Excel"
-            >
-              {isExporting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-500" />
-                  <span>Exporting...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5 text-neutral-600" />
-                  <span>Export Excel</span>
-                </>
-              )}
-            </button>
+            {/* Export Excel Button (Only for Payouts View) */}
+            {activeViewTab === 'payouts' && (
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={isExporting || loading || refunds.length === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200/90 rounded-lg text-xs font-semibold text-brand-dark hover:bg-neutral-50 hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-dark transition-all duration-150 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export filtered refund cases to Excel"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-500" />
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Export Excel</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Refresh Button */}
             <button
@@ -678,10 +740,61 @@ export const AdminRefundDesk = () => {
         }
       />
 
-      {/* ========================================================================= */}
-      {/* 2. COMPACT SEARCH & FILTERS ROW                                           */}
-      {/* ========================================================================= */}
-      <div className="bg-white border border-neutral-200/80 rounded-xl px-3.5 py-2.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+      {/* View Switcher: Refunds & Payouts vs Shiprocket Reverse Logistics */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200/90 pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleTabChange('payouts')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeViewTab === 'payouts'
+                ? 'bg-brand-dark text-white shadow-xs ring-1 ring-brand-dark'
+                : 'bg-white text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 border border-neutral-200/80'
+            }`}
+          >
+            <Banknote className="w-3.5 h-3.5" />
+            <span>Refunds & Payouts Desk</span>
+            {totalCount !== undefined && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                activeViewTab === 'payouts' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}>
+                {totalCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('shiprocket')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeViewTab === 'shiprocket'
+                ? 'bg-brand-dark text-white shadow-xs ring-1 ring-brand-dark'
+                : 'bg-white text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 border border-neutral-200/80'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Shiprocket Reverse & Returns Desk</span>
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-300">
+              Reverse Logistics
+            </span>
+          </button>
+        </div>
+
+        <div className="text-[11px] text-neutral-500 font-medium">
+          {activeViewTab === 'payouts'
+            ? 'Manage customer bank refunds, payment gateway reversal UTRs, and payout approvals'
+            : 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements'}
+        </div>
+      </div>
+
+      {activeViewTab === 'shiprocket' ? (
+        <ShiprocketRefundDeskView onSelectOrder={(ord) => handleOpenOrderDetail(ord?.id || ord?.order_number)} />
+      ) : (
+        <>
+          {/* ========================================================================= */}
+          {/* 2. COMPACT SEARCH & FILTERS ROW                                           */}
+          {/* ========================================================================= */}
+          <div className="bg-white border border-neutral-200/80 rounded-xl px-3.5 py-2.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -1208,6 +1321,8 @@ export const AdminRefundDesk = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* ========================================================================= */}
       {/* 4. MODALS: Order Details Modal + Process Refund Modal                     */}

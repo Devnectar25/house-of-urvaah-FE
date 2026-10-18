@@ -67,6 +67,21 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
     const fetchInvoiceData = async () => {
       setLoading(true);
       setError(null);
+
+      // End users / customers may only access invoices once delivered
+      const isAdmin = Boolean(getAdminAuthToken());
+      const orderStatusStr = String(order?.status || '').toLowerCase();
+      const origStatusStr = String(order?.original_status || '').toLowerCase();
+      const isDelivered = orderStatusStr.includes('delivered') || origStatusStr.includes('delivered') || Boolean(order?.delivered_at || order?.deliveredAt);
+
+      if (order && !isAdmin && !isDelivered) {
+        if (isMounted) {
+          setError('Official tax invoice is only accessible once your order or replacement piece has been delivered.');
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const response = await apiClient(`/api/orders/${targetId}/invoice?format=json`);
         if (isMounted) {
@@ -77,6 +92,13 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
           }
         }
       } catch (err) {
+        if (err.message && err.message.toLowerCase().includes('delivered')) {
+          if (isMounted) {
+            setError(err.message);
+            setLoading(false);
+          }
+          return;
+        }
         console.warn('Could not fetch rich JSON invoice, falling back to order props:', err);
         // Fallback: assemble from existing order props
         if (isMounted && order) {

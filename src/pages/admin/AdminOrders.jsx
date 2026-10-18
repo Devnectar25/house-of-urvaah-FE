@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   ShoppingBag,
   Clock,
@@ -28,6 +28,7 @@ import { apiClient } from '../../lib/apiClient';
 import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../../lib/orderSync';
+import { ShiprocketOrderDeskView } from '../../components/admin/ShiprocketOrderDeskView';
 
 const checkStatusMatches = (orderStatus, filterStatus) => {
   if (!filterStatus || filterStatus === 'all') return true;
@@ -113,6 +114,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Cancelled', label: 'Cancelled' },
   { value: 'Return Requested', label: 'Return Requested' },
   { value: 'Return Approved', label: 'Return Approved' },
+  { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
   { value: 'Returned', label: 'Returned' },
   { value: 'Replacement Request Processing', label: 'Replacement Requested' },
@@ -178,6 +180,20 @@ const formatOrderDateTime = (dateStr) => {
 export const AdminOrders = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Active View Tab: 'orders' (default store order desk) vs 'shiprocket' (live forward fulfillment)
+  const activeViewTab = searchParams.get('view') === 'shiprocket' ? 'shiprocket' : 'orders';
+
+  const handleTabChange = (tab) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (tab === 'shiprocket') {
+      nextParams.set('view', 'shiprocket');
+    } else {
+      nextParams.delete('view');
+    }
+    setSearchParams(nextParams);
+  };
 
   // Stat Cards State
   const [stats, setStats] = useState(null);
@@ -717,8 +733,12 @@ export const AdminOrders = () => {
     <div className="space-y-6 pb-12">
       {/* Page Header Banner */}
       <AdminPageHeader
-        title="Order Management"
-        subtitle="Track, filter, and manage store orders, dispatch status, and customer payments."
+        title={activeViewTab === 'shiprocket' ? 'Order Fulfillment & Shiprocket Desk' : 'Order Management'}
+        subtitle={
+          activeViewTab === 'shiprocket'
+            ? 'Real-time courier allocation, AWB generation, shipping labels, and live transit tracking via Shiprocket.'
+            : 'Track, filter, and manage store orders, dispatch status, and customer payments.'
+        }
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -735,9 +755,60 @@ export const AdminOrders = () => {
         }
       />
 
-      {/* ========================================================================= */}
-      {/* 1. STAT CARDS / STATUS METRICS BREAKDOWN SECTION (ABOVE FILTERS)          */}
-      {/* ========================================================================= */}
+      {/* View Switcher: Store Orders vs Shiprocket Forward Desk */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200/90 pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleTabChange('orders')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeViewTab === 'orders'
+                ? 'bg-brand-dark text-white shadow-xs ring-1 ring-brand-dark'
+                : 'bg-white text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 border border-neutral-200/80'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>Store Orders & Processing</span>
+            {stats?.total !== undefined && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                activeViewTab === 'orders' ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
+              }`}>
+                {stats.total}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('shiprocket')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeViewTab === 'shiprocket'
+                ? 'bg-brand-dark text-white shadow-xs ring-1 ring-brand-dark'
+                : 'bg-white text-neutral-600 hover:text-brand-dark hover:bg-neutral-50 border border-neutral-200/80'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>Shiprocket Forward Desk</span>
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+              Live Fulfillment
+            </span>
+          </button>
+        </div>
+
+        <div className="text-[11px] text-neutral-500 font-medium">
+          {activeViewTab === 'orders'
+            ? 'Managing store orders, payment records, and lifecycle statuses'
+            : 'Live AWB generation, courier allocation, label printing, and tracking'}
+        </div>
+      </div>
+
+      {activeViewTab === 'shiprocket' ? (
+        <ShiprocketOrderDeskView onSelectOrder={handleOpenOrderDetail} />
+      ) : (
+        <>
+          {/* ========================================================================= */}
+          {/* 1. STAT CARDS / STATUS METRICS BREAKDOWN SECTION (ABOVE FILTERS)          */}
+          {/* ========================================================================= */}
       <div className="space-y-3 pt-1">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase font-admin">
@@ -1377,6 +1448,8 @@ export const AdminOrders = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Order Details Modal */}
       <OrderDetailModal

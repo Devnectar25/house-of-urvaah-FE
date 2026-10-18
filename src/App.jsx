@@ -194,6 +194,44 @@ export function AppContent() {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
+
+    // Global listener: Prevents background scrolling whenever SweetAlert2 or any modal is active
+    const handleWheelOrTouch = (e) => {
+      const isSwalShown = document.body.classList.contains('swal2-shown') || document.documentElement.classList.contains('swal2-shown');
+      const isModalOpen = document.body.getAttribute('data-modal-open') === 'true';
+
+      if (!isSwalShown && !isModalOpen) return;
+
+      if (isSwalShown) {
+        const swalContainer = document.querySelector('.swal2-container');
+        if (swalContainer) {
+          const popup = swalContainer.querySelector('.swal2-popup');
+          // If event is on backdrop or popup doesn't have scrollable height, stop background scroll
+          if (!popup || !popup.contains(e.target) || popup.scrollHeight <= popup.clientHeight) {
+            e.preventDefault();
+            return;
+          }
+          // If target is inside popup, prevent scroll bleed at top or bottom boundary
+          if (e.deltaY) {
+            const isScrollingDown = e.deltaY > 0;
+            const isScrollingUp = e.deltaY < 0;
+            const atTop = popup.scrollTop <= 0;
+            const atBottom = Math.ceil(popup.scrollTop + popup.clientHeight) >= popup.scrollHeight;
+            if ((isScrollingDown && atBottom) || (isScrollingUp && atTop)) {
+              e.preventDefault();
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('wheel', handleWheelOrTouch, { passive: false });
+    window.addEventListener('touchmove', handleWheelOrTouch, { passive: false });
+
+    return () => {
+      window.removeEventListener('wheel', handleWheelOrTouch);
+      window.removeEventListener('touchmove', handleWheelOrTouch);
+    };
   }, []);
 
   return (
@@ -218,14 +256,14 @@ export function AppContent() {
 
         <Route path="categories" element={<PermissionGuard moduleKey="categories"><AdminCategories /></PermissionGuard>} />
         <Route path="orders" element={<PermissionGuard moduleKey="orders"><AdminOrders /></PermissionGuard>} />
-        <Route path="shiprocket-order-desk" element={<PermissionGuard moduleKey="orders"><AdminShiprocketOrderDesk /></PermissionGuard>} />
+        <Route path="shiprocket-order-desk" element={<Navigate to="/admin/orders?view=shiprocket" replace />} />
         <Route path="cancellation-flow" element={<PermissionGuard moduleKey="orders"><AdminCancellationFlowDemo /></PermissionGuard>} />
         {/* <Route path="coupons" element={<PermissionGuard moduleKey="coupons"><AdminCoupons /></PermissionGuard>} /> */}
         <Route path="customers" element={<PermissionGuard moduleKey="customers"><AdminCustomers /></PermissionGuard>} />
         <Route path="leads" element={<PermissionGuard moduleKey="leads"><AdminLeads /></PermissionGuard>} />
         <Route path="refunds" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
-        <Route path="shiprocket-refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminShiprocketRefundDesk /></PermissionGuard>} />
+        <Route path="shiprocket-refund-desk" element={<Navigate to="/admin/refunds?view=shiprocket" replace />} />
         <Route path="email-notifications" element={<PermissionGuard moduleKey="email-notifications"><AdminEmailNotifications /></PermissionGuard>} />
         <Route path="newsletter" element={<PermissionGuard moduleKey="newsletter"><AdminNewsletter /></PermissionGuard>} />
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
