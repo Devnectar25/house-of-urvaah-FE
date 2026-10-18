@@ -719,7 +719,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
               rel="noopener noreferrer"
               className="text-[9px] tracking-widest text-neutral-400 hover:text-black transition-colors uppercase font-medium inline-block hover:underline"
             >
-              Powered by devnectar
+              Powered by <span className="normal-case font-semibold">devNectar</span>
             </a>
           </div>
         </motion.div>

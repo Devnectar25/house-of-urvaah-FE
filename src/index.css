@@ -424,6 +424,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   background: rgba(0, 0, 0, 0.6) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
+  overscroll-behavior: none !important;
 }
 
 div[class*="backdrop-blur-xs"],
@@ -431,6 +432,33 @@ div[class*="backdrop-blur-sm"],
 .modal-backdrop-blur {
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* ==========================================================================
+   Global Modal & SweetAlert2 Background Scroll Lock
+   Completely prevents background page scrolling when any modal, drawer,
+   dialog, or SweetAlert2 popup is open.
+   ========================================================================== */
+html.swal2-shown,
+body.swal2-shown,
+html.swal2-height-auto,
+body.swal2-height-auto,
+html[data-modal-open="true"],
+body[data-modal-open="true"] {
+  overflow: hidden !important;
+  height: 100% !important;
+  overscroll-behavior: none !important;
+}
+
+html.swal2-shown body,
+html[data-modal-open="true"] body {
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+.swal2-container {
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Seamless Full-Screen Dim & Blur for Admin Header during Modals */

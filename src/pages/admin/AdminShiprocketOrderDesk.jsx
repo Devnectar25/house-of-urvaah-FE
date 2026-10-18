@@ -22,7 +22,9 @@ import {
   MapPin,
   Calendar,
   Send,
-  Sliders
+  Sliders,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
@@ -36,6 +38,8 @@ export const AdminShiprocketOrderDesk = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // State: Live Pincode Serviceability Inspector
   const [inspectPincode, setInspectPincode] = useState('110001');
@@ -56,7 +60,7 @@ export const AdminShiprocketOrderDesk = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient('/api/orders?limit=50').catch(() => ({ data: [] }));
+      const res = await apiClient('/api/orders?limit=500').catch(() => ({ data: [] }));
       const orderList = Array.isArray(res?.data) ? res.data : (res?.orders || []);
       setOrders(orderList);
     } catch (err) {
@@ -122,6 +126,41 @@ export const AdminShiprocketOrderDesk = () => {
       return true;
     });
   }, [orders, searchTerm, stageFilter]);
+
+  // Reset page when search or stage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, stageFilter]);
+
+  // Pagination Calculations
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, safeCurrentPage, pageSize]);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = [];
+    pages.push(1);
+    if (safeCurrentPage > 3) {
+      pages.push('...');
+    }
+    const start = Math.max(2, safeCurrentPage - 1);
+    const end = Math.min(totalPages - 1, safeCurrentPage + 1);
+    for (let p = start; p <= end; p++) {
+      pages.push(p);
+    }
+    if (safeCurrentPage < totalPages - 2) {
+      pages.push('...');
+    }
+    pages.push(totalPages);
+    return pages;
+  };
 
   // Inspect Live Scans
   const handleViewTracking = async (awb) => {
@@ -302,7 +341,8 @@ export const AdminShiprocketOrderDesk = () => {
             <p className="text-xs text-neutral-500">No forward shipments match your filter criteria.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-[10px] font-semibold">
                 <tr>
@@ -315,7 +355,7 @@ export const AdminShiprocketOrderDesk = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filteredOrders.map(ord => {
+                {paginatedOrders.map(ord => {
                   const s = ord.status || 'Placed';
                   const isDelivered = s === 'Delivered';
                   const isOFD = s === 'Out for Delivery';
@@ -334,7 +374,10 @@ export const AdminShiprocketOrderDesk = () => {
                           {ord.recipient_name || ord.user_name || 'Customer'}
                         </span>
                         <span className="text-[10px] text-neutral-400">
-                          {ord.city || 'Mumbai'}, {ord.pincode || '400001'}
+                          {[
+                            ord.city || ord.shipping_address?.city,
+                            ord.postal_code || ord.pincode || ord.shipping_address?.postal_code || ord.shipping_address?.pincode
+                          ].filter(Boolean).join(', ') || 'Address on file'}
                         </span>
                       </td>
 
@@ -403,8 +446,92 @@ export const AdminShiprocketOrderDesk = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+
+          {/* Pagination Bar */}
+          {!loading && filteredOrders.length > 0 && (
+            <div className="pt-4 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-sans">
+              <div className="flex items-center gap-3 text-neutral-500">
+                <span>
+                  Showing <strong className="font-semibold text-neutral-900">{(safeCurrentPage - 1) * pageSize + 1}</strong>–
+                  <strong className="font-semibold text-neutral-900">{Math.min(safeCurrentPage * pageSize, filteredOrders.length)}</strong> of{' '}
+                  <strong className="font-semibold text-neutral-900">{filteredOrders.length}</strong> shipments
+                </span>
+                <span className="text-neutral-300">|</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="bg-neutral-50 border border-neutral-200 text-neutral-800 text-[11px] rounded-lg px-2 py-1 focus:outline-hidden font-semibold cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Prev</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers().map((p, idx) => {
+                      if (p === '...') {
+                        return (
+                          <span key={`sr-desk-ellipsis-${idx}`} className="w-7 text-center text-neutral-400 text-xs">
+                            ...
+                          </span>
+                        );
+                      }
+                      const isActive = p === safeCurrentPage;
+                      return (
+                        <button
+                          key={`sr-desk-page-${p}`}
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          className={`min-w-7 h-7 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-neutral-900 text-white shadow-xs'
+                              : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100 hover:text-black'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={safeCurrentPage >= totalPages}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
+                    title="Next Page"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
 
       {/* 6. Live Tracking Scans Drawer Modal */}
       {activeTrackingAwb && (

@@ -35,10 +35,15 @@ export const shippingApi = {
   },
 
   // 5. Assign AWB (Admin)
-  async assignAwb(shipmentId, courierId = null) {
+  async assignAwb(shipmentId, courierId = null, orderId = null, orderNumber = null) {
     return apiFetch('/api/shipping/courier/assign-awb', {
       method: 'POST',
-      body: JSON.stringify({ shipment_id: shipmentId, courier_id: courierId })
+      body: JSON.stringify({
+        shipment_id: shipmentId,
+        courier_id: courierId,
+        order_id: orderId,
+        order_number: orderNumber
+      })
     });
   },
 
@@ -138,12 +143,14 @@ export const shippingApi = {
   },
 
   // 17. Dispatch Replacement Item
-  async dispatchReplacement(originalOrder, replacementItems = []) {
+  async dispatchReplacement(originalOrder, replacementItems = [], options = {}) {
     return apiFetch('/api/shipping/replacement/dispatch', {
       method: 'POST',
       body: JSON.stringify({
         original_order: originalOrder,
-        replacement_items: replacementItems.length ? replacementItems : (originalOrder.items || [])
+        replacement_items: replacementItems.length ? replacementItems : (originalOrder.items || []),
+        replacement_size: options.replacement_size || options.replacementSize || originalOrder.replacement_size,
+        notes: options.notes
       })
     });
   }

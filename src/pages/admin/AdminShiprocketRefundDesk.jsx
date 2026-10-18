@@ -21,6 +21,8 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   Check,
   ExternalLink
@@ -37,6 +39,8 @@ export const AdminShiprocketRefundDesk = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [scenarioFilter, setScenarioFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // State: Interactive Sandbox Simulator
   const [selectedOrderNumber, setSelectedOrderNumber] = useState('');
@@ -57,11 +61,11 @@ export const AdminShiprocketRefundDesk = () => {
     setError(null);
     try {
       // 1. Fetch from cancelled/refund desk endpoint
-      const cancelledRes = await apiClient('/api/admin/cancelled-orders?refundStatusFilter=all&limit=50').catch(() => ({ data: [] }));
+      const cancelledRes = await apiClient('/api/admin/cancelled-orders?refundStatusFilter=all&limit=200').catch(() => ({ data: [] }));
       const cancelledList = cancelledRes?.data || [];
 
       // 2. Fetch all orders (to include Delivered orders eligible for returns)
-      const allOrdersRes = await apiClient('/api/orders?limit=50').catch(() => ({ data: [] }));
+      const allOrdersRes = await apiClient('/api/orders?limit=200').catch(() => ({ data: [] }));
       const allList = allOrdersRes?.data || [];
 
       // Merge and deduplicate by ID
@@ -148,6 +152,41 @@ export const AdminShiprocketRefundDesk = () => {
       return true;
     });
   }, [orders, searchTerm, scenarioFilter]);
+
+  // Reset pagination when search or scenario filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, scenarioFilter]);
+
+  // Pagination Calculations
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [filteredOrders, safeCurrentPage, pageSize]);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = [];
+    pages.push(1);
+    if (safeCurrentPage > 3) {
+      pages.push('...');
+    }
+    const start = Math.max(2, safeCurrentPage - 1);
+    const end = Math.min(totalPages - 1, safeCurrentPage + 1);
+    for (let p = start; p <= end; p++) {
+      pages.push(p);
+    }
+    if (safeCurrentPage < totalPages - 2) {
+      pages.push('...');
+    }
+    pages.push(totalPages);
+    return pages;
+  };
 
   // Handle Scenario Execution
   const handleExecuteScenario = async () => {
@@ -582,7 +621,7 @@ export const AdminShiprocketRefundDesk = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {filteredOrders.map(ord => {
+                {paginatedOrders.map(ord => {
                   const s = ord.status || 'Pending';
                   const rs = ord.refund_status || 'Pending';
                   const isHomved = s.includes('Homved') || s === 'Received at Homved';
@@ -681,6 +720,89 @@ export const AdminShiprocketRefundDesk = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* 5. Pagination Footer Bar */}
+        {!loading && filteredOrders.length > 0 && (
+          <div className="p-4 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-sans">
+            <div className="flex items-center gap-3 text-neutral-500">
+              <span>
+                Showing <strong className="font-semibold text-neutral-900">{(safeCurrentPage - 1) * pageSize + 1}</strong>–
+                <strong className="font-semibold text-neutral-900">{Math.min(safeCurrentPage * pageSize, filteredOrders.length)}</strong> of{' '}
+                <strong className="font-semibold text-neutral-900">{filteredOrders.length}</strong> claims
+              </span>
+              <span className="text-neutral-300">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-neutral-400">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-neutral-50 border border-neutral-200 text-neutral-800 text-[11px] rounded-lg px-2 py-1 focus:outline-hidden font-semibold cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((p, idx) => {
+                    if (p === '...') {
+                      return (
+                        <span key={`sr-refund-ellipsis-${idx}`} className="w-7 text-center text-neutral-400 text-xs">
+                          ...
+                        </span>
+                      );
+                    }
+                    const isActive = p === safeCurrentPage;
+                    return (
+                      <button
+                        key={`sr-refund-page-${p}`}
+                        type="button"
+                        onClick={() => setCurrentPage(p)}
+                        className={`min-w-7 h-7 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-neutral-900 text-white shadow-xs'
+                            : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100 hover:text-black'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed transition-colors text-[11px] font-semibold"
+                  title="Next Page"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

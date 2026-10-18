@@ -12,6 +12,7 @@ export const forceUnlockScroll = () => {
   activeLocksCount = 0;
   if (typeof document !== 'undefined') {
     document.body.removeAttribute('data-modal-open');
+    document.documentElement.removeAttribute('data-modal-open');
     document.documentElement.style.overflow = '';
     document.documentElement.style.height = '';
     document.documentElement.style.overscrollBehavior = '';
@@ -45,10 +46,8 @@ export const useModalScrollLock = (isOpen, onClose) => {
     if (!isOpen || typeof document === 'undefined') return;
 
     if (activeLocksCount === 0) {
-      if (typeof window !== 'undefined') {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      }
       document.body.setAttribute('data-modal-open', 'true');
+      document.documentElement.setAttribute('data-modal-open', 'true');
 
       initialHtmlOverflow = document.documentElement.style.overflow || '';
       initialHtmlHeight = document.documentElement.style.height || '';
@@ -80,6 +79,42 @@ export const useModalScrollLock = (isOpen, onClose) => {
 
     activeLocksCount++;
 
+    // Prevent background wheel and touch scrolling when target has no scroll room
+    const handleActiveWheelOrTouch = (e) => {
+      let target = e.target;
+      let canScroll = false;
+
+      while (target && target !== document.body && target !== document.documentElement) {
+        const style = window.getComputedStyle(target);
+        const overflowY = style.overflowY;
+
+        if ((overflowY === 'auto' || overflowY === 'scroll') && target.scrollHeight > target.clientHeight) {
+          if (e.deltaY) {
+            const isScrollingDown = e.deltaY > 0;
+            const isScrollingUp = e.deltaY < 0;
+            const atTop = target.scrollTop <= 0;
+            const atBottom = Math.ceil(target.scrollTop + target.clientHeight) >= target.scrollHeight;
+
+            if ((isScrollingDown && !atBottom) || (isScrollingUp && !atTop)) {
+              canScroll = true;
+              break;
+            }
+          } else {
+            canScroll = true;
+            break;
+          }
+        }
+        target = target.parentElement;
+      }
+
+      if (!canScroll) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', handleActiveWheelOrTouch, { passive: false });
+    window.addEventListener('touchmove', handleActiveWheelOrTouch, { passive: false });
+
     // ESC key listener
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && typeof onCloseRef.current === 'function') {
@@ -89,11 +124,14 @@ export const useModalScrollLock = (isOpen, onClose) => {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      window.removeEventListener('wheel', handleActiveWheelOrTouch);
+      window.removeEventListener('touchmove', handleActiveWheelOrTouch);
       window.removeEventListener('keydown', handleKeyDown);
       activeLocksCount = Math.max(0, activeLocksCount - 1);
 
       if (activeLocksCount === 0) {
         document.body.removeAttribute('data-modal-open');
+        document.documentElement.removeAttribute('data-modal-open');
         document.documentElement.style.overflow = initialHtmlOverflow;
         document.documentElement.style.height = initialHtmlHeight;
         document.documentElement.style.overscrollBehavior = '';
