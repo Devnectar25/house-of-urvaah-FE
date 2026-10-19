@@ -63,7 +63,10 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Replacement Out for Delivery', label: 'Replacement Out for Delivery' },
   { value: 'Replaced', label: 'Replaced' },
   { value: 'Replace Rejected', label: 'Replace Rejected' },
-  { value: 'Exchanged', label: 'Exchanged' }
+  { value: 'Exchanged', label: 'Exchanged' },
+  { value: 'Return & Replacement Processing', label: 'Return & Replacement Processing' },
+  { value: 'Return & Replacement Approved', label: 'Return & Replacement Approved (Pickup Scheduled)' },
+  { value: 'Returned & Replaced', label: 'Returned & Replaced (Completed)' }
 ];
 
 const PAYMENT_STATUS_OPTIONS = [
@@ -76,6 +79,10 @@ const PAYMENT_STATUS_OPTIONS = [
 const getRequestedReplacementSize = (ord) => {
   if (!ord) return 'M';
   if (ord.replacement_size) return ord.replacement_size;
+  if (Array.isArray(ord.items)) {
+    const repItem = ord.items.find(it => it.replacement_size || (it.return_action || '').toLowerCase() === 'replace');
+    if (repItem && repItem.replacement_size) return repItem.replacement_size;
+  }
   const combined = `${ord.cancel_reason || ''} ${ord.return_reason || ''}`;
   const match = combined.match(/Preferred Size:\s*([A-Za-z0-9]+)/i) || 
                 combined.match(/Size:\s*([A-Za-z0-9]+)/i);
@@ -557,6 +564,120 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  const handleApproveMixedReturnReplace = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Return & Replacement Approved'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Return & Replacement Approved',
+        logistics_status: 'Pickup Scheduled'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Return & Replacement Approved');
+      setSelectedStatus('Return & Replacement Approved');
+      confirmedRef.current.status = 'Return & Replacement Approved';
+      setSaveSuccessMsg('Return & Replacement approved! Doorstep reverse pickup scheduled with Delhivery.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Return & Replacement Approved',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Return & Replacement Approved',
+          isPreview: false
+        });
+      }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Return & Replacement Approved'
+      });
+    } catch (err) {
+      console.error('Failed to approve return & replacement:', err);
+      setSaveError(err.message || 'Failed to approve return & replacement request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleRejectMixedReturnReplace = async () => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Return & Replacement Rejected',
+          cancelReason: 'Return & Replacement request rejected by Admin'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Delivered'
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus('Delivered');
+      setSelectedStatus('Delivered');
+      confirmedRef.current.status = 'Delivered';
+      setSaveSuccessMsg('Return & replacement request rejected. Order remains Delivered.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Delivered',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Delivered',
+          isPreview: false
+        });
+      }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Delivered'
+      });
+    } catch (err) {
+      console.error('Failed to reject return & replacement:', err);
+      setSaveError(err.message || 'Failed to reject return & replacement request.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handleApproveReplacement = async () => {
     if (!order) return;
     setSavingStatus(true);
@@ -803,7 +924,12 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSaveError(null);
     try {
       const sizeToUse = targetSize || customReplacementSize || getRequestedReplacementSize(order);
-      const res = await shippingApi.dispatchReplacement(order, order.items || [], {
+      const repItemsOnly = Array.isArray(order.items)
+        ? order.items.filter(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+        : [];
+      const itemsToDispatch = repItemsOnly.length > 0 ? repItemsOnly : (order.items || []);
+
+      const res = await shippingApi.dispatchReplacement(order, itemsToDispatch, {
         replacement_size: sizeToUse
       });
 
@@ -811,9 +937,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         const newOrderNum = res.replacement_order_number || res.order_number;
         const newOrderId = res.replacement_order_id;
 
+        const isMixed = Boolean(
+          (order?.return_type || '').toLowerCase().includes('mixed') ||
+          (order?.status || '').toLowerCase().includes('& replacement')
+        );
+        const nextStatus = isMixed ? (order.refund_status === 'Completed' ? 'Returned & Replaced' : order.status) : 'Replaced';
+
         const updatedData = {
           ...order,
-          status: 'Replaced',
+          status: nextStatus,
           logistics_status: 'Replacement Order Dispatched',
           replacement_order_id: newOrderId,
           replacement_order_number: newOrderNum,
@@ -1189,7 +1321,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setLogisticsLoading(true);
     setLogisticsMsg(null);
     try {
-      const res = await shippingApi.createReturnOrder(order, order.items, 'Customer return approved by admin');
+      const itemsToPickup = Array.isArray(order.items) && order.items.length
+        ? order.items.filter(i => {
+            const act = (i.return_action || '').toLowerCase();
+            const stat = (i.status || '').toLowerCase();
+            if (act === 'keep') return false;
+            if (stat === 'delivered' && act !== 'return' && act !== 'replace') return false;
+            return true;
+          })
+        : [];
+      const itemsToSend = itemsToPickup.length > 0 ? itemsToPickup : order.items;
+      const res = await shippingApi.createReturnOrder(order, itemsToSend, 'Customer return approved by admin');
       const updated = {
         ...order,
         tracking_number: res.awb_code,
@@ -1201,7 +1343,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setOrder(updated);
       setLogisticsMsg({
         type: 'success',
-        text: `Reverse Pickup Scheduled! AWB: ${res.awb_code} (Pickup from customer within 24-48 hrs).`
+        text: `Reverse Pickup Scheduled for ${itemsToSend.length} item(s)! AWB: ${res.awb_code} (Pickup from customer within 24-48 hrs).`
       });
       if (onStatusUpdated || onOrderUpdated) {
         (onStatusUpdated || onOrderUpdated)(updated);
@@ -1220,10 +1362,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setLogisticsLoading(true);
     setLogisticsMsg(null);
     try {
-      const res = await shippingApi.dispatchReplacement(order, order.items);
+      const replaceItems = (order.items || []).filter(i => {
+        const act = (i.return_action || '').toLowerCase();
+        const stat = (i.status || '').toLowerCase();
+        return act === 'replace' || stat.includes('replace') || stat.includes('exchange');
+      });
+      const itemsToSend = replaceItems.length > 0 ? replaceItems : order.items;
+      const res = await shippingApi.dispatchReplacement(order, itemsToSend);
       setLogisticsMsg({
         type: 'success',
-        text: `Replacement Dispatched! Order: ${res.order_number}, AWB: ${res.awb_code} (${res.courier_name}).`
+        text: `Replacement Dispatched for ${itemsToSend.length} item(s)! Order: ${res.order_number}, AWB: ${res.awb_code} (${res.courier_name}).`
       });
     } catch (err) {
       setLogisticsMsg({ type: 'error', text: err.message || 'Failed to dispatch replacement.' });
@@ -1238,15 +1386,20 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const totalAmount = parseFloat(order?.total || 0);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200 font-admin overscroll-contain"
-      onClick={handleCloseModal}
-      onWheel={(e) => {
-        if (e.target === e.currentTarget) {
-          e.stopPropagation();
-        }
-      }}
-    >
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in duration-200 font-admin overscroll-contain"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            handleCloseModal();
+          }
+        }}
+        onWheel={(e) => {
+          if (e.target === e.currentTarget) {
+            e.stopPropagation();
+          }
+        }}
+      >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-neutral-200 my-auto transition-all max-h-[85vh] sm:max-h-[88vh] flex flex-col overscroll-contain"
         onClick={(e) => e.stopPropagation()}
@@ -1626,8 +1779,408 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 </div>
               )}
 
+              {/* Customer Mixed Return & Replacement Review Banner */}
+              {Boolean(
+                (order?.return_type || '').toLowerCase().includes('mixed') ||
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('& replacement') ||
+                (
+                  Array.isArray(order?.items) &&
+                  order.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
+                  order.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+                )
+              ) && (['return & replacement processing', 'return and replacement processing', 'return & replacement requested'].includes(
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+              )) && (
+                <div className="bg-gradient-to-r from-purple-50 via-sky-50 to-indigo-50 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-lg text-indigo-800 shrink-0 mt-0.5">
+                      <RefreshCw className="w-5 h-5 text-indigo-700" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-2">
+                          <span>Customer Mixed Return & Replacement Request (Simultaneous)</span>
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
+                          Action Required
+                        </span>
+                      </div>
+                      <p className="text-xs text-indigo-900/90 leading-relaxed">
+                        The customer has requested to return 1 or more items for a refund and exchange 1 or more items for a different size simultaneously. Approving will confirm both actions and coordinate a single reverse pickup with Delhivery for the customer doorstep.
+                      </p>
+
+                      {/* Itemised Breakdown Card */}
+                      <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {/* Exchange Item(s) */}
+                        <div className="p-2.5 bg-purple-50/80 border border-purple-200 rounded-lg">
+                          <span className="text-[10px] font-bold text-purple-900 uppercase block mb-1">
+                            🔄 Replacement Item(s)
+                          </span>
+                          {Array.isArray(order.items) && order.items.filter(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace')).map((it, idx) => (
+                            <div key={idx} className="font-medium text-neutral-900 text-[11px] leading-tight">
+                              {it.name || `Product #${it.product_id}`} <span className="font-bold text-purple-800">(Replace with Size: {it.replacement_size || customReplacementSize || 'L'})</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Return Item(s) */}
+                        <div className="p-2.5 bg-sky-50/80 border border-sky-200 rounded-lg">
+                          <span className="text-[10px] font-bold text-sky-900 uppercase block mb-1">
+                            ↩️ Return & Refund Item(s)
+                          </span>
+                          {Array.isArray(order.items) && order.items.filter(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')).map((it, idx) => (
+                            <div key={idx} className="font-medium text-neutral-900 text-[11px] leading-tight flex justify-between items-center">
+                              <span>{it.name || `Product #${it.product_id}`}</span>
+                              <span className="font-bold text-emerald-800">Refund: ₹{Number(order.refund_eligible_amount || it.price || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {(order.cancel_reason || order.return_reason) && (
+                        <div className="mt-2 p-2.5 bg-white/80 border border-indigo-200/80 rounded-lg text-xs">
+                          <span className="text-[10px] font-bold text-indigo-900 uppercase block">Customer Notes & Fit Reason:</span>
+                          <p className="text-neutral-800 font-medium mt-0.5">{order.cancel_reason || order.return_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-indigo-200">
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleRejectMixedReturnReplace}
+                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Reject Request
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStatus}
+                      onClick={handleApproveMixedReturnReplace}
+                      className="px-5 py-2 bg-indigo-900 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingStatus ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-indigo-200" />
+                          <span>Approve Return & Replacement (Schedule Pickup)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* COMPREHENSIVE SIMULTANEOUS RETURN & REPLACEMENT (MIXED LIFECYCLE) HUB */}
+              {(() => {
+                const isMixed = Boolean(
+                  (order?.return_type || '').toLowerCase().includes('mixed') ||
+                  (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('& replacement') ||
+                  (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('returned & replaced') ||
+                  (
+                    Array.isArray(order?.items) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+                  )
+                );
+                if (!isMixed) return null;
+
+                const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+                const curLog = (order?.logistics_status || '').toLowerCase();
+                const repOrderNum = order?.replacement_order_number;
+
+                const isS2 = ['return & replacement approved', 'replace approved', 'return approved', 'in transit to house of urvaah', 'received at house of urvaah', 'replaced', 'returned', 'returned & replaced'].includes(curSt) || Boolean(repOrderNum) || (curLog.includes('reverse') && (curLog.includes('pickup') || curLog.includes('awb')));
+                const isS3 = ['in transit to house of urvaah', 'received at house of urvaah', 'replaced', 'returned', 'returned & replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS3Active = (['return & replacement approved', 'replace approved', 'return approved'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3;
+                const isS4 = ['received at house of urvaah', 'replaced', 'returned', 'returned & replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS4Active = (['in transit to house of urvaah'].includes(curSt) || curLog.includes('transit')) && !isS4;
+                const isS5 = Boolean(repOrderNum) && (order?.refund_status === 'Completed' || curSt === 'returned & replaced');
+                const isS5Active = ['received at house of urvaah'].includes(curSt) && !isS5;
+                const stepNum = isS5 ? 5 : isS5Active ? 5 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
+
+                const reqSize = customReplacementSize || getRequestedReplacementSize(order);
+                const refundAmount = Number(order.refund_eligible_amount || 0);
+
+                return (
+                  <div className="bg-gradient-to-br from-indigo-50/70 via-purple-50/70 to-sky-50/70 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-xs">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-indigo-200/80 pb-3 flex-wrap gap-2">
+                      <div className="flex items-center gap-2 text-xs font-bold font-admin text-indigo-950 uppercase tracking-wider">
+                        <RefreshCw className="w-4 h-4 text-indigo-700" />
+                        <span>Simultaneous Return & Replacement Journey</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
+                          Step {stepNum} of 5 Active
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-900 border border-purple-200 uppercase">
+                          Mixed Lifecycle
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 5-Step Stepper */}
+                    <div className="bg-white border border-indigo-200/90 rounded-xl p-3 sm:p-4 shadow-2xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                        {/* Step 1: Requested */}
+                        <div className="p-2.5 rounded-lg border bg-indigo-50/60 border-indigo-300">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-indigo-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0">✓</div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-950">1. Requested</span>
+                          </div>
+                          <p className="text-[10px] text-indigo-800 mt-1 pl-6">Mixed: Return + Replace</p>
+                        </div>
+
+                        {/* Step 2: Approved */}
+                        <div className={`p-2.5 rounded-lg border ${isS2 ? 'bg-indigo-50/60 border-indigo-300' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS2 ? 'bg-indigo-700 text-white' : 'bg-neutral-300 text-neutral-600'}`}>{isS2 ? '✓' : '2'}</div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">2. Approved</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS2 ? 'Reverse Pickup Scheduled' : 'Pending Review'}</p>
+                        </div>
+
+                        {/* Step 3: Courier Pickup */}
+                        <div className={`p-2.5 rounded-lg border ${isS3 ? 'bg-indigo-50/60 border-indigo-300' : isS3Active ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS3 ? 'bg-indigo-700 text-white' : isS3Active ? 'bg-amber-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>{isS3 ? '✓' : '3'}</div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">3. Handover</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS3 ? 'Collected & In Transit' : isS3Active ? 'Rider Assigned' : 'Doorstep Pickup'}</p>
+                        </div>
+
+                        {/* Step 4: Atelier QC */}
+                        <div className={`p-2.5 rounded-lg border ${isS4 ? 'bg-indigo-50/60 border-indigo-300' : isS4Active ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS4 ? 'bg-indigo-700 text-white' : isS4Active ? 'bg-blue-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>{isS4 ? '✓' : '4'}</div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Atelier QC</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS4 ? 'Both Pieces Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}</p>
+                        </div>
+
+                        {/* Step 5: Completed */}
+                        <div className={`p-2.5 rounded-lg border ${isS5 ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : isS5Active ? 'bg-purple-100 border-purple-300 ring-1 ring-purple-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS5 ? 'bg-emerald-700 text-white' : isS5Active ? 'bg-indigo-700 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>{isS5 ? '✓' : '5'}</div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Settle & Dispatch</span>
+                          </div>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS5 ? 'Both Completed' : isS5Active ? 'Ready to Fulfill' : 'Refund & Exchange'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ACTION PANELS ACCORDING TO STAGES */}
+                    {/* 1. If Awaiting Pickup / Approved (Step 2 or 3 Active) */}
+                    {(['return & replacement approved', 'replace approved', 'return approved'].includes(curSt) || isS3Active) && !isS3 && (
+                      <div className="bg-white border border-indigo-200 rounded-xl p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <Truck className="w-4 h-4 text-indigo-700" />
+                            <span>Doorstep Reverse Collection Scheduled</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            Delhivery reverse courier has been scheduled. The rider will collect both original pieces from the customer address. When the customer hands over the package, confirm below:
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            onClick={() => setIsLabelModalOpen(true)}
+                            className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                            <span>Return Label (PDF)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsManifestModalOpen(true)}
+                            className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                            <span>Pickup Manifest</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleMarkReplacementCollected}
+                            className="px-4 py-2 bg-indigo-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <PackageCheck className="w-4 h-4 text-emerald-400" />
+                            <span>Confirm Doorstep Pickup ➔ In Reverse Transit (Step 4)</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. If Parcel In Reverse Transit (Step 4 Active) */}
+                    {(curSt === 'in transit to house of urvaah' || isS4Active) && !isS4 && (
+                      <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <Building className="w-4 h-4 text-blue-700" />
+                            <span>Parcel In Reverse Transit to House of Urvaah Atelier</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            Courier collected both pieces from customer. Once the parcel physically arrives at the atelier and passes quality inspection (QC), confirm receipt below:
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleConfirmReplacementQCReceived}
+                            className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                            <span>Confirm Both Pieces Received at Atelier & Restocked (QC Passed)</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. If Received at Atelier (Step 5 Active) - Dual Settlement Panel */}
+                    {(curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active || isS5) && (
+                      <div className="space-y-3">
+                        {/* Dual Fulfillment Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {/* A. Exchange Piece Fulfillment */}
+                          <div className="bg-white border-2 border-purple-300 rounded-xl p-4 space-y-3 shadow-2xs">
+                            <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                              <span className="text-xs font-bold uppercase text-purple-950 flex items-center gap-1.5">
+                                <RefreshCw className="w-4 h-4 text-purple-700" />
+                                <span>1. Exchange Piece Dispatch</span>
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${repOrderNum ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-purple-100 text-purple-800 border-purple-200'}`}>
+                                {repOrderNum ? 'Order Dispatched' : 'Ready to Dispatch'}
+                              </span>
+                            </div>
+
+                            {repOrderNum ? (
+                              <div className="space-y-2">
+                                <p className="text-xs text-emerald-900 font-semibold flex items-center gap-1">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                  <span>Replacement Order Live: #{repOrderNum}</span>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenReplacementOrder(repOrderNum)}
+                                  className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  <span>Open Replacement Order #{repOrderNum}</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <p className="text-xs text-neutral-600">
+                                  QC passed for original item. Confirm replacement size and generate the forward exchange order with 100% credit (₹0 balance).
+                                </p>
+                                <div>
+                                  <span className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">
+                                    Garment Size for Replacement:
+                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                                      <button
+                                        key={sz}
+                                        type="button"
+                                        onClick={() => setCustomReplacementSize(sz)}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
+                                          customReplacementSize === sz
+                                            ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                        }`}
+                                      >
+                                        {sz}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={savingStatus}
+                                  onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
+                                  className="w-full py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                  {savingStatus ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <PackagePlus className="w-4 h-4 text-purple-300" />
+                                      <span>Generate & Dispatch Size {customReplacementSize || reqSize}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* B. Return Item Refund Settlement */}
+                          <div className="bg-white border-2 border-sky-300 rounded-xl p-4 space-y-3 shadow-2xs">
+                            <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                              <span className="text-xs font-bold uppercase text-sky-950 flex items-center gap-1.5">
+                                <Banknote className="w-4 h-4 text-sky-700" />
+                                <span>2. Return Item Refund Settlement</span>
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${order.refund_status === 'Completed' || order.refund_status === 'Refunded' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                                {order.refund_status === 'Completed' || order.refund_status === 'Refunded' ? 'Refund Settled' : 'Ready for Payout'}
+                              </span>
+                            </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs text-neutral-600">
+                                Customer is eligible for refund on the returned item. Settlement is disbursed via Refund Desk directly to customer's account.
+                              </p>
+                              <div className="p-2.5 bg-sky-50 rounded-lg text-xs space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-neutral-500">Refund Amount:</span>
+                                  <span className="font-bold text-emerald-700 text-sm">₹{refundAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="text-neutral-500">Refund Desk Status:</span>
+                                  <span className="font-semibold text-neutral-800">{order.refund_status || 'Pending'}</span>
+                                </div>
+                              </div>
+                              <a
+                                href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                              >
+                                <Banknote className="w-4 h-4 text-emerald-200" />
+                                <span>Open in Refund Desk (Disburse ₹{refundAmount.toLocaleString('en-IN')})</span>
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-300" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* COMPREHENSIVE REPLACEMENT & EXCHANGE LIFECYCLE SECTION */}
               {(() => {
+                const isMixed = Boolean(
+                  (order?.return_type || '').toLowerCase().includes('mixed') ||
+                  (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('& replacement') ||
+                  (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('returned & replaced') ||
+                  (
+                    Array.isArray(order?.items) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+                  )
+                );
+                if (isMixed) return null;
+
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const returnType = (order?.return_type || '').toLowerCase();
@@ -1956,6 +2509,18 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const returnType = (order?.return_type || '').toLowerCase();
+
+                const isMixed = Boolean(
+                  (order?.return_type || '').toLowerCase().includes('mixed') ||
+                  curSt.includes('& replacement') ||
+                  curSt.includes('returned & replaced') ||
+                  (
+                    Array.isArray(order?.items) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
+                    order.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+                  )
+                );
+                if (isMixed) return null;
 
                 // Mutually exclusive: If Exchange Journey is active or order is in replacement lifecycle, never show Return Journey
                 const isReplacementRelated = (
@@ -2766,14 +3331,50 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 <span className="font-admin font-bold text-brand-dark truncate">
                                   {item.name || item.title || `Product #${item.product_id}`}
                                 </span>
-                                {item.status && (
-                                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
-                                    {item.status}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const act = (item.return_action || '').toLowerCase();
+                                  const stat = (item.status || '').toLowerCase();
+                                  if (act === 'keep') {
+                                    return (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                        Kept by Customer
+                                      </span>
+                                    );
+                                  }
+                                  if (act === 'replace' || stat.includes('replace') || stat.includes('exchange')) {
+                                    return (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-900 border border-purple-200">
+                                        Replace (Size: {item.replacement_size || 'M'})
+                                      </span>
+                                    );
+                                  }
+                                  if (act === 'return' || stat.includes('return')) {
+                                    return (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                        Return Requested
+                                      </span>
+                                    );
+                                  }
+                                  if (stat.includes('cancel')) {
+                                    return (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                                        Cancelled
+                                      </span>
+                                    );
+                                  }
+                                  if (item.status) {
+                                    return (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
+                                        {item.status}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               <p className="text-[11px] text-neutral-500 mt-0.5">
                                 Qty: <span className="font-medium text-brand-dark">{qty}</span> × ₹{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                {item.size && <span className="ml-2">• Size: {item.size}</span>}
                               </p>
                             </div>
                           </div>
@@ -2836,6 +3437,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           </button>
         </div>
       </div>
+    </div>
 
       {/* Official Haute Couture Invoice Modal */}
       <InvoiceModal
@@ -2858,7 +3460,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         onClose={() => setIsManifestModalOpen(false)}
         order={order}
       />
-    </div>
+    </>
   );
 };
 

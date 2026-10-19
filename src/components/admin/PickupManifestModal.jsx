@@ -83,6 +83,12 @@ export const PickupManifestModal = ({ isOpen, onClose, order }) => {
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain animate-in fade-in duration-200"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          onClose?.();
+        }
+      }}
       onWheel={(e) => e.stopPropagation()}
     >
       <style>{`
@@ -130,7 +136,10 @@ export const PickupManifestModal = ({ isOpen, onClose, order }) => {
         }
       `}</style>
 
-      <div className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-700/80 rounded-2xl shadow-2xl overflow-hidden my-auto">
+      <div
+        className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-700/80 rounded-2xl shadow-2xl overflow-hidden my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Action Bar */}
         <div className="px-5 py-3.5 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -158,7 +167,10 @@ export const PickupManifestModal = ({ isOpen, onClose, order }) => {
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose?.();
+              }}
               className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />

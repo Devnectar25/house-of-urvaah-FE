@@ -165,7 +165,7 @@ export const AdminCustomers = () => {
   const totalSpentAll = customers.reduce((acc, c) => acc + (Number(c.totalSpent) || 0), 0);
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <div className="space-y-4 pb-8 font-sans w-full">
       {/* Toast Notification */}
       {toast && (
         <div
@@ -186,19 +186,20 @@ export const AdminCustomers = () => {
       <AdminPageHeader
         title="Customer Directory"
         subtitle="Realtime monitoring of registered clients, account status, purchase history, and contact details."
+        className="p-4 sm:p-5"
         actions={
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {isRevalidating && (
               <span className="inline-flex items-center gap-1 text-[11px] font-sans text-neutral-500 mr-1">
                 <RefreshCw className="w-3 h-3 animate-spin" />
-                <span>Live Syncing...</span>
+                <span>Syncing...</span>
               </span>
             )}
             <button
               type="button"
               onClick={() => fetchCustomers(false)}
               disabled={loading || isRevalidating}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-neutral-200/90 text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-neutral-200/90 text-neutral-800 rounded-xl text-xs font-semibold hover:bg-neutral-50 transition-colors shadow-2xs cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRevalidating ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -208,102 +209,104 @@ export const AdminCustomers = () => {
       />
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
               Total Customers
             </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center">
-              <Users className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
+              <Users className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-2xl font-admin font-bold text-brand-dark mt-2">
+          <div className="text-xl sm:text-2xl font-admin font-bold text-brand-dark mt-1">
             {customers.length}
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
               Active Accounts
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center">
-              <UserCheck className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
+              <UserCheck className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-2xl font-admin font-bold text-emerald-700 mt-2">
+          <div className="text-xl sm:text-2xl font-admin font-bold text-emerald-700 mt-1">
             {activeCount}
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
               Inactive / Restricted
             </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center">
-              <UserX className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center shrink-0">
+              <UserX className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-2xl font-admin font-bold text-rose-700 mt-2">
+          <div className="text-xl sm:text-2xl font-admin font-bold text-rose-700 mt-1">
             {inactiveCount}
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs">
+        <div className="bg-white border border-neutral-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
-              Total Client Revenue
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-semibold font-sans">
+              Total Revenue
             </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center">
-              <CreditCard className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
+              <CreditCard className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-2xl font-admin font-bold text-brand-dark mt-2">
+          <div className="text-xl sm:text-2xl font-admin font-bold text-brand-dark mt-1">
             ₹{totalSpentAll.toLocaleString('en-IN')}
           </div>
         </div>
       </div>
 
-      {/* Filter Row */}
-      <div className="bg-white border border-neutral-200/80 rounded-xl p-4 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by name, email, or phone number..."
-            className="w-full pl-9 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans"
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-neutral-50 border border-neutral-200 text-brand-dark text-xs rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white font-medium cursor-pointer"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Table Container */}
+      {/* Table Container with Integrated Search & Filter Header */}
       <div className="bg-white border border-neutral-200/80 rounded-xl shadow-2xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-neutral-200/80 flex items-center justify-between bg-neutral-50/50">
-          <h2 className="text-xs font-semibold tracking-wider text-brand-dark uppercase">
-            Registered Customers <span className="ml-1 px-2 py-0.5 bg-neutral-200/60 rounded-full text-neutral-700 text-[11px]">{totalFiltered}</span>
-          </h2>
+        <div className="p-3 sm:p-3.5 border-b border-neutral-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-neutral-50/50">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-semibold tracking-wider text-brand-dark uppercase">
+              Registered Customers
+            </h2>
+            <span className="px-2 py-0.5 bg-neutral-200/70 rounded-full text-neutral-800 text-[11px] font-bold">
+              {totalFiltered}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by name, email, phone..."
+                className="w-full pl-8 pr-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:border-brand-dark transition-all font-sans"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-white border border-neutral-200 text-brand-dark text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-dark font-medium cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+          </div>
         </div>
 
         {error && !loading && (
@@ -313,56 +316,56 @@ export const AdminCustomers = () => {
             <p className="text-xs text-rose-700 mb-4">{error}</p>
             <button
               onClick={() => fetchCustomers(false)}
-              className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700"
+              className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 cursor-pointer"
             >
               Retry
             </button>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px]">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
-              <tr className="bg-neutral-50/80 text-[11px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
-                <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4">Contact Info</th>
-                <th className="py-3 px-4">Address</th>
-                <th className="py-3 px-4">Joined Date</th>
-                <th className="py-3 px-4">Orders</th>
-                <th className="py-3 px-4">Total Spent</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="bg-neutral-50/90 text-[10px] font-semibold tracking-wider text-neutral-500 uppercase border-b border-neutral-200/80">
+                <th className="py-2.5 px-3">Customer</th>
+                <th className="py-2.5 px-3">Contact Info</th>
+                <th className="py-2.5 px-3">Address</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Joined Date</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap">Orders</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Total Spent</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap">Status</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200/60 text-xs text-brand-dark">
               {loading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
-                    <td className="py-3.5 px-4 space-y-1">
-                      <div className="h-4 bg-neutral-200 rounded w-32" />
+                    <td className="py-3 px-3 space-y-1">
+                      <div className="h-4 bg-neutral-200 rounded w-28" />
+                      <div className="h-3 bg-neutral-200 rounded w-16" />
+                    </td>
+                    <td className="py-3 px-3 space-y-1">
+                      <div className="h-3.5 bg-neutral-200 rounded w-32" />
                       <div className="h-3 bg-neutral-200 rounded w-20" />
                     </td>
-                    <td className="py-3.5 px-4 space-y-1">
+                    <td className="py-3 px-3">
                       <div className="h-3.5 bg-neutral-200 rounded w-36" />
-                      <div className="h-3 bg-neutral-200 rounded w-24" />
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-3.5 bg-neutral-200 rounded w-44" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-4 bg-neutral-200 rounded w-24" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="h-4 bg-neutral-200 rounded w-12" />
-                    </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3">
                       <div className="h-4 bg-neutral-200 rounded w-20" />
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="h-6 w-16 bg-neutral-200 rounded-full mx-auto" />
+                    <td className="py-3 px-2 text-center">
+                      <div className="h-4 bg-neutral-200 rounded w-8 mx-auto" />
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="h-6 w-16 bg-neutral-200 rounded mx-ml-auto" />
+                    <td className="py-3 px-3">
+                      <div className="h-4 bg-neutral-200 rounded w-16" />
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <div className="h-5 w-14 bg-neutral-200 rounded-full mx-auto" />
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <div className="h-6 w-14 bg-neutral-200 rounded ml-auto" />
                     </td>
                   </tr>
                 ))
@@ -388,72 +391,75 @@ export const AdminCustomers = () => {
                       })
                     : 'N/A';
 
+                  const shortId = user.id ? (user.id.includes('@') ? user.id.split('@')[0] : user.id.slice(0, 10)) : 'N/A';
+
                   return (
                     <tr key={user.id || user.email} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-brand-sand text-brand-dark font-bold font-admin flex items-center justify-center uppercase text-xs">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-brand-sand text-brand-dark font-bold font-admin flex items-center justify-center uppercase text-[11px] shrink-0">
                             {(user.name || 'U').charAt(0)}
                           </div>
-                          <div>
-                            <div className="font-semibold text-brand-dark text-xs">{user.name}</div>
-                            <div className="text-[11px] text-neutral-400 font-mono">ID: {user.id}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-brand-dark text-xs truncate max-w-[110px] md:max-w-[130px] lg:max-w-[160px]" title={user.name}>
+                              {user.name}
+                            </div>
+                            <div className="text-[10px] text-neutral-400 font-mono truncate max-w-[110px] md:max-w-[130px]" title={`ID: ${user.id}`}>
+                              ID: {shortId}
+                            </div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4 space-y-0.5">
-                        <div className="flex items-center gap-1.5 text-neutral-700 text-xs">
-                          <Mail className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>{user.email || 'N/A'}</span>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1.5 text-neutral-700 text-xs truncate max-w-[130px] md:max-w-[160px] lg:max-w-[190px]" title={user.email}>
+                          <Mail className="w-3 h-3 text-neutral-400 shrink-0" />
+                          <span className="truncate">{user.email || 'N/A'}</span>
                         </div>
                         {user.phone && (
-                          <div className="flex items-center gap-1.5 text-neutral-500 text-[11px]">
-                            <Phone className="w-3.5 h-3.5 text-neutral-400" />
+                          <div className="flex items-center gap-1.5 text-neutral-500 text-[10.5px] mt-0.5 whitespace-nowrap">
+                            <Phone className="w-3 h-3 text-neutral-400 shrink-0" />
                             <span>{user.phone}</span>
                           </div>
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4 text-xs max-w-xs">
+                      <td className="py-2.5 px-3 text-xs">
                         {user.formattedAddress ? (
-                          <div className="flex items-start gap-1.5 text-neutral-700">
-                            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
-                            <span className="line-clamp-2 leading-relaxed font-sans" title={user.formattedAddress}>
+                          <div className="flex items-center gap-1.5 text-neutral-700 max-w-[120px] md:max-w-[150px] lg:max-w-[180px]" title={user.formattedAddress}>
+                            <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
+                            <span className="truncate font-sans leading-tight">
                               {user.formattedAddress}
                             </span>
                             {user.addresses && user.addresses.length > 1 && (
-                              <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] bg-neutral-100 text-neutral-600 font-semibold border border-neutral-200" title={`${user.addresses.length} saved addresses`}>
+                              <span className="shrink-0 px-1 py-0.2 rounded text-[9.5px] bg-neutral-100 text-neutral-600 font-semibold border border-neutral-200" title={`${user.addresses.length} saved addresses`}>
                                 +{user.addresses.length - 1}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-neutral-400 italic text-[11px]">No address saved</span>
+                          <span className="text-neutral-400 italic text-[10.5px]">No address</span>
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4 text-xs text-neutral-600">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>{memberDate}</span>
-                        </div>
+                      <td className="py-2.5 px-3 text-xs text-neutral-600 whitespace-nowrap">
+                        <div className="text-[11px] font-medium leading-tight">{memberDate}</div>
                       </td>
 
-                      <td className="py-3.5 px-4 text-xs font-semibold text-brand-dark">
+                      <td className="py-2.5 px-2 text-center text-xs font-semibold text-brand-dark whitespace-nowrap">
                         {user.totalOrders || 0}
                       </td>
 
-                      <td className="py-3.5 px-4 text-xs font-bold text-brand-dark">
+                      <td className="py-2.5 px-3 text-xs font-bold text-brand-dark whitespace-nowrap">
                         ₹{(user.totalSpent || 0).toLocaleString('en-IN')}
                       </td>
 
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(user)}
                           disabled={togglingId === (user.id || user.name)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all cursor-pointer whitespace-nowrap ${
                             user.active
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                               : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
@@ -461,25 +467,26 @@ export const AdminCustomers = () => {
                         >
                           {user.active ? (
                             <>
-                              <UserCheck className="w-3 h-3 text-emerald-600" />
+                              <UserCheck className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
                               <span>Active</span>
                             </>
                           ) : (
                             <>
-                              <UserX className="w-3 h-3 text-rose-600" />
+                              <UserX className="w-2.5 h-2.5 text-rose-600 shrink-0" />
                               <span>Inactive</span>
                             </>
                           )}
                         </button>
                       </td>
 
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleViewCustomerDetails(user)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-neutral-100 text-neutral-700 rounded-lg text-xs font-medium hover:bg-brand-dark hover:text-white transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-neutral-100 text-neutral-800 rounded-lg text-[11px] font-semibold hover:bg-neutral-900 hover:text-white transition-colors cursor-pointer"
+                          title="View Customer Profile"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3 h-3 shrink-0" />
                           <span>Profile</span>
                         </button>
                       </td>

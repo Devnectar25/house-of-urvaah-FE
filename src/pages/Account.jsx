@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star, Building2, Banknote } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import apiClient from '../lib/apiClient';
@@ -118,6 +118,13 @@ export const Account = () => {
   const [cancelComments, setCancelComments] = useState('');
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+  const [returnBankDetails, setReturnBankDetails] = useState({
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    holderName: ''
+  });
+  const [bankDetailsError, setBankDetailsError] = useState('');
 
   useEffect(() => {
     if (toastMsg) {
@@ -128,12 +135,18 @@ export const Account = () => {
     }
   }, [toastMsg]);
 
-
   const handleCancelOrderInAccount = (ord) => {
     setCancelModalOrder(ord);
     setSelectedCancelItems([]);
     setCancelReason('');
     setCancelComments('');
+    setReturnBankDetails({
+      accountNumber: ord?.refund_bank_account || '',
+      confirmAccountNumber: ord?.refund_bank_account || '',
+      ifscCode: ord?.refund_ifsc_code || '',
+      holderName: ord?.refund_holder_name || ord?.customer_name || user?.name || ''
+    });
+    setBankDetailsError('');
   };
 
   const handleCloseCancelModal = () => {
@@ -142,6 +155,13 @@ export const Account = () => {
     setSelectedCancelItems([]);
     setCancelReason('');
     setCancelComments('');
+    setReturnBankDetails({
+      accountNumber: '',
+      confirmAccountNumber: '',
+      ifscCode: '',
+      holderName: ''
+    });
+    setBankDetailsError('');
   };
 
   const handleToggleCancelItem = (itemId) => {
@@ -183,8 +203,6 @@ export const Account = () => {
     )
   );
 
-  const isFormFilled = selectedCancelItems.length > 0 && cancelReason.trim().length > 0;
-
   const isDeliveredModalOrder = Boolean(
     cancelModalOrder && (
       (cancelModalOrder.status || '').toLowerCase().includes('delivered') ||
@@ -192,25 +210,75 @@ export const Account = () => {
     )
   );
 
+  // Refund Situation: Either post-delivery return (COD or Prepaid) OR pre-delivery online paid cancellation
+  const isRefundSituation = Boolean(cancelModalOrder && (isDeliveredModalOrder || !isCODOrder));
+
+  const isBankValid = !isRefundSituation || (
+    returnBankDetails.holderName.trim().length > 0 &&
+    returnBankDetails.accountNumber.trim().length >= 6 &&
+    returnBankDetails.confirmAccountNumber.trim() === returnBankDetails.accountNumber.trim() &&
+    returnBankDetails.ifscCode.trim().length >= 4
+  );
+
+  const isFormFilled = selectedCancelItems.length > 0 && 
+                       cancelReason.trim().length > 0 && 
+                       isBankValid;
+
   const handleSubmitCancellation = async () => {
     if (!cancelModalOrder || !isFormFilled) return;
+
+    if (isRefundSituation) {
+      if (!returnBankDetails.holderName.trim()) {
+        setBankDetailsError('Please enter the Account Holder Name.');
+        return;
+      }
+      if (!returnBankDetails.accountNumber.trim() || returnBankDetails.accountNumber.trim().length < 6) {
+        setBankDetailsError('Please enter a valid Bank Account Number (minimum 6 digits).');
+        return;
+      }
+      if (returnBankDetails.accountNumber.trim() !== returnBankDetails.confirmAccountNumber.trim()) {
+        setBankDetailsError('Bank Account Numbers do not match.');
+        return;
+      }
+      if (!returnBankDetails.ifscCode.trim() || returnBankDetails.ifscCode.trim().length < 4) {
+        setBankDetailsError('Please enter a valid Bank IFSC code.');
+        return;
+      }
+    }
+
     setIsSubmittingCancellation(true);
+    setBankDetailsError('');
     const ord = cancelModalOrder;
     const orderNum = ord.order_number || ord.orderNumber || ord.id;
     const endpoint = `/api/orders/${orderNum}/cancel`;
     const targetStatus = isDeliveredModalOrder ? 'Return Requested' : 'Cancellation Requested';
 
     try {
+      const cleanBankDetails = isRefundSituation ? {
+        accountNumber: returnBankDetails.accountNumber.trim(),
+        ifscCode: returnBankDetails.ifscCode.trim().toUpperCase(),
+        holderName: returnBankDetails.holderName.trim()
+      } : null;
+
       await apiClient(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           cancelReason,
           comments: cancelComments,
-          itemIds: selectedCancelItems
+          itemIds: selectedCancelItems,
+          bankDetails: cleanBankDetails
         })
       });
       setOrders((prev) =>
-        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? { ...o, status: targetStatus, cancel_reason: cancelReason, return_reason: isDeliveredModalOrder ? cancelReason : o.return_reason } : o))
+        prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? {
+          ...o,
+          status: targetStatus,
+          cancel_reason: cancelReason,
+          return_reason: isDeliveredModalOrder ? cancelReason : o.return_reason,
+          refund_bank_account: cleanBankDetails?.accountNumber || o.refund_bank_account,
+          refund_ifsc_code: cleanBankDetails?.ifscCode || o.refund_ifsc_code,
+          refund_holder_name: cleanBankDetails?.holderName || o.refund_holder_name
+        } : o))
       );
 
       // Broadcast update across admin panel and all tabs dynamically
@@ -1269,6 +1337,118 @@ export const Account = () => {
                   />
                 </div>
 
+                {/* Bank Details for Refund Disbursement */}
+                {isRefundSituation && (
+                  <div className="p-4 sm:p-5 bg-[#FAF9F5] border border-neutral-200/90 rounded-2xl space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-neutral-200/70 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-neutral-800" />
+                        <span className="text-xs font-serif font-bold uppercase tracking-[0.12em] text-neutral-900">
+                          Bank Details for Refund Disbursement
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-sans font-bold text-neutral-600 uppercase tracking-widest bg-white border border-neutral-200 px-2 py-0.5 rounded-full shadow-2xs">
+                        Required for Refund
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-neutral-500 font-sans leading-relaxed">
+                      Please enter your verified bank details. Once your {isDeliveredModalOrder ? 'return is received and verified' : 'cancellation is approved'}, your refund of <strong className="text-neutral-900 font-semibold font-serif">₹{estimatedRefund.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> will be credited directly to this bank account via secure IMPS / NEFT transfer.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {/* Account Holder Name */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-neutral-700 uppercase tracking-wider mb-1 font-sans">
+                          Account Holder Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={returnBankDetails.holderName}
+                          onChange={(e) => {
+                            setReturnBankDetails(prev => ({ ...prev, holderName: e.target.value }));
+                            setBankDetailsError('');
+                          }}
+                          placeholder="Name exactly as registered with bank"
+                          className="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 font-sans"
+                        />
+                      </div>
+
+                      {/* Account Number */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-700 uppercase tracking-wider mb-1 font-sans">
+                          Bank Account Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={returnBankDetails.accountNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\s+/g, '');
+                            setReturnBankDetails(prev => ({ ...prev, accountNumber: val }));
+                            setBankDetailsError('');
+                          }}
+                          placeholder="e.g. 50100234567890"
+                          className="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 font-mono"
+                        />
+                      </div>
+
+                      {/* Confirm Account Number */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-700 uppercase tracking-wider mb-1 font-sans">
+                          Confirm Account Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={returnBankDetails.confirmAccountNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\s+/g, '');
+                            setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
+                            setBankDetailsError('');
+                          }}
+                          placeholder="Re-enter Account Number"
+                          className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none font-mono ${
+                            returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber !== returnBankDetails.accountNumber
+                              ? 'border-red-400 focus:border-red-500'
+                              : 'border-neutral-200 focus:border-neutral-400'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Bank IFSC Code */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-neutral-700 uppercase tracking-wider mb-1 font-sans">
+                          Bank IFSC Code <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={returnBankDetails.ifscCode}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\s+/g, '').toUpperCase();
+                            setReturnBankDetails(prev => ({ ...prev, ifscCode: val }));
+                            setBankDetailsError('');
+                          }}
+                          placeholder="e.g. HDFC0001234"
+                          maxLength={11}
+                          className="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Mismatch Warning */}
+                    {returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber !== returnBankDetails.accountNumber && (
+                      <p className="text-[11px] text-red-600 font-medium">
+                        * Account numbers do not match. Please verify.
+                      </p>
+                    )}
+
+                    {bankDetailsError && (
+                      <p className="text-[11px] text-red-600 font-medium bg-red-50 p-2 rounded-lg border border-red-200">
+                        {bankDetailsError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Note Banner */}
                 <div className={`border rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 ${
                   isDeliveredModalOrder ? 'bg-indigo-50/70 border-indigo-200' : 'bg-amber-50/70 border-amber-200'
@@ -2139,17 +2319,54 @@ export const Account = () => {
 
                   // Post-delivery Return Flow States (Mutually exclusive from Replacement)
                   const logLower = (ord.logistics_status || ord.shipment_status || '').toLowerCase();
-                  const isReturnRequested = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'return requested' || statusLower === 'return request processing' || logLower === 'return initiated');
-                  const isReturnApproved = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'return approved' || statusLower.includes('pickup scheduled') || logLower.includes('pickup scheduled') || logLower.includes('awb assigned'));
-                  const isReturnCollected = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower.includes('collected') || statusLower.includes('in transit to') || statusLower.includes('reverse transit') || logLower.includes('collected') || logLower.includes('in transit'));
-                  const isReceivedAtUrvaah = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'received at house of urvaah' || statusLower === 'received at urvaah house' || statusLower === 'received at homved');
-                  const isReturned = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'returned' || statusLower === 'return completed' || (isProductEverDelivered && ord.refund_status && String(ord.refund_status).toLowerCase() === 'completed'));
-                  const isReturnRejected = !isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'return rejected');
-                  const isInReturnFlow = isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned || isReturnRejected;
+                  const hasReturnIntent = Boolean(
+                    ord.return_type ||
+                    statusLower.includes('return') ||
+                    logLower.includes('return') ||
+                    logLower.includes('reverse') ||
+                    ord.return_pickup_scheduled ||
+                    ord.return_reason
+                  );
+
+                  const isReturnRequested = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'return requested' || 
+                    statusLower === 'return request processing' || 
+                    logLower === 'return initiated' ||
+                    logLower === 'return requested'
+                  );
+                  const isReturnApproved = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'return approved' || 
+                    statusLower === 'return pickup scheduled' || 
+                    (statusLower.includes('pickup scheduled') && (statusLower.includes('return') || logLower.includes('return'))) || 
+                    logLower.includes('return pickup scheduled') || 
+                    logLower.includes('reverse pickup scheduled')
+                  );
+                  const isReturnCollected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower.includes('collected') || 
+                    statusLower.includes('in transit to') || 
+                    statusLower.includes('reverse transit') || 
+                    logLower.includes('reverse transit') || 
+                    (logLower.includes('collected') && hasReturnIntent)
+                  );
+                  const isReceivedAtUrvaah = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'received at house of urvaah' || 
+                    statusLower === 'received at urvaah house' || 
+                    statusLower === 'received at homved' ||
+                    logLower.includes('received at house of urvaah')
+                  );
+                  const isReturned = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'returned' || 
+                    statusLower === 'return completed' || 
+                    (isProductEverDelivered && ord.refund_status && String(ord.refund_status).toLowerCase() === 'completed' && hasReturnIntent)
+                  );
+                  const isReturnRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'return rejected'
+                  );
+                  const isInReturnFlow = hasReturnIntent && (isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned || isReturnRejected);
 
                   // Post-delivery Replacement Flow States (Original parent order)
                   const isReplacementRequested = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replacement request processing' || statusLower === 'replace requested' || statusLower === 'replacement requested');
-                  const isReplacementApproved = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replace approved' || statusLower === 'replacement approved' || statusLower.includes('pickup scheduled'));
+                  const isReplacementApproved = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replace approved' || statusLower === 'replacement approved' || (statusLower.includes('pickup scheduled') && (statusLower.includes('replace') || logLower.includes('replace'))));
                   const isReplacementCollected = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower.includes('collected') || statusLower.includes('in transit to') || statusLower.includes('reverse transit') || logLower.includes('collected') || logLower.includes('reverse transit'));
                   const isReplacementQCReceived = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower.includes('received at') || logLower.includes('received at') || logLower.includes('qc passed'));
                   const isReplacementInTransit = isReplacementCollected || (isReplacementIntent && (statusLower === 'replacement processing' || statusLower === 'replacement shipped' || statusLower === 'in reverse transit'));
@@ -2204,7 +2421,7 @@ export const Account = () => {
                   const totalItemsCount = itemsList.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
 
                   return (
-                    <div key={ord.id || idx} className="bg-white border border-[#E7E2D8] rounded-2xl p-6 sm:p-7 shadow-[0_4px_25px_rgba(0,0,0,0.03)] font-sans text-left space-y-6 hover:border-neutral-300 transition-all duration-300">
+                    <div key={ord.id || idx} className="bg-white border border-[#E7E2D8] rounded-2xl p-4 sm:p-7 shadow-[0_4px_25px_rgba(0,0,0,0.03)] font-sans text-left space-y-5 sm:space-y-6 hover:border-neutral-300 transition-all duration-300">
                       {/* Header Row */}
                       <div className="flex flex-wrap items-start justify-between gap-4 pb-2 border-b border-neutral-100">
                         <div>
@@ -3097,14 +3314,14 @@ export const Account = () => {
                       )}
 
                       {/* Sub-card Products List */}
-                      <div className="bg-white border border-neutral-200/80 rounded-2xl p-4 sm:p-5 divide-y divide-neutral-100 space-y-4 shadow-2xs">
+                      <div className="bg-white border border-neutral-200/80 rounded-2xl p-3.5 sm:p-5 divide-y divide-neutral-100 space-y-3.5 sm:space-y-4 shadow-2xs">
                         {itemsList.map((item, itemIdx) => {
                           const itemImg = getSupabaseMediaUrl(item.image || (item.product && item.product.image) || item.image_url);
                           const itemPrice = Number(item.price || item.unit_price || 0);
                           return (
-                            <div key={itemIdx} className="flex items-center justify-between gap-4 pt-4 first:pt-0">
-                              <div className="flex items-center gap-4 min-w-0">
-                                <div className="w-14 h-18 sm:w-16 sm:h-20 bg-[#FAF8F3] rounded-xl overflow-hidden border border-neutral-200/80 p-0.5 flex-shrink-0 shadow-2xs">
+                            <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pt-3.5 sm:pt-4 first:pt-0">
+                              <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                                <div className="w-14 h-18 sm:w-16 sm:h-20 bg-[#FAF8F3] rounded-xl overflow-hidden border border-neutral-200/80 p-0.5 shrink-0 shadow-2xs">
                                   <img
                                     src={itemImg}
                                     alt={item.name || item.title || 'Product'}
@@ -3115,24 +3332,30 @@ export const Account = () => {
                                     }}
                                   />
                                 </div>
-                                <div className="min-w-0">
-                                  <h5 className="text-xs sm:text-sm font-serif tracking-[0.06em] uppercase text-black font-semibold truncate leading-snug">
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="text-xs sm:text-sm font-serif tracking-[0.04em] uppercase text-black font-semibold truncate leading-snug" title={item.name || item.title}>
                                     {item.name || item.title || 'Atelier Item'}
                                   </h5>
-                                  <div className="flex items-center gap-3 text-xs text-neutral-500 font-sans tracking-wide mt-1">
+                                  <div className="flex items-center gap-2 text-xs text-neutral-500 font-sans tracking-wide mt-1 flex-wrap">
                                     <span>Qty: {item.quantity || 1}</span>
+                                    {item.size && (
+                                      <>
+                                        <span className="text-neutral-300">•</span>
+                                        <span>Size: {item.size}</span>
+                                      </>
+                                    )}
                                     {itemPrice > 0 && (
                                       <>
                                         <span className="text-neutral-300">•</span>
-                                        <span className="font-medium text-neutral-700">₹{itemPrice.toLocaleString('en-IN')}</span>
+                                        <span className="font-semibold text-neutral-900">₹{itemPrice.toLocaleString('en-IN')}</span>
                                       </>
                                     )}
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.16em] uppercase border shrink-0 ${
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:justify-end self-start sm:self-center pl-[68px] sm:pl-0">
+                                <span className={`px-2.5 sm:px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.14em] uppercase border shrink-0 ${
                                   isCancellationRequested
                                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                                     : isCancelled
@@ -3160,12 +3383,12 @@ export const Account = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const prodId = item.product_id || item.productId || item.id;
+                                      const prodId = item.product_id || item.productId || (item.product && (item.product.id || item.product.product_id)) || item.id;
                                       if (prodId) {
                                         navigate(`/product/${prodId}?openReview=true#customer-reviews`);
                                       }
                                     }}
-                                    className="px-3.5 py-1.5 rounded-lg border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-bold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                                    className="px-3.5 py-1.5 rounded-lg border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-bold tracking-[0.14em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
                                     title="Rate and give feedback for this delivered product"
                                   >
                                     <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -3229,11 +3452,55 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                const firstItem = itemsList[0];
-                                const prodId = firstItem?.product_id || firstItem?.productId || firstItem?.id;
-                                if (prodId) {
-                                  navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                if (!itemsList || itemsList.length === 0) return;
+
+                                if (itemsList.length === 1) {
+                                  const firstItem = itemsList[0];
+                                  const prodId = firstItem?.product_id || firstItem?.productId || (firstItem?.product && (firstItem.product.id || firstItem.product.product_id)) || firstItem?.id;
+                                  if (prodId) {
+                                    navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                  }
+                                  return;
                                 }
+
+                                // For multi-item orders, show a clean modal to select which piece to review
+                                Swal.fire({
+                                  title: 'SELECT PRODUCT TO REVIEW',
+                                  text: 'Which piece from your delivered order would you like to review?',
+                                  html: `
+                                    <div class="space-y-2.5 mt-4 text-left font-sans">
+                                      ${itemsList.map((it, idx) => {
+                                        const pid = it.product_id || it.productId || (it.product && (it.product.id || it.product.product_id)) || it.id;
+                                        const pName = it.name || it.product_name || `Product #${idx + 1}`;
+                                        const pImg = it.image || it.image_url || '/assets/Images/Blue01.png';
+                                        return `
+                                          <button type="button" class="swal-acc-feedback-btn w-full p-2.5 flex items-center gap-3 border border-neutral-200 hover:border-black rounded-xl transition-all cursor-pointer bg-white hover:bg-neutral-50 text-left shadow-2xs" data-prod-id="${pid}">
+                                            <img src="${pImg}" class="w-12 h-14 object-contain bg-neutral-100 rounded-lg border border-neutral-200 shrink-0" alt="${pName}" />
+                                            <div class="flex-1 min-w-0">
+                                              <p class="text-xs font-bold text-black truncate uppercase tracking-wider">${pName}</p>
+                                              <p class="text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">Click to write feedback</p>
+                                            </div>
+                                            <span class="text-xs font-bold text-amber-500 flex items-center gap-1 shrink-0">★ REVIEW</span>
+                                          </button>
+                                        `;
+                                      }).join('')}
+                                    </div>
+                                  `,
+                                  showConfirmButton: false,
+                                  showCloseButton: true,
+                                  didOpen: () => {
+                                    const btns = document.querySelectorAll('.swal-acc-feedback-btn');
+                                    btns.forEach(btn => {
+                                      btn.addEventListener('click', () => {
+                                        const targetPid = btn.getAttribute('data-prod-id');
+                                        Swal.close();
+                                        if (targetPid) {
+                                          navigate(`/product/${targetPid}?openReview=true#customer-reviews`);
+                                        }
+                                      });
+                                    });
+                                  }
+                                });
                               }}
                               className="px-5 py-2.5 rounded-xl border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title="Give feedback for your delivered pieces"
@@ -3381,26 +3648,75 @@ export const Account = () => {
                     </button>
 
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: totalOrderPages }, (_, i) => i + 1).map((pageNum) => {
-                        const isActive = pageNum === orderPage;
-                        return (
-                          <button
-                            key={`order-page-${pageNum}`}
-                            type="button"
-                            onClick={() => {
-                              setOrderPage(pageNum);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              isActive
-                                ? 'bg-brand-dark text-white shadow-xs'
-                                : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-black'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
+                      {(() => {
+                        if (totalOrderPages <= 7) {
+                          return Array.from({ length: totalOrderPages }, (_, i) => i + 1).map((pageNum) => {
+                            const isActive = pageNum === orderPage;
+                            return (
+                              <button
+                                key={`order-page-${pageNum}`}
+                                type="button"
+                                onClick={() => {
+                                  setOrderPage(pageNum);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  isActive
+                                    ? 'bg-brand-dark text-white shadow-xs'
+                                    : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-black'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          });
+                        }
+                        const pages = [];
+                        if (orderPage <= 4) {
+                          for (let i = 1; i <= 5; i++) pages.push(i);
+                          pages.push('...');
+                          pages.push(totalOrderPages);
+                        } else if (orderPage >= totalOrderPages - 3) {
+                          pages.push(1);
+                          pages.push('...');
+                          for (let i = totalOrderPages - 4; i <= totalOrderPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          pages.push('...');
+                          pages.push(orderPage - 1);
+                          pages.push(orderPage);
+                          pages.push(orderPage + 1);
+                          pages.push('...');
+                          pages.push(totalOrderPages);
+                        }
+                        return pages.map((p, idx) => {
+                          if (p === '...') {
+                            return (
+                              <span key={`order-ellipsis-${idx}`} className="w-7 text-center text-neutral-400 font-bold text-xs select-none">
+                                ...
+                              </span>
+                            );
+                          }
+                          const isActive = p === orderPage;
+                          return (
+                            <button
+                              key={`order-page-${p}`}
+                              type="button"
+                              onClick={() => {
+                                setOrderPage(p);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-brand-dark text-white shadow-xs'
+                                  : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-black'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
 
                     <button
@@ -3970,29 +4286,57 @@ export const Account = () => {
                     const itemIsCancelled = (item.status || selectedOrderModal.status || '').toLowerCase().includes('cancel');
 
                     return (
-                      <div key={i} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200/60 text-xs">
-                        <div className="flex items-center gap-3">
+                      <div key={i} className="flex items-center justify-between gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200/60 text-xs">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <img
                             src={modalImg}
                             alt={item.name || item.title || 'Product'}
-                            className="w-12 h-14 object-contain rounded-md border bg-white p-0.5"
+                            className="w-12 h-14 object-contain rounded-md border bg-white p-0.5 shrink-0"
                             onError={(e) => {
                               e.target.onerror = null;
                               e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
                             }}
                           />
-                          <div>
-                            <p className="font-bold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
-                            <p className="text-neutral-500 font-medium">Quantity: {item.quantity || 1}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-neutral-900 truncate leading-snug">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="text-neutral-500 font-medium text-[11px] mt-0.5">Quantity: {item.quantity || 1}</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-bold text-neutral-900 block">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
-                          {itemIsCancelled && (
-                            <span className="text-[9px] font-bold text-red-600 uppercase bg-red-50 border border-red-200 px-1.5 py-0.2 rounded mt-0.5 inline-block">
-                              Cancelled
-                            </span>
-                          )}
+                        <div className="text-right shrink-0">
+                          <span className="font-bold text-neutral-900 block text-xs">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
+                          {(() => {
+                            const act = (item.return_action || '').toLowerCase();
+                            const stat = (item.status || selectedOrderModal.status || '').toLowerCase();
+                            if (act === 'keep') {
+                              return (
+                                <span className="text-[9px] font-bold text-emerald-700 uppercase bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                  Kept
+                                </span>
+                              );
+                            }
+                            if (act === 'replace' || stat.includes('replace') || stat.includes('exchange')) {
+                              return (
+                                <span className="text-[9px] font-bold text-purple-700 uppercase bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                  Exchange ({item.replacement_size || 'M'})
+                                </span>
+                              );
+                            }
+                            if (act === 'return' || stat.includes('return')) {
+                              return (
+                                <span className="text-[9px] font-bold text-amber-700 uppercase bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                  Return Requested
+                                </span>
+                              );
+                            }
+                            if (stat.includes('cancel')) {
+                              return (
+                                <span className="text-[9px] font-bold text-red-600 uppercase bg-red-50 border border-red-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                  Cancelled
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     );

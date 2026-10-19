@@ -249,6 +249,12 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          onClose?.();
+        }
+      }}
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >
@@ -288,6 +294,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
       <div
         className="relative w-full max-w-4xl bg-neutral-100 rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden my-auto max-h-[92vh] flex flex-col invoice-font-roboto"
         style={{ fontFamily: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" }}
+        onClick={(e) => e.stopPropagation()}
       >
         
         {/* Top Control Bar */}
@@ -344,7 +351,10 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose?.();
+              }}
               className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition ml-1"
               aria-label="Close modal"
             >

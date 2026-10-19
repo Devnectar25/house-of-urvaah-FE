@@ -196,7 +196,21 @@ export const ReturnOrderDetailModal = ({
     setLogisticsMsg(null);
     try {
       // Step A: Create Reverse Order in Shiprocket
-      const returnItems = order.items && order.items.length ? order.items : [{ name: 'Returned Garment', price: order.total || 0, quantity: 1 }];
+      // Filter out items that the customer chose to KEEP! Only reverse-pickup items to return or replace
+      const itemsToPickup = Array.isArray(order.items) && order.items.length
+        ? order.items.filter(i => {
+            const act = (i.return_action || '').toLowerCase();
+            const stat = (i.status || '').toLowerCase();
+            if (act === 'keep') return false;
+            if (stat === 'delivered' && act !== 'return' && act !== 'replace') return false;
+            return true;
+          })
+        : [];
+
+      const returnItems = itemsToPickup.length > 0 
+        ? itemsToPickup 
+        : (order.items && order.items.length ? order.items : [{ name: 'Returned Garment', price: order.total || 0, quantity: 1 }]);
+      
       const reason = order.return_reason || order.cancel_reason || 'Customer requested return (Admin Approved)';
       
       const retRes = await shippingApi.createReturnOrder(order, returnItems, reason);
@@ -234,7 +248,7 @@ export const ReturnOrderDetailModal = ({
 
       setLogisticsMsg({
         type: 'success',
-        text: `Reverse Pickup Scheduled! Return AWB: ${returnAwb} (${courierName}). Courier will collect from customer doorstep within 24-48 hrs.`
+        text: `Reverse Pickup Scheduled for ${returnItems.length} item(s)! Return AWB: ${returnAwb} (${courierName}). Courier will collect from customer doorstep within 24-48 hrs.`
       });
 
       if (onOrderUpdated) onOrderUpdated(updated);
@@ -244,6 +258,35 @@ export const ReturnOrderDetailModal = ({
       setLogisticsMsg({
         type: 'error',
         text: err.message || 'Failed to schedule reverse pickup with Shiprocket.'
+      });
+    } finally {
+      setLogisticsLoading(false);
+    }
+  };
+
+  // Reverse Action 1b: Dispatch Replacement Forward Piece
+  const handleDispatchReplacement = async () => {
+    if (!order) return;
+    setLogisticsLoading(true);
+    setLogisticsMsg(null);
+    try {
+      const replaceItems = (order.items || []).filter(i => {
+        const act = (i.return_action || '').toLowerCase();
+        const stat = (i.status || '').toLowerCase();
+        return act === 'replace' || stat.includes('replace') || stat.includes('exchange');
+      });
+      const itemsToSend = replaceItems.length > 0 ? replaceItems : order.items;
+      const res = await shippingApi.dispatchReplacement(order, itemsToSend);
+      setLogisticsMsg({
+        type: 'success',
+        text: `Replacement Forward Shipment Dispatched! Order: ${res.order_number || `${order.order_number}-REP`}, AWB: ${res.awb_code || 'Generated'}.`
+      });
+      await fetchOrderDetail();
+    } catch (err) {
+      console.error('Failed to dispatch replacement:', err);
+      setLogisticsMsg({
+        type: 'error',
+        text: err.message || 'Failed to dispatch replacement order.'
       });
     } finally {
       setLogisticsLoading(false);
@@ -357,20 +400,41 @@ export const ReturnOrderDetailModal = ({
       const payoutType = isCod ? 'Bank Transfer (IMPS/NEFT)' : 'Original Payment Source (Razorpay)';
       const referenceNumber = utrInput.trim() || `UTR${Math.floor(1000000000 + Math.random() * 9000000000)}`;
 
+      const returnItems = (order.items || []).filter(i => {
+        const act = (i.return_action || '').toLowerCase();
+        const stat = (i.status || '').toLowerCase();
+        return act === 'return' || stat.includes('return');
+      });
+      const refundAmount = Number(
+        order.refund_eligible_amount || 
+        (returnItems.length > 0 
+          ? returnItems.reduce((sum, it) => sum + (Number(it.price || 0) * (it.quantity || 1)), 0) 
+          : order.total) || 
+        0
+      );
+
       await apiClient(`/api/admin/order/${order.id}/refund-status`, {
         method: 'PATCH',
         body: JSON.stringify({
           refundStatus: 'Completed',
           payoutType,
           referenceNumber,
-          notes: `Refund disbursed via Return Desk. Reference: ${referenceNumber}`
+          amount: refundAmount,
+          notes: `Item-level refund disbursed via Return Desk. Amount: ₹${refundAmount}. Reference: ${referenceNumber}`
         })
       });
+
+      const hasReplacedItems = (order.items || []).some(i => {
+        const act = (i.return_action || '').toLowerCase();
+        const stat = (i.status || '').toLowerCase();
+        return act === 'replace' || stat.includes('replace');
+      });
+      const newOrderStatus = hasReplacedItems ? 'Replaced' : 'Returned';
 
       await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
-          status: 'Returned',
+          status: newOrderStatus,
           paymentStatus: 'Refunded'
         })
       });
@@ -380,10 +444,10 @@ export const ReturnOrderDetailModal = ({
 
       setLogisticsMsg({
         type: 'success',
-        text: `Financial refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} disbursed! Payout Ref: ${referenceNumber}.`
+        text: `Financial refund of ₹${refundAmount.toLocaleString('en-IN')} disbursed! Payout Ref: ${referenceNumber}.`
       });
 
-      if (onOrderUpdated) onOrderUpdated({ ...order, status: 'Returned', refund_status: 'Completed' });
+      if (onOrderUpdated) onOrderUpdated({ ...order, status: newOrderStatus, refund_status: 'Completed' });
     } catch (err) {
       alert('Failed to disburse refund: ' + err.message);
     } finally {
@@ -397,10 +461,15 @@ export const ReturnOrderDetailModal = ({
     (order?.status || '') === 'Returned';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200"
-      onClick={onClose}
-    >
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-neutral-200"
         onClick={(e) => e.stopPropagation()}
@@ -923,6 +992,33 @@ export const ReturnOrderDetailModal = ({
                   </div>
                 </div>
 
+                {/* Replacement Forward Leg Strip (if exchange pieces exist) */}
+                {((order.return_type || '').toLowerCase().includes('replace') || 
+                  (order.return_type || '').toLowerCase().includes('mixed') || 
+                  (order.status || '').toLowerCase().includes('replace') ||
+                  (order.items || []).some(i => (i.return_action || '').toLowerCase() === 'replace' || (i.status || '').toLowerCase().includes('replace'))) && (
+                  <div className="pt-3 border-t border-neutral-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-purple-50/60 p-3 rounded-lg border border-purple-200/60">
+                    <div>
+                      <span className="text-xs font-bold text-purple-950 block font-admin">
+                        Replacement Piece Dispatch (Exchange Forward Leg)
+                      </span>
+                      <p className="text-[11px] text-purple-700">
+                        Dispatches replacement piece with priority forward transit & automated AWB.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={logisticsLoading}
+                      onClick={handleDispatchReplacement}
+                      className="px-3.5 py-2 bg-purple-900 hover:bg-purple-950 text-white text-xs font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+                    >
+                      <Package className="w-4 h-4 text-purple-200" />
+                      <span>Dispatch Replacement Forward Item</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Financial Refund Settlement Strip */}
                 <div className="pt-3 border-t border-neutral-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/60 p-3 rounded-lg border border-amber-200/60">
                   <div>
@@ -952,49 +1048,74 @@ export const ReturnOrderDetailModal = ({
                 <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
                   <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider font-admin flex items-center gap-2">
                     <Package className="w-3.5 h-3.5" />
-                    <span>Items for Return & Inspection ({order.items?.length || 1})</span>
+                    <span>Order Items & Lifecycles ({order.items?.length || 1})</span>
                   </span>
                   <span className="text-[10px] text-neutral-400">
-                    Reason: <strong className="text-neutral-700">{order.return_reason || order.cancel_reason || 'Size or fit mismatch'}</strong>
+                    Reason: <strong className="text-neutral-700">{order.return_reason || order.cancel_reason || 'Customer request'}</strong>
                   </span>
                 </div>
 
                 <div className="space-y-3">
-                  {(order.items || []).map((item, idx) => (
-                    <div
-                      key={item.id || idx}
-                      className="flex items-center justify-between gap-4 p-3 bg-neutral-50 rounded-xl border border-neutral-200/70 text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        {item.image ? (
-                          <img
-                            src={getSupabaseMediaUrl(item.image)}
-                            alt={item.name}
-                            className="w-12 h-12 object-cover rounded-lg border border-neutral-200"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-400">
-                            <Package className="w-5 h-5" />
+                  {(order.items || []).map((item, idx) => {
+                    const itemAction = (item.return_action || '').toLowerCase();
+                    const itemStatus = (item.status || '').toLowerCase();
+                    const isKept = itemAction === 'keep' || (itemStatus === 'delivered' && !itemAction);
+                    const isReplace = itemAction === 'replace' || itemStatus.includes('replace') || itemStatus.includes('exchange');
+                    const isReturn = itemAction === 'return' || itemStatus.includes('return') || (!isKept && !isReplace);
+
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className="flex items-center justify-between gap-4 p-3 bg-neutral-50 rounded-xl border border-neutral-200/70 text-xs"
+                      >
+                        <div className="flex items-center gap-3">
+                          {item.image ? (
+                            <img
+                              src={getSupabaseMediaUrl(item.image)}
+                              alt={item.name}
+                              className="w-12 h-12 object-cover rounded-lg border border-neutral-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-400">
+                              <Package className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="text-[11px] text-neutral-500">
+                              Qty: {item.quantity || 1} • Size: {item.size || 'M'}
+                            </p>
+                            {item.return_reason && (
+                              <p className="text-[10px] text-neutral-500 italic mt-0.5">
+                                Note: {item.return_reason}
+                              </p>
+                            )}
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
-                          <p className="text-[11px] text-neutral-500">
-                            Qty: {item.quantity || 1} • Size: {item.size || 'M'}
-                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="font-bold text-neutral-900 block">
+                            ₹{Number(item.price || 0).toLocaleString('en-IN')}
+                          </span>
+                          {isKept && (
+                            <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 mt-0.5 inline-block">
+                              Kept by Customer
+                            </span>
+                          )}
+                          {isReplace && (
+                            <span className="text-[10px] text-purple-800 font-semibold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200 mt-0.5 inline-block">
+                              Replace (New Size: {item.replacement_size || order.replacement_size || 'M'})
+                            </span>
+                          )}
+                          {isReturn && (
+                            <span className="text-[10px] text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-0.5 inline-block">
+                              Return for Refund
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      <div className="text-right">
-                        <span className="font-bold text-neutral-900 block">
-                          ₹{Number(item.price || 0).toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 mt-0.5 inline-block">
-                          Return Requested
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1044,12 +1165,18 @@ export const ReturnOrderDetailModal = ({
           </button>
         </div>
       </div>
+    </div>
 
       {/* Financial Refund Disbursement Confirmation Dialog */}
       {showRefundDialog && (
         <div
           className="fixed inset-0 z-60 flex items-center justify-center bg-neutral-950/80 backdrop-blur-xs p-4 animate-in fade-in duration-200"
-          onClick={() => setShowRefundDialog(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.target === e.currentTarget) {
+              setShowRefundDialog(false);
+            }
+          }}
         >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-neutral-200 text-xs"
@@ -1069,13 +1196,34 @@ export const ReturnOrderDetailModal = ({
               </button>
             </div>
 
-            <p className="text-neutral-600 leading-relaxed">
-              Disburse financial refund of{' '}
-              <strong className="text-neutral-950 text-sm">
-                ₹{Number(order?.total || 0).toLocaleString('en-IN')}
-              </strong>{' '}
-              for Order #{order?.order_number}.
-            </p>
+            {(() => {
+              const returnItems = (order?.items || []).filter(i => {
+                const act = (i.return_action || '').toLowerCase();
+                const stat = (i.status || '').toLowerCase();
+                return act === 'return' || stat.includes('return');
+              });
+              const refundAmount = Number(
+                order?.refund_eligible_amount || 
+                (returnItems.length > 0 
+                  ? returnItems.reduce((sum, it) => sum + (Number(it.price || 0) * (it.quantity || 1)), 0) 
+                  : order?.total) || 
+                0
+              );
+              return (
+                <p className="text-neutral-600 leading-relaxed">
+                  Disburse financial refund of{' '}
+                  <strong className="text-neutral-950 text-sm">
+                    ₹{refundAmount.toLocaleString('en-IN')}
+                  </strong>{' '}
+                  {returnItems.length > 0 && returnItems.length < (order?.items?.length || 1) && (
+                    <span className="text-emerald-700 font-semibold text-[11px] block mt-0.5">
+                      (Pro-rata refund for {returnItems.length} returned item; remaining items kept or replaced)
+                    </span>
+                  )}
+                  for Order #{order?.order_number}.
+                </p>
+              );
+            })()}
 
             {order?.payment_method === 'cod' ? (
               <div className="space-y-2 bg-neutral-50 p-3 rounded-xl border border-neutral-200">
@@ -1158,7 +1306,7 @@ export const ReturnOrderDetailModal = ({
         onClose={() => setIsManifestModalOpen(false)}
         order={order}
       />
-    </div>
+    </>
   );
 };
 

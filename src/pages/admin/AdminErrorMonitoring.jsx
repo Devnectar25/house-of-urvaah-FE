@@ -804,7 +804,7 @@ export const AdminErrorMonitoring = () => {
                       </div>
                     </div>
 
-                    {/* Right Expand / Status Toggle */}
+                    {/* Right Expand / Status Toggle & Delete */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       <button
                         type="button"
@@ -824,6 +824,25 @@ export const AdminErrorMonitoring = () => {
                         }`}
                       >
                         {item.status === 'resolved' ? 'Reopen' : 'Mark Resolved'}
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteError(item.id, item.grouped_ids);
+                        }}
+                        disabled={deletingId === item.id}
+                        title={item.occurrence_count > 1 ? `Delete all ${item.occurrence_count} occurrences` : 'Delete error record'}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {deletingId === item.id ? (
+                          <RefreshCw className="w-3 h-3 animate-spin text-rose-600" />
+                        ) : (
+                          <Trash2 className="w-3 h-3 text-rose-600" />
+                        )}
+                        <span>Delete</span>
                       </button>
 
                       <div className="w-7 h-7 rounded-lg text-neutral-400 flex items-center justify-center">

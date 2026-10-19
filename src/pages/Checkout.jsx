@@ -30,7 +30,8 @@ import {
   ChevronDown,
   RefreshCw,
   Star,
-  Trash2
+  Trash2,
+  Banknote
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
@@ -118,8 +119,11 @@ const formatOrderDetails = (ord, currentUser) => {
     if (isRepForward && itemPrice === 0) {
       itemPrice = origTotalNum > 0 ? origTotalNum : subtotal > 0 ? subtotal : totalPaid > 0 ? totalPaid : 0;
     }
+    const realProdId = it.product_id || it.productId || (it.product && (it.product.id || it.product.product_id)) || it.id;
     return {
       id: String(it.id || it.product_id || '1'),
+      product_id: realProdId,
+      productId: realProdId,
       name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
       price: itemPrice,
       quantity: Number(it.quantity || 1),
@@ -129,7 +133,9 @@ const formatOrderDetails = (ord, currentUser) => {
       cancel_reason: it.cancel_reason || ord.cancel_reason || null,
       return_reason: it.return_reason || ord.return_reason || null,
       product: {
-        id: String(it.id || it.product_id || '1'),
+        id: String(realProdId || '1'),
+        product_id: realProdId,
+        productId: realProdId,
         name: it.name || it.product_name || it.title || 'PEACH BLOOM CORSET SET',
         price: itemPrice,
         image: it.image || it.image_url || '/assets/Images/Brown01.png'
@@ -509,6 +515,17 @@ export const Checkout = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isCancelOrderModalOpen, setIsCancelOrderModalOpen] = useState(false);
   const [isConfirmOrderModalOpen, setIsConfirmOrderModalOpen] = useState(false);
+  const [isItemReturnModalOpen, setIsItemReturnModalOpen] = useState(false);
+  const [itemActionsState, setItemActionsState] = useState({});
+  const [returnBankDetails, setReturnBankDetails] = useState({
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    holderName: ''
+  });
+  const [returnComments, setReturnComments] = useState('');
+  const [isSubmittingItemReturn, setIsSubmittingItemReturn] = useState(false);
+  const [itemReturnError, setItemReturnError] = useState('');
 
   // Real-time Shiprocket Pincode Serviceability & Courier Check (Optimized to avoid duplicate requests)
   const lastCheckedPinRef = useRef('');
@@ -598,6 +615,7 @@ export const Checkout = () => {
 
   useModalScrollLock(isCancelOrderModalOpen, () => !isCancellingOrder && setIsCancelOrderModalOpen(false));
   useModalScrollLock(isConfirmOrderModalOpen, () => !isPlacingOrder && setIsConfirmOrderModalOpen(false));
+  useModalScrollLock(isItemReturnModalOpen, () => !isSubmittingItemReturn && setIsItemReturnModalOpen(false));
 
   const activeAddressForReview = useMemo(() => {
     if (showNewAddressForm || addresses.length === 0) {
@@ -1783,6 +1801,31 @@ export const Checkout = () => {
       (details.return_reason || '').toLowerCase().includes('exchange')
     );
 
+    // Mixed Return & Replacement (Simultaneous Items)
+    const isMixedReturnReplace = !isReplacementForwardOrder && Boolean(
+      (details.return_type || '').toLowerCase().includes('mixed') ||
+      currentStatusStr.includes('& replacement') ||
+      currentStatusStr.includes('returned & replaced') ||
+      (
+        Array.isArray(details.items) &&
+        details.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
+        details.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+      )
+    );
+
+    const mixedRefundAmount = parseFloat(details.refund_eligible_amount || details.refund_amount || 0) || (
+      Array.isArray(details.items)
+        ? details.items.filter(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return'))
+            .reduce((sum, it) => sum + (parseFloat(it.price || 0) * (parseInt(it.quantity, 10) || 1)), 0)
+        : 0
+    );
+
+    const mixedReplacementSize = details.replacement_size || (
+      Array.isArray(details.items)
+        ? (details.items.find(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))?.replacement_size)
+        : null
+    );
+
     // 1. Return Flow States (Post-Delivery only, Mutually exclusive from Replacement)
     const isReturnRequested = !isReplacementIntent && (currentStatusStr === 'return requested' || currentStatusStr === 'return request processing' || logLower === 'return initiated' || logLower === 'return requested');
     const isReturnApproved = !isReplacementIntent && (currentStatusStr === 'return approved' || currentStatusStr === 'return pickup scheduled' || (currentStatusStr.includes('pickup scheduled') && (currentStatusStr.includes('return') || logLower.includes('return'))) || logLower.includes('return pickup scheduled'));
@@ -2150,75 +2193,160 @@ export const Checkout = () => {
       }
     };
 
-    const handleOpenReturnReplaceChoice = async () => {
-      await Swal.fire({
-        title: 'Return or Replace Piece',
-        heightAuto: false,
-        scrollbarPadding: false,
-        willOpen: () => {
-          document.documentElement.style.overflow = 'hidden';
-          document.body.style.overflow = 'hidden';
-          document.body.setAttribute('data-modal-open', 'true');
-        },
-        didClose: () => {
-          document.documentElement.style.overflow = '';
-          document.body.style.overflow = '';
-          document.body.removeAttribute('data-modal-open');
-        },
-        html: `
-          <div class="text-left font-sans space-y-4 py-2">
-            <p class="text-xs text-neutral-600 leading-relaxed">
-              Your piece has been delivered. Choose your desired action below:
-            </p>
-            <div class="space-y-3">
-              <div id="choice-return-btn" class="p-4 border-2 border-neutral-200 hover:border-black rounded-xl cursor-pointer transition-all flex items-start gap-3 bg-white hover:bg-neutral-50 shadow-2xs">
-                <div class="w-9 h-9 rounded-lg bg-neutral-900 text-white flex items-center justify-center shrink-0">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
-                </div>
-                <div>
-                  <div class="font-bold text-xs uppercase tracking-wider text-black">1. Return & Refund</div>
-                  <div class="text-[11px] text-neutral-500 mt-0.5">Return delivered piece for 100% full refund back to your payment account.</div>
-                </div>
-              </div>
-              <div id="choice-replace-btn" class="p-4 border-2 border-purple-200 hover:border-purple-800 rounded-xl cursor-pointer transition-all flex items-start gap-3 bg-purple-50/50 hover:bg-purple-50 shadow-2xs">
-                <div class="w-9 h-9 rounded-lg bg-purple-900 text-white flex items-center justify-center shrink-0">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                </div>
-                <div>
-                  <div class="font-bold text-xs uppercase tracking-wider text-purple-950">2. Replace / Exchange</div>
-                  <div class="text-[11px] text-purple-800/80 mt-0.5">Exchange for a different size with complimentary reverse pickup.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `,
-        showCancelButton: true,
-        showConfirmButton: false,
-        cancelButtonText: 'Keep Piece',
-        cancelButtonColor: '#737373',
-        background: '#ffffff',
-        didOpen: () => {
-          const returnBtn = document.getElementById('choice-return-btn');
-          const replaceBtn = document.getElementById('choice-replace-btn');
-          if (returnBtn) {
-            returnBtn.onclick = () => {
-              Swal.close();
-              handleReturnOrder();
-            };
-          }
-          if (replaceBtn) {
-            replaceBtn.onclick = () => {
-              Swal.close();
-              handleReplaceOrder();
-            };
-          }
-        },
-        customClass: {
-          popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
-          title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
-          cancelButton: 'rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
-        }
+    const handleOpenReturnReplaceChoice = () => {
+      const currentItems = details?.items || placedOrderDetails?.items || [];
+      const initialMap = {};
+
+      // If 1 item: default to Return
+      // If 2 or 3 items: default to Keep, customer picks which one to return or replace!
+      const defaultAction = currentItems.length <= 1 ? 'Return' : 'Keep';
+
+      currentItems.forEach((item, idx) => {
+        const key = item.id || item.product_id || idx;
+        initialMap[key] = {
+          action: defaultAction,
+          reason: 'Size or fit issue',
+          replacementSize: item.size || 'M'
+        };
       });
+
+      setItemActionsState(initialMap);
+      setItemReturnError('');
+      setReturnComments('');
+      setIsItemReturnModalOpen(true);
+    };
+
+    const handleConfirmItemReturn = async (e) => {
+      if (e) e.preventDefault();
+      const currentItems = details?.items || placedOrderDetails?.items || [];
+      const isOrderCod = (details?.paymentMethod || details?.payment_method || '').toLowerCase().includes('cash') || (details?.paymentMethod || details?.payment_method || '').toLowerCase().includes('cod');
+
+      // Verify at least one item is marked for Return or Replace
+      const nonKeepItems = currentItems.filter(it => {
+        const key = it.id || it.product_id;
+        const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id];
+        return st && (st.action === 'Return' || st.action === 'Replace');
+      });
+
+      if (nonKeepItems.length === 0) {
+        setItemReturnError('Please select at least one item to return or replace.');
+        return;
+      }
+
+      const hasReturnItem = nonKeepItems.some(it => {
+        const key = it.id || it.product_id;
+        const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id];
+        return st?.action === 'Return';
+      });
+
+      if (hasReturnItem) {
+        if (!returnBankDetails.accountNumber.trim()) {
+          setItemReturnError('Please enter your Bank Account Number for the refund transfer.');
+          return;
+        }
+        if (returnBankDetails.accountNumber.trim() !== returnBankDetails.confirmAccountNumber.trim()) {
+          setItemReturnError('Bank Account Numbers do not match. Please verify.');
+          return;
+        }
+        if (!returnBankDetails.ifscCode.trim()) {
+          setItemReturnError('Please enter your Bank IFSC code.');
+          return;
+        }
+        if (!returnBankDetails.holderName.trim()) {
+          setItemReturnError('Please enter the Account Holder Name.');
+          return;
+        }
+      }
+
+      setIsSubmittingItemReturn(true);
+      setItemReturnError('');
+
+      try {
+        const orderNum = details?.orderNumber || placedOrderNumber;
+        const formattedItems = currentItems.map(it => {
+          const key = it.id || it.product_id;
+          const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id] || { action: 'Keep' };
+          return {
+            id: it.id || it.product_id,
+            product_id: it.product_id,
+            action: st.action,
+            reason: st.reason,
+            replacementSize: st.replacementSize,
+            quantity: it.quantity || 1
+          };
+        });
+
+        const res = await apiClient(`/api/orders/${orderNum}/return-request`, {
+          method: 'POST',
+          body: JSON.stringify({
+            items: formattedItems,
+            bankDetails: hasReturnItem ? returnBankDetails : null,
+            comments: returnComments,
+            reason: returnComments || 'Customer return / exchange request'
+          })
+        });
+
+        const updatedOrder = res?.data || {};
+        const targetStatus = updatedOrder.status || 'Return Request Processing';
+
+        setPlacedOrderDetails((prev) => {
+          const next = {
+            ...prev,
+            status: targetStatus,
+            return_type: updatedOrder.return_type || 'Return',
+            return_reason: updatedOrder.return_reason || returnComments,
+            items: updatedOrder.items || prev?.items
+          };
+          try {
+            sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+
+        broadcastOrderUpdate({
+          orderNumber: orderNum,
+          order_number: orderNum,
+          status: targetStatus,
+          return_type: updatedOrder.return_type,
+          return_reason: updatedOrder.return_reason
+        });
+
+        setIsItemReturnModalOpen(false);
+
+        // Count scenarios to display personalized Haute Couture message
+        const returnCount = nonKeepItems.filter(it => (itemActionsState[it.id || it.product_id]?.action === 'Return')).length;
+        const replaceCount = nonKeepItems.filter(it => (itemActionsState[it.id || it.product_id]?.action === 'Replace')).length;
+        const keepCount = currentItems.length - nonKeepItems.length;
+
+        let summaryText = '';
+        if (returnCount > 0 && replaceCount > 0) {
+          summaryText = `Your request has been submitted: ${returnCount} item(s) for return & refund, ${replaceCount} item(s) for exchange, and ${keepCount} item(s) retained. Complimentary reverse pickup will be arranged.`;
+        } else if (returnCount > 0) {
+          summaryText = `Your return request for ${returnCount} item(s) has been submitted. Reverse pickup will be scheduled and your refund will be disbursed upon inspection. ${keepCount > 0 ? `(${keepCount} item(s) retained by you).` : ''}`;
+        } else {
+          summaryText = `Your replacement request for ${replaceCount} item(s) has been submitted. Reverse pickup will be arranged and your new size will be dispatched with priority delivery.`;
+        }
+
+        await Swal.fire({
+          title: 'Request Submitted Successfully',
+          text: summaryText,
+          icon: 'success',
+          confirmButtonColor: '#171717',
+          confirmButtonText: 'OK',
+          background: '#ffffff',
+          customClass: {
+            popup: 'rounded-2xl shadow-2xl border border-neutral-200 font-sans',
+            title: 'font-serif font-bold text-xl uppercase tracking-wider text-neutral-900',
+            htmlContainer: 'text-sm text-neutral-600',
+            confirmButton: 'rounded-xl px-6 py-2.5 text-xs font-bold uppercase tracking-wider shadow-sm cursor-pointer'
+          }
+        });
+      } catch (err) {
+        console.error('Item return request error:', err);
+        setItemReturnError(err.message || 'Failed to submit request. Please try again.');
+      } finally {
+        setIsSubmittingItemReturn(false);
+      }
     };
 
     const handleCancelOrder = () => {
@@ -2493,6 +2621,8 @@ export const Checkout = () => {
                 ? (isRefundCompleted ? 'ORDER CANCELLED & 100% REFUND COMPLETED' : 'ORDER CANCELLED & SHIPROCKET SHIPMENT VOIDED')
                 : isCancellationRequested
                 ? 'CANCELLATION REQUEST UNDER REVIEW'
+                : isMixedReturnReplace
+                ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED & REFUND PROCESSED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT ATELIER • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'EXCHANGE & RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'SIMULTANEOUS RETURN & REPLACEMENT UNDER REVIEW')
                 : isInReturnFlow
                 ? (isReturned ? 'RETURN COMPLETED & 100% REFUND SETTLED' : isReceivedAtUrvaah ? 'RETURN RECEIVED AT ATELIER • QC IN PROGRESS' : isReturnApproved ? 'RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'RETURN REQUEST UNDER ATELIER REVIEW')
                 : isReplacementForwardOrder
@@ -2508,6 +2638,8 @@ export const Checkout = () => {
                 ? 'THIS ORDER HAS BEEN CANCELLED'
                 : isCancellationRequested
                 ? 'CANCELLATION REQUEST SUBMITTED'
+                : isMixedReturnReplace
+                ? (isReplaced || Boolean(details.replacement_order_number) ? 'EXCHANGE DISPATCHED & RETURN SETTLED' : 'EXCHANGE & RETURN IN MOTION')
                 : isInReturnFlow
                 ? (isReturned ? 'RETURN & REFUND COMPLETED' : isReceivedAtUrvaah ? 'PIECE RECEIVED AT HOUSE OF URVAAH' : isReturnApproved ? 'RETURN APPROVED BY ATELIER' : 'RETURN REQUEST SUBMITTED')
                 : isReplacementForwardOrder
@@ -2527,6 +2659,18 @@ export const Checkout = () => {
                 )
               ) : isCancellationRequested ? (
                 <>Your cancellation request has been recorded and is currently being reviewed by our atelier management team. Once approved, freight will be voided and your refund will be processed.</>
+              ) : isMixedReturnReplace ? (
+                isReplaced || Boolean(details.replacement_order_number) ? (
+                  <>Your replacement order #{details.replacement_order_number || `${details.orderNumber}-REP`} has been generated and dispatched with 100% exchange credit, and ₹{mixedRefundAmount.toLocaleString('en-IN')} refund for your returned item has been processed.</>
+                ) : isReplacementQCReceived ? (
+                  <>Reverse parcel containing both exchange and return items has arrived at House of Urvaah atelier and verified in pristine condition. Replacement order is queued and refund of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong> is in settlement.</>
+                ) : isReplacementCollected ? (
+                  <>Courier rider has collected both exchange and return pieces from your doorstep and they are in transit to our atelier.</>
+                ) : isReplacementApproved ? (
+                  <>Both exchange and return requests have been authorized. Delhivery reverse courier pickup has been scheduled for your doorstep. Please keep pieces ready.</>
+                ) : (
+                  <>Your simultaneous exchange and return request is active. Our concierge is coordinating doorstep collection for both items, replacement dispatch, and refund settlement of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong>.</>
+                )
               ) : isInReturnFlow ? (
                 isReturned ? (
                   <>Your delivered piece was received back at House of Urvaah and passed inspection. 100% full refund of <strong className="text-black font-medium">{formatPrice(details.totalPaid)}</strong> has been settled to your account{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
@@ -2610,11 +2754,13 @@ export const Checkout = () => {
               </div>
               <div className="font-sans flex-1">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  {isOrderCancelled ? 'Shiprocket Logistics' : isInReturnFlow ? 'Reverse Logistics' : isInReplacementFlow ? 'Exchange Logistics' : isCancellationRequested ? 'Logistics Status' : 'Tracking Number'}
+                  {isOrderCancelled ? 'Shiprocket Logistics' : isMixedReturnReplace ? 'Mixed Reverse Logistics' : isInReturnFlow ? 'Reverse Logistics' : isInReplacementFlow ? 'Exchange Logistics' : isCancellationRequested ? 'Logistics Status' : 'Tracking Number'}
                 </span>
                 <span className={`text-sm sm:text-base font-semibold font-serif tracking-[0.06em] block ${
                   isOrderCancelled
                     ? 'text-red-700'
+                    : isMixedReturnReplace
+                    ? 'text-indigo-950'
                     : isInReturnFlow
                     ? 'text-indigo-950'
                     : isInReplacementFlow
@@ -2627,6 +2773,8 @@ export const Checkout = () => {
                     ? 'Pickup Voided • ₹0 Freight'
                     : isCancellationRequested
                     ? 'Cancellation Under Review'
+                    : isMixedReturnReplace
+                    ? (returnAwb ? `Reverse AWB: ${returnAwb}` : (isReplacementApproved ? 'Reverse Pickup Scheduled' : 'Reverse Pickup Active'))
                     : isInReturnFlow
                     ? (returnAwb ? `Reverse AWB: ${returnAwb}` : (isReturnApproved ? 'Pickup Scheduled' : 'Reverse Pickup Pending Approval'))
                     : isInReplacementFlow
@@ -2643,6 +2791,8 @@ export const Checkout = () => {
                   ? 'bg-emerald-700'
                   : isCancellationRequested
                   ? 'bg-amber-600'
+                  : isMixedReturnReplace
+                  ? 'bg-purple-900'
                   : isInReturnFlow
                   ? (isReturned ? 'bg-emerald-700' : 'bg-indigo-900')
                   : isInReplacementFlow
@@ -2653,13 +2803,15 @@ export const Checkout = () => {
               </div>
               <div className="font-sans">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  {isOrderCancelled || isInReturnFlow || isCancellationRequested ? 'Financial Settlement' : isInReplacementFlow ? 'Exchange Fulfillment' : 'Estimated Delivery'}
+                  {isOrderCancelled || isInReturnFlow || isCancellationRequested ? 'Financial Settlement' : isMixedReturnReplace ? 'Exchange & Refund' : isInReplacementFlow ? 'Exchange Fulfillment' : 'Estimated Delivery'}
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-black font-sans tracking-tight">
                   {isOrderCancelled
                     ? (isRefundCompleted ? '100% Refund Disbursed (Completed)' : 'Full Refund Initiated (3-5 Days)')
                     : isCancellationRequested
                     ? 'Refund Pending Admin Approval'
+                    : isMixedReturnReplace
+                    ? (isReplaced || Boolean(details.replacement_order_number) ? `Dispatched + Refund ${formatPrice(mixedRefundAmount)}` : `Exchange Piece + Refund ${formatPrice(mixedRefundAmount)}`)
                     : isInReturnFlow
                     ? (isReturned ? '100% Refund Disbursed (Completed)' : isReceivedAtUrvaah ? 'QC Inspection • Refund Queued' : `Refund Pending QC (${formatPrice(details.totalPaid)})`)
                     : isInReplacementFlow
@@ -2715,23 +2867,66 @@ export const Checkout = () => {
                           <h4 className="text-xs sm:text-sm font-semibold uppercase text-black font-serif tracking-wide leading-snug">
                             {item.name}
                           </h4>
-                          <div className="flex items-center gap-2 mt-1.5 font-sans">
-                            <span className="text-[11px] text-neutral-500 font-medium">Qty: {item.quantity}</span>
-                            <span className={`px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase ${
-                              isOrderCancelled
-                                ? 'bg-red-900 text-white'
-                                : isReturned
-                                ? 'bg-emerald-700 text-white'
-                                : isDelivered
-                                ? 'bg-emerald-700 text-white'
-                                : isOutForDelivery
-                                ? 'bg-blue-700 text-white'
-                                : isShipped
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-brand-dark text-white'
-                            }`}>
-                              {isOrderCancelled ? 'CANCELLED' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
-                            </span>
+                          <div className="flex items-center gap-2 mt-1.5 font-sans flex-wrap">
+                            <span className="text-[11px] text-neutral-500 font-medium">Qty: {item.quantity}{item.size ? ` • Size: ${item.size}` : ''}</span>
+                            {(() => {
+                              const itemAct = (item.return_action || '').toLowerCase();
+                              const itemStat = (item.status || '').toLowerCase();
+                              if (itemAct === 'replace' || itemStat.includes('replace') || itemStat.includes('exchange')) {
+                                return (
+                                  <span className="px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase bg-purple-100 text-purple-900 border border-purple-200">
+                                    Replace (Size: {item.replacement_size || details.replacement_size || 'M'})
+                                  </span>
+                                );
+                              }
+                              if (itemAct === 'return' || itemStat.includes('return')) {
+                                return (
+                                  <span className="px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase bg-amber-100 text-amber-900 border border-amber-200">
+                                    Return Requested
+                                  </span>
+                                );
+                              }
+                              if (itemAct === 'keep') {
+                                return (
+                                  <span className="px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    Kept
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className={`px-2 py-0.5 text-[9px] font-sans font-semibold tracking-[0.16em] uppercase ${
+                                  isOrderCancelled
+                                    ? 'bg-red-900 text-white'
+                                    : isReturned
+                                    ? 'bg-emerald-700 text-white'
+                                    : isDelivered
+                                    ? 'bg-emerald-700 text-white'
+                                    : isOutForDelivery
+                                    ? 'bg-blue-700 text-white'
+                                    : isShipped
+                                    ? 'bg-amber-600 text-white'
+                                    : 'bg-brand-dark text-white'
+                                }`}>
+                                  {isOrderCancelled ? 'CANCELLED' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                </span>
+                              );
+                            })()}
+                            {isDelivered && !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const prodId = item.product_id || item.productId || (item.product && (item.product.id || item.product.product_id)) || item.id;
+                                  if (prodId) {
+                                    navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[9px] font-sans font-bold tracking-[0.14em] uppercase transition-all shadow-2xs cursor-pointer ml-1"
+                                title="Rate and give feedback for this piece"
+                              >
+                                <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                                <span>Feedback</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2858,7 +3053,7 @@ export const Checkout = () => {
                   <div className="flex items-center justify-between pb-3 mb-6 border-b border-purple-100">
                     <h3 className="text-xs font-serif tracking-[0.25em] uppercase text-purple-950 font-semibold flex items-center gap-2">
                       <RefreshCw className="w-3.5 h-3.5 text-purple-700" />
-                      <span>EXCHANGE & REPLACEMENT JOURNEY</span>
+                      <span>{isMixedReturnReplace ? 'SIMULTANEOUS RETURN & REPLACEMENT JOURNEY' : 'EXCHANGE & REPLACEMENT JOURNEY'}</span>
                     </h3>
                     <span className="text-[10px] font-sans font-bold tracking-[0.16em] uppercase text-purple-700">
                       STEP {isReplaced || Boolean(details.replacement_order_number) ? '5 OF 5' : isReplacementQCReceived ? '4 OF 5' : isReplacementCollected ? '3 OF 5' : isReplacementApproved ? '2 OF 5' : '1 OF 5'}
@@ -2869,15 +3064,19 @@ export const Checkout = () => {
                     {/* Connected Vertical Line */}
                     <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-neutral-200" />
 
-                    {/* Step 1: REPLACEMENT REQUESTED */}
+                    {/* Step 1: REPLACEMENT / MIXED REQUESTED */}
                     <div className="relative flex items-start gap-4">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-purple-700 text-white shadow-xs">
                         <Check className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">1. REPLACEMENT REQUESTED</h4>
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">
+                          {isMixedReturnReplace ? '1. RETURN & REPLACEMENT REQUESTED' : '1. REPLACEMENT REQUESTED'}
+                        </h4>
                         <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 text-purple-700">
-                          {details.replacement_size ? `SIZE ${details.replacement_size} REQUESTED` : 'COMPLETED'}
+                          {isMixedReturnReplace
+                            ? (mixedReplacementSize ? `REPLACE (SIZE ${mixedReplacementSize}) + RETURN (₹${mixedRefundAmount.toLocaleString('en-IN')})` : 'EXCHANGE & RETURN RECORDED')
+                            : (details.replacement_size ? `SIZE ${details.replacement_size} REQUESTED` : 'COMPLETED')}
                         </span>
                       </div>
                     </div>
@@ -2921,15 +3120,19 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Step 5: REPLACEMENT ORDER DISPATCHED */}
+                    {/* Step 5: REPLACEMENT ORDER DISPATCHED / REFUND SETTLED */}
                     <div className="relative flex items-start gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplaced || Boolean(details.replacement_order_number) ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                         <PackageCheck className="w-4 h-4" />
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplaced || Boolean(details.replacement_order_number) ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>5. REPLACEMENT ORDER PLACED</h4>
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplaced || Boolean(details.replacement_order_number) ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
+                          {isMixedReturnReplace ? '5. REPLACEMENT DISPATCHED & REFUND SETTLED' : '5. REPLACEMENT ORDER PLACED'}
+                        </h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplaced || Boolean(details.replacement_order_number) ? 'text-emerald-700 font-bold' : 'text-neutral-400'}`}>
-                          {isReplaced || Boolean(details.replacement_order_number) ? (details.replacement_order_number ? `NEW ORDER #${details.replacement_order_number}` : 'DISPATCHED') : 'PENDING DISPATCH'}
+                          {isMixedReturnReplace
+                            ? (isReplaced || Boolean(details.replacement_order_number) ? (details.replacement_order_number ? `NEW ORDER #${details.replacement_order_number} + ₹${mixedRefundAmount.toLocaleString('en-IN')} REFUNDED` : 'DISPATCHED & REFUND SETTLED') : 'PENDING DISPATCH & SETTLEMENT')
+                            : (isReplaced || Boolean(details.replacement_order_number) ? (details.replacement_order_number ? `NEW ORDER #${details.replacement_order_number}` : 'DISPATCHED') : 'PENDING DISPATCH')}
                         </span>
                       </div>
                     </div>
@@ -3547,12 +3750,56 @@ export const Checkout = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const items = orderDetails?.items || [];
-                        const firstItem = items[0];
-                        const prodId = firstItem?.product_id || firstItem?.productId || firstItem?.id;
-                        if (prodId) {
-                          navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                        const items = details?.items || placedOrderDetails?.items || [];
+                        if (!items || items.length === 0) return;
+
+                        if (items.length === 1) {
+                          const item = items[0];
+                          const prodId = item?.product_id || item?.productId || (item?.product && (item.product.id || item.product.product_id)) || item?.id;
+                          if (prodId) {
+                            navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                          }
+                          return;
                         }
+
+                        // For multi-item orders, show a clean modal to select which product to review
+                        Swal.fire({
+                          title: 'SELECT PRODUCT TO REVIEW',
+                          text: 'Which piece from your delivered order would you like to review?',
+                          html: `
+                            <div class="space-y-2.5 mt-4 text-left font-sans">
+                              ${items.map((it, idx) => {
+                                const pid = it.product_id || it.productId || (it.product && (it.product.id || it.product.product_id)) || it.id;
+                                const pName = it.name || it.product_name || `Product #${idx + 1}`;
+                                const pImg = it.image || it.image_url || '/assets/Images/Blue01.png';
+                                return `
+                                  <button type="button" class="swal-feedback-item-btn w-full p-2.5 flex items-center gap-3 border border-neutral-200 hover:border-black rounded-xl transition-all cursor-pointer bg-white hover:bg-neutral-50 text-left shadow-2xs" data-prod-id="${pid}">
+                                    <img src="${pImg}" class="w-12 h-14 object-contain bg-neutral-100 rounded-lg border border-neutral-200 shrink-0" alt="${pName}" />
+                                    <div class="flex-1 min-w-0">
+                                      <p class="text-xs font-bold text-black truncate uppercase tracking-wider">${pName}</p>
+                                      <p class="text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">Click to write feedback</p>
+                                    </div>
+                                    <span class="text-xs font-bold text-amber-500 flex items-center gap-1 shrink-0">★ REVIEW</span>
+                                  </button>
+                                `;
+                              }).join('')}
+                            </div>
+                          `,
+                          showConfirmButton: false,
+                          showCloseButton: true,
+                          didOpen: () => {
+                            const btns = document.querySelectorAll('.swal-feedback-item-btn');
+                            btns.forEach(btn => {
+                              btn.addEventListener('click', () => {
+                                const targetPid = btn.getAttribute('data-prod-id');
+                                Swal.close();
+                                if (targetPid) {
+                                  navigate(`/product/${targetPid}?openReview=true#customer-reviews`);
+                                }
+                              });
+                            });
+                          }
+                        });
                       }}
                       className="w-full py-3.5 px-4 border border-black text-white bg-black hover:bg-neutral-800 text-xs font-sans font-bold tracking-[0.25em] uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                     >
@@ -3806,6 +4053,425 @@ export const Checkout = () => {
                         </>
                       ) : (
                         <span>SUBMIT CANCELLATION</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Atelier Granular Multi-Item Return & Exchange Modal */}
+        <AnimatePresence>
+          {isItemReturnModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 font-sans text-left">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isSubmittingItemReturn && setIsItemReturnModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              />
+
+              {/* Modal Box */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="relative z-10 w-full max-w-2xl bg-white shadow-2xl p-5 sm:p-7 border border-neutral-200 max-h-[92vh] flex flex-col text-left rounded-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-200 shrink-0">
+                  <div>
+                    <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
+                      HOUSE OF URVAAH ATELIER • RETURNS & EXCHANGES
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-neutral-900 text-white flex items-center justify-center shrink-0">
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </div>
+                      <h3 className="text-base sm:text-lg font-serif tracking-[0.1em] uppercase text-neutral-900 font-bold">
+                        RETURN OR EXCHANGE PIECES
+                      </h3>
+                    </div>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Choose an action for each garment in Order #{details?.orderNumber || placedOrderNumber}.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsItemReturnModalOpen(false)}
+                    disabled={isSubmittingItemReturn}
+                    className="p-1.5 text-neutral-400 hover:text-black rounded-full hover:bg-neutral-100 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Scrollable Body */}
+                <form onSubmit={handleConfirmItemReturn} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+                  {itemReturnError && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{itemReturnError}</span>
+                    </div>
+                  )}
+
+                  {/* Items List */}
+                  <div className="space-y-3">
+                    <span className="text-[11px] font-bold text-neutral-700 uppercase tracking-wider block">
+                      Select Action Per Product ({((details?.items || placedOrderDetails?.items || [])).length} items)
+                    </span>
+
+                    {(details?.items || placedOrderDetails?.items || []).map((item, idx) => {
+                      const itemKey = item.id || item.product_id || idx;
+                      const allItems = details?.items || placedOrderDetails?.items || [];
+                      const currentState = itemActionsState[itemKey] || {
+                        action: allItems.length <= 1 ? 'Return' : 'Keep',
+                        reason: 'Size or fit issue',
+                        replacementSize: item.size || 'M'
+                      };
+                      const itemAction = currentState.action;
+                      const itemImg = getSupabaseMediaUrl(item.image || item.image_url || '/assets/Images/Blue02.png');
+                      const unitPrice = Number(item.price || item.unit_price || 0);
+
+                      return (
+                        <div
+                          key={itemKey}
+                          className={`p-3.5 rounded-xl border transition-all text-xs ${
+                            itemAction === 'Return'
+                              ? 'border-amber-300 bg-amber-50/40'
+                              : itemAction === 'Replace'
+                              ? 'border-purple-300 bg-purple-50/40'
+                              : 'border-neutral-200 bg-neutral-50/60'
+                          }`}
+                        >
+                          {/* Item Basic Info */}
+                          <div className="flex items-center justify-between gap-3 pb-3 border-b border-neutral-200/60">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img
+                                src={itemImg}
+                                alt={item.name}
+                                className="w-12 h-14 object-contain rounded-lg border bg-white p-0.5 shrink-0"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = getSupabaseMediaUrl('Images/Blue02.png');
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <p className="font-bold text-neutral-900 truncate">{item.name || item.title || 'Atelier Item'}</p>
+                                <p className="text-[11px] text-neutral-500">
+                                  Size: <strong className="text-neutral-800">{item.size || 'M'}</strong> • Qty: {item.quantity || 1}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="font-bold text-neutral-900 block text-sm">
+                                ₹{unitPrice.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 3 Action Buttons */}
+                          <div className="pt-3">
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setItemActionsState(prev => ({
+                                    ...prev,
+                                    [itemKey]: { ...currentState, action: 'Keep' }
+                                  }));
+                                }}
+                                className={`py-2 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border text-center ${
+                                  itemAction === 'Keep'
+                                    ? 'bg-neutral-900 text-white border-neutral-900 shadow-xs'
+                                    : 'bg-white text-neutral-700 border-neutral-300 hover:border-black'
+                                }`}
+                              >
+                                Keep Piece
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setItemActionsState(prev => ({
+                                    ...prev,
+                                    [itemKey]: { ...currentState, action: 'Return' }
+                                  }));
+                                }}
+                                className={`py-2 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border text-center ${
+                                  itemAction === 'Return'
+                                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                    : 'bg-white text-neutral-700 border-neutral-300 hover:border-amber-600 hover:text-amber-800'
+                                }`}
+                              >
+                                Return & Refund
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setItemActionsState(prev => ({
+                                    ...prev,
+                                    [itemKey]: { ...currentState, action: 'Replace' }
+                                  }));
+                                }}
+                                className={`py-2 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border text-center ${
+                                  itemAction === 'Replace'
+                                    ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                                    : 'bg-white text-neutral-700 border-neutral-300 hover:border-purple-800 hover:text-purple-900'
+                                }`}
+                              >
+                                Exchange Size
+                              </button>
+                            </div>
+
+                            {/* Return Specific Option */}
+                            {itemAction === 'Return' && (
+                              <div className="mt-3 p-2.5 bg-white rounded-lg border border-amber-200 text-xs space-y-1.5 animate-in fade-in duration-150">
+                                <label className="block text-[10px] font-bold text-amber-900 uppercase">
+                                  Reason for Returning
+                                </label>
+                                <select
+                                  value={currentState.reason || 'Size or fit issue'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setItemActionsState(prev => ({
+                                      ...prev,
+                                      [itemKey]: { ...currentState, reason: val }
+                                    }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-neutral-300 rounded text-xs bg-white text-neutral-800 focus:outline-none"
+                                >
+                                  <option value="Size or fit issue">Size or fit issue</option>
+                                  <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                                  <option value="Quality or fabric not as expected">Quality or fabric not as expected</option>
+                                  <option value="Received incorrect item or color">Received incorrect item or color</option>
+                                  <option value="Did not match online images">Did not match online images</option>
+                                  <option value="Changed my mind">Changed my mind</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                                <p className="text-[10px] text-amber-800">
+                                  Refund of ₹{unitPrice.toLocaleString('en-IN')} will be credited upon doorstep collection & atelier QC.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Replace Specific Option */}
+                            {itemAction === 'Replace' && (
+                              <div className="mt-3 p-2.5 bg-white rounded-lg border border-purple-200 text-xs space-y-2 animate-in fade-in duration-150">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">
+                                      Preferred Replacement Size
+                                    </label>
+                                    <select
+                                      value={currentState.replacementSize || 'M'}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setItemActionsState(prev => ({
+                                          ...prev,
+                                          [itemKey]: { ...currentState, replacementSize: val }
+                                        }));
+                                      }}
+                                      className="w-full px-2.5 py-1.5 border border-neutral-300 rounded text-xs bg-white text-neutral-800 focus:outline-none"
+                                    >
+                                      {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                                        <option key={sz} value={sz}>{sz}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">
+                                      Reason for Exchange
+                                    </label>
+                                    <select
+                                      value={currentState.reason || 'Size or fit issue - need different size'}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setItemActionsState(prev => ({
+                                          ...prev,
+                                          [itemKey]: { ...currentState, reason: val }
+                                        }));
+                                      }}
+                                      className="w-full px-2.5 py-1.5 border border-neutral-300 rounded text-xs bg-white text-neutral-800 focus:outline-none"
+                                    >
+                                      <option value="Size or fit issue - need different size">Size or fit issue - need different size</option>
+                                      <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                                      <option value="Color or variant exchange">Color or variant exchange</option>
+                                      <option value="Other">Other</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-purple-800">
+                                  Complimentary reverse pickup will collect this piece and your preferred size will be dispatched.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Real-time Scenario Summary Strip */}
+                  {(() => {
+                    const currentItems = details?.items || placedOrderDetails?.items || [];
+                    let keptC = 0;
+                    let retC = 0;
+                    let repC = 0;
+                    let refTotal = 0;
+
+                    currentItems.forEach(it => {
+                      const k = it.id || it.product_id;
+                      const act = itemActionsState[k]?.action || (currentItems.length <= 1 ? 'Return' : 'Keep');
+                      const p = Number(it.price || 0) * (it.quantity || 1);
+                      if (act === 'Keep') keptC++;
+                      else if (act === 'Return') { retC++; refTotal += p; }
+                      else if (act === 'Replace') repC++;
+                    });
+
+                    return (
+                      <div className="p-3 bg-neutral-900 text-white rounded-xl text-xs space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                          REQUEST SUMMARY
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          {keptC > 0 && (
+                            <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-md text-[11px] font-semibold">
+                              {keptC} Piece(s) Kept
+                            </span>
+                          )}
+                          {retC > 0 && (
+                            <span className="px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded-md text-[11px] font-semibold">
+                              {retC} Return (Refund: ₹{refTotal.toLocaleString('en-IN')})
+                            </span>
+                          )}
+                          {repC > 0 && (
+                            <span className="px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded-md text-[11px] font-semibold">
+                              {repC} Exchange Piece(s)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Bank Details for Refund (if any return items selected) */}
+                  {(details?.items || placedOrderDetails?.items || []).some(it => itemActionsState[it.id || it.product_id]?.action === 'Return') && (
+                    <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3 text-xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold uppercase text-[11px]">
+                        <Banknote className="w-4 h-4 text-amber-700" />
+                        <span>Bank Details for Refund Disbursement (IMPS / NEFT)</span>
+                      </div>
+                      <p className="text-[11px] text-neutral-600">
+                        Please provide your verified bank account details so our finance desk can disburse your refund directly via secure IMPS / NEFT transfer upon return arrival.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                            Account Holder Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={returnBankDetails.holderName}
+                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, holderName: e.target.value }))}
+                            placeholder="e.g. Aditi Sharma"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                            Bank IFSC Code <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={returnBankDetails.ifscCode}
+                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, ifscCode: e.target.value.toUpperCase() }))}
+                            placeholder="e.g. HDFC0001234"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                            Bank Account Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={returnBankDetails.accountNumber}
+                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
+                            placeholder="e.g. 50100234567890"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                            Confirm Account Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={returnBankDetails.confirmAccountNumber}
+                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: e.target.value }))}
+                            placeholder="Re-enter Account Number"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* General Comments */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                      Additional Notes for Atelier Concierge (Optional)
+                    </label>
+                    <textarea
+                      value={returnComments}
+                      onChange={(e) => setReturnComments(e.target.value)}
+                      placeholder="Add any additional details or fit preferences..."
+                      rows={2}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  {/* Modal Footer Buttons */}
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isSubmittingItemReturn}
+                      onClick={() => setIsItemReturnModalOpen(false)}
+                      className="w-full sm:w-1/3 py-3 border border-neutral-300 text-neutral-800 text-xs font-bold tracking-[0.2em] uppercase hover:border-black transition-colors cursor-pointer text-center disabled:opacity-50 rounded-xl"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingItemReturn}
+                      className="w-full sm:w-2/3 py-3 bg-neutral-900 text-white text-xs font-bold tracking-[0.2em] uppercase hover:bg-black transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm rounded-xl"
+                    >
+                      {isSubmittingItemReturn ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>SUBMITTING REQUEST...</span>
+                        </>
+                      ) : (
+                        <span>SUBMIT RETURN / EXCHANGE REQUEST</span>
                       )}
                     </button>
                   </div>
