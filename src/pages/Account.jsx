@@ -263,6 +263,8 @@ export const Account = () => {
       await apiClient(endpoint, {
         method: 'POST',
         body: JSON.stringify({
+          status: targetStatus,
+          type: isDeliveredModalOrder ? 'Return' : 'Cancellation',
           cancelReason,
           comments: cancelComments,
           itemIds: selectedCancelItems,

@@ -67,6 +67,9 @@ export const printElement = (element, options = {}) => {
               overflow: visible !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
             }
+            body, body * {
+              visibility: visible !important;
+            }
             ${pageStyle}
           </style>
         </head>
@@ -96,8 +99,34 @@ export const printElement = (element, options = {}) => {
       }
     };
 
-    // Allow browser 250ms to parse copied styles, images, and fonts before triggering dialog
-    setTimeout(executePrint, 250);
+    // Ensure images inside iframe (like brand logo) are loaded before calling print
+    const images = Array.from(iframeDoc.images || []);
+    if (images.length > 0) {
+      let isExecuted = false;
+      const safeTrigger = () => {
+        if (!isExecuted) {
+          isExecuted = true;
+          setTimeout(executePrint, 150);
+        }
+      };
+
+      Promise.all(
+        images.map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      )
+        .then(safeTrigger)
+        .catch(safeTrigger);
+
+      // Fallback timeout in case images hang
+      setTimeout(safeTrigger, 1200);
+    } else {
+      setTimeout(executePrint, 250);
+    }
   } catch (err) {
     console.error('printElement error, using fallback:', err);
     window.print();

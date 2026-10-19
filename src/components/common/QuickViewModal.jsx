@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, ShoppingBag, Check, Bell } from 'lucide-react';
+import { X, Heart, ShoppingBag, Check, Bell, CheckCircle2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
@@ -35,11 +35,8 @@ export const QuickViewModal = () => {
   useEffect(() => {
     if (quickViewProduct?.id) {
       try {
-        const generalKey = `urvaah_stock_notified_${quickViewProduct.id}_all`;
         const sizeKey = `urvaah_stock_notified_${quickViewProduct.id}_${selectedSize || 'all'}`;
-        const isStored =
-          localStorage.getItem(generalKey) === 'true' ||
-          localStorage.getItem(sizeKey) === 'true';
+        const isStored = localStorage.getItem(sizeKey) === 'true';
         setHasSubscribedStock(isStored);
       } catch (e) {
         setHasSubscribedStock(false);
@@ -52,7 +49,6 @@ export const QuickViewModal = () => {
     const targetSize = size || selectedSize || 'all';
     try {
       localStorage.setItem(`urvaah_stock_notified_${targetId}_${targetSize}`, 'true');
-      localStorage.setItem(`urvaah_stock_notified_${targetId}_all`, 'true');
     } catch (e) {}
     setHasSubscribedStock(true);
   };
@@ -186,26 +182,29 @@ export const QuickViewModal = () => {
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4 border-t border-neutral-100">
               {isOutOfStock ? (
-                hasSubscribedStock ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="flex-1 py-3.5 px-4 bg-neutral-200 text-neutral-500 text-xs font-semibold tracking-[0.18em] uppercase cursor-not-allowed border border-neutral-300 select-none"
-                    title="Alert registered — you will be notified when this item is back in stock"
-                  >
-                    OUT OF STOCK ({selectedSize})
-                  </button>
-                ) : (
-                  <Button
-                    fullWidth
-                    variant="primary"
-                    onClick={() => setIsStockModalOpen(true)}
-                    className="flex items-center justify-center gap-2 py-3.5 bg-neutral-900 hover:bg-black text-white"
-                  >
-                    <Bell className="w-4 h-4 text-amber-300" />
-                    NOTIFY ME ({selectedSize})
-                  </Button>
-                )
+                <Button
+                  fullWidth
+                  variant="primary"
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="flex items-center justify-center gap-2 py-3.5 bg-neutral-900 hover:bg-black text-white"
+                  title={
+                    hasSubscribedStock
+                      ? `Alert registered for size ${selectedSize}. Click to update contact details.`
+                      : `Notify me when size ${selectedSize} is back in stock`
+                  }
+                >
+                  {hasSubscribedStock ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>NOTIFY ME ({selectedSize}) - REGISTERED</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="w-4 h-4 text-amber-300 shrink-0" />
+                      <span>NOTIFY ME ({selectedSize})</span>
+                    </>
+                  )}
+                </Button>
               ) : (
                 <Button
                   fullWidth

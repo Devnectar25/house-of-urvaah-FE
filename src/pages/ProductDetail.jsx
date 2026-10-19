@@ -212,8 +212,7 @@ export const ProductDetail = () => {
     if (product?.id) {
       try {
         const key = `urvaah_stock_notified_${product.id}_${selectedSize || 'all'}`;
-        const generalKey = `urvaah_stock_notified_${product.id}_all`;
-        const isStored = localStorage.getItem(key) === 'true' || localStorage.getItem(generalKey) === 'true';
+        const isStored = localStorage.getItem(key) === 'true';
         setHasSubscribedStock(isStored);
       } catch (e) {
         setHasSubscribedStock(false);
@@ -226,7 +225,6 @@ export const ProductDetail = () => {
     const targetSize = size || selectedSize || 'all';
     try {
       localStorage.setItem(`urvaah_stock_notified_${targetId}_${targetSize}`, 'true');
-      localStorage.setItem(`urvaah_stock_notified_${targetId}_all`, 'true');
     } catch (e) {}
     setHasSubscribedStock(true);
   };
@@ -1273,28 +1271,36 @@ export const ProductDetail = () => {
               const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
 
               if (isSelectedSizeOut) {
+                const sizeLabel = selectedSize ? `FOR SIZE ${selectedSize}` : 'WHEN AVAILABLE';
                 return (
-                  <div className="flex items-center gap-2.5 pt-1">
-                    {hasSubscribedStock ? (
-                      <button
-                        type="button"
-                        disabled
-                        aria-disabled="true"
-                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-200 text-neutral-500 text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-none flex items-center justify-center gap-2 font-sans cursor-not-allowed select-none border border-neutral-300/90"
-                        title="Alert registered — you will be notified when this size is back in stock"
-                      >
-                        <span>OUT OF STOCK ({selectedSize})</span>
-                      </button>
-                    ) : (
+                  <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex items-center gap-2.5">
                       <button
                         type="button"
                         onClick={() => setIsStockModalOpen(true)}
-                        className="flex-1 h-11 sm:h-12.5 px-4 bg-neutral-900 text-white hover:bg-black text-xs sm:text-sm font-bold tracking-[0.18em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group"
+                        className={`flex-1 h-11 sm:h-12.5 px-4 text-xs sm:text-sm font-bold tracking-[0.16em] uppercase transition-all shadow-sm flex items-center justify-center gap-2.5 font-sans cursor-pointer group ${
+                          hasSubscribedStock
+                            ? 'bg-neutral-900 text-white hover:bg-black border border-neutral-900'
+                            : 'bg-neutral-900 text-white hover:bg-black'
+                        }`}
+                        title={
+                          hasSubscribedStock
+                            ? `Alert registered for size ${selectedSize}. Click to view or update contact details.`
+                            : `Notify me when size ${selectedSize} is back in stock`
+                        }
                       >
-                        <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform" />
-                        <span>NOTIFY ME FOR SIZE {selectedSize}</span>
+                        {hasSubscribedStock ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-400 shrink-0" />
+                            <span>NOTIFY ME {sizeLabel} (REGISTERED)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+                            <span>NOTIFY ME {sizeLabel}</span>
+                          </>
+                        )}
                       </button>
-                    )}
 
                     {/* Wishlist Heart Icon Button */}
                     <button
@@ -1320,7 +1326,15 @@ export const ProductDetail = () => {
                       <Share2 className="w-4.5 h-4.5 stroke-[1.5]" />
                     </button>
                   </div>
-                );
+
+                  {hasSubscribedStock && (
+                    <p className="text-[11px] text-neutral-600 font-sans tracking-wide flex items-center gap-1.5 pl-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>You are registered for restock alerts on size {selectedSize}. Click the button above to view or update details.</span>
+                    </p>
+                  )}
+                </div>
+              );
               }
 
               const availableStock = sizeQty !== null ? sizeQty : (totalStock > 0 ? totalStock : 99);
