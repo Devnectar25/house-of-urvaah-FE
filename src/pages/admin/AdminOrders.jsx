@@ -58,8 +58,8 @@ const checkStatusMatches = (orderStatus, filterStatus) => {
   if (f === 'returned' || f === 'return' || f === 'returns') {
     return o.startsWith('return') || o.includes('house of urvaah');
   }
-  if (f === 'return requested') {
-    return o === 'return requested';
+  if (f === 'return requested' || f === 'return request processing' || f === 'return request' || f === 'return requests') {
+    return o === 'return requested' || o === 'return request processing' || o.startsWith('return request');
   }
   if (f === 'return approved') {
     return o === 'return approved';
@@ -719,6 +719,15 @@ export const AdminOrders = () => {
       colorClass: 'bg-amber-50 text-amber-700 border-amber-300',
       badgeBg: 'bg-amber-200 text-amber-900',
       statusFilter: 'Cancellation Requested'
+    },
+    {
+      key: 'returnRequested',
+      label: 'Return Requests',
+      count: stats?.returnRequested ?? stats?.return_requested ?? 0,
+      icon: RotateCcw,
+      colorClass: 'bg-rose-50 text-rose-700 border-rose-300',
+      badgeBg: 'bg-rose-200 text-rose-900',
+      statusFilter: 'Return Requested'
     },
     {
       key: 'cancelled',
@@ -1518,6 +1527,7 @@ export const AdminOrders = () => {
         onOptimisticPreview={handleOptimisticPreview}
         onStatusUpdated={handleOrderUpdatedInList}
         onOrderUpdated={handleOrderUpdatedInList}
+        isShiprocketDesk={activeViewTab === 'shiprocket'}
       />
     </div>
   );

@@ -600,6 +600,7 @@ export const AdminShiprocketOrderDesk = () => {
         orderId={selectedOrderIdForDetail}
         isOpen={isDetailModalOpen}
         hideStatusManagement={true}
+        isShiprocketDesk={true}
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedOrderIdForDetail(null);

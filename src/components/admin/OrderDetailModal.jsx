@@ -91,7 +91,7 @@ const getRequestedReplacementSize = (ord) => {
   return 'M';
 };
 
-export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false }) => {
+export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false, isShiprocketDesk = false }) => {
   // Lock background scrolling on body and admin container when modal is open
   useModalScrollLock(isOpen, onClose);
 
@@ -1638,7 +1638,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Post-Delivery Return Request Review Banner */}
-              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'return requested') && (
+              {(['return requested', 'return request processing', 'return processing'].includes(
+                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
+              )) && (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
@@ -2705,12 +2707,20 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
-                            {order.tracking_number ? 'Reverse AWB Assigned' : 'Awaiting AWB'}
-                          </span>
-                          {(order.tracking_number || order.awb_code) && (
-                            <span className="font-mono font-bold text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 text-[11px]">
-                              {order.tracking_number || order.awb_code}
+                          {isS2 ? (
+                            <>
+                              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Reverse AWB Assigned
+                              </span>
+                              {(order.reverse_tracking_number || order.reverse_awb || order.tracking_number || order.awb_code) && (
+                                <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
+                                  {order.reverse_tracking_number || order.reverse_awb || order.tracking_number || order.awb_code}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                              Awaiting Review & Approval
                             </span>
                           )}
                         </div>
@@ -2756,8 +2766,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                       {/* Action Bar inside Return Hub with Sequential Advance Options */}
                       <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-sky-100">
-                        {/* Step 1 Actions: If Return Requested */}
-                        {curSt === 'return requested' && (
+                        {/* Step 1 Actions: If Return Requested or Processing */}
+                        {['return requested', 'return request processing', 'return processing'].includes(curSt) && (
                           <>
                             <button
                               type="button"
@@ -3211,57 +3221,59 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </div>
                 )}
 
-                {/* 1-Click Milestone Testing Strip */}
-                <div className="pt-2 border-t border-neutral-200/60">
-                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
-                    Testing Suite: Simulate Shiprocket Webhook Milestones
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      disabled={logisticsLoading}
-                      onClick={() => handleSimulateMilestone('IN TRANSIT')}
-                      className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
-                      title="Simulates package reaching transit hub"
-                    >
-                      <Package className="w-3.5 h-3.5 text-neutral-600" />
-                      <span>In Transit (Shipped)</span>
-                    </button>
+                {/* 1-Click Milestone Testing Strip (Shiprocket Forward Desk Only) */}
+                {isShiprocketDesk && (
+                  <div className="pt-2 border-t border-neutral-200/60">
+                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+                      Testing Suite: Simulate Shiprocket Webhook Milestones
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <button
+                        type="button"
+                        disabled={logisticsLoading}
+                        onClick={() => handleSimulateMilestone('IN TRANSIT')}
+                        className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
+                        title="Simulates package reaching transit hub"
+                      >
+                        <Package className="w-3.5 h-3.5 text-neutral-600" />
+                        <span>In Transit (Shipped)</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      disabled={logisticsLoading}
-                      onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
-                      className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
-                      title="Simulates local rider out for delivery"
-                    >
-                      <Truck className="w-3.5 h-3.5 text-neutral-600" />
-                      <span>Out for Delivery</span>
-                    </button>
+                      <button
+                        type="button"
+                        disabled={logisticsLoading}
+                        onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
+                        className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
+                        title="Simulates local rider out for delivery"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-neutral-600" />
+                        <span>Out for Delivery</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      disabled={logisticsLoading}
-                      onClick={() => handleSimulateMilestone('DELIVERED')}
-                      className="px-2.5 py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
-                      title="Simulates customer doorstep handover"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Mark Delivered</span>
-                    </button>
+                      <button
+                        type="button"
+                        disabled={logisticsLoading}
+                        onClick={() => handleSimulateMilestone('DELIVERED')}
+                        className="px-2.5 py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
+                        title="Simulates customer doorstep handover"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Mark Delivered</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      disabled={logisticsLoading}
-                      onClick={() => handleSimulateMilestone('CANCELLED')}
-                      className="px-2.5 py-2 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-rose-600"
-                      title="Simulates shipment cancellation"
-                    >
-                      <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Void / Cancel</span>
-                    </button>
+                      <button
+                        type="button"
+                        disabled={logisticsLoading}
+                        onClick={() => handleSimulateMilestone('CANCELLED')}
+                        className="px-2.5 py-2 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-rose-600"
+                        title="Simulates shipment cancellation"
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Void / Cancel</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Reverse Logistics Actions (Returns & Exchanges) */}
                 {['delivered', 'returned', 'exchanged', 'return approved', 'replace approved'].includes((order.status || '').toLowerCase()) && (

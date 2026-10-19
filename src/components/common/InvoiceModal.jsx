@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Printer,
   Download,
   ExternalLink,
   Loader2,
-  FileText,
-  ShieldCheck,
-  CheckCircle2,
   AlertCircle
 } from 'lucide-react';
 import { apiClient, getAuthToken, getAdminAuthToken } from '../../lib/apiClient';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { printElement } from '../../utils/printHelper';
 
 const numberToWords = (num) => {
   if (!num || isNaN(num) || Number(num) <= 0) return 'Rupees Zero Only';
@@ -46,6 +44,7 @@ const numberToWords = (num) => {
 
 export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
   const targetId = order?.id || order?.order_number || orderId;
+  const printAreaRef = useRef(null);
 
   // Lock background screen scroll while Invoice Modal is open
   useModalScrollLock(isOpen, onClose);
@@ -86,7 +85,35 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         const response = await apiClient(`/api/orders/${targetId}/invoice?format=json`);
         if (isMounted) {
           if (response?.success && response?.data) {
-            setInvoiceData(response.data);
+            const data = { ...response.data };
+            if (data.invoiceNumber) {
+              const stripped = data.invoiceNumber.replace(/^HOU-/, '');
+              const fyMatch = stripped.match(/^(\d{2})?(\d{2})-(\d{2})(\d{2})(\d+)$/);
+              if (fyMatch) {
+                const sYr2 = fyMatch[2];
+                const eYr2 = fyMatch[3];
+                const moStr = fyMatch[4];
+                const seq = fyMatch[5];
+                data.invoiceNumber = `${sYr2}${eYr2}${moStr}${seq.length === 1 ? '0' + seq : seq}`;
+              } else {
+                const match = stripped.match(/^(\d{4})(\d{2})(\d+)$/);
+                if (match) {
+                  const rawYr = parseInt(match[1], 10);
+                  const rawMo = parseInt(match[2], 10);
+                  const rawSeq = parseInt(match[3], 10);
+                  const rawSYr = rawMo >= 4 ? rawYr : rawYr - 1;
+                  const rawEYr = rawMo >= 4 ? rawYr + 1 : rawYr;
+                  const sYr2 = String(rawSYr % 100).padStart(2, '0');
+                  const eYr2 = String(rawEYr % 100).padStart(2, '0');
+                  data.invoiceNumber = `${sYr2}${eYr2}${String(rawMo).padStart(2, '0')}${String(rawSeq).padStart(2, '0')}`;
+                } else {
+                  data.invoiceNumber = stripped;
+                }
+              }
+            }
+            data.placeOfSupply = 'Mumbai, India';
+            data.orderNumber = data.orderNumber || data.orderId || order?.order_number || targetId;
+            setInvoiceData(data);
           } else {
             throw new Error('Invoice data not returned');
           }
@@ -138,15 +165,52 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               || (order.user_id && !order.user_id.includes('@') ? order.user_id : 'Valued Client');
 
             const orderDateObj = new Date(order.created_at || Date.now());
-            const fallbackYear = orderDateObj.getFullYear();
-            const fallbackMonth = String(orderDateObj.getMonth() + 1).padStart(2, '0');
+            const year = orderDateObj.getFullYear();
+            const month = orderDateObj.getMonth() + 1;
+            const sYr = month >= 4 ? year : year - 1;
+            const eYr = month >= 4 ? year + 1 : year;
+            const sYr2 = String(sYr % 100).padStart(2, '0');
+            const eYr2 = String(eYr % 100).padStart(2, '0');
+            const fallbackFy = `${sYr2}${eYr2}`;
+            const fallbackMo = String(month).padStart(2, '0');
             const fallbackDigits = String(order.id || order.order_number || targetId || '').replace(/\D/g, '');
-            const fallbackCount = fallbackDigits ? String(parseInt(fallbackDigits.slice(-2), 10) || 1).padStart(2, '0') : '01';
-            const fallbackInvoiceNumber = order.invoice_number || `HOU-${fallbackYear}${fallbackMonth}${fallbackCount}`;
+            const fallbackSeq = fallbackDigits ? parseInt(fallbackDigits.slice(-2), 10) || 1 : 1;
+            const fallbackSeqStr = String(fallbackSeq).padStart(2, '0');
+
+            let resolvedInvoiceNumber = order.invoice_number;
+            if (resolvedInvoiceNumber) {
+              const stripped = resolvedInvoiceNumber.replace(/^HOU-/, '');
+              const fyMatch = stripped.match(/^(\d{2})?(\d{2})-(\d{2})(\d{2})(\d+)$/);
+              if (fyMatch) {
+                const sYr2m = fyMatch[2];
+                const eYr2m = fyMatch[3];
+                const moStrm = fyMatch[4];
+                const seqm = fyMatch[5];
+                resolvedInvoiceNumber = `${sYr2m}${eYr2m}${moStrm}${seqm.length === 1 ? '0' + seqm : seqm}`;
+              } else {
+                const match = stripped.match(/^(\d{4})(\d{2})(\d+)$/);
+                if (match) {
+                  const rawYr = parseInt(match[1], 10);
+                  const rawMo = parseInt(match[2], 10);
+                  const rawSeq = parseInt(match[3], 10);
+                  const rawSYr = rawMo >= 4 ? rawYr : rawYr - 1;
+                  const rawEYr = rawMo >= 4 ? rawYr + 1 : rawYr;
+                  const s2 = String(rawSYr % 100).padStart(2, '0');
+                  const e2 = String(rawEYr % 100).padStart(2, '0');
+                  resolvedInvoiceNumber = `${s2}${e2}${String(rawMo).padStart(2, '0')}${String(rawSeq).padStart(2, '0')}`;
+                } else if (/^\d{8,}$/.test(stripped)) {
+                  resolvedInvoiceNumber = stripped;
+                } else {
+                  resolvedInvoiceNumber = `${fallbackFy}${fallbackMo}${fallbackSeqStr}`;
+                }
+              }
+            } else {
+              resolvedInvoiceNumber = `${fallbackFy}${fallbackMo}${fallbackSeqStr}`;
+            }
 
             setInvoiceData({
               currencySymbol: '₹',
-              invoiceNumber: fallbackInvoiceNumber,
+              invoiceNumber: resolvedInvoiceNumber,
               orderNumber: order.order_number || targetId,
               orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN', {
                 day: '2-digit', month: 'short', year: 'numeric'
@@ -154,8 +218,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               issueDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN', {
                 day: '2-digit', month: 'long', year: 'numeric'
               }),
-              placeOfSupply: order.state || order.shippingAddress?.state || 'Delhi, India',
-              stateCode: '07 (Delhi)',
+              placeOfSupply: 'Mumbai, India',
+              stateCode: '27 (Maharashtra)',
               userName: customerNameFallback,
               userStreet: streetFallback,
               userCityStatePin: cityStatePinFallback,
@@ -200,6 +264,128 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
     };
   }, [isOpen, targetId, order]);
 
+  // Dedicated reliable print handler using isolated iframe
+  const handlePrint = () => {
+    if (!printAreaRef.current) {
+      window.print();
+      return;
+    }
+
+    const invNum = (invoiceData?.invoiceNumber || targetId || 'INVOICE').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    printElement(printAreaRef.current, {
+      title: `TAX_INVOICE_${invNum}`,
+      pageStyle: `
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700&display=swap');
+
+        @page {
+          size: A4 portrait;
+          margin: 10mm 12mm;
+        }
+
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+          box-sizing: border-box !important;
+        }
+
+        html, body {
+          width: 100% !important;
+          height: auto !important;
+          min-height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          overflow: visible !important;
+          font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        }
+
+        #urvaah-invoice-print-area {
+          position: relative !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 auto !important;
+          padding: 20px 24px !important;
+          box-shadow: none !important;
+          border: 1px solid #dfd7cb !important;
+          background: #ffffff !important;
+          visibility: visible !important;
+          page-break-inside: auto !important;
+        }
+
+        #urvaah-invoice-print-area * {
+          visibility: visible !important;
+          font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        }
+
+        .invoice-gold-border {
+          display: none !important;
+        }
+
+        .invoice-header-strip {
+          display: flex !important;
+          flex-direction: row !important;
+          justify-content: space-between !important;
+          align-items: flex-start !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        .invoice-meta-banner {
+          display: grid !important;
+          grid-template-columns: repeat(5, 1fr) !important;
+          gap: 6px !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        .invoice-dossier-grid {
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        .invoice-items-table {
+          page-break-inside: auto !important;
+          break-inside: auto !important;
+        }
+
+        .invoice-totals-grid {
+          display: grid !important;
+          grid-template-columns: 7fr 5fr !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        .invoice-signature-block {
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        table {
+          width: 100% !important;
+          table-layout: auto !important;
+          page-break-inside: auto !important;
+        }
+
+        thead {
+          display: table-header-group !important;
+        }
+
+        tr {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+      `
+    });
+  };
+
   // Handle direct PDF Download
   const handleDownloadPdf = async () => {
     if (!targetId || downloadingPdf) return;
@@ -229,8 +415,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('PDF Download failed:', err);
-      // Fallback: open print dialog
-      window.print();
+      // Fallback: open isolated print dialog
+      handlePrint();
     } finally {
       setDownloadingPdf(false);
     }
@@ -248,7 +434,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain"
+      className="invoice-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain"
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) {
@@ -270,35 +456,114 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         }
 
         @media print {
+          html, body {
+            overflow: visible !important;
+            height: auto !important;
+            min-height: auto !important;
+            position: static !important;
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
           body * {
             visibility: hidden !important;
           }
-          #urvaah-invoice-print-area, #urvaah-invoice-print-area * {
+
+          .invoice-modal-overlay,
+          .invoice-modal-dialog,
+          .invoice-modal-scroll {
+            position: static !important;
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: auto !important;
+            max-height: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            transform: none !important;
+          }
+
+          .invoice-modal-control-bar {
+            display: none !important;
+          }
+
+          #urvaah-invoice-print-area,
+          #urvaah-invoice-print-area * {
             visibility: visible !important;
             font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
+
           #urvaah-invoice-print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: relative !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
-            margin: 0 !important;
-            padding: 20px !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
+            padding: 20px 24px !important;
             box-shadow: none !important;
-            border: none !important;
+            border: 1px solid #dfd7cb !important;
             background: #ffffff !important;
+          }
+
+          .invoice-gold-border {
+            display: none !important;
+          }
+
+          .invoice-header-strip {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+          }
+
+          .invoice-meta-banner {
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 6px !important;
+          }
+
+          .invoice-dossier-grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+
+          .invoice-totals-grid {
+            display: grid !important;
+            grid-template-columns: 7fr 5fr !important;
+          }
+
+          .invoice-signature-block {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+
+          table {
+            page-break-inside: auto !important;
+          }
+
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
 
       <div
-        className="relative w-full max-w-4xl bg-neutral-100 rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden my-auto max-h-[92vh] flex flex-col invoice-font-roboto"
+        className="invoice-modal-dialog relative w-full max-w-4xl bg-neutral-100 rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden my-auto max-h-[92vh] flex flex-col invoice-font-roboto"
         style={{ fontFamily: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" }}
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Top Control Bar */}
-        <div className="bg-neutral-900 text-white px-5 py-3.5 flex items-center justify-between gap-4 border-b border-neutral-800 shrink-0">
+        <div className="invoice-modal-control-bar bg-neutral-900 text-white px-5 py-3.5 flex items-center justify-between gap-4 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-bold text-xs">
               U
@@ -308,7 +573,9 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                 House of Urvaah &bull; Official Tax Invoice
               </h3>
               <p className="text-[10px] text-neutral-400 tracking-wider">
-                {invoiceData?.invoiceNumber ? `Invoice #${invoiceData.invoiceNumber}` : `Order #${invoiceData?.orderNumber || targetId}`}
+                {invoiceData?.invoiceNumber
+                  ? `Invoice #${invoiceData.invoiceNumber} • Order #${invoiceData?.orderNumber || targetId}`
+                  : `Order #${invoiceData?.orderNumber || targetId}`}
               </p>
             </div>
           </div>
@@ -316,7 +583,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrint}
               disabled={loading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium transition cursor-pointer border border-neutral-700 disabled:opacity-50"
               title="Print Invoice directly to printer or save as PDF"
@@ -364,7 +631,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         </div>
 
         {/* Scrollable Document Container */}
-        <div className="overflow-y-auto p-4 sm:p-8 bg-[#f5f4ef] flex justify-center">
+        <div className="invoice-modal-scroll overflow-y-auto p-4 sm:p-8 bg-[#f5f4ef] flex justify-center">
           {loading ? (
             <div className="py-24 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-neutral-700 mx-auto mb-3" />
@@ -389,6 +656,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
             /* Authoritative Haute Couture Printable Invoice Document */
             <div
               id="urvaah-invoice-print-area"
+              ref={printAreaRef}
               className="w-full max-w-[840px] bg-white border border-[#dfd7cb] p-6 sm:p-12 rounded-sm shadow-xl text-neutral-900 text-xs relative"
               style={{
                 fontFamily: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
@@ -397,49 +665,52 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
             >
               {/* Inner Gold Filigree Border Accent */}
               <div
-                className="absolute inset-2 pointer-events-none rounded-xs border border-[#C5A880]/30"
+                className="invoice-gold-border absolute inset-2 pointer-events-none rounded-xs border border-[#C5A880]/30"
                 style={{ zIndex: 1 }}
               />
 
-              {/* Header: Brand & Tax Invoice Title */}
-              <div className="flex flex-col sm:flex-row items-start justify-between pb-6 border-b-2 border-[#141414] gap-4 relative z-10">
-                <div className="flex items-center gap-4">
+              {/* Header: Brand Logo & Tax Invoice Title */}
+              <div className="invoice-header-strip flex flex-col sm:flex-row items-start justify-between pb-6 border-b-2 border-[#141414] gap-4 relative z-10">
+                <div className="flex flex-col items-start gap-1.5">
                   <img
                     src="/assets/logo.png"
-                    alt="House of Urvaah Logo"
-                    className="h-16 sm:h-20 w-auto object-contain"
+                    alt="House of Urvaah"
+                    className="h-14 sm:h-18 w-auto object-contain"
                     onError={(e) => {
                       e.target.style.display = 'none';
                     }}
                   />
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold tracking-[0.18em] uppercase text-neutral-950 leading-tight">
-                      House of Urvaah
-                    </h1>
-                    <p className="text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold mt-1">
-                      Haute Couture &bull; Luxury Pret Atelier &bull; New Delhi
-                    </p>
-                  </div>
+                  <p className="text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold">
+                    Haute Couture &bull; Luxury Pret Atelier &bull; New Delhi
+                  </p>
                 </div>
 
-                <div className="sm:text-right">
+                <div className="sm:text-right pt-[20px]" style={{ paddingTop: '20px' }}>
                   <div className="text-2xl sm:text-3xl font-bold tracking-[0.14em] uppercase text-neutral-950 leading-tight">
                     Tax Invoice
                   </div>
                   <div className="text-[10px] uppercase tracking-wider text-neutral-500 mt-1">
-                    Original for Recipient &bull; Rule 48 CGST
+                    Original for Recipient
                   </div>
                 </div>
               </div>
 
               {/* Metadata Banner Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-[#faf8f5] border border-[#eae3d8] rounded-md p-4 my-6 relative z-10">
+              <div className="invoice-meta-banner grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 bg-[#faf8f5] border border-[#eae3d8] rounded-md p-4 my-6 relative z-10">
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-[#8c734b] block">
                     Invoice No.
                   </span>
                   <span className="font-bold text-xs sm:text-[13px] text-neutral-950 block mt-1">
                     {invoiceData?.invoiceNumber}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#8c734b] block">
+                    Order Number
+                  </span>
+                  <span className="font-bold text-xs sm:text-[13px] text-neutral-950 block mt-1">
+                    {invoiceData?.orderNumber || targetId}
                   </span>
                 </div>
                 <div>
@@ -469,23 +740,18 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               </div>
 
               {/* Dossier: Atelier Details vs Customer Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 relative z-10">
+              <div className="invoice-dossier-grid grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 relative z-10">
                 <div className="border border-[#eae3d8] rounded-md p-4 sm:p-5 bg-[#fcfbfa]">
                   <div className="text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
                     <span>Sold By &bull; Registered Atelier</span>
-                    <span>GSTIN / CIN</span>
+                    <span>Concierge</span>
                   </div>
                   <div className="text-[13px] font-bold text-neutral-950 mb-1.5">
                     House of Urvaah Private Limited
                   </div>
                   <div className="text-[10.5px] text-neutral-600 leading-relaxed">
-                    Eastern winds, 1402, E wing, Kurla East<br />
                     Mumbai 400070, Maharashtra, India<br />
-                    <strong>GSTIN:</strong> 07AAECH9988K1Z3 &bull; <strong>State:</strong> 27 (Maharashtra)<br />
-                    <strong>CIN:</strong> U18101DL2024PTC123456<br />
-                    <span className="text-neutral-500 pt-1.5 block">
-                      <strong>Concierge:</strong> houseofurvaah@gmail.com
-                    </span>
+                    <strong>Email:</strong> houseofurvaah@gmail.com
                   </div>
                 </div>
 
@@ -511,14 +777,14 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     <strong>Contact:</strong> {invoiceData?.userPhone || 'N/A'}<br />
                     <strong>Email:</strong> {invoiceData?.userEmail || 'N/A'}<br />
                     <span className="text-neutral-500 pt-1.5 block">
-                      <strong>Payment Mode:</strong> {invoiceData?.paymentMethod || 'Online'} &bull; <strong>Ref:</strong> {invoiceData?.paymentReference || 'N/A'}
+                      <strong>Order No:</strong> {invoiceData?.orderNumber || targetId} &bull; <strong>Payment Mode:</strong> {invoiceData?.paymentMethod || 'Online'} &bull; <strong>Ref:</strong> {invoiceData?.paymentReference || 'N/A'}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Garment Line Items Table */}
-              <div className="border border-[#141414] rounded-md overflow-hidden mb-6 relative z-10 shadow-xs">
+              <div className="invoice-items-table border border-[#141414] rounded-md overflow-hidden mb-6 relative z-10 shadow-xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#141414] text-[#f7f4ee] text-[9.5px] tracking-widest uppercase font-bold">
@@ -540,6 +806,12 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                           <div className="font-bold text-xs sm:text-[12.5px] text-neutral-950 leading-snug">
                             {item.name}
                           </div>
+                          <div className="text-[10px] text-neutral-500 mt-1">
+                            Order No: <strong className="text-neutral-800">{invoiceData?.orderNumber || targetId}</strong>
+                            {item.sku && (
+                              <span> &bull; SKU: <strong className="text-neutral-800">{item.sku}</strong></span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-center font-medium text-neutral-700">
                           {item.size}
@@ -560,7 +832,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               </div>
 
               {/* Financial Calculations & GST Ledger */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 relative z-10">
+              <div className="invoice-totals-grid grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6 relative z-10">
                 {/* Left Column (7 cols): In Words & Bank Details */}
                 <div className="sm:col-span-7 space-y-4">
                   {/* Amount in words */}
@@ -632,7 +904,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
               </div>
 
               {/* Digital Seal & Authorized Signatory Block */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-6 border-t border-[#eae3d8] items-center relative z-10">
+              <div className="invoice-signature-block grid grid-cols-1 sm:grid-cols-2 gap-5 pt-6 border-t border-[#eae3d8] items-center relative z-10">
                 <div className="flex items-center gap-3.5">
                   <div className="w-11 h-11 rounded-full border-2 border-[#c5a880] flex items-center justify-center font-bold text-[#8c734b] text-base shrink-0 bg-[#faf8f5] shadow-xs">
                     U

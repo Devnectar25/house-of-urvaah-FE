@@ -56,7 +56,7 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     originalPrice: '',
     discountPercent: '',
     price: '',
-    stockQuantity: 0,
+    stockQuantity: '',
     sizeStock: {},
     active: true,
     promoted: false,
@@ -943,8 +943,19 @@ const DEFAULT_CATEGORIES = [
                 <input
                   type="number"
                   min="0"
-                  value={formData.stockQuantity}
-                  onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+                  value={formData.stockQuantity === 0 || formData.stockQuantity === '0' || formData.stockQuantity === '' ? '' : formData.stockQuantity}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setFormData(prev => ({ ...prev, stockQuantity: '' }));
+                      return;
+                    }
+                    const sanitized = raw.replace(/^0+(?=\d)/, '');
+                    const parsed = parseInt(sanitized, 10);
+                    setFormData(prev => ({ ...prev, stockQuantity: isNaN(parsed) ? '' : parsed }));
+                  }}
                   className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                 />
               </div>
@@ -1098,7 +1109,7 @@ const DEFAULT_CATEGORIES = [
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-bold text-neutral-800 self-start sm:self-auto">
                       <span className="text-[10px] text-neutral-500 uppercase font-semibold">Total:</span>
-                      <span>{formData.stockQuantity} units</span>
+                      <span>{formData.stockQuantity || 0} units</span>
                     </div>
                   </div>
 
@@ -1131,9 +1142,26 @@ const DEFAULT_CATEGORIES = [
                           <input
                             type="number"
                             min="0"
-                            value={qty}
+                            value={qty === 0 || qty === '0' || qty === '' ? '' : qty}
+                            placeholder="0"
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) => {
-                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              const rawVal = e.target.value;
+                              if (rawVal === '') {
+                                const nextSizeStock = { ...(formData.sizeStock || {}), [sz]: '' };
+                                const newTotal = Object.values(nextSizeStock).reduce(
+                                  (acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0),
+                                  0
+                                );
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sizeStock: nextSizeStock,
+                                  stockQuantity: newTotal === 0 ? '' : newTotal
+                                }));
+                                return;
+                              }
+                              const sanitized = rawVal.replace(/^0+(?=\d)/, '');
+                              const val = Math.max(0, parseInt(sanitized, 10) || 0);
                               const nextSizeStock = { ...(formData.sizeStock || {}), [sz]: val };
                               const newTotal = Object.values(nextSizeStock).reduce(
                                 (acc, v) => acc + (Math.max(0, parseInt(v, 10)) || 0),
@@ -1142,11 +1170,10 @@ const DEFAULT_CATEGORIES = [
                               setFormData((prev) => ({
                                 ...prev,
                                 sizeStock: nextSizeStock,
-                                stockQuantity: newTotal
+                                stockQuantity: newTotal === 0 ? '' : newTotal
                               }));
                             }}
                             className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded text-xs font-bold text-neutral-900 focus:outline-none focus:ring-1 focus:ring-black"
-                            placeholder="Units"
                           />
                         </div>
                       );

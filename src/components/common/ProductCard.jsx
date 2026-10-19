@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Eye, ShoppingBag, Bell, X, Check } from 'lucide-react';
+import { Heart, Eye, ShoppingBag, Bell, X, Check, CheckCircle2 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { StockNotificationModal } from '../product/StockNotificationModal';
 import { getSwatchCss } from '../../utils/colorValidator';
@@ -221,12 +221,15 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
             {hasSubscribedStock ? (
               <button
                 type="button"
-                disabled
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 bg-neutral-200/95 text-neutral-600 text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 flex items-center justify-center gap-1 shadow-md min-h-[36px] cursor-not-allowed select-none border border-neutral-300/80"
-                title="Alert registered — you will be notified when this item is back in stock"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsStockModalOpen(true);
+                }}
+                className="flex-1 bg-neutral-900 text-white hover:bg-black text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[36px] cursor-pointer"
+                title="Restock alert registered. Click to update"
               >
-                <span>OUT OF STOCK</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>NOTIFY ME (SET ✓)</span>
               </button>
             ) : (
               <button
@@ -238,8 +241,8 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
                 className="flex-1 bg-neutral-900 text-white hover:bg-black text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 transition-colors flex items-center justify-center gap-1.5 shadow-md min-h-[36px] cursor-pointer group/notify"
                 title="Notify me when available"
               >
-                <Bell className="w-3.5 h-3.5 text-amber-300 group-hover/notify:scale-110 transition-transform" />
-                <span>OUT OF STOCK</span>
+                <Bell className="w-3.5 h-3.5 text-amber-300 group-hover/notify:scale-110 transition-transform shrink-0" />
+                <span>NOTIFY ME</span>
               </button>
             )}
             <button
