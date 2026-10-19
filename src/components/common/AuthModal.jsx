@@ -50,39 +50,7 @@ export const AuthModal = () => {
   // Refs for OTP input auto-focus
   const otpInputRefs = useRef([]);
 
-  // Prevent background scrolling while modal is open, intercepting mouse wheel and touch gestures
-  useEffect(() => {
-    const el = modalOverlayRef.current;
-    if (!el || !isAuthModalOpen) return;
 
-    const handleWheel = (e) => {
-      // If modal overlay does not overflow vertically, prevent wheel bubbling to the background page
-      if (el.scrollHeight <= el.clientHeight) {
-        e.preventDefault();
-        return;
-      }
-      // If modal content is taller than viewport (e.g. mobile keyboard), prevent scroll chaining at top/bottom
-      const isAtTop = el.scrollTop <= 0 && e.deltaY < 0;
-      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
-      if (isAtTop || isAtBottom) {
-        e.preventDefault();
-      }
-    };
-
-    const handleTouchMove = (e) => {
-      if (el.scrollHeight <= el.clientHeight) {
-        e.preventDefault();
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
-
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-      el.removeEventListener('touchmove', handleTouchMove);
-    };
-  }, [isAuthModalOpen]);
 
   // Auto-close modal if user is already authenticated
   useEffect(() => {
@@ -163,6 +131,9 @@ export const AuthModal = () => {
         setOtpDigits(['', '', '', '', '', '']);
         setResendCountdown(60);
         setCanResend(false);
+        if (res.devOtp) {
+          console.log('🔑 [Dev Mode Verification Code]:', res.devOtp);
+        }
       } else {
         setServerError(res.message || 'Failed to send OTP. Please try again.');
       }
@@ -394,7 +365,6 @@ export const AuthModal = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          onWheel={(e) => e.stopPropagation()}
           className="relative z-10 w-full max-w-md bg-white border border-neutral-200 shadow-2xl overflow-hidden my-auto transition-all duration-300"
         >
           {/* Header Bar */}
@@ -574,15 +544,13 @@ export const AuthModal = () => {
 
                       <button
                         type="submit"
-                        disabled={isSubmitting || otpDigits.join('').length !== 6 || canResend || resendCountdown === 0}
+                        disabled={isSubmitting || otpDigits.join('').length !== 6}
                         className="w-full bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase py-3.5 hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
                           <span className="animate-pulse flex items-center gap-2">
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" /> VERIFYING...
                           </span>
-                        ) : (canResend || resendCountdown === 0) ? (
-                          'OTP EXPIRED - RESEND CODE'
                         ) : (
                           'VERIFY & CONTINUE'
                         )}
@@ -591,22 +559,17 @@ export const AuthModal = () => {
                       {/* Resend OTP Link with 60s Countdown */}
                       <div className="text-center pt-2">
                         {canResend || resendCountdown === 0 ? (
-                          <div className="space-y-1.5">
-                            <p className="text-[11px] text-red-600 font-medium tracking-wider uppercase">
-                              Verification code expired
-                            </p>
-                            <button
-                              type="button"
-                              onClick={handleResendOtp}
-                              disabled={isSubmitting}
-                              className="text-xs tracking-wider uppercase font-semibold text-neutral-900 hover:underline cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                              <RefreshCw className="w-3 h-3" /> RESEND OTP CODE
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={handleResendOtp}
+                            disabled={isSubmitting}
+                            className="text-xs tracking-wider uppercase font-semibold text-neutral-900 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3 h-3" /> RESEND OTP CODE
+                          </button>
                         ) : (
                           <p className="text-xs text-neutral-400 font-light tracking-wider uppercase">
-                            Code expires in <span className="font-semibold text-neutral-900">{resendCountdown}s</span>
+                            Resend code in <span className="font-semibold text-neutral-900">{resendCountdown}s</span>
                           </p>
                         )}
                       </div>

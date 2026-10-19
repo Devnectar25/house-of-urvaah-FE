@@ -72,6 +72,14 @@
     width: 100%;
   }
 
+  html[data-modal-open="true"],
+  body[data-modal-open="true"] {
+    overflow: hidden !important;
+    height: 100% !important;
+    overscroll-behavior: none !important;
+    touch-action: none !important;
+  }
+
   /* Global Luxury Selection */
   ::selection {
     background-color: #111111;
