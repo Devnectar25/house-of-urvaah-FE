@@ -7,6 +7,12 @@ let initialHtmlOverflow = '';
 let initialHtmlHeight = '';
 let initialBodyOverflow = '';
 let initialBodyHeight = '';
+let initialBodyPosition = '';
+let initialBodyTop = '';
+let initialBodyLeft = '';
+let initialBodyRight = '';
+let initialBodyWidth = '';
+let lockedScrollY = 0;
 
 // Global stack for Escape key handlers to ensure only the topmost modal closes on ESC
 const escapeHandlersStack = [];
@@ -34,6 +40,7 @@ export const forceUnlockScroll = () => {
   activeLocksCount = 0;
   escapeHandlersStack.length = 0;
   if (typeof document !== 'undefined') {
+    const restoreY = lockedScrollY;
     document.body.removeAttribute('data-modal-open');
     document.documentElement.removeAttribute('data-modal-open');
     document.documentElement.style.overflow = '';
@@ -43,6 +50,11 @@ export const forceUnlockScroll = () => {
     document.body.style.height = '';
     document.body.style.overscrollBehavior = '';
     document.body.style.paddingRight = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
 
     const adminScrollEl =
       document.getElementById('admin-content-scroll') ||
@@ -50,6 +62,10 @@ export const forceUnlockScroll = () => {
       document.querySelector('.admin-panel-container .overflow-y-auto');
     if (adminScrollEl) {
       adminScrollEl.style.overflow = '';
+    }
+
+    if (restoreY) {
+      window.scrollTo(0, restoreY);
     }
   }
 };
@@ -69,6 +85,7 @@ export const useModalScrollLock = (isOpen, onClose) => {
     if (!isOpen || typeof document === 'undefined') return;
 
     if (activeLocksCount === 0) {
+      lockedScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
       document.body.setAttribute('data-modal-open', 'true');
       document.documentElement.setAttribute('data-modal-open', 'true');
 
@@ -77,15 +94,26 @@ export const useModalScrollLock = (isOpen, onClose) => {
       initialBodyOverflow = document.body.style.overflow || '';
       initialBodyHeight = document.body.style.height || '';
       initialBodyPaddingRight = document.body.style.paddingRight || '';
+      initialBodyPosition = document.body.style.position || '';
+      initialBodyTop = document.body.style.top || '';
+      initialBodyLeft = document.body.style.left || '';
+      initialBodyRight = document.body.style.right || '';
+      initialBodyWidth = document.body.style.width || '';
 
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
       document.documentElement.style.overflow = 'hidden';
       document.documentElement.style.height = '100%';
       document.documentElement.style.overscrollBehavior = 'none';
+
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100%';
       document.body.style.overscrollBehavior = 'none';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${lockedScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
 
       if (scrollbarWidth > 0) {
         document.body.style.paddingRight = `${scrollbarWidth}px`;
@@ -159,6 +187,7 @@ export const useModalScrollLock = (isOpen, onClose) => {
       activeLocksCount = Math.max(0, activeLocksCount - 1);
 
       if (activeLocksCount === 0) {
+        const restoreY = lockedScrollY;
         document.body.removeAttribute('data-modal-open');
         document.documentElement.removeAttribute('data-modal-open');
         document.documentElement.style.overflow = initialHtmlOverflow;
@@ -168,6 +197,11 @@ export const useModalScrollLock = (isOpen, onClose) => {
         document.body.style.height = initialBodyHeight;
         document.body.style.overscrollBehavior = '';
         document.body.style.paddingRight = initialBodyPaddingRight;
+        document.body.style.position = initialBodyPosition;
+        document.body.style.top = initialBodyTop;
+        document.body.style.left = initialBodyLeft;
+        document.body.style.right = initialBodyRight;
+        document.body.style.width = initialBodyWidth;
 
         const adminScrollEl =
           document.getElementById('admin-content-scroll') ||
@@ -176,6 +210,8 @@ export const useModalScrollLock = (isOpen, onClose) => {
         if (adminScrollEl) {
           adminScrollEl.style.overflow = '';
         }
+
+        window.scrollTo(0, restoreY);
       }
     };
   }, [isOpen]);
