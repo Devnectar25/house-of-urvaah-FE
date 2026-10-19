@@ -8,8 +8,31 @@ let initialHtmlHeight = '';
 let initialBodyOverflow = '';
 let initialBodyHeight = '';
 
+// Global stack for Escape key handlers to ensure only the topmost modal closes on ESC
+const escapeHandlersStack = [];
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key === 'Escape' && escapeHandlersStack.length > 0) {
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+          e.stopImmediatePropagation();
+        }
+        const topHandler = escapeHandlersStack[escapeHandlersStack.length - 1];
+        if (typeof topHandler === 'function') {
+          topHandler(e);
+        }
+      }
+    },
+    true
+  );
+}
+
 export const forceUnlockScroll = () => {
   activeLocksCount = 0;
+  escapeHandlersStack.length = 0;
   if (typeof document !== 'undefined') {
     document.body.removeAttribute('data-modal-open');
     document.documentElement.removeAttribute('data-modal-open');
@@ -115,18 +138,24 @@ export const useModalScrollLock = (isOpen, onClose) => {
     window.addEventListener('wheel', handleActiveWheelOrTouch, { passive: false });
     window.addEventListener('touchmove', handleActiveWheelOrTouch, { passive: false });
 
-    // ESC key listener
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && typeof onCloseRef.current === 'function') {
+    // Register this modal's close handler to the top of the ESC key stack
+    const currentCloseHandler = () => {
+      if (typeof onCloseRef.current === 'function') {
         onCloseRef.current();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+    escapeHandlersStack.push(currentCloseHandler);
 
     return () => {
       window.removeEventListener('wheel', handleActiveWheelOrTouch);
       window.removeEventListener('touchmove', handleActiveWheelOrTouch);
-      window.removeEventListener('keydown', handleKeyDown);
+
+      // Pop/remove this modal's handler from the ESC stack
+      const stackIndex = escapeHandlersStack.lastIndexOf(currentCloseHandler);
+      if (stackIndex !== -1) {
+        escapeHandlersStack.splice(stackIndex, 1);
+      }
+
       activeLocksCount = Math.max(0, activeLocksCount - 1);
 
       if (activeLocksCount === 0) {

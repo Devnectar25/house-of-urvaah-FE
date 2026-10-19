@@ -147,12 +147,12 @@ export const Header = () => {
               )}
             </button>
 
-            {/* Account Icon */}
+            {/* Account Icon (Right Side) */}
             <button
               onClick={handleAccountClick}
-              className="hidden sm:flex p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Account"
-              title="Account"
+              title={user ? 'My Account' : 'Account'}
             >
               <User className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>
@@ -172,20 +172,20 @@ export const Header = () => {
             : 'bg-transparent border-transparent opacity-0 -translate-y-2 pointer-events-none absolute inset-x-0 top-0 invisible'
         }`}
       >
-        <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-8 grid grid-cols-3 items-center min-h-[52px] sm:min-h-[60px] md:min-h-[68px]">
-          {/* Column 1 (Left): Hamburger Icon Only */}
-          <div className="flex items-center justify-start">
+        <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-8 relative flex items-center justify-between min-h-[56px] sm:min-h-[64px] md:min-h-[72px]">
+          {/* Left Side: Hamburger Icon */}
+          <div className="flex items-center z-10">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
+              className="p-1.5 min-w-[40px] min-h-[40px] flex items-center justify-center hover:opacity-60 transition-opacity text-brand-dark cursor-pointer"
               aria-label="Open navigation drawer"
             >
               <Menu className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.5]" />
             </button>
           </div>
 
-          {/* Column 2 (Center): house of URVAAH Logo Image */}
-          <div className="flex items-center justify-center">
+          {/* Center: Brand Logo */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-auto z-10">
             <Link
               to="/"
               aria-label="House of Urvaah Home"
@@ -193,14 +193,14 @@ export const Header = () => {
               onClick={() => {
                 window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
               }}
-              className="inline-flex items-center justify-center"
+              className="inline-flex items-center justify-center py-1"
             >
-              <Logo className="h-8 sm:h-12 md:h-16 lg:h-20" />
+              <Logo className="h-10 sm:h-12 md:h-14 lg:h-16" />
             </Link>
           </div>
 
-          {/* Column 3 (Right): Search, Wishlist, Bag, Account Icons */}
-          <div className="flex items-center justify-end gap-3 sm:gap-4 text-brand-dark">
+          {/* Right Side: Search, Wishlist, Bag, Profile Icons */}
+          <div className="flex items-center justify-end gap-2.5 sm:gap-4 text-brand-dark z-10">
             {/* Search Trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -242,12 +242,12 @@ export const Header = () => {
               )}
             </button>
 
-            {/* Account Icon */}
+            {/* Account / Profile Icon (Right Side) */}
             <button
               onClick={handleAccountClick}
-              className="hidden sm:flex p-1 items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
+              className="relative p-1 flex items-center justify-center hover:opacity-60 hover:scale-105 transition-all text-brand-dark cursor-pointer"
               aria-label="Account"
-              title="Account"
+              title={user ? 'My Account' : 'Account'}
             >
               <User className="w-5 h-5 sm:w-[22px] sm:h-[22px] stroke-[1.5]" />
             </button>

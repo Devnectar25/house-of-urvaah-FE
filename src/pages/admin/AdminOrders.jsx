@@ -222,8 +222,38 @@ export const AdminOrders = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
+  const [limit, setLimit] = useState(10);
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = newest first, 'asc' = oldest first
+
+  // Dynamic Sliding Window for Pagination (shows at most 7 page pills with ellipses)
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = [];
+    if (currentPage <= 4) {
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i);
+      }
+      pages.push('...');
+      pages.push(totalPages);
+    } else if (currentPage >= totalPages - 3) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = totalPages - 4; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(currentPage - 1);
+      pages.push(currentPage);
+      pages.push(currentPage + 1);
+      pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState(null);
@@ -1395,11 +1425,30 @@ export const AdminOrders = () => {
 
         {/* Pagination Bar */}
         {!ordersLoading && totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-neutral-50/50 text-xs">
-            <div className="text-neutral-500">
-              Showing <span className="font-semibold text-brand-dark">{(currentPage - 1) * limit + 1}</span>–
-              <span className="font-semibold text-brand-dark">{Math.min(currentPage * limit, totalOrders)}</span> of{' '}
-              <span className="font-semibold text-brand-dark">{totalOrders}</span> orders (Page {currentPage} of {totalPages})
+          <div className="px-6 py-4 border-t border-neutral-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-neutral-50/50 text-xs font-sans">
+            <div className="flex items-center gap-3 text-neutral-500">
+              <span>
+                Showing <strong className="font-semibold text-neutral-900">{(currentPage - 1) * limit + 1}</strong>–
+                <strong className="font-semibold text-neutral-900">{Math.min(currentPage * limit, totalOrders)}</strong> of{' '}
+                <strong className="font-semibold text-neutral-900">{totalOrders}</strong> orders (Page {currentPage} of {totalPages})
+              </span>
+              <span className="text-neutral-300">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-neutral-400">Rows:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white border border-neutral-200 text-neutral-800 text-[11px] rounded-lg px-2 py-1 focus:outline-hidden font-semibold cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -1415,20 +1464,30 @@ export const AdminOrders = () => {
               </button>
 
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                  const isActive = pageNum === currentPage;
+                {getPageNumbers().map((p, idx) => {
+                  if (p === '...') {
+                    return (
+                      <span
+                        key={`admin-order-ellipsis-${idx}`}
+                        className="w-7 text-center text-neutral-400 font-bold text-xs select-none"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  const isActive = p === currentPage;
                   return (
                     <button
-                      key={`admin-order-page-${pageNum}`}
+                      key={`admin-order-page-${p}`}
                       type="button"
-                      onClick={() => setCurrentPage(pageNum)}
+                      onClick={() => setCurrentPage(p)}
                       className={`min-w-8 h-8 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         isActive
                           ? 'bg-brand-dark text-white shadow-xs'
                           : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100 hover:text-black'
                       }`}
                     >
-                      {pageNum}
+                      {p}
                     </button>
                   );
                 })}

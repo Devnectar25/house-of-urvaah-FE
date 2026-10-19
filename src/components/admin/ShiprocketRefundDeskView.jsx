@@ -201,9 +201,17 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
 
       switch (selectedScenario) {
         case 'approve_return': {
+          const itemsToReturn = (targetOrder.items || []).filter(i => {
+            const act = (i.return_action || '').toLowerCase();
+            const stat = (i.status || '').toLowerCase();
+            if (act === 'keep') return false;
+            if (stat === 'delivered' && act !== 'return' && act !== 'replace') return false;
+            return true;
+          });
+          const returnItems = itemsToReturn.length > 0 ? itemsToReturn : (targetOrder.items || [{ product_id: 1, name: 'Garment', price: 4999, quantity: 1 }]);
           const retRes = await shippingApi.createReturnOrder(
             targetOrder, 
-            targetOrder.items || [{ product_id: 1, name: 'Garment', price: 4999, quantity: 1 }], 
+            returnItems, 
             'Size or fit mismatch - Admin Approved'
           );
           
@@ -303,7 +311,12 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
         }
 
         case 'dispatch_replacement': {
-          const repRes = await shippingApi.dispatchReplacement(targetOrder, targetOrder.items);
+          const repItems = (targetOrder.items || []).filter(i => {
+            const act = (i.return_action || '').toLowerCase();
+            const stat = (i.status || '').toLowerCase();
+            return act === 'replace' || stat.includes('replace') || stat.includes('exchange');
+          });
+          const repRes = await shippingApi.dispatchReplacement(targetOrder, repItems.length > 0 ? repItems : targetOrder.items);
           
           await apiClient(`/api/orders/${targetOrder.id || targetOrder.order_number}/status`, {
             method: 'PATCH',

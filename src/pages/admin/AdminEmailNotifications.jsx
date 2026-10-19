@@ -150,28 +150,28 @@ export const AdminEmailNotifications = () => {
     switch (type) {
       case 'ORDER_CONFIRMATION':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-stone-100 text-stone-800 border border-stone-200">
-            <PackageCheck className="w-3 h-3 text-stone-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-stone-100 text-stone-800 border border-stone-200 whitespace-nowrap">
+            <PackageCheck className="w-2.5 h-2.5 text-stone-600 shrink-0" />
             Order Confirm
           </span>
         );
       case 'PAYMENT_STATUS':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-            <CreditCard className="w-3 h-3 text-amber-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+            <CreditCard className="w-2.5 h-2.5 text-amber-600 shrink-0" />
             Payment Status
           </span>
         );
       case 'INVOICE':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-            <FileText className="w-3 h-3 text-emerald-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+            <FileText className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
             Invoice PDF
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-neutral-100 text-neutral-700">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-neutral-100 text-neutral-700 whitespace-nowrap">
             {type}
           </span>
         );
@@ -182,28 +182,28 @@ export const AdminEmailNotifications = () => {
     switch (status) {
       case 'sent':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
             Sent
           </span>
         );
       case 'failed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <XCircle className="w-3 h-3 text-rose-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+            <XCircle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
             Failed
           </span>
         );
       case 'pending':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-            <Clock className="w-3 h-3 text-sky-600" />
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
+            <Clock className="w-2.5 h-2.5 text-sky-600 shrink-0" />
             Pending
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] tracking-wider uppercase font-semibold bg-neutral-100 text-neutral-700">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] tracking-wider uppercase font-semibold bg-neutral-100 text-neutral-700 whitespace-nowrap">
             {status}
           </span>
         );
@@ -211,7 +211,7 @@ export const AdminEmailNotifications = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-4 sm:space-y-5 w-full pb-8">
       {/* Toast Alert */}
       {toast && (
         <div
@@ -243,61 +243,61 @@ export const AdminEmailNotifications = () => {
       </AdminPageHeader>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded border border-neutral-200 shadow-sm">
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Total Dispatched</span>
-            <Mail className="w-4 h-4 text-neutral-400" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white p-3.5 rounded border border-neutral-200 shadow-sm">
+          <div className="flex items-center justify-between text-neutral-500 mb-1.5">
+            <span className="text-[10.5px] font-medium uppercase tracking-wider">Total Dispatched</span>
+            <Mail className="w-3.5 h-3.5 text-neutral-400" />
           </div>
-          <div className="text-2xl font-serif text-neutral-900">{stats?.total_notifications || 0}</div>
-          <div className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Across all 3 workflows</div>
+          <div className="text-xl sm:text-2xl font-serif text-neutral-900">{stats?.total_notifications || 0}</div>
+          <div className="text-[9.5px] text-neutral-400 mt-0.5 uppercase tracking-wider">Across all 3 workflows</div>
         </div>
 
-        <div className="bg-white p-4 rounded border border-neutral-200 shadow-sm">
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Order Confirmations</span>
-            <PackageCheck className="w-4 h-4 text-stone-600" />
+        <div className="bg-white p-3.5 rounded border border-neutral-200 shadow-sm">
+          <div className="flex items-center justify-between text-neutral-500 mb-1.5">
+            <span className="text-[10.5px] font-medium uppercase tracking-wider">Order Confirmations</span>
+            <PackageCheck className="w-3.5 h-3.5 text-stone-600" />
           </div>
-          <div className="text-2xl font-serif text-stone-900">{stats?.order_confirmations || 0}</div>
-          <div className="text-[10px] text-stone-500 mt-1 uppercase tracking-wider">Workflow 1 &bull; Created orders</div>
+          <div className="text-xl sm:text-2xl font-serif text-stone-900">{stats?.order_confirmations || 0}</div>
+          <div className="text-[9.5px] text-stone-500 mt-0.5 uppercase tracking-wider">Workflow 1 &bull; Created orders</div>
         </div>
 
-        <div className="bg-white p-4 rounded border border-neutral-200 shadow-sm">
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Payment Status Updates</span>
-            <CreditCard className="w-4 h-4 text-amber-600" />
+        <div className="bg-white p-3.5 rounded border border-neutral-200 shadow-sm">
+          <div className="flex items-center justify-between text-neutral-500 mb-1.5">
+            <span className="text-[10.5px] font-medium uppercase tracking-wider">Payment Status Updates</span>
+            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
           </div>
-          <div className="text-2xl font-serif text-amber-900">{stats?.payment_updates || 0}</div>
-          <div className="text-[10px] text-amber-600 mt-1 uppercase tracking-wider">Workflow 2 &bull; Verified state changes</div>
+          <div className="text-xl sm:text-2xl font-serif text-amber-900">{stats?.payment_updates || 0}</div>
+          <div className="text-[9.5px] text-amber-600 mt-0.5 uppercase tracking-wider">Workflow 2 &bull; State changes</div>
         </div>
 
-        <div className="bg-white p-4 rounded border border-neutral-200 shadow-sm">
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Invoices Issued</span>
-            <FileText className="w-4 h-4 text-emerald-600" />
+        <div className="bg-white p-3.5 rounded border border-neutral-200 shadow-sm">
+          <div className="flex items-center justify-between text-neutral-500 mb-1.5">
+            <span className="text-[10.5px] font-medium uppercase tracking-wider">Invoices Issued</span>
+            <FileText className="w-3.5 h-3.5 text-emerald-600" />
           </div>
-          <div className="text-2xl font-serif text-emerald-900">{stats?.invoice_emails || 0}</div>
-          <div className="text-[10px] text-emerald-600 mt-1 uppercase tracking-wider">Workflow 3 &bull; Verified PDF invoices</div>
+          <div className="text-xl sm:text-2xl font-serif text-emerald-900">{stats?.invoice_emails || 0}</div>
+          <div className="text-[9.5px] text-emerald-600 mt-0.5 uppercase tracking-wider">Workflow 3 &bull; Verified invoices</div>
         </div>
       </div>
 
       {/* Main Panel */}
-      <div className="bg-white rounded border border-neutral-200 shadow-sm">
+      <div className="bg-white rounded border border-neutral-200 shadow-sm overflow-hidden">
         {/* Navigation Tabs (Strictly Separated Workflows) */}
-        <div className="border-b border-neutral-200 flex flex-wrap gap-2 px-4 pt-3 bg-neutral-50/50">
+        <div className="border-b border-neutral-200 flex items-center gap-1 sm:gap-2 px-3 pt-2 bg-neutral-50/50 overflow-x-auto no-scrollbar">
           <button
             onClick={() => {
               setActiveTab('ORDER_CONFIRMATION');
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className={`flex items-center gap-2 pb-3 px-3 text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 ${
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-2.5 sm:px-3 text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'ORDER_CONFIRMATION'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            <PackageCheck className="w-3.5 h-3.5" />
-            1. Order Confirmation Emails
+            <PackageCheck className="w-3.5 h-3.5 shrink-0" />
+            1. Order Confirmations
             <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200 text-neutral-700">
               {stats?.order_confirmations || 0}
             </span>
@@ -308,14 +308,14 @@ export const AdminEmailNotifications = () => {
               setActiveTab('PAYMENT_STATUS');
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className={`flex items-center gap-2 pb-3 px-3 text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 ${
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-2.5 sm:px-3 text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'PAYMENT_STATUS'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            <CreditCard className="w-3.5 h-3.5" />
-            2. Payment Status Emails
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            2. Payment Status
             <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200 text-neutral-700">
               {stats?.payment_updates || 0}
             </span>
@@ -326,14 +326,14 @@ export const AdminEmailNotifications = () => {
               setActiveTab('INVOICE');
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className={`flex items-center gap-2 pb-3 px-3 text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 ${
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-2.5 sm:px-3 text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'INVOICE'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            <FileText className="w-3.5 h-3.5" />
-            3. Invoice Delivery Emails
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            3. Invoice Delivery
             <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200 text-neutral-700">
               {stats?.invoice_emails || 0}
             </span>
@@ -344,32 +344,32 @@ export const AdminEmailNotifications = () => {
               setActiveTab('ALL');
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className={`flex items-center gap-2 pb-3 px-3 text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 ${
+            className={`flex items-center gap-1.5 pb-2.5 pt-1 px-2.5 sm:px-3 text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-colors border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'ALL'
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            <Mail className="w-3.5 h-3.5" />
+            <Mail className="w-3.5 h-3.5 shrink-0" />
             All Notification Logs
           </button>
         </div>
 
         {/* Filter Controls Bar */}
-        <div className="p-4 border-b border-neutral-200 flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full md:w-96">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-neutral-400" />
+        <div className="p-3 sm:p-3.5 border-b border-neutral-200 flex flex-col sm:flex-row gap-2.5 sm:gap-4 items-center justify-between bg-white">
+          <div className="relative w-full sm:w-80 md:w-96">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-neutral-400" />
             <input
               type="text"
               placeholder="Search by Order #, Invoice #, or Recipient..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-neutral-300 rounded focus:outline-none focus:border-neutral-900 transition-colors"
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <label className="text-[11px] text-neutral-500 font-medium uppercase tracking-wider">Status:</label>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <label className="text-[11px] text-neutral-500 font-medium uppercase tracking-wider whitespace-nowrap">Status:</label>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -387,18 +387,18 @@ export const AdminEmailNotifications = () => {
         </div>
 
         {/* Notification Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
-              <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-[10px] font-semibold">
-                <th className="py-3 px-4">Workflow &amp; Event</th>
-                <th className="py-3 px-4">Order / Invoice</th>
-                <th className="py-3 px-4">Authoritative Recipient</th>
-                <th className="py-3 px-4">Subject</th>
-                <th className="py-3 px-4">Delivery Status</th>
-                <th className="py-3 px-4">Attempts</th>
-                <th className="py-3 px-4">Date &amp; Time</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="bg-neutral-50/90 border-b border-neutral-200 text-neutral-500 uppercase tracking-wider text-[10px] font-semibold">
+                <th className="py-2.5 px-3 whitespace-nowrap">Workflow</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Order / Invoice</th>
+                <th className="py-2.5 px-3">Recipient</th>
+                <th className="py-2.5 px-3">Subject</th>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap">Status</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap">Tries</th>
+                <th className="py-2.5 px-3 whitespace-nowrap">Date &amp; Time</th>
+                <th className="py-2.5 px-3 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -426,77 +426,84 @@ export const AdminEmailNotifications = () => {
               ) : (
                 notifications.map((item) => (
                   <tr key={item.id} className="hover:bg-neutral-50/70 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="space-y-1">
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      <div className="space-y-0.5">
                         <div>{getWorkflowBadge(item.workflow_type)}</div>
-                        <div className="text-[10px] text-neutral-400 font-mono tracking-tight">{item.event_type}</div>
+                        <div className="text-[9px] text-neutral-400 font-mono tracking-tight">{item.event_type}</div>
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="font-serif font-medium text-neutral-900">
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      <div className="font-serif font-medium text-neutral-900 text-xs">
                         #{item.order_number || item.order_id?.slice(0, 8)}
                       </div>
                       {item.invoice_number && (
-                        <div className="text-[10px] text-emerald-700 font-mono mt-0.5 font-medium">
+                        <div className="text-[9.5px] text-emerald-700 font-mono font-medium">
                           {item.invoice_number}
                         </div>
                       )}
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-neutral-900 truncate max-w-[200px]" title={item.recipient_email}>
+                    <td className="py-2.5 px-3">
+                      <div className="font-medium text-neutral-900 truncate max-w-[130px] sm:max-w-[160px] lg:max-w-[190px]" title={item.recipient_email}>
                         {item.recipient_email}
                       </div>
                       {item.recipient_name && (
-                        <div className="text-[10px] text-neutral-500 truncate max-w-[180px]">{item.recipient_name}</div>
+                        <div className="text-[10px] text-neutral-500 truncate max-w-[120px] sm:max-w-[150px]">{item.recipient_name}</div>
                       )}
                     </td>
 
-                    <td className="py-3 px-4 max-w-[240px]">
-                      <div className="truncate text-neutral-800" title={item.subject}>
+                    <td className="py-2.5 px-3">
+                      <div className="truncate text-neutral-800 max-w-[130px] sm:max-w-[170px] lg:max-w-[220px]" title={item.subject}>
                         {item.subject}
                       </div>
                       {item.has_attachment && (
-                        <div className="text-[10px] text-emerald-600 flex items-center gap-1 mt-0.5">
-                          <FileText className="w-2.5 h-2.5" />
+                        <div className="text-[9.5px] text-emerald-600 flex items-center gap-1 mt-0.5 font-medium whitespace-nowrap">
+                          <FileText className="w-2.5 h-2.5 shrink-0" />
                           <span>PDF Attached</span>
                         </div>
                       )}
                     </td>
 
-                    <td className="py-3 px-4">{getStatusBadge(item.status)}</td>
+                    <td className="py-2.5 px-2.5 text-center whitespace-nowrap">{getStatusBadge(item.status)}</td>
 
-                    <td className="py-3 px-4">
-                      <span className="font-mono text-neutral-700 text-xs">{item.attempt_count || 1}</span>
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                      <span className="font-mono text-neutral-700 text-xs font-semibold">{item.attempt_count || 1}</span>
                     </td>
 
-                    <td className="py-3 px-4 text-neutral-500 whitespace-nowrap text-[11px]">
-                      {item.sent_at
-                        ? new Date(item.sent_at).toLocaleString('en-IN', {
-                            dateStyle: 'short',
-                            timeStyle: 'short'
-                          })
-                        : new Date(item.created_at).toLocaleString('en-IN', {
-                            dateStyle: 'short',
-                            timeStyle: 'short'
-                          })}
+                    <td className="py-2.5 px-3 text-neutral-600 whitespace-nowrap">
+                      <div className="text-[11px] font-medium leading-tight">
+                        {new Date(item.sent_at || item.created_at).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: '2-digit'
+                        })}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-mono leading-tight mt-0.5">
+                        {new Date(item.sent_at || item.created_at).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </div>
                     </td>
 
-                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => setSelectedNotification(item)}
-                          className="px-2 py-1 text-[10px] tracking-wider uppercase border border-neutral-300 rounded text-neutral-700 hover:bg-neutral-100 transition-colors"
+                          className="px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase border border-neutral-300 rounded text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                          title="View Audit Details"
                         >
-                          Audit Details
+                          Audit
                         </button>
 
                         {item.status === 'failed' && (
                           <button
                             onClick={() => handleRetry(item.id)}
                             disabled={retryingId === item.id}
-                            className="flex items-center gap-1 px-2.5 py-1 text-[10px] tracking-wider uppercase font-medium bg-neutral-900 text-white rounded hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase bg-neutral-900 text-white rounded hover:bg-neutral-800 transition-colors disabled:opacity-50 cursor-pointer"
+                            title="Retry Notification"
                           >
                             {retryingId === item.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
