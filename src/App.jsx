@@ -27,6 +27,7 @@ import { TermsAndConditions } from './pages/TermsAndConditions';
 import { Sitemap } from './pages/Sitemap';
 import { CategoryPage } from './pages/CategoryPage';
 import { ExploreFabricsBlog } from './pages/ExploreFabricsBlog';
+import { TrueToFabricPage } from './pages/TrueToFabricPage';
 
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -123,6 +124,8 @@ export function StorefrontLayout() {
       <div className="flex-1 w-full max-w-full">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/true-to-fabric" element={<TrueToFabricPage />} />
+          <Route path="/true-to-fabric/:fabricSlug" element={<TrueToFabricPage />} />
           <Route path="/explore-fabrics" element={<ExploreFabricsBlog />} />
           <Route path="/blog/explore-fabrics" element={<ExploreFabricsBlog />} />
           <Route path="/fabric-guide" element={<ExploreFabricsBlog />} />
@@ -152,6 +155,11 @@ export function StorefrontLayout() {
           <Route path="/category" element={<CategoryPage defaultCategory="all" />} />
           <Route path="/collection/:slug" element={<CategoryPage />} />
           <Route path="/collections" element={<CategoryPage defaultCategory="all" />} />
+          <Route path="/new-arrivals" element={<CategoryPage defaultCategory="new-arrivals" />} />
+          <Route path="/co-ord-sets" element={<CategoryPage defaultCategory="co-ord-sets" />} />
+          <Route path="/festive-wear" element={<CategoryPage defaultCategory="festive-wear" />} />
+          <Route path="/kurtis-and-dresses" element={<CategoryPage defaultCategory="kurtis-and-dresses" />} />
+          <Route path="/corset-tops" element={<CategoryPage defaultCategory="corset-tops" />} />
           <Route path="/new-in" element={<Home />} />
           <Route path="/clothing" element={<CategoryPage defaultCategory="clothing" />} />
           <Route path="/dresses" element={<CategoryPage defaultCategory="party-wear" />} />

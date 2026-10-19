@@ -60,7 +60,7 @@ export const BestSellers = ({ onQuickView }) => {
   }, []);
 
   return (
-    <section id="best-sellers" className="pt-12 md:pt-16 pb-0 bg-white font-serif scroll-mt-20">
+    <section id="best-sellers" className="pt-16 md:pt-20 pb-0 bg-white font-serif scroll-mt-20">
       <div className="max-w-[1800px] mx-auto px-4 md:px-8">
         {/* Section Heading */}
         <div className="mb-10 md:mb-14 border-b border-neutral-200 pb-6 md:pb-7">

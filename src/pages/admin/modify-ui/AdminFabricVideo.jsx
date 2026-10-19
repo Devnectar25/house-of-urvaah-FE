@@ -68,6 +68,8 @@ const DEFAULT_VIDEOS = [
   {
     id: 'blush-pink',
     tag: 'PETAL THREADWORK',
+    slug: 'petal-threadwork',
+    fabric_slug: 'petal-threadwork',
     title: 'Blush Pink Embroidered Floral Co-Ord Set',
     video_url: 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/videos/Blush%20Pink%20Embroidered%20Floral%20Co-Ord%20Set_h264.mp4',
     badge: 'Card 1 (Left)',
@@ -76,6 +78,8 @@ const DEFAULT_VIDEOS = [
   {
     id: 'mocha-brown',
     tag: 'HERITAGE WEAVE',
+    slug: 'heritage-weave',
+    fabric_slug: 'heritage-weave',
     title: 'Mocha Brown Embroidered Co-Ord Set',
     video_url: 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/videos/Mocha%20Brown%20Embroidered%20Co-Ord%20Set_h264.mp4',
     badge: 'Card 2 (Center)',
@@ -84,6 +88,8 @@ const DEFAULT_VIDEOS = [
   {
     id: 'teal',
     tag: 'OCEAN BLOOM',
+    slug: 'ocean-bloom',
+    fabric_slug: 'ocean-bloom',
     title: 'Teal Embroidered Floral Co-Ord Set',
     video_url: 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/videos/Teal%20Embroidered%20Floral%20Co-Ord%20Set_h264.mp4',
     badge: 'Card 3 (Right)',
@@ -388,12 +394,21 @@ export const AdminFabricVideo = () => {
         secondary_button_link: editorial.secondary_button_link,
         is_active: editorial.is_active,
         video_url: videos[0]?.video_url || '',
-        videos: videos.slice(0, 10).map((v, idx) => ({
-          id: v.id || `video-${idx + 1}`,
-          tag: v.tag || '',
-          title: v.title || '',
-          video_url: v.video_url || ''
-        }))
+        videos: videos.slice(0, 10).map((v, idx) => {
+          const derivedSlug =
+            v.slug ||
+            v.fabric_slug ||
+            (v.tag ? v.tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (v.id || `fabric-${idx + 1}`));
+          return {
+            id: v.id || `video-${idx + 1}`,
+            tag: v.tag || '',
+            slug: derivedSlug,
+            fabric_slug: derivedSlug,
+            title: v.title || '',
+            video_url: v.video_url || '',
+            description: v.description || ''
+          };
+        })
       };
 
       const res = await apiClient('/api/ui/admin/fabric-video', {

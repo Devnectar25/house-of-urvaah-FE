@@ -27,7 +27,7 @@ export const BrandStory = () => {
   ];
 
   return (
-    <section className="pt-10 md:pt-14 pb-6 md:pb-8 bg-white border-t border-b border-neutral-200/80 font-serif text-brand-dark">
+    <section className="pt-12 md:pt-16 pb-14 md:pb-20 mb-10 md:mb-16 bg-white border-t border-b border-neutral-200/80 font-serif text-brand-dark">
       <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

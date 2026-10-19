@@ -174,6 +174,28 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
           </div>
         )}
 
+        {/* Top-Left Badges: Wear It Two Ways / Editorial Tag */}
+        {(() => {
+          const hasTwoWays =
+            (Array.isArray(product.tags) && product.tags.some(t => t.toLowerCase().includes('two ways'))) ||
+            (typeof product.tag === 'string' && product.tag.toLowerCase().includes('two ways'));
+          if (hasTwoWays) {
+            return (
+              <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-10 px-2 py-1 bg-white/95 text-neutral-900 border border-neutral-200 text-[9px] sm:text-[10px] font-sans font-medium uppercase tracking-[0.15em] shadow-2xs backdrop-blur-xs">
+                Wear it 2 ways
+              </span>
+            );
+          }
+          if (product.tag) {
+            return (
+              <span className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-10 px-2 py-0.5 bg-neutral-900/90 text-white text-[9px] font-sans font-medium uppercase tracking-[0.18em] shadow-2xs">
+                {product.tag}
+              </span>
+            );
+          }
+          return null;
+        })()}
+
         {/* Wishlist Icon Button */}
         <button
           onClick={(e) => {

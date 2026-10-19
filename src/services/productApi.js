@@ -15,6 +15,11 @@ export const productApi = {
     if (params.page) query.append('page', params.page);
     if (params.limit) query.append('limit', params.limit);
     if (params.active !== undefined) query.append('active', params.active);
+    if (params.occasion) query.append('occasion', params.occasion);
+    if (params.tag) query.append('tag', params.tag);
+    if (params.fabric) query.append('fabric', params.fabric);
+    if (params.fabric_slug) query.append('fabric_slug', params.fabric_slug);
+    if (params.fabricSlug) query.append('fabric_slug', params.fabricSlug);
 
     const queryString = query.toString();
     const endpoint = `/api/products${queryString ? `?${queryString}` : ''}`;

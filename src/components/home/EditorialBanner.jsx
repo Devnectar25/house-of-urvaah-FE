@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../common/Button';
 import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
@@ -10,6 +11,7 @@ const EDITORIAL_VIDEOS = [
     id: 'blush-pink',
     name: 'Blush Pink Embroidered Floral Co-Ord Set',
     tag: 'PETAL THREADWORK',
+    slug: 'petal-threadwork',
     defaultPath: 'videos/Blush Pink Embroidered Floral Co-Ord Set_h264.mp4',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
@@ -20,6 +22,7 @@ const EDITORIAL_VIDEOS = [
     id: 'mocha-brown',
     name: 'Mocha Brown Embroidered Co-Ord Set',
     tag: 'HERITAGE WEAVE',
+    slug: 'heritage-weave',
     defaultPath: 'videos/Mocha Brown Embroidered Co-Ord Set_h264.mp4',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
@@ -30,6 +33,7 @@ const EDITORIAL_VIDEOS = [
     id: 'teal',
     name: 'Teal Embroidered Floral Co-Ord Set',
     tag: 'OCEAN BLOOM',
+    slug: 'ocean-bloom',
     defaultPath: 'videos/Teal Embroidered Floral Co-Ord Set_h264.mp4',
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
@@ -54,6 +58,7 @@ const getInitialVideoUrl = (path) => {
 };
 
 export const EditorialBanner = () => {
+  const navigate = useNavigate();
   const [videos, setVideos] = useState(() =>
     EDITORIAL_VIDEOS.map((item) => ({
       ...item,
@@ -107,12 +112,20 @@ export const EditorialBanner = () => {
             if (Array.isArray(res.data.videos) && res.data.videos.length > 0) {
               hasAdminConfiguredRef.current = true;
               setVideos(
-                res.data.videos.map((v, idx) => ({
-                  id: v.id || EDITORIAL_VIDEOS[idx]?.id || `video-${idx + 1}`,
-                  name: v.title || v.name || EDITORIAL_VIDEOS[idx]?.name || '',
-                  tag: v.tag || EDITORIAL_VIDEOS[idx]?.tag || '',
-                  url: appendVersion(v.video_url || v.url || getInitialVideoUrl(EDITORIAL_VIDEOS[idx]?.defaultPath))
-                }))
+                res.data.videos.map((v, idx) => {
+                  const tag = v.tag || EDITORIAL_VIDEOS[idx]?.tag || '';
+                  const derivedSlug =
+                    v.slug ||
+                    v.fabric_slug ||
+                    (tag ? tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (v.id || EDITORIAL_VIDEOS[idx]?.slug || `fabric-${idx + 1}`));
+                  return {
+                    id: v.id || EDITORIAL_VIDEOS[idx]?.id || `video-${idx + 1}`,
+                    name: v.title || v.name || EDITORIAL_VIDEOS[idx]?.name || '',
+                    tag,
+                    slug: derivedSlug,
+                    url: appendVersion(v.video_url || v.url || getInitialVideoUrl(EDITORIAL_VIDEOS[idx]?.defaultPath))
+                  };
+                })
               );
             }
           }
@@ -215,7 +228,7 @@ export const EditorialBanner = () => {
   }, []);
 
   return (
-    <section id="editorial" className="mt-6 md:mt-8 mb-6 md:mb-8 py-10 md:py-12 bg-brand-sand text-brand-dark overflow-hidden font-serif scroll-mt-20">
+    <section id="editorial" className="mt-16 md:mt-20 mb-6 md:mb-8 py-10 md:py-12 bg-brand-sand text-brand-dark overflow-hidden font-serif scroll-mt-20">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
           {/* Left Editorial 3-Video Frame */}
@@ -237,7 +250,10 @@ export const EditorialBanner = () => {
                 <>
                   <button
                     type="button"
-                    onClick={scrollPrev}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollPrev();
+                    }}
                     aria-label="Previous fabric video"
                     className="absolute left-2.5 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300/80 flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer opacity-90 hover:opacity-100"
                   >
@@ -245,7 +261,10 @@ export const EditorialBanner = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={scrollNext}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      scrollNext();
+                    }}
                     aria-label="Next fabric video"
                     className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-neutral-900 shadow-md border border-neutral-300/80 flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 active:scale-95 cursor-pointer opacity-90 hover:opacity-100"
                   >
@@ -260,27 +279,35 @@ export const EditorialBanner = () => {
                 className="flex gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none py-0.5"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
-                {videos.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    data-video-card="true"
-                    className="relative flex-shrink-0 w-[80vw] sm:w-[calc(50%-5px)] md:w-[calc(33.333%-7px)] snap-start aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none"
-                  >
-                    {/* Individual Video Tag */}
-                    <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap">
-                      {item.tag}
-                    </div>
+                {videos.map((item, idx) => {
+                  const targetSlug =
+                    item.slug ||
+                    (item.tag ? item.tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : item.id);
+
+                  return (
+                    <Link
+                      key={item.id || idx}
+                      to={`/true-to-fabric/${targetSlug}`}
+                      state={{ videoName: item.name, tag: item.tag }}
+                      data-video-card="true"
+                      aria-label={`Explore all outfits crafted in ${item.tag || item.name} fabric`}
+                      className="relative block flex-shrink-0 w-[80vw] sm:w-[calc(50%-5px)] md:w-[calc(33.333%-7px)] snap-start aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 text-left"
+                    >
+                      {/* Individual Video Tag with subtle hover state */}
+                      <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap transition-colors duration-200 group-hover:bg-black group-hover:text-white">
+                        {item.tag}
+                      </div>
 
                     {/* Warm sand neutral loading skeleton/background (4% darker than section bg) */}
                     {!videoLoaded[item.id] && !videoErrors[item.id] && (
-                      <div className="absolute inset-0 bg-[#EBEBE6] animate-pulse flex items-center justify-center">
+                      <div className="absolute inset-0 bg-[#EBEBE6] animate-pulse flex items-center justify-center pointer-events-none">
                         <div className="w-6 h-6 rounded-full border border-neutral-300 border-t-neutral-600 animate-spin" />
                       </div>
                     )}
 
                     {/* Fallback placeholder if video fails to load */}
                     {videoErrors[item.id] ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-[#EBEBE6] text-neutral-600 text-center font-serif">
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-[#EBEBE6] text-neutral-600 text-center font-serif pointer-events-none">
                         <div className="w-8 h-8 rounded-full border border-neutral-300 flex items-center justify-center mb-2">
                           <span className="text-xs text-neutral-700">✕</span>
                         </div>
@@ -333,7 +360,7 @@ export const EditorialBanner = () => {
                           });
                           setVideoErrors((prev) => ({ ...prev, [item.id]: true }));
                         }}
-                        className={`w-full h-full object-cover transition-opacity duration-700 ${
+                        className={`w-full h-full object-cover pointer-events-none transition-opacity duration-700 ${
                           videoLoaded[item.id] ? 'opacity-100' : 'opacity-0'
                         }`}
                       >
@@ -354,14 +381,21 @@ export const EditorialBanner = () => {
                       </video>
                     )}
 
-                    {/* Gradient Scrim for caption legibility */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent pt-14 pb-3.5 px-2.5 sm:px-3 flex flex-col justify-end text-center pointer-events-none z-10">
-                      <span className="font-serif text-[10px] sm:text-[11px] text-white/95 uppercase tracking-wider leading-snug line-clamp-2 drop-shadow-sm">
+                    {/* Gradient Scrim for caption legibility & View Outfits Action */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-16 pb-4 px-3 flex flex-col justify-end text-center pointer-events-none z-10 transition-all duration-300">
+                      <span className="font-serif text-[10.5px] sm:text-[11.5px] text-white/95 uppercase tracking-wider leading-snug line-clamp-2 drop-shadow-sm mb-1.5 font-medium">
                         {item.name}
                       </span>
+                      <div className="flex items-center justify-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 group-hover:bg-white text-white group-hover:text-black backdrop-blur-md rounded-full text-[9px] font-sans tracking-[0.2em] uppercase font-semibold border border-white/30 shadow-xs transition-all duration-300">
+                          <span>EXPLORE OUTFITS</span>
+                          <span className="transition-transform duration-300 group-hover:translate-x-0.5">&rarr;</span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  </Link>
+                );
+              })}
               </div>
 
               {/* Slide Counter / Hint */}
@@ -392,14 +426,12 @@ export const EditorialBanner = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
-              <button
-                type="button"
-                data-no-hover="true"
-                disabled
-                className="no-global-hover w-full sm:w-auto inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase bg-brand-dark text-white border border-brand-dark cursor-default select-none pointer-events-none opacity-100"
+              <Link
+                to={fabricConfig?.button_link || "/true-to-fabric"}
+                className="w-full sm:w-auto inline-flex items-center justify-center font-medium text-xs px-6 py-3 tracking-widest uppercase bg-brand-dark text-white border border-brand-dark hover:bg-neutral-800 transition-colors cursor-pointer select-none"
               >
                 {fabricConfig?.button_text || 'EXPLORE FABRICS'}
-              </button>
+              </Link>
             </div>
           </motion.div>
         </div>

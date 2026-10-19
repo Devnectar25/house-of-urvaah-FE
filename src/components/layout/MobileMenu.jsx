@@ -65,9 +65,36 @@ export const MobileMenu = () => {
         if (!isMounted) return;
 
         const rawCats = Array.isArray(catsRes) ? catsRes : (catsRes?.data || catsRes?.data?.data || []);
-        const activeCats = rawCats.filter(
-          (c) => c && c.is_active !== false && c.active !== false
-        );
+        let activeCats = rawCats.filter((c) => {
+          if (!c || c.is_active === false || c.active === false) return false;
+          // Corset Tops visibility rule: hide from main navigation if fewer than 2 eligible products belong to it
+          const isCorsetCat =
+            (c.name || '').toLowerCase().includes('corset') ||
+            (c.slug || '').toLowerCase().includes('corset');
+          if (isCorsetCat) {
+            const count = Number(c.product_count !== undefined ? c.product_count : (c.eligible_count || 0));
+            if (count < 2) return false;
+          }
+          return true;
+        });
+
+        if (activeCats.length === 0) {
+          activeCats = [
+            { id: 15, name: 'NEW ARRIVALS', slug: 'new-arrivals', product_count: 6 },
+            { id: 2, name: 'CO-ORD SETS', slug: 'co-ord-sets', product_count: 3 },
+            { id: 3, name: 'FESTIVE WEAR', slug: 'festive-wear', product_count: 2 },
+            { id: 4, name: 'KURTIS AND DRESSES', slug: 'kurtis-and-dresses', product_count: 1 }
+          ];
+        }
+
+        const CANONICAL_ORDER = ['new-arrivals', 'co-ord-sets', 'festive-wear', 'kurtis-and-dresses', 'corset-tops'];
+        activeCats.sort((a, b) => {
+          const slugA = (a.slug || a.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+          const slugB = (b.slug || b.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+          const idxA = CANONICAL_ORDER.findIndex(o => slugA.includes(o) || o.includes(slugA));
+          const idxB = CANONICAL_ORDER.findIndex(o => slugB.includes(o) || o.includes(slugB));
+          return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+        });
 
         setCategories(activeCats);
       } catch (err) {
@@ -282,11 +309,17 @@ export const MobileMenu = () => {
                 {/* DYNAMIC CATEGORIES LIST - DIRECT NAVIGATION TO CATEGORY PAGE */}
                 {categories.map((cat, idx) => {
                   const catSlug = (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+                  let targetRoute = `/category/${catSlug}`;
+                  if (catSlug.includes('new-arrival')) targetRoute = '/new-arrivals';
+                  else if (catSlug.includes('co-ord')) targetRoute = '/co-ord-sets';
+                  else if (catSlug.includes('festive') || catSlug.includes('ethnic')) targetRoute = '/festive-wear';
+                  else if (catSlug.includes('kurti') || catSlug.includes('dress')) targetRoute = '/kurtis-and-dresses';
+                  else if (catSlug.includes('corset')) targetRoute = '/corset-tops';
 
                   return (
                     <div key={cat.id || idx} className="py-1">
                       <Link
-                        to={`/category/${catSlug}`}
+                        to={targetRoute}
                         onClick={() => {
                           setIsMobileMenuOpen(false);
                           window.scrollTo({ top: 0, behavior: 'instant' });
