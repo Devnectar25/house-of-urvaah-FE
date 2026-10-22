@@ -30,10 +30,19 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../../lib/orderSync';
 import { ShiprocketOrderDeskView } from '../../components/admin/ShiprocketOrderDeskView';
 
-const checkStatusMatches = (orderStatus, filterStatus) => {
+const checkStatusMatches = (orderStatus, filterStatus, order = null) => {
   if (!filterStatus || filterStatus === 'all') return true;
   const o = (orderStatus || '').toLowerCase();
   const f = filterStatus.toLowerCase();
+  const isRep = Boolean(
+    (order?.return_type || '').toLowerCase().includes('replace') ||
+    (order?.return_type || '').toLowerCase().includes('exchange') ||
+    Boolean(order?.replacement_size) ||
+    Boolean(order?.replacement_order_number) ||
+    (order?.return_reason || '').toLowerCase().includes('exchange') ||
+    (order?.return_reason || '').toLowerCase().includes('replace')
+  );
+
   if (f === 'confirmed') {
     return o === 'confirmed';
   }
@@ -56,19 +65,22 @@ const checkStatusMatches = (orderStatus, filterStatus) => {
     return o === 'cancelled' || o === 'canceled' || o === 'cancellation requested' || o === 'refunded';
   }
   if (f === 'returned' || f === 'return' || f === 'returns') {
-    return o.startsWith('return') || o.includes('house of urvaah');
+    if (isRep) return false;
+    return o.startsWith('return') || (o.includes('house of urvaah') && !isRep);
   }
   if (f === 'return requested' || f === 'return request processing' || f === 'return request' || f === 'return requests') {
+    if (isRep) return false;
     return o === 'return requested' || o === 'return request processing' || o.startsWith('return request');
   }
   if (f === 'return approved') {
+    if (isRep) return false;
     return o === 'return approved';
   }
   if (f === 'received at house of urvaah') {
     return o === 'received at house of urvaah' || o === 'received at homved';
   }
   if (f === 'exchanged' || f === 'exchange' || f === 'exchanges') {
-    return o.startsWith('exchange') || o.startsWith('replace') || o.includes('replacement');
+    return isRep || o.startsWith('exchange') || o.startsWith('replace') || o.includes('replacement');
   }
   if (f === 'replacement request processing' || f === 'replace requested' || f === 'replacement requested') {
     return o === 'replacement request processing' || o === 'replace requested' || o === 'replacement requested';
@@ -113,6 +125,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Cancellation Requested', label: 'Cancellation Requested' },
   { value: 'Cancelled', label: 'Cancelled' },
   { value: 'Return Requested', label: 'Return Requested' },
+  { value: 'Return Request Processing', label: 'Return Request Processing' },
   { value: 'Return Approved', label: 'Return Approved' },
   { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah' },
@@ -282,6 +295,25 @@ export const AdminOrders = () => {
     }
     return null;
   }, [fromDate, toDate]);
+
+  // Order ID format validation check (allows partial typing like "HOU-", digits, or letters/digits/hyphens; flags invalid special characters or bad prefix)
+  const orderIdError = useMemo(() => {
+    const val = orderIdInput.trim();
+    if (!val) return null;
+
+    // Disallow disallowed special characters (only letters, numbers, and hyphens permitted)
+    if (!/^[a-zA-Z0-9-]+$/.test(val)) {
+      return 'Only letters, numbers, and hyphens (-) allowed';
+    }
+
+    // If starts with letters followed by hyphen or partial prefix, check consistency
+    const upper = val.toUpperCase();
+    if (upper.length >= 3 && !upper.startsWith('HOU') && !/^\d+$/.test(val)) {
+      return 'Order ID must start with "HOU-" or contain numbers';
+    }
+
+    return null;
+  }, [orderIdInput]);
 
   // Active filters check
   const isFilterActive = useMemo(() => {
@@ -568,6 +600,28 @@ export const AdminOrders = () => {
   };
 
 
+  // Format status for short display in table pills
+  const formatOrderStatusDisplay = (status) => {
+    if (!status) return 'Pending';
+    const s = String(status).toLowerCase();
+    if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
+      return 'Received at HOU';
+    }
+    if (s.includes('in transit to house of urvaah')) {
+      return 'In Transit to HOU';
+    }
+    if (s.includes('replacement request processing') || s.includes('replace requested') || s.includes('replacement requested')) {
+      return 'Replacement Req.';
+    }
+    if (s.includes('return request processing')) {
+      return 'Return Req.';
+    }
+    if (s.includes('cancellation requested') || s.includes('cancel_requested')) {
+      return 'Cancel Req.';
+    }
+    return status;
+  };
+
   // Helper for Order Status Pill Styling
   const getOrderStatusPill = (status) => {
     const s = (status || '').toLowerCase();
@@ -595,7 +649,7 @@ export const AdminOrders = () => {
     if (s.includes('cancel')) {
       return 'bg-neutral-100 text-neutral-700 border-neutral-200';
     }
-    if (s.includes('return requested')) {
+    if (s.includes('return requested') || s.includes('return request processing')) {
       return 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
     }
     if (s.includes('return approved')) {
@@ -1063,15 +1117,35 @@ export const AdminOrders = () => {
               Order ID
             </label>
             <div className="relative">
-              <Hash className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <Hash className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
               <input
                 type="text"
                 value={orderIdInput}
                 onChange={(e) => setOrderIdInput(e.target.value)}
                 placeholder="e.g. HOU-924856"
-                className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all"
+                className={`w-full pl-8 pr-7 py-2 bg-neutral-50 border rounded-xl text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:bg-white transition-all ${
+                  orderIdError
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 bg-rose-50/20'
+                    : 'border-neutral-200 focus:ring-1 focus:ring-brand-dark'
+                }`}
               />
+              {orderIdInput && (
+                <button
+                  type="button"
+                  onClick={() => setOrderIdInput('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-brand-dark text-xs p-0.5 cursor-pointer"
+                  title="Clear Order ID"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
+            {orderIdError && (
+              <p className="text-[10px] text-rose-500 mt-1 font-medium flex items-center gap-1">
+                <span className="inline-block w-1 h-1 rounded-full bg-rose-500"></span>
+                {orderIdError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1145,11 +1219,6 @@ export const AdminOrders = () => {
               </span>
             </h2>
 
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-              <Clock className="w-3 h-3 text-emerald-600" />
-              <span>Recent Orders on Top</span>
-            </span>
-
             {isFilterActive && (
               <span className="text-xs text-neutral-500 font-medium">
                 • Filtered View
@@ -1160,19 +1229,24 @@ export const AdminOrders = () => {
           <div className="flex items-center gap-2.5">
             {/* Quick search input */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
               <input
                 type="text"
                 value={orderIdInput}
                 onChange={(e) => setOrderIdInput(e.target.value)}
                 placeholder="Search Order ID..."
-                className="pl-8 pr-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark w-36 sm:w-48 shadow-2xs"
+                className={`pl-8 pr-6 py-1.5 bg-white border rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none w-36 sm:w-48 shadow-2xs transition-all ${
+                  orderIdError
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 bg-rose-50/20'
+                    : 'border-neutral-200 focus:ring-1 focus:ring-brand-dark'
+                }`}
               />
               {orderIdInput && (
                 <button
                   type="button"
                   onClick={() => setOrderIdInput('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                  title="Clear search"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1381,11 +1455,11 @@ export const AdminOrders = () => {
                       <td className="py-3 px-4 text-center">
                         <div className="inline-flex items-center justify-center gap-1.5">
                           <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${getOrderStatusPill(
+                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${getOrderStatusPill(
                               ord.status
                             )}`}
                           >
-                            {ord.status || 'Pending'}
+                            {formatOrderStatusDisplay(ord.status)}
                           </span>
                           {ord.isPreview && (
                             <span
@@ -1528,6 +1602,7 @@ export const AdminOrders = () => {
         onStatusUpdated={handleOrderUpdatedInList}
         onOrderUpdated={handleOrderUpdatedInList}
         isShiprocketDesk={activeViewTab === 'shiprocket'}
+        isRefundDesk={false}
       />
     </div>
   );

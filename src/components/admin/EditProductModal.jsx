@@ -218,8 +218,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
-          description: data.description || '',
-          fullDescription: data.fullDescription || data.full_description || data.fulldescription || '',
+          description: data.fullDescription || data.full_description || data.fulldescription || data.description || '',
+          fullDescription: data.fullDescription || data.full_description || data.fulldescription || data.description || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: origPrice,
@@ -288,8 +288,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
-          description: product.description || '',
-          fullDescription: product.fullDescription || product.full_description || product.fulldescription || '',
+          description: product.fullDescription || product.full_description || product.fulldescription || product.description || '',
+          fullDescription: product.fullDescription || product.full_description || product.fulldescription || product.description || '',
           nameOptions: nameOpts,
           productDetails: prodDetails,
           originalPrice: product.originalPrice || product.price || 0,
@@ -799,9 +799,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         subcategory_name: formData.subCategory,
         shortDescription: formData.shortDescription.trim(),
         short_description: formData.shortDescription.trim(),
-        description: formData.description.trim(),
-        fullDescription: formData.fullDescription.trim(),
-        full_description: formData.fullDescription.trim(),
+        description: (formData.fullDescription || formData.description || '').trim(),
+        fullDescription: (formData.fullDescription || formData.description || '').trim(),
+        full_description: (formData.fullDescription || formData.description || '').trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
         productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
@@ -1247,28 +1247,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 />
               </div>
 
-              {/* 4. Description (Website Copy) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                  Description (Website Copy)
-                </label>
-                <textarea
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Everyday-easy piece that works two ways..."
-                  className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all resize-y"
-                />
-              </div>
-
-              {/* 4.1 Full Description with Rich Formatting Toolbar */}
+              {/* 4. Full Description with Rich Formatting Toolbar */}
               <div className="space-y-1.5">
                 <RichDescriptionEditor
-                  value={formData.fullDescription}
-                  onChange={(val) => setFormData(prev => ({ ...prev, fullDescription: val }))}
+                  value={formData.fullDescription || formData.description}
+                  onChange={(val) => setFormData(prev => ({ ...prev, fullDescription: val, description: val }))}
                   placeholder="Comprehensive product story, artisan detailing, styling ideas, and garment drape overview..."
-                  title="OVERVIEW DESCRIPTION & DETAILS"
-                  badgeText="STANDARD SECTION"
+                  title="FULL DESCRIPTION"
+                  badgeText="RICH EDITOR"
                   rows={6}
                 />
               </div>

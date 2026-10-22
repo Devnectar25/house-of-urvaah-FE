@@ -598,6 +598,7 @@ export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = fal
           isOpen={internalDetailOpen}
           hideStatusManagement={true}
           isShiprocketDesk={true}
+          isRefundDesk={false}
           onClose={() => {
             setInternalDetailOpen(false);
             setInternalSelectedOrderId(null);

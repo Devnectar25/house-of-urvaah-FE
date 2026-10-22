@@ -72,11 +72,21 @@ function markdownToHtml(md) {
       const itemContent = line.replace(/^[-*•]\s+/, '');
       result.push(`  <li>${itemContent}</li>`);
     }
+    // Blockquote
+    else if (line.startsWith('> ')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+      const quoteText = line.replace(/^>\s*/, '');
+      result.push(`<blockquote>${quoteText}</blockquote>`);
+    }
     // Standard paragraph line
     else {
       if (inList) { result.push('</ul>'); inList = false; }
-      // Bold formatting inside paragraph
-      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      // Formatting inside paragraph: bold, italic, underline
+      let formatted = line
+        .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/__(.*?)__/g, '<u>$1</u>');
       result.push(`<p>${formatted}</p>`);
     }
   }

@@ -837,7 +837,7 @@ export const ProductDetail = () => {
         "Model is 5'9\" (175 cm) wearing size 28. Tailored for a relaxed yet structured silhouette. Fits true to size."
     },
     {
-      title: 'PRODUCT DESCRIPTION',
+      title: 'FULL DESCRIPTION',
       content:
         product.description ||
         'Structured high-fashion garment crafted from premium virgin fabrics with meticulous architectural tailoring details, horn-effect buttons, and hand-finished seams.'
@@ -1408,7 +1408,7 @@ export const ProductDetail = () => {
                   className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
                   aria-expanded={Boolean(openAccordions['desc'])}
                 >
-                  <span>PRODUCT DESCRIPTION</span>
+                  <span>FULL DESCRIPTION</span>
                   {openAccordions['desc'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                 </button>
                 {openAccordions['desc'] && (

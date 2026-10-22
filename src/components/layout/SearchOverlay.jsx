@@ -22,12 +22,12 @@ export const SearchOverlay = () => {
   const recognitionRef = useRef(null);
 
   const trendingTags = [
-    'Silk Dresses',
     'Co-ord Sets',
-    'Tailored Blazers',
-    'Cashmere Knitwear',
-    'Calfskin Shoulder Bag',
-    'Wide Leg Trousers',
+    'Corset Tops',
+    'Kurtis & Dresses',
+    'Festive Wear',
+    'Gharara Sets',
+    'Floral Embroidered',
   ];
 
   // Prefetch active live products from PostgreSQL DB when search overlay opens or when catalog updates
@@ -111,8 +111,8 @@ export const SearchOverlay = () => {
 
   // Merge live database search results with instant local matches
   const filteredProducts = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return [];
+    const rawQuery = searchTerm.trim().toLowerCase();
+    if (!rawQuery) return [];
 
     const map = new Map();
 
@@ -125,19 +125,39 @@ export const SearchOverlay = () => {
       }
     }
 
-    // 2. Instant client-side matches from preloaded catalog
+    // 2. Instant client-side intelligent matches from preloaded catalog
+    const cleanQuery = rawQuery.replace(/&/g, 'and');
+    const rawTokens = cleanQuery.split(/\s+/).filter(Boolean);
+    const tokens = rawTokens.map(t => (t.endsWith('s') && t.length > 3 ? t.slice(0, -1) : t));
+
     for (const p of allCatalog) {
       if (!p) continue;
       const key = String(p.id || p.product_id || p.productId || p.name);
       if (map.has(key)) continue;
 
-      const nameMatch = p.name?.toLowerCase().includes(query) || p.title?.toLowerCase().includes(query);
-      const catMatch = p.category?.toLowerCase().includes(query) || p.category_name?.toLowerCase().includes(query);
-      const subcatMatch = p.subcategory?.toLowerCase().includes(query) || p.subCategory?.toLowerCase().includes(query) || p.subcategory_name?.toLowerCase().includes(query);
-      const tagMatch = p.tag?.toLowerCase().includes(query) || p.styleCode?.toLowerCase().includes(query) || p.style_code?.toLowerCase().includes(query);
-      const descMatch = p.description?.toLowerCase().includes(query) || p.shortDescription?.toLowerCase().includes(query);
+      const searchableText = [
+        p.name,
+        p.title,
+        p.category,
+        p.category_name,
+        Array.isArray(p.categories) ? p.categories.join(' ') : '',
+        p.subcategory,
+        p.subCategory,
+        p.subcategory_name,
+        p.fabric,
+        p.occasion,
+        Array.isArray(p.tags) ? p.tags.join(' ') : '',
+        p.tag,
+        p.styleCode,
+        p.style_code,
+        p.description,
+        p.shortDescription
+      ].filter(Boolean).join(' ').toLowerCase();
 
-      if (nameMatch || catMatch || subcatMatch || tagMatch || descMatch) {
+      const fullMatch = searchableText.includes(rawQuery) || searchableText.includes(cleanQuery);
+      const allTokensMatch = tokens.length > 0 && tokens.every(token => searchableText.includes(token));
+
+      if (fullMatch || allTokensMatch) {
         map.set(key, p);
       }
     }
@@ -306,7 +326,7 @@ export const SearchOverlay = () => {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="SEARCH FOR BLAZERS, DRESSES, COATS, LEATHER..."
+                  placeholder="SEARCH FOR CO-ORD SETS, CORSETS, KURTIS, FESTIVE WEAR..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   autoFocus
@@ -360,25 +380,52 @@ export const SearchOverlay = () => {
                 </div>
               )}
 
-              {/* Trending Tags */}
-              {!searchTerm && (
-                <div className="py-4">
-                  <h4 className="text-[10px] tracking-widest text-neutral-400 uppercase font-semibold mb-4">
+              {/* Trending Filter Tabs - Always visible for fast category discovery */}
+              <div className="py-3 border-b border-neutral-100">
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-[10px] tracking-widest text-neutral-400 uppercase font-semibold">
                     TRENDING SEARCHES
                   </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {trendingTags.map((tag, idx) => (
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        if (inputRef.current) inputRef.current.focus();
+                      }}
+                      className="text-[10px] tracking-wider uppercase text-neutral-400 hover:text-black transition-colors cursor-pointer"
+                    >
+                      Show All
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trendingTags.map((tag, idx) => {
+                    const isSelected = searchTerm.trim().toLowerCase() === tag.trim().toLowerCase();
+                    return (
                       <button
                         key={idx}
-                        onClick={() => setSearchTerm(tag)}
-                        className="px-4 py-2 bg-brand-sand hover:bg-neutral-200 text-xs tracking-wider uppercase font-medium transition-colors cursor-pointer"
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSearchTerm('');
+                          } else {
+                            setSearchTerm(tag);
+                          }
+                          if (inputRef.current) inputRef.current.focus();
+                        }}
+                        className={`px-3.5 py-1.5 rounded-full text-xs tracking-wider uppercase font-medium transition-all cursor-pointer border ${
+                          isSelected
+                            ? 'bg-black text-white border-black shadow-xs font-semibold'
+                            : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200/80 hover:border-black'
+                        }`}
                       >
                         {tag}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
               {/* Search Results */}
               {searchTerm && (
