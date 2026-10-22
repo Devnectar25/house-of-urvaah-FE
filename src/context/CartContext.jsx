@@ -100,7 +100,12 @@ export const CartProvider = ({ children }) => {
       phone: userData.phone || userData.contactno || '',
       addresses: userData.addresses || [],
       memberSince: userData.memberSince || userData.member_since || null,
-      avatar: userData.avatar || userData.avatar_url || ''
+      avatar: userData.avatar || userData.avatar_url || '',
+      bankDetails: userData.bankDetails || {
+        accountNumber: userData.refund_bank_account || '',
+        ifscCode: userData.refund_ifsc_code || '',
+        holderName: userData.refund_holder_name || ''
+      }
     };
   };
 

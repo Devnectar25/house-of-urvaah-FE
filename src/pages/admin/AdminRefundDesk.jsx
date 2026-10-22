@@ -797,13 +797,13 @@ export const AdminRefundDesk = () => {
           <div className="bg-white border border-neutral-200/80 rounded-xl px-3.5 py-2.5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         {/* Search Input */}
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by Order ID (e.g. HOU-ORD-1008), customer name or email..."
-            className="w-full pl-8.5 pr-8 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans"
+            className="w-full pl-9 pr-8 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-brand-dark placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-brand-dark focus:bg-white transition-all font-sans"
           />
           {searchQuery && (
             <button
@@ -1331,6 +1331,7 @@ export const AdminRefundDesk = () => {
       <OrderDetailModal
         orderId={selectedOrderIdForDetail}
         isOpen={isDetailModalOpen}
+        isRefundDesk={true}
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedOrderIdForDetail(null);

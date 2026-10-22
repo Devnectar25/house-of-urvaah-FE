@@ -54,6 +54,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Return Approved', label: 'Return Approved (Pickup Scheduled)' },
   { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah (Return In Transit)' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah (Atelier Restocked)' },
+  { value: 'Return QC Rejected', label: 'Return QC Rejected (Damaged/Wrong Item)' },
   { value: 'Returned', label: 'Returned (Refund Completed)' },
   { value: 'Return Rejected', label: 'Return Rejected' },
   { value: 'Replacement Request Processing', label: 'Replacement Request Processing' },
@@ -69,6 +70,30 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Returned & Replaced', label: 'Returned & Replaced (Completed)' }
 ];
 
+const RETURN_RESTRICTED_STATUSES = [
+  'Return Requested',
+  'Return Approved',
+  'Return Collected',
+  'In Transit to House of Urvaah',
+  'Received at House of Urvaah',
+  'Return QC Rejected',
+  'Returned',
+  'Return Rejected',
+  'Replacement Request Processing',
+  'Replace Requested',
+  'Replacement Requested',
+  'Replace Approved',
+  'Replacement Processing',
+  'Replacement Shipped',
+  'Replacement Out for Delivery',
+  'Replaced',
+  'Replace Rejected',
+  'Exchanged',
+  'Return & Replacement Processing',
+  'Return & Replacement Approved',
+  'Returned & Replaced'
+];
+
 const PAYMENT_STATUS_OPTIONS = [
   { value: 'Paid', label: 'Paid' },
   { value: 'Pending', label: 'Pending' },
@@ -78,20 +103,102 @@ const PAYMENT_STATUS_OPTIONS = [
 
 const getRequestedReplacementSize = (ord) => {
   if (!ord) return 'M';
+  const returnType = (ord.return_type || '').toLowerCase();
+  if (returnType === 'return') return 'M'; // Return orders have no replacement size
+
   if (ord.replacement_size) return ord.replacement_size;
   if (Array.isArray(ord.items)) {
-    const repItem = ord.items.find(it => it.replacement_size || (it.return_action || '').toLowerCase() === 'replace');
+    const repItem = ord.items.find(it => (it.return_action || '').toLowerCase() === 'replace');
     if (repItem && repItem.replacement_size) return repItem.replacement_size;
   }
   const combined = `${ord.cancel_reason || ''} ${ord.return_reason || ''}`;
-  const match = combined.match(/Preferred Size:\s*([A-Za-z0-9]+)/i) || 
-                combined.match(/Size:\s*([A-Za-z0-9]+)/i);
-  if (match && match[1]) return match[1].trim();
-  if (ord.items && ord.items[0] && ord.items[0].size) return ord.items[0].size;
+  // Only look for size in notes if return_type is replacement/exchange
+  if (returnType.includes('replace') || returnType.includes('exchange')) {
+    const match = combined.match(/Preferred Size:\s*([A-Za-z0-9]+)/i) || 
+                  combined.match(/Size:\s*([A-Za-z0-9]+)/i);
+    if (match && match[1]) return match[1].trim();
+    if (ord.items && ord.items[0] && ord.items[0].size) return ord.items[0].size;
+  }
   return 'M';
 };
 
-export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false, isShiprocketDesk = false }) => {
+export const isOrderReplacementLifecycle = (ord, curStatus = '') => {
+  if (!ord) return false;
+  const curSt = (curStatus || ord?.status || '').toLowerCase();
+  if (curSt === 'cancelled' || curSt === 'refunded') return false;
+
+  const returnType = (ord?.return_type || '').toLowerCase();
+  const returnReason = (ord?.return_reason || '').toLowerCase();
+  const cancelReason = (ord?.cancel_reason || '').toLowerCase();
+
+  // 1. If explicit return_type is 'return', it is strictly a RETURN flow (never replacement)
+  // unless there are explicit replacement items in order.items
+  const hasExplicitReplaceItem = Array.isArray(ord?.items) && ord.items.some(
+    it => (it.return_action || '').toLowerCase() === 'replace'
+  );
+  if (returnType === 'return' && !hasExplicitReplaceItem) {
+    return false;
+  }
+
+  // 2. Explicit replacement/exchange return type
+  if (
+    returnType === 'replacement' ||
+    returnType === 'exchange' ||
+    returnType.includes('replace') ||
+    returnType.includes('exchange')
+  ) {
+    return true;
+  }
+
+  // 3. If replacement order generated
+  if (Boolean(ord?.replacement_order_number || ord?.replacement_order_id)) {
+    return true;
+  }
+
+  // 4. If order status is replacement-specific
+  if (
+    curSt.includes('replace') ||
+    curSt.includes('exchanged') ||
+    [
+      'replacement request processing',
+      'replace requested',
+      'replacement requested',
+      'replace approved',
+      'replacement processing',
+      'replacement shipped',
+      'replacement out for delivery',
+      'replaced',
+      'exchanged'
+    ].includes(curSt)
+  ) {
+    return true;
+  }
+
+  // 5. If order items state replace action
+  if (hasExplicitReplaceItem) {
+    return true;
+  }
+
+  // 6. If customer comments / reasons explicitly state replace or exchange (ignoring default generic texts)
+  const isGenericReturnReason = returnReason === 'customer return / exchange request' || returnReason === 'customer return request';
+  if (!isGenericReturnReason && (
+    returnReason.includes('replace') ||
+    returnReason.includes('exchange') ||
+    cancelReason.includes('replace') ||
+    cancelReason.includes('exchange')
+  )) {
+    return true;
+  }
+
+  // 7. If replacement_size is explicitly assigned and returnType is not 'return'
+  if (Boolean(ord?.replacement_size) && returnType !== 'return') {
+    return true;
+  }
+
+  return false;
+};
+
+export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false, isShiprocketDesk = false, isRefundDesk = false }) => {
   // Lock background scrolling on body and admin container when modal is open
   useModalScrollLock(isOpen, onClose);
 
@@ -112,6 +219,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
   const [customReplacementSize, setCustomReplacementSize] = useState('M');
+  const [isRejectingReplacement, setIsRejectingReplacement] = useState(false);
+  const [replacementRejectReason, setReplacementRejectReason] = useState('Wrong product returned by customer');
+  const [replacementRejectNotes, setReplacementRejectNotes] = useState('');
+
+  // Return QC Inspection & Rejection State
+  const [showQCRejectForm, setShowQCRejectForm] = useState(false);
+  const [qcRejectReason, setQcRejectReason] = useState('Damaged / Torn / Stained product received');
+  const [qcCustomNote, setQcCustomNote] = useState('');
 
   // Logistics & Shiprocket Testing Suite State
   const [logisticsLoading, setLogisticsLoading] = useState(false);
@@ -130,6 +245,12 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setFetchError(null);
     setSaveError(null);
     setSaveSuccessMsg(null);
+    setIsRejectingReplacement(false);
+    setReplacementRejectReason('Wrong product returned by customer');
+    setReplacementRejectNotes('');
+    setShowQCRejectForm(false);
+    setQcRejectReason('Damaged / Torn / Stained product received');
+    setQcCustomNote('');
     try {
       const response = await apiClient(`/api/orders/${orderId}`);
       const data = response?.data || response;
@@ -251,6 +372,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
     if (!selectedStatus) {
       setSaveError('Please select a valid order status before saving.');
+      return;
+    }
+
+    if (!isRefundDesk && RETURN_RESTRICTED_STATUSES.includes(selectedStatus)) {
+      setSaveError('Permission denied: Only the Refund Desk Admin can update return and refund statuses.');
       return;
     }
 
@@ -735,37 +861,46 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
-  const handleRejectReplacement = async () => {
+  const handleRejectReplacement = async (customReason) => {
     if (!order) return;
     setSavingStatus(true);
     setSaveError(null);
     setSaveSuccessMsg(null);
     try {
+      const selectedReason = customReason || replacementRejectReason || 'Wrong product returned by customer';
+      const finalReason = replacementRejectNotes && replacementRejectNotes.trim()
+        ? `${selectedReason} - ${replacementRejectNotes.trim()}`
+        : selectedReason;
+
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: 'Replace Rejected',
-          cancelReason: 'Replacement request rejected by Admin'
+          cancelReason: finalReason,
+          rejectionReason: finalReason
         })
       });
 
       const updatedData = response?.data || response || {
         ...order,
-        status: 'Delivered'
+        status: 'Replace Rejected',
+        rejection_reason: finalReason,
+        cancel_reason: finalReason
       };
 
       setOrder(updatedData);
-      setConfirmedStatus('Delivered');
-      setSelectedStatus('Delivered');
-      confirmedRef.current.status = 'Delivered';
-      setSaveSuccessMsg('Replacement request rejected. Order remains Delivered.');
+      setConfirmedStatus('Replace Rejected');
+      setSelectedStatus('Replace Rejected');
+      confirmedRef.current.status = 'Replace Rejected';
+      setIsRejectingReplacement(false);
+      setSaveSuccessMsg('Replacement request rejected successfully (QC Failed / Wrong item).');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyPreview = onOptimisticPreview || onStatusPreview;
       if (notifyPreview && order) {
         notifyPreview({
           id: order.id,
-          status: 'Delivered',
+          status: 'Replace Rejected',
           payment_status: updatedData.payment_status || order.payment_status,
           isPreview: false
         });
@@ -775,14 +910,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       if (notifyParent) {
         notifyParent({
           ...updatedData,
-          status: 'Delivered',
+          status: 'Replace Rejected',
+          rejection_reason: finalReason,
           isPreview: false
         });
       }
 
       broadcastOrderUpdate({
         ...updatedData,
-        status: 'Delivered'
+        status: 'Replace Rejected',
+        rejection_reason: finalReason
       });
     } catch (err) {
       console.error('Failed to reject replacement:', err);
@@ -982,19 +1119,39 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setLoading(true);
     setSaveError(null);
     try {
-      const res = await apiClient(`/api/orders/${encodeURIComponent(repNum)}`);
-      const newOrd = res.data || res.order;
+      let res;
+      let newOrd;
+      try {
+        res = await apiClient(`/api/orders/${encodeURIComponent(repNum)}`);
+        newOrd = res?.data || res?.order;
+      } catch (fetchErr) {
+        // Child replacement order not yet created in DB - auto-dispatch on demand
+        console.warn(`[OrderDetailModal] Replacement order ${repNum} not found in DB. Auto-generating...`, fetchErr);
+      }
+
+      if (!newOrd && order) {
+        const sizeToUse = order.replacement_size || customReplacementSize || getRequestedReplacementSize(order);
+        const repRes = await shippingApi.dispatchReplacement(order, order.items || [], {
+          replacement_size: sizeToUse
+        });
+        const createdNum = repRes?.replacement_order_number || repRes?.order_number || repNum;
+        res = await apiClient(`/api/orders/${encodeURIComponent(createdNum)}`);
+        newOrd = res?.data || res?.order;
+      }
+
       if (newOrd) {
         setOrder(newOrd);
         setConfirmedStatus(newOrd.status || 'Confirmed');
         setSelectedStatus(newOrd.status || 'Confirmed');
         confirmedRef.current.status = newOrd.status || 'Confirmed';
-        setSaveSuccessMsg(`Switched to Replacement Order #${repNum}`);
+        setSaveSuccessMsg(`Switched to Replacement Order #${newOrd.order_number || repNum}`);
         setTimeout(() => setSaveSuccessMsg(null), 3000);
+      } else {
+        throw new Error('Could not load replacement order.');
       }
     } catch (err) {
       console.error('Failed to open replacement order:', err);
-      setSaveError('Could not open replacement order.');
+      setSaveError(err.message || 'Could not open replacement order.');
     } finally {
       setLoading(false);
     }
@@ -1009,14 +1166,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
-          status: 'Received at House of Urvaah'
+          status: 'Received at House of Urvaah',
+          return_qc_status: 'Pending QC',
+          is_product_received: false
         })
       });
 
       const updatedData = response?.data || response || {
         ...order,
         status: 'Received at House of Urvaah',
-        is_product_received: true,
+        return_qc_status: 'Pending QC',
+        is_product_received: false,
         refund_status: 'Pending',
         refund_eligible_amount: order.total
       };
@@ -1025,7 +1185,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setConfirmedStatus('Received at House of Urvaah');
       setSelectedStatus('Received at House of Urvaah');
       confirmedRef.current.status = 'Received at House of Urvaah';
-      setSaveSuccessMsg('Package verified at House of Urvaah! Stock restocked and routed to Refund Desk.');
+      setSaveSuccessMsg('Package arrived at Atelier! Awaiting physical QC inspection to confirm acceptable or reject.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyPreview = onOptimisticPreview || onStatusPreview;
@@ -1054,8 +1214,85 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  const handleConfirmParcelQC = async (isAccepted, rejectionReason = '') => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+
+    const targetStatus = isAccepted ? 'Received at House of Urvaah' : 'Return QC Rejected';
+    const finalReason = isAccepted
+      ? 'Parcel verified in acceptable condition by Atelier QC'
+      : (rejectionReason || 'Wrong or damaged product received during QC inspection');
+
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: targetStatus,
+          cancelReason: finalReason,
+          return_qc_status: isAccepted ? 'Accepted' : 'Rejected',
+          return_rejection_reason: isAccepted ? null : finalReason,
+          is_product_received: isAccepted,
+          paymentStatus: isAccepted ? order.payment_status : 'Pending'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: targetStatus,
+        is_product_received: isAccepted,
+        return_qc_status: isAccepted ? 'Accepted' : 'Rejected',
+        return_rejection_reason: isAccepted ? null : finalReason,
+        refund_status: isAccepted ? 'Pending' : 'Cancelled',
+        refund_eligible_amount: isAccepted ? order.total : 0
+      };
+
+      setOrder(updatedData);
+      setConfirmedStatus(targetStatus);
+      setSelectedStatus(targetStatus);
+      confirmedRef.current.status = targetStatus;
+      setShowQCRejectForm(false);
+
+      if (isAccepted) {
+        setSaveSuccessMsg('Parcel confirmed received and acceptable! Items restocked into inventory and amount refund is started.');
+      } else {
+        setSaveSuccessMsg('Return QC Rejected! Product was NOT accepted into inventory, and refund has been cancelled.');
+      }
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: targetStatus,
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: targetStatus,
+          isPreview: false
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update Return QC status:', err);
+      setSaveError(err.message || 'Failed to update Return QC status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handleSimulateDoorstepHandover = async () => {
     if (!order) return;
+    if (!isRefundDesk) {
+      setSaveError('Permission denied: Only the Refund Desk Admin can confirm doorstep pickups.');
+      return;
+    }
     setSavingStatus(true);
     setSaveError(null);
     try {
@@ -1638,9 +1875,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Post-Delivery Return Request Review Banner */}
-              {(['return requested', 'return request processing', 'return processing'].includes(
+              {isRefundDesk && (['return requested', 'return request processing', 'return processing'].includes(
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-              )) && (
+              )) && !isOrderReplacementLifecycle(order, (confirmedRef.current.status || confirmedStatus || order?.status || '')) && (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
@@ -1719,7 +1956,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Customer Replacement Request Review Banner */}
-              {(['replacement request processing', 'replace requested', 'replacement requested'].includes(
+              {isRefundDesk && (['replacement request processing', 'replace requested', 'replacement requested'].includes(
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
               )) && (
                 <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
@@ -1782,7 +2019,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Customer Mixed Return & Replacement Review Banner */}
-              {Boolean(
+              {isRefundDesk && Boolean(
                 (order?.return_type || '').toLowerCase().includes('mixed') ||
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('& replacement') ||
                 (
@@ -1893,6 +2130,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   )
                 );
                 if (!isMixed) return null;
+                if (!isRefundDesk) return null;
 
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                 const curLog = (order?.logistics_status || '').toLowerCase();
@@ -2187,36 +2425,24 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const returnType = (order?.return_type || '').toLowerCase();
 
-                // Only show Exchange Journey when the order is explicitly in an exchange/replacement lifecycle
-                const isReplacementRelated = (
-                  returnType === 'replacement' ||
-                  returnType === 'exchange' ||
-                  [
-                    'replacement request processing',
-                    'replace requested',
-                    'replacement requested',
-                    'replace approved',
-                    'replacement processing',
-                    'replacement shipped',
-                    'replacement out for delivery',
-                    'replaced',
-                    'exchanged'
-                  ].includes(curSt) ||
-                  Boolean(order?.replacement_order_number || order?.replacement_order_id) ||
-                  (Boolean(order?.replacement_size) && (curSt.includes('replace') || curSt === 'exchanged'))
-                ) && returnType !== 'return' && !curSt.includes('return') && curSt !== 'cancelled' && curSt !== 'refunded';
+                // Only show Exchange Journey inside the dedicated Refund Desk
+                if (!isRefundDesk) return null;
+
+                // Only show Exchange Journey when the order is in an exchange/replacement lifecycle
+                const isReplacementRelated = isOrderReplacementLifecycle(order, curSt);
 
                 if (!isReplacementRelated) return null;
 
                 const repOrderNum = order?.replacement_order_number;
-                const isS2 = ['replace approved', 'in transit to house of urvaah', 'received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum) || (curLog.includes('reverse') && curLog.includes('pickup'));
-                const isS3 = ['in transit to house of urvaah', 'received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum);
-                const isS3Active = (curSt === 'replace approved' || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3;
-                const isS4 = ['received at house of urvaah', 'replaced'].includes(curSt) || Boolean(repOrderNum);
-                const isS4Active = (['in transit to house of urvaah'].includes(curSt)) && !isS4;
+                const isRejected = curSt === 'replace rejected';
+                const isS2 = ['replace approved', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'replaced'].includes(curSt) || Boolean(repOrderNum) || (curLog.includes('reverse') && curLog.includes('pickup'));
+                const isS3 = ['in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS3Active = (curSt === 'replace approved' || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3 && !isRejected;
+                const isS4 = ['received at house of urvaah', 'received at homved', 'replaced'].includes(curSt) || Boolean(repOrderNum);
+                const isS4Active = (['in transit to house of urvaah'].includes(curSt)) && !isS4 && !isRejected;
                 const isS5 = Boolean(repOrderNum) || curSt === 'replaced';
-                const isS5Active = ['received at house of urvaah'].includes(curSt) && !isS5;
-                const stepNum = isS5 ? 5 : isS5Active ? 4 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
+                const isS5Active = ['received at house of urvaah', 'received at homved'].includes(curSt) && !isS5 && !isRejected;
+                const stepNum = isRejected ? 4 : isS5 ? 5 : isS5Active ? 4 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
 
                 const reqSize = customReplacementSize || getRequestedReplacementSize(order);
 
@@ -2228,9 +2454,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         <RefreshCw className="w-4 h-4 text-purple-700" />
                         <span>Exchange & Doorstep Reverse Pickup Journey</span>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
-                        Step {stepNum} of 5 Active
-                      </span>
+                      {isRejected ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase flex items-center gap-1">
+                          <XCircle className="w-3 h-3 text-rose-700" />
+                          <span>QC Rejected</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
+                          Step {stepNum} of 5 Active
+                        </span>
+                      )}
                     </div>
 
                     {/* 5-Step Visual Stepper */}
@@ -2270,32 +2503,162 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         </div>
 
                         {/* Step 4: Atelier QC */}
-                        <div className={`p-2.5 rounded-lg border ${isS4 ? 'bg-purple-50/60 border-purple-300' : isS4Active ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                        <div className={`p-2.5 rounded-lg border ${
+                          isRejected
+                            ? 'bg-rose-50 border-rose-300 ring-1 ring-rose-400'
+                            : isS4
+                            ? 'bg-purple-50/60 border-purple-300'
+                            : isS4Active
+                            ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400'
+                            : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS4 ? 'bg-purple-700 text-white' : isS4Active ? 'bg-blue-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>
-                              {isS4 ? '✓' : '4'}
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isRejected
+                                ? 'bg-rose-600 text-white'
+                                : isS4
+                                ? 'bg-purple-700 text-white'
+                                : isS4Active
+                                ? 'bg-blue-600 text-white animate-pulse'
+                                : 'bg-neutral-300 text-neutral-600'
+                            }`}>
+                              {isRejected ? '✕' : isS4 ? '✓' : '4'}
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Atelier QC</span>
                           </div>
-                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS4 ? 'Piece Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}</p>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                            {isRejected ? 'QC Rejected' : isS4 ? 'Piece Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}
+                          </p>
                         </div>
 
                         {/* Step 5: Replacement Dispatched */}
-                        <div className={`p-2.5 rounded-lg border ${isS5 ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : isS5Active ? 'bg-purple-100 border-purple-300 ring-1 ring-purple-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
+                        <div className={`p-2.5 rounded-lg border ${
+                          isRejected
+                            ? 'bg-neutral-50 border-neutral-200 opacity-50'
+                            : isS5
+                            ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400'
+                            : isS5Active
+                            ? 'bg-purple-100 border-purple-300 ring-1 ring-purple-400'
+                            : 'bg-neutral-50 border-neutral-200 opacity-60'
+                        }`}>
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS5 ? 'bg-emerald-700 text-white' : isS5Active ? 'bg-purple-700 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                              isRejected
+                                ? 'bg-neutral-300 text-neutral-500'
+                                : isS5
+                                ? 'bg-emerald-700 text-white'
+                                : isS5Active
+                                ? 'bg-purple-700 text-white animate-pulse'
+                                : 'bg-neutral-300 text-neutral-600'
+                            }`}>
                               {isS5 ? '✓' : '5'}
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Dispatched</span>
                           </div>
-                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS5 ? (repOrderNum || 'New Order Active') : isS5Active ? 'Ready to Dispatch' : 'New Order'}</p>
+                          <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                            {isRejected ? 'Order Cancelled' : isS5 ? (repOrderNum || 'New Order Active') : isS5Active ? 'Ready to Dispatch' : 'New Order'}
+                          </p>
                         </div>
                       </div>
                     </div>
 
                     {/* ACTION PANEL BASED ON CURRENT STEP */}
-                    {/* A. If Pickup Scheduled (Step 3 Active) */}
-                    {(curSt === 'replace approved' || isS3Active) && !isS3 && !repOrderNum && (
+                    {/* 0. IF REPLACEMENT REJECTED (QC FAILED / WRONG ITEM) */}
+                    {isRejected && (
+                      <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-2xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-rose-100 rounded-lg text-rose-700 shrink-0 mt-0.5">
+                              <XCircle className="w-5 h-5 text-rose-600" />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-xs sm:text-sm font-admin font-bold text-rose-950 uppercase tracking-wide">
+                                  Replacement Request Rejected • Atelier QC Failed
+                                </h4>
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase">
+                                  REJECTED
+                                </span>
+                              </div>
+                              <p className="text-xs text-rose-900/90 leading-relaxed">
+                                The returned piece was inspected at the atelier and replacement was rejected because the returned item did not meet policy criteria (e.g. wrong product returned, item damaged, or QC failed). Forward replacement order will NOT be dispatched.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recorded Rejection Reason */}
+                        <div className="p-3.5 bg-white/90 border border-rose-200 rounded-lg text-xs space-y-1.5">
+                          <div className="flex items-center justify-between text-rose-950">
+                            <span className="font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Recorded Rejection Reason:</span>
+                            </span>
+                            <span className="text-[10px] text-neutral-500">
+                              {order.updated_at ? new Date(order.updated_at).toLocaleString('en-IN') : 'Recent'}
+                            </span>
+                          </div>
+                          <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded border border-rose-200">
+                            "{order.rejection_reason || order.cancel_reason || 'Wrong product returned by customer / QC Inspection failed'}"
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-rose-200 text-xs">
+                          <span className="text-[11px] text-rose-700 font-medium">Customer order status reflects Replacement Rejected.</span>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => {
+                              setIsRejectingReplacement(false);
+                              handleConfirmReplacementQCReceived();
+                            }}
+                            className="px-3.5 py-1.5 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 text-[11px] font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="Re-open QC inspection if piece was rejected by mistake"
+                          >
+                            Re-inspect Piece / Reset QC
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* A. If Requested (Step 1/2 Active) */}
+                    {(curSt === 'replacement request processing' || curSt === 'replace requested' || (!isS2 && !isRejected)) && (
+                      <div className="bg-white border border-purple-200 rounded-xl p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <RefreshCw className="w-4 h-4 text-purple-700" />
+                            <span>Replacement Requested by Customer</span>
+                          </h5>
+                          <p className="text-xs text-neutral-600 leading-relaxed">
+                            Customer has requested replacement for size <strong className="text-neutral-900 font-bold">{reqSize}</strong>. Review customer return reason and choose to approve reverse pickup or reject the request:
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => setIsRejectingReplacement(true)}
+                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Reject Request</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={handleApproveReplacement}
+                            className="px-4 py-2 bg-purple-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span>Approve Replacement & Schedule Pickup</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* B. If Pickup Scheduled (Step 3 Active) */}
+                    {(curSt === 'replace approved' || isS3Active) && !isS3 && !repOrderNum && !isRejected && (
                       <div className="bg-white border border-purple-200 rounded-xl p-4 space-y-3">
                         <div className="space-y-1">
                           <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
@@ -2331,8 +2694,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
                     )}
 
-                    {/* B. If Parcel in Transit to Atelier (Step 4 Active) */}
-                    {(curSt === 'in transit to house of urvaah' || isS4Active) && !isS4 && !repOrderNum && (
+                    {/* C. If Parcel in Transit to Atelier (Step 4 Active) */}
+                    {(curSt === 'in transit to house of urvaah' || isS4Active) && !isS4 && !repOrderNum && !isRejected && (
                       <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
                         <div className="space-y-1">
                           <h5 className="text-xs font-bold font-admin text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
@@ -2340,11 +2703,20 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             <span>Parcel In Reverse Transit to Urvaah Atelier</span>
                           </h5>
                           <p className="text-xs text-neutral-600 leading-relaxed">
-                            Courier has collected the original piece from the customer doorstep. Once the parcel physically arrives at the atelier and passes quality inspection (QC), confirm receipt below:
+                            Courier has collected the original piece from the customer doorstep. Once the parcel physically arrives at the atelier, inspect and verify the garment below:
                           </p>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => setIsRejectingReplacement(true)}
+                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Reject (Damaged / Wrong Item)</span>
+                          </button>
                           <button
                             type="button"
                             disabled={savingStatus}
@@ -2352,83 +2724,234 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                           >
                             <CheckCircle2 className="w-4 h-4 text-white" />
-                            <span>Confirm Parcel Received at Atelier & Verified (QC Passed)</span>
+                            <span>Confirm Piece Received at Atelier (Begin QC)</span>
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {/* C. If Piece Received at Atelier & Ready for Dispatch (Step 5 Active) */}
-                    {((curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active) && !repOrderNum) && (
-                      <div className="bg-white border border-purple-300 rounded-xl p-4 space-y-4">
+                    {/* D. If Piece Received at Atelier & Ready for QC Decision (Step 4/5 Active) */}
+                    {((curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active) && !repOrderNum && !isRejected) && (
+                      <div className="bg-white border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
                         <div className="space-y-1">
-                          <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Original Piece Verified at Atelier • Ready to Dispatch Replacement Order</span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-200 uppercase">
+                              ATELIER PHYSICAL INSPECTION (QC)
+                            </span>
+                          </div>
+                          <h5 className="text-sm font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                            <PackageCheck className="w-4 h-4 text-purple-700" />
+                            <span>Returned Piece Received at Atelier — Approve or Reject Replacement</span>
                           </h5>
                           <p className="text-xs text-neutral-600 leading-relaxed">
-                            The returned piece has passed inspection. Generate the new replacement order below. This will create a linked forward order in the customer's account so they can track the full forward lifecycle!
+                            The original garment has arrived at the atelier. Perform physical quality check (QC). If correct piece arrived in good condition, approve replacement below. If wrong product or damaged item was returned, reject replacement with reason:
                           </p>
                         </div>
 
-                        {/* Size Selection & Confirmation Box */}
-                        <div className="p-3.5 bg-purple-50/80 border border-purple-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                          <div>
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">
-                              Replacement Garment Size:
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
-                                <button
-                                  key={sz}
-                                  type="button"
-                                  onClick={() => setCustomReplacementSize(sz)}
-                                  className={`px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
-                                    customReplacementSize === sz
-                                      ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                                      : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
-                                  }`}
-                                >
-                                  {sz}
-                                </button>
-                              ))}
+                        {/* QC Rejection Details Panel (If admin chose to reject) */}
+                        {isRejectingReplacement ? (
+                          <div className="p-4 bg-rose-50/90 border-2 border-rose-300 rounded-xl space-y-3.5">
+                            <div className="flex items-center justify-between border-b border-rose-200 pb-2.5">
+                              <div className="flex items-center gap-2 text-rose-950 font-bold text-xs uppercase tracking-wide">
+                                <XCircle className="w-4 h-4 text-rose-600" />
+                                <span>Reject Replacement Request (QC Failed / Wrong Product)</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsRejectingReplacement(false)}
+                                className="text-xs text-neutral-500 hover:text-neutral-800 font-semibold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+
+                            <p className="text-xs text-rose-900/90 leading-relaxed">
+                              Select the reason for rejecting this replacement. Once confirmed, the order will be marked as <strong className="font-bold text-rose-950">Replace Rejected</strong>, no forward replacement order will be dispatched, and the reason will be logged for the customer.
+                            </p>
+
+                            {/* Reason Selection Chips */}
+                            <div>
+                              <span className="text-[10px] font-bold text-rose-950 uppercase tracking-wider block mb-2">
+                                Select Rejection Reason:
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                {[
+                                  'Wrong product returned by customer',
+                                  'Damaged, altered or used item received',
+                                  'Original brand tags or packaging missing',
+                                  'Quality inspection failed (QC Failed)',
+                                  'Incomplete or empty parcel received',
+                                  'Other reason (Specified in remarks below)'
+                                ].map((rsn) => (
+                                  <button
+                                    key={rsn}
+                                    type="button"
+                                    onClick={() => setReplacementRejectReason(rsn)}
+                                    className={`p-2 rounded-lg border text-left font-medium transition-all cursor-pointer ${
+                                      replacementRejectReason === rsn
+                                        ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                        : 'bg-white text-neutral-700 border-rose-200 hover:border-rose-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`w-3 h-3 rounded-full border flex items-center justify-center shrink-0 ${
+                                        replacementRejectReason === rsn ? 'border-white bg-white' : 'border-neutral-400 bg-white'
+                                      }`}>
+                                        {replacementRejectReason === rsn && <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />}
+                                      </span>
+                                      <span className="text-[11px] leading-tight">{rsn}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Remarks Input */}
+                            <div>
+                              <label className="text-[10px] font-bold text-rose-950 uppercase tracking-wider block mb-1">
+                                Inspection Remarks / Notes (Optional):
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={replacementRejectNotes}
+                                onChange={(e) => setReplacementRejectNotes(e.target.value)}
+                                placeholder="e.g. Received incorrect red kurta instead of the blue dress, tags detached."
+                                className="w-full text-xs p-2.5 rounded-lg border border-rose-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-rose-500 placeholder:text-neutral-400"
+                              />
+                            </div>
+
+                            {/* Confirm Buttons */}
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-rose-200">
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setIsRejectingReplacement(false)}
+                                className="px-4 py-2 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                              >
+                                Cancel / Back
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => handleRejectReplacement()}
+                                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                {savingStatus ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Rejecting...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="w-4 h-4" />
+                                    <span>Confirm Rejection (Mark Replace Rejected)</span>
+                                  </>
+                                )}
+                              </button>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                              Order Total:
-                            </span>
-                            <span className="font-bold text-emerald-700 text-sm">
-                              ₹0 (100% Exchange Credit)
-                            </span>
-                          </div>
-                        </div>
+                        ) : (
+                          /* Normal View: Shows Approve Option AND Reject Option in 2 clear sections */
+                          <div className="space-y-4">
+                            {/* APPROVE REPLACEMENT SECTION */}
+                            <div className="p-4 bg-purple-50/80 border border-purple-200 rounded-xl space-y-3">
+                              <div className="flex items-center justify-between border-b border-purple-200/70 pb-2">
+                                <span className="text-xs font-bold uppercase text-purple-950 flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                  <span>Option A: Piece Verified (QC Passed) • Approve & Dispatch Replacement</span>
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                                  QC Passed
+                                </span>
+                              </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
-                          <button
-                            type="button"
-                            disabled={savingStatus}
-                            onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
-                            className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
-                          >
-                            {savingStatus ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Generating Order...</span>
-                              </>
-                            ) : (
-                              <>
-                                <PackagePlus className="w-4 h-4 text-purple-300" />
-                                <span>Generate & Dispatch Replacement Order</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                              <p className="text-xs text-neutral-600 leading-relaxed">
+                                The returned piece is verified and in original condition. Select the replacement garment size to generate and dispatch the forward exchange order:
+                              </p>
+
+                              {/* Size Selection & Confirmation Box */}
+                              <div className="p-3 bg-white border border-purple-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                <div>
+                                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">
+                                    Replacement Garment Size:
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                                      <button
+                                        key={sz}
+                                        type="button"
+                                        onClick={() => setCustomReplacementSize(sz)}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
+                                          customReplacementSize === sz
+                                            ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                        }`}
+                                      >
+                                        {sz}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                                    Order Total:
+                                  </span>
+                                  <span className="font-bold text-emerald-700 text-sm">
+                                    ₹0 (100% Exchange Credit)
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={savingStatus}
+                                  onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
+                                  className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                >
+                                  {savingStatus ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Generating Order...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PackagePlus className="w-4 h-4 text-purple-300" />
+                                      <span>Approve QC & Dispatch Replacement Order (Size {customReplacementSize || reqSize})</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* REJECT REPLACEMENT SECTION TRIGGER */}
+                            <div className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-rose-950 text-xs flex items-center gap-1.5 uppercase">
+                                  <XCircle className="w-4 h-4 text-rose-600" />
+                                  <span>Option B: Wrong Product or Damaged Item Received?</span>
+                                </span>
+                                <p className="text-[11px] text-rose-900/80">
+                                  If the customer returned an incorrect piece, used garment, or QC inspection failed, reject the replacement.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setIsRejectingReplacement(true)}
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Reject Replacement (QC Failed)</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* D. If Replacement Order has been Generated */}
-                    {(repOrderNum || curSt === 'replaced') && (
+                    {/* E. If Replacement Order has been Generated */}
+                    {(repOrderNum || curSt === 'replaced') && !isRejected && (
                       <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
                         <div className="flex items-start gap-3">
                           <div className="p-2 bg-emerald-100 rounded-lg text-emerald-800 shrink-0 mt-0.5">
@@ -2525,23 +3048,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 if (isMixed) return null;
 
                 // Mutually exclusive: If Exchange Journey is active or order is in replacement lifecycle, never show Return Journey
-                const isReplacementRelated = (
-                  returnType === 'replacement' ||
-                  returnType === 'exchange' ||
-                  [
-                    'replacement request processing',
-                    'replace requested',
-                    'replacement requested',
-                    'replace approved',
-                    'replacement processing',
-                    'replacement shipped',
-                    'replacement out for delivery',
-                    'replaced',
-                    'exchanged'
-                  ].includes(curSt) ||
-                  Boolean(order?.replacement_order_number || order?.replacement_order_id) ||
-                  (Boolean(order?.replacement_size) && (curSt.includes('replace') || curSt === 'exchanged'))
-                ) && returnType !== 'return' && !curSt.includes('return') && curSt !== 'cancelled' && curSt !== 'refunded';
+                const isReplacementRelated = isOrderReplacementLifecycle(order, curSt);
                 if (isReplacementRelated) return null;
 
                 const isProductEverDelivered = Boolean(order?.delivered_at) || 
@@ -2565,20 +3072,29 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     'received at house of urvaah',
                     'received at homved',
                     'returned',
-                    'return rejected'
+                    'return rejected',
+                    'return qc rejected'
                   ].includes(curSt)
                 ) && curSt !== 'cancelled' && curSt !== 'refunded' && !curSt.includes('replace');
 
+                // Only show Return Journey inside the dedicated Refund Desk
+                if (!isRefundDesk) return null;
+
                 if (!isReturnRelated) return null;
 
-                const isS2 = ['return approved', 'return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && (curLog.includes('pickup') || curLog.includes('awb')));
-                const isS3 = ['return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('collected'));
+                const isQCRejected = curSt === 'return qc rejected' || order?.return_qc_status === 'Rejected';
+                const isQCPassed = (['received at house of urvaah', 'received at homved', 'returned'].includes(curSt) && !isQCRejected && (order?.return_qc_status === 'Accepted' || (curSt === 'returned' && order?.return_qc_status !== 'Pending QC')));
+
+                const isS2 = ['return approved', 'return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned', 'return qc rejected'].includes(curSt) || (curLog.includes('reverse') && (curLog.includes('pickup') || curLog.includes('awb')));
+                const isS3 = ['return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned', 'return qc rejected'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('collected'));
                 const isS3Active = (curSt === 'return approved' || (curLog.includes('reverse') && curLog.includes('pickup scheduled'))) && !isS3;
-                const isS4 = ['received at house of urvaah', 'received at homved', 'returned'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('delivered to'));
+                const isS4 = ['received at house of urvaah', 'received at homved', 'returned', 'return qc rejected'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('delivered to'));
                 const isS4Active = (['return collected', 'in transit to house of urvaah'].includes(curSt) || (curLog.includes('reverse') && curLog.includes('transit'))) && !isS4;
-                const isS5 = curSt === 'returned';
-                const isS5Active = ['received at house of urvaah', 'received at homved'].includes(curSt) && !isS5;
-                const stepNum = isS5 ? 5 : isS5Active ? 5 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
+                const isS5 = isQCPassed;
+                const isS5Active = (isS4 || ['received at house of urvaah', 'received at homved'].includes(curSt)) && !isQCPassed && !isQCRejected;
+                const isS6 = isQCPassed && (curSt === 'returned' || (order?.payment_status || '').toLowerCase() === 'refunded' || (order?.refund_status || '').toLowerCase() === 'completed');
+                const isS6Active = isQCPassed && !isS6 && !isQCRejected;
+                const stepNum = isQCRejected ? 5 : isS6 ? 6 : isS6Active ? 6 : (isS5 || isS5Active) ? 5 : isS4 || isS4Active ? 4 : isS3 ? 3 : isS3Active ? 3 : isS2 ? 2 : 1;
 
                 return (
                   <div className="bg-sky-50/70 border-2 border-sky-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-xs">
@@ -2588,14 +3104,20 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         <RotateCcw className="w-4 h-4 text-sky-700" />
                         <span>Return & Doorstep Reverse Pickup Journey</span>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-200 text-sky-900 border border-sky-300 uppercase">
-                        Step {stepNum} of 5 Active
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        isQCRejected
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : isS6
+                          ? 'bg-emerald-200 text-emerald-900 border-emerald-300'
+                          : 'bg-sky-200 text-sky-900 border-sky-300'
+                      }`}>
+                        {isQCRejected ? 'Step 5: QC Rejected' : `Step ${stepNum} of 6 Active`}
                       </span>
                     </div>
 
-                    {/* 5-Step Visual Stepper */}
+                    {/* 6-Step Visual Stepper */}
                     <div className="bg-white border border-sky-200/90 rounded-xl p-3 sm:p-4 shadow-2xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 text-xs">
                           {/* Step 1: Return Requested */}
                           <div className="p-2.5 rounded-lg border bg-sky-50/60 border-sky-300">
                             <div className="flex items-center gap-1.5">
@@ -2672,26 +3194,63 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             </p>
                           </div>
 
-                          {/* Step 5: Received & Refund Settled */}
+                          {/* Step 5: QC Verification (Admin Confirmation) */}
                           <div className={`p-2.5 rounded-lg border ${
-                            isS5
-                              ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400'
+                            isQCRejected
+                              ? 'bg-rose-50 border-rose-400 ring-1 ring-rose-400'
+                              : isS5
+                              ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300'
                               : isS5Active
+                              ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400'
+                              : 'bg-neutral-50 border-neutral-200 opacity-60'
+                          }`}>
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                isQCRejected
+                                  ? 'bg-rose-600 text-white'
+                                  : isS5
+                                  ? 'bg-emerald-700 text-white'
+                                  : isS5Active
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-neutral-300 text-neutral-600'
+                              }`}>
+                                {isQCRejected ? '✕' : isS5 ? '✓' : '5'}
+                              </div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">
+                                {isQCRejected ? '5. QC Rejected' : '5. QC Check'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-neutral-600 mt-1 pl-6">
+                              {isQCRejected ? 'Damaged/Wrong' : isS5 ? 'Acceptable & Restocked' : isS5Active ? 'Awaiting Check' : 'Pending'}
+                            </p>
+                          </div>
+
+                          {/* Step 6: Received & Refund Settled */}
+                          <div className={`p-2.5 rounded-lg border ${
+                            isQCRejected
+                              ? 'bg-neutral-50 border-neutral-200 opacity-50'
+                              : isS6
+                              ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-400'
+                              : isS6Active
                               ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300'
                               : 'bg-neutral-50 border-neutral-200 opacity-60'
                           }`}>
                             <div className="flex items-center gap-1.5">
                               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                                isS5 || isS5Active
+                                isQCRejected
+                                  ? 'bg-neutral-300 text-neutral-500'
+                                  : isS6 || isS6Active
                                   ? 'bg-emerald-700 text-white'
                                   : 'bg-neutral-300 text-neutral-600'
                               }`}>
-                                {isS5 ? '✓' : '5'}
+                                {isQCRejected ? '✕' : isS6 ? '✓' : '6'}
                               </div>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">5. Refund Settled</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">
+                                {isQCRejected ? '6. Refund Cancelled' : '6. Refund Settled'}
+                              </span>
                             </div>
                             <p className="text-[10px] text-neutral-600 mt-1 pl-6">
-                              {isS5 ? '100% Disbursed' : isS5Active ? 'In Refund Desk' : 'Pending'}
+                              {isQCRejected ? 'QC Failed - Blocked' : isS6 ? '100% Disbursed' : isS6Active ? 'In Refund Desk' : 'Pending (Awaiting QC)'}
                             </p>
                           </div>
                         </div>
@@ -2753,16 +3312,208 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
 
                       {/* Explanatory Journey Status Text */}
-                      <div className="p-2.5 bg-sky-50 rounded-lg text-sky-900 text-[11px] leading-relaxed border border-sky-200/70">
+                      <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed border ${
+                        isQCRejected
+                          ? 'bg-rose-50 text-rose-950 border-rose-200'
+                          : 'bg-sky-50 text-sky-900 border-sky-200/70'
+                      }`}>
                         {(() => {
+                          if (isQCRejected) return `❌ Return QC Rejected: ${order.return_rejection_reason || order.cancel_reason || 'Product wrong or damaged received'}. Parcel was NOT accepted into atelier inventory, and refund disbursement has been cancelled.`;
                           const s = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                           if (s === 'returned') return '100% full refund has been settled to the customer. Return and reverse courier journey complete.';
-                          if (s.includes('received')) return 'Package has arrived at House of Urvaah atelier, verified by QC team and auto-restocked. Ready for refund disbursement.';
+                          if (isQCPassed) return 'Package arrived at House of Urvaah atelier, verified by QC team as acceptable, and auto-restocked. Amount refund is active and started in Refund Desk.';
+                          if (s.includes('received')) return 'Package has arrived at House of Urvaah atelier. Please perform QC check below: confirm parcel is acceptable to restock & start refund, or reject if wrong/damaged.';
                           if (s.includes('transit') || s.includes('collected')) return 'Courier rider has collected the parcel from customer doorstep! Parcel is currently in transit to House of Urvaah atelier.';
                           if (s === 'return approved') return 'Return request approved and reverse AWB allocated! Delhivery courier is dispatched to customer doorstep for collection within 24-48 hours.';
                           return 'Customer has requested a return. Review and approve the request to dispatch reverse courier pickup.';
                         })()}
                       </div>
+
+                      {/* Step 5: Admin QC Inspection & Confirmation Box (Parcel Received & Acceptable vs Rejected) */}
+                      {(isS4 || ['received at house of urvaah', 'received at homved'].includes(curSt) || isQCRejected) && (
+                        <div className={`p-4 rounded-xl border text-xs space-y-3 transition-all ${
+                          isQCRejected
+                            ? 'bg-rose-50/90 border-rose-300 text-rose-950'
+                            : isQCPassed
+                            ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                            : 'bg-amber-50/90 border-amber-300 text-amber-950'
+                        }`}>
+                          <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-black/10">
+                            <div className="flex items-center gap-2">
+                              {isQCRejected ? (
+                                <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                              ) : isQCPassed ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                              ) : (
+                                <PackageCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                              )}
+                              <span className="font-bold uppercase tracking-wider text-[11px]">
+                                Step 5: Atelier Parcel Arrival &amp; Quality Inspection (QC)
+                              </span>
+                            </div>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                              isQCRejected
+                                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                : isQCPassed
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-100 text-amber-900 border-amber-300'
+                            }`}>
+                              {isQCRejected ? 'QC Rejected (Damaged / Wrong)' : isQCPassed ? '✓ QC Verified & Acceptable' : 'Awaiting Admin Confirmation'}
+                            </span>
+                          </div>
+
+                          {/* Status Description */}
+                          <p className="text-[11px] leading-relaxed">
+                            {isQCRejected ? (
+                              <>
+                                <strong>Return Rejected by Admin:</strong> The received parcel failed QC inspection (
+                                <span className="font-semibold text-rose-800">{order.return_rejection_reason || order.cancel_reason || 'Product is wrong or damaged received'}</span>
+                                ). The product was <strong>NOT accepted</strong> into atelier inventory and stock was not restored. <strong>Amount refund has been cancelled and stopped.</strong>
+                              </>
+                            ) : isQCPassed ? (
+                              <>
+                                <strong>Parcel Received &amp; Acceptable:</strong> The atelier admin physically inspected the parcel contents. Correct product verified in good condition, tags intact, and auto-restocked into atelier inventory. <strong>Amount refund has been unlocked and started.</strong>
+                              </>
+                            ) : (
+                              <>
+                                <strong>Admin QC Inspection Required:</strong> Please physically inspect the parcel received from the reverse courier. Confirm that the product is the genuine item, unwashed/unworn, and undamaged before accepting into inventory and initiating customer refund.
+                              </>
+                            )}
+                          </p>
+
+                          {/* Admin Actions */}
+                          {!isQCPassed && !isQCRejected && (
+                            <div className="pt-1 flex flex-wrap items-center gap-2.5">
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => handleConfirmParcelQC(true)}
+                                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                                title="Confirm parcel is received and acceptable. Unlocks refund disbursement."
+                              >
+                                {savingStatus ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5" />
+                                )}
+                                <span>Confirm Parcel Acceptable &amp; Start Refund</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setShowQCRejectForm(prev => !prev)}
+                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                                title="Reject return if wrong or damaged product received"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>{showQCRejectForm ? 'Close Rejection Form' : 'Reject Parcel (Wrong / Damaged)'}</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {isQCRejected && (
+                            <div className="pt-1 flex flex-wrap items-center gap-2.5">
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => handleConfirmParcelQC(true)}
+                                className="px-3.5 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                title="Re-inspect and override rejection to accept parcel"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-neutral-600" />
+                                <span>Override Rejection &amp; Accept Parcel</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Inline QC Rejection Form */}
+                          {showQCRejectForm && (
+                            <div className="mt-3 p-3.5 bg-white border border-rose-300 rounded-xl space-y-3 text-xs shadow-xs">
+                              <div className="flex items-center justify-between pb-1 border-b border-rose-100">
+                                <span className="font-bold text-rose-900 uppercase text-[11px]">
+                                  Select Rejection Reason (Product will not be received &amp; refund cancelled):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowQCRejectForm(false)}
+                                  className="text-neutral-400 hover:text-black cursor-pointer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {[
+                                  'Damaged / Torn / Stained product received',
+                                  'Wrong / Fake / Different item received',
+                                  'Used / Worn / Original tags cut or missing',
+                                  'Empty box / Items missing from package'
+                               ].map((reasonOption) => (
+                                  <label
+                                    key={reasonOption}
+                                    className={`p-2.5 rounded-lg border text-[11px] cursor-pointer flex items-center gap-2 transition-colors ${
+                                      qcRejectReason === reasonOption
+                                        ? 'border-rose-400 bg-rose-50/70 text-rose-950 font-semibold'
+                                        : 'border-neutral-200 bg-neutral-50/50 text-neutral-700 hover:bg-neutral-50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="qcRejectReasonRadio"
+                                      checked={qcRejectReason === reasonOption}
+                                      onChange={() => setQcRejectReason(reasonOption)}
+                                      className="accent-rose-600"
+                                    />
+                                    <span>{reasonOption}</span>
+                                  </label>
+                                ))}
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                                  Additional Admin QC Notes / Evidence (Optional):
+                                </label>
+                                <input
+                                  type="text"
+                                  value={qcCustomNote}
+                                  onChange={(e) => setQcCustomNote(e.target.value)}
+                                  placeholder="e.g. Received local shirt with torn collar instead of Urvaah silk kurta"
+                                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-rose-500"
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={savingStatus}
+                                  onClick={() => {
+                                    const finalReason = qcCustomNote.trim()
+                                      ? `${qcRejectReason} (${qcCustomNote.trim()})`
+                                      : qcRejectReason;
+                                    handleConfirmParcelQC(false, finalReason);
+                                  }}
+                                  className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-lg uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                                >
+                                  {savingStatus ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Confirm Rejection (Don't Receive &amp; Stop Refund)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowQCRejectForm(false)}
+                                  className="px-3 py-2 border border-neutral-300 hover:border-black text-neutral-700 text-xs font-semibold rounded-lg uppercase transition-colors cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Action Bar inside Return Hub with Sequential Advance Options */}
                       <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-sky-100">
@@ -2785,7 +3536,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-sky-200" />
-                              <span>Approve Return & Schedule Pickup (Step 2/3)</span>
+                              <span>Approve Return &amp; Schedule Pickup (Step 2/3)</span>
                             </button>
                           </>
                         )}
@@ -2809,25 +3560,27 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               <FileText className="w-3.5 h-3.5 text-neutral-600" />
                               <span>Pickup Manifest</span>
                             </button>
-                            <button
-                              type="button"
-                              disabled={savingStatus}
-                              onClick={handleSimulateDoorstepHandover}
-                              className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                              title="Advance to Step 4: Courier collected item at doorstep"
-                            >
-                              {savingStatus ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Truck className="w-3.5 h-3.5 text-sky-200" />
-                              )}
-                              <span>Confirm Doorstep Pickup ➔ In Transit (Step 4)</span>
-                            </button>
+                            {isRefundDesk && (
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={handleSimulateDoorstepHandover}
+                                className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                                title="Advance to Step 4: Courier collected item at doorstep"
+                              >
+                                {savingStatus ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Truck className="w-3.5 h-3.5 text-sky-200" />
+                                )}
+                                <span>Confirm Doorstep Pickup ➔ In Transit (Step 4)</span>
+                              </button>
+                            )}
                           </>
                         )}
 
-                        {/* Step 4 Actions: If In Transit */}
-                        {(curSt.includes('transit') || curSt.includes('collected') || isS4Active) && (
+                        {/* Step 4 Actions: If In Transit (Refund Desk Admin only) */}
+                        {isRefundDesk && (curSt.includes('transit') || curSt.includes('collected') || isS4Active) && (
                           <button
                             type="button"
                             disabled={savingStatus}
@@ -2843,14 +3596,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             ) : (
                               <>
                                 <PackageCheck className="w-4 h-4 text-emerald-400" />
-                                <span>Mark Received at Atelier & Restock (Step 5)</span>
+                                <span>Mark Received at Atelier &amp; Restock (Step 5)</span>
                               </>
                             )}
                           </button>
                         )}
 
-                        {/* Step 5 Actions: If Received at Atelier - Process exclusively via Refund Desk */}
-                        {(['received at house of urvaah', 'received at homved'].includes(curSt) || isS5Active) && (
+                        {/* Step 6 Actions: Only when parcel is confirmed acceptable by admin QC - Process exclusively via Refund Desk */}
+                        {(['received at house of urvaah', 'received at homved'].includes(curSt) || isS5Active || isS5) && isQCPassed && !isQCRejected && (
                           <a
                             href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
                             className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
@@ -2862,8 +3615,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </a>
                         )}
 
+                        {/* If QC Rejected */}
+                        {isQCRejected && (
+                          <span className="px-3.5 py-2 bg-rose-100 text-rose-800 border border-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                            <XCircle className="w-4 h-4 text-rose-600" />
+                            <span>Refund Cancelled (Parcel QC Failed)</span>
+                          </span>
+                        )}
+
                         {/* Completed State: If Returned */}
-                        {isS5 && (
+                        {isS6 && (
                           <div className="flex items-center gap-2">
                             <span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
                               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -2979,12 +3740,24 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         onChange={(e) => handleOrderStatusChange(e.target.value)}
                         className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
                       >
-                        {ORDER_STATUS_OPTIONS.map((opt) => (
+                        {ORDER_STATUS_OPTIONS.filter((opt) => {
+                          if (isRefundDesk) return true;
+                          if (RETURN_RESTRICTED_STATUSES.includes(opt.value)) {
+                            return opt.value === (confirmedStatus || order?.status);
+                          }
+                          return true;
+                        }).map((opt) => (
                           <option key={opt.value} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
                       </select>
+                      {!isRefundDesk && RETURN_RESTRICTED_STATUSES.includes(confirmedStatus || order?.status) && (
+                        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1.5 flex items-center gap-1.5 leading-normal">
+                          <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Return &amp; replacement delivery cycles can only be updated in the Refund / Shiprocket Desk.</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Payment Status Dropdown */}
@@ -3123,160 +3896,205 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </div>
                 )}
 
-                {/* Forward Logistics Actions */}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {(!order.tracking_number && !order.trackingNumber) || ['placed', 'confirmed', 'pending', 'processing'].includes((order.status || '').toLowerCase()) ? (
-                    <button
-                      type="button"
-                      disabled={logisticsLoading}
-                      onClick={handleGenerateAwb}
-                      className="px-3.5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-                    >
-                      {logisticsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
-                      <span>Generate AWB & Mark Shipped</span>
-                    </button>
-                  ) : null}
+                  {/* Forward Logistics Actions */}
+                {(() => {
+                  const hasAwb = Boolean((order.tracking_number || order.trackingNumber || order.awb_code || order.awb || '').toString().trim());
+                  return (
+                    <>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {(!hasAwb || ['placed', 'confirmed', 'pending', 'processing'].includes((order.status || '').toLowerCase())) ? (
+                          <button
+                            type="button"
+                            disabled={logisticsLoading}
+                            onClick={handleGenerateAwb}
+                            className="px-3.5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                          >
+                            {logisticsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
+                            <span>Generate AWB &amp; Mark Shipped</span>
+                          </button>
+                        ) : null}
 
-                  <button
-                    type="button"
-                    onClick={handleDownloadLabel}
-                    className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-neutral-600" />
-                    <span>Shipping Label (PDF)</span>
-                  </button>
+                        <button
+                          type="button"
+                          disabled={logisticsLoading || !hasAwb}
+                          onClick={handleDownloadLabel}
+                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
+                            !hasAwb
+                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
+                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer'
+                          }`}
+                          title={!hasAwb ? "Generate AWB first to download shipping label" : "Download Official Courier Shipping Label (PDF)"}
+                        >
+                          <FileText className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
+                          <span>Shipping Label (PDF)</span>
+                        </button>
 
-                  <button
-                    type="button"
-                    onClick={handleDownloadManifest}
-                    className="px-3 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-neutral-600" />
-                    <span>Pickup Manifest</span>
-                  </button>
+                        <button
+                          type="button"
+                          disabled={logisticsLoading || !hasAwb}
+                          onClick={handleDownloadManifest}
+                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
+                            !hasAwb
+                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
+                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer'
+                          }`}
+                          title={!hasAwb ? "Generate AWB first to download pickup manifest" : "Download Courier Pickup Manifest (PDF)"}
+                        >
+                          <FileText className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
+                          <span>Pickup Manifest</span>
+                        </button>
 
-                  <button
-                    type="button"
-                    disabled={logisticsLoading || (!order.tracking_number && !order.trackingNumber)}
-                    onClick={handleSchedulePickup}
-                    className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs ${
-                      order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled'
-                        ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                        : 'bg-neutral-900 hover:bg-black text-white'
-                    }`}
-                    title={(!order.tracking_number && !order.trackingNumber) ? "Generate AWB first before scheduling pickup" : (order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment")}
-                  >
-                    {logisticsLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                    ) : (
-                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                    )}
-                    <span>
-                      {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
-                        ? `Pickup Scheduled${order.pickup_token ? ` (${order.pickup_token})` : ''}`
-                        : 'Schedule Courier Pickup'}
-                    </span>
-                  </button>
+                        <button
+                          type="button"
+                          disabled={logisticsLoading || !hasAwb}
+                          onClick={handleSchedulePickup}
+                          className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
+                            !hasAwb
+                              ? 'bg-neutral-200 text-neutral-400 border border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
+                              : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
+                                ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                                : 'bg-neutral-900 hover:bg-black text-white cursor-pointer'
+                          }`}
+                          title={!hasAwb ? "Generate AWB first before scheduling courier pickup" : (order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment")}
+                        >
+                          {!hasAwb ? (
+                            <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                          ) : logisticsLoading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                          ) : (
+                            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                          <span>
+                            {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
+                              ? `Pickup Scheduled${order.pickup_token ? ` (${order.pickup_token})` : ''}`
+                              : 'Schedule Courier Pickup'}
+                          </span>
+                        </button>
 
-                  <button
-                    type="button"
-                    onClick={handleFetchTracking}
-                    className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer ml-auto shadow-2xs"
-                  >
-                    <Truck className="w-3.5 h-3.5 text-neutral-700" />
-                    <span>{showTrackingScans ? 'Hide Scans' : 'Live Courier Scans'}</span>
-                    {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                {/* Live Scans Timeline Drawer */}
-                {showTrackingScans && (
-                  <div className="bg-white border border-neutral-200 rounded-lg p-3 space-y-2 text-xs">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-neutral-100">
-                      <span className="font-semibold text-brand-dark uppercase text-[11px] tracking-wider">Courier Transit Milestones</span>
-                      <span className="text-[10px] text-neutral-400 font-mono">Simulated Scans (Real-Time)</span>
-                    </div>
-                    {loadingTracking ? (
-                      <div className="p-4 text-center text-neutral-400 flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Fetching tracking scans...</span>
+                        <button
+                          type="button"
+                          disabled={!hasAwb}
+                          onClick={handleFetchTracking}
+                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors ml-auto shadow-2xs ${
+                            !hasAwb
+                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
+                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border-neutral-300 cursor-pointer'
+                          }`}
+                          title={!hasAwb ? "Generate AWB first to view live scans" : "View Live Courier Tracking Scans"}
+                        >
+                          <Truck className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-700'}`} />
+                          <span>{showTrackingScans ? 'Hide Scans' : 'Live Courier Scans'}</span>
+                          {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
-                    ) : trackingData?.scans?.length ? (
-                      <div className="space-y-2.5 pt-1">
-                        {trackingData.scans.map((scan, i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <div className="w-2 h-2 rounded-full bg-brand-dark mt-1.5 shrink-0" />
-                            <div className="flex-1">
-                              <p className="font-semibold text-brand-dark text-xs">{scan.activity}</p>
-                              <p className="text-[10px] text-neutral-500">{scan.location} • {scan.date}</p>
-                            </div>
+
+                      {/* Live Scans Timeline Drawer */}
+                      {showTrackingScans && (
+                        <div className="bg-white border border-neutral-200 rounded-lg p-3 space-y-2 text-xs">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-neutral-100">
+                            <span className="font-semibold text-brand-dark uppercase text-[11px] tracking-wider">Courier Transit Milestones</span>
+                            <span className="text-[10px] text-neutral-400 font-mono">Simulated Scans (Real-Time)</span>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-neutral-500 italic text-[11px]">No scans recorded yet. Package is awaiting courier pickup.</p>
-                    )}
-                  </div>
-                )}
+                          {loadingTracking ? (
+                            <div className="p-4 text-center text-neutral-400 flex items-center justify-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Fetching tracking scans...</span>
+                            </div>
+                          ) : trackingData?.scans?.length ? (
+                            <div className="space-y-2.5 pt-1">
+                              {trackingData.scans.map((scan, i) => (
+                                <div key={i} className="flex items-start gap-2.5">
+                                  <div className="w-2 h-2 rounded-full bg-brand-dark mt-1.5 shrink-0" />
+                                  <div className="flex-1">
+                                    <p className="font-semibold text-brand-dark text-xs">{scan.activity}</p>
+                                    <p className="text-[10px] text-neutral-500">{scan.location} • {scan.date}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-neutral-500 italic text-[11px]">No scans recorded yet. Package is awaiting courier pickup.</p>
+                          )}
+                        </div>
+                      )}
 
-                {/* 1-Click Milestone Testing Strip (Shiprocket Forward Desk Only) */}
-                {isShiprocketDesk && (
-                  <div className="pt-2 border-t border-neutral-200/60">
-                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
-                      Testing Suite: Simulate Shiprocket Webhook Milestones
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <button
-                        type="button"
-                        disabled={logisticsLoading}
-                        onClick={() => handleSimulateMilestone('IN TRANSIT')}
-                        className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
-                        title="Simulates package reaching transit hub"
-                      >
-                        <Package className="w-3.5 h-3.5 text-neutral-600" />
-                        <span>In Transit (Shipped)</span>
-                      </button>
+                      {/* 1-Click Milestone Testing Strip (Shiprocket Forward Desk Only) */}
+                      {isShiprocketDesk && (
+                        <div className="pt-2 border-t border-neutral-200/60">
+                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+                            Testing Suite: Simulate Shiprocket Webhook Milestones
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button
+                              type="button"
+                              disabled={logisticsLoading || !hasAwb}
+                              onClick={() => handleSimulateMilestone('IN TRANSIT')}
+                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
+                                !hasAwb
+                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
+                                  : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer hover:border-black'
+                              }`}
+                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates package reaching transit hub"}
+                            >
+                              <Package className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
+                              <span>In Transit (Shipped)</span>
+                            </button>
 
-                      <button
-                        type="button"
-                        disabled={logisticsLoading}
-                        onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
-                        className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-neutral-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-black"
-                        title="Simulates local rider out for delivery"
-                      >
-                        <Truck className="w-3.5 h-3.5 text-neutral-600" />
-                        <span>Out for Delivery</span>
-                      </button>
+                            <button
+                              type="button"
+                              disabled={logisticsLoading || !hasAwb}
+                              onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
+                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
+                                !hasAwb
+                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
+                                  : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer hover:border-black'
+                              }`}
+                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates local rider out for delivery"}
+                            >
+                              <Truck className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
+                              <span>Out for Delivery</span>
+                            </button>
 
-                      <button
-                        type="button"
-                        disabled={logisticsLoading}
-                        onClick={() => handleSimulateMilestone('DELIVERED')}
-                        className="px-2.5 py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
-                        title="Simulates customer doorstep handover"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Mark Delivered</span>
-                      </button>
+                            <button
+                              type="button"
+                              disabled={logisticsLoading || !hasAwb}
+                              onClick={() => handleSimulateMilestone('DELIVERED')}
+                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
+                                !hasAwb
+                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
+                                  : 'bg-white hover:bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer hover:border-emerald-600'
+                              }`}
+                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates customer doorstep handover"}
+                            >
+                              <CheckCircle2 className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-emerald-600'}`} />
+                              <span>Mark Delivered</span>
+                            </button>
 
-                      <button
-                        type="button"
-                        disabled={logisticsLoading}
-                        onClick={() => handleSimulateMilestone('CANCELLED')}
-                        className="px-2.5 py-2 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-rose-600"
-                        title="Simulates shipment cancellation"
-                      >
-                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Void / Cancel</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                            <button
+                              type="button"
+                              disabled={logisticsLoading || !hasAwb}
+                              onClick={() => handleSimulateMilestone('CANCELLED')}
+                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
+                                !hasAwb
+                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
+                                  : 'bg-white hover:bg-rose-50 border-rose-300 text-rose-800 cursor-pointer hover:border-rose-600'
+                              }`}
+                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates shipment cancellation"}
+                            >
+                              <XCircle className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-rose-600'}`} />
+                              <span>Void / Cancel</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Reverse Logistics Actions (Returns & Exchanges) */}
-                {['delivered', 'returned', 'exchanged', 'return approved', 'replace approved'].includes((order.status || '').toLowerCase()) && (
+                {isRefundDesk && ['delivered', 'returned', 'exchanged', 'return approved', 'replace approved'].includes((order.status || '').toLowerCase()) && (
                   <div className="pt-2 border-t border-neutral-200/60 flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block w-full mb-1">
                       Reverse Logistics (URVAAH-RR-05 Returns & Exchanges)

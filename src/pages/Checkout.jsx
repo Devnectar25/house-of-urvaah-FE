@@ -143,8 +143,23 @@ const formatOrderDetails = (ord, currentUser) => {
     };
   });
 
-  const discount = Number(ord.discount || 0);
-  const shippingFee = Number(ord.shipping_fee || ord.shippingFee || 0);
+  const discount = Number(ord.discount || ord.discount_amount || ord.discountAmount || 0);
+  const shippingFee = Number(ord.shipping_fee || ord.shippingFee || ord.shipping || 0);
+
+  let rawTax = Number(ord.tax || ord.tax_amount || ord.taxAmount || 0);
+  let rawTaxRate = Number(ord.tax_rate || ord.taxRate || ord.gst_percentage || 0);
+
+  // If tax was not directly provided or is 0, compute fallback from totalPaid vs subtotal
+  if (!rawTax && totalPaid > (subtotal - discount + shippingFee)) {
+    rawTax = Math.max(0, Math.round(totalPaid - (subtotal - discount) - shippingFee));
+  }
+  if (!rawTaxRate) {
+    if (rawTax > 0 && (subtotal - discount) > 0) {
+      rawTaxRate = Math.round((rawTax / (subtotal - discount)) * 100);
+    } else {
+      rawTaxRate = (subtotal - discount) > 2500 ? 18 : 5;
+    }
+  }
 
   const rawCreatedAt = ord.created_at || ord.createddate || ord.createdAt || ord.placedAt;
   const createdAt = rawCreatedAt ? new Date(rawCreatedAt) : new Date();
@@ -161,6 +176,8 @@ const formatOrderDetails = (ord, currentUser) => {
     estimatedDelivery: estDeliveryStr,
     items: mappedItems,
     subtotal: subtotal,
+    tax: rawTax,
+    taxRate: rawTaxRate,
     discount: discount,
     shippingFee: shippingFee,
     totalPaid: totalPaid,
@@ -1766,6 +1783,8 @@ export const Checkout = () => {
         }
       ],
       subtotal: confirmedGrandTotal || 4999,
+      tax: 0,
+      taxRate: 18,
       discount: 0,
       shippingFee: 0,
       totalPaid: confirmedGrandTotal || 4999,
@@ -1789,21 +1808,24 @@ export const Checkout = () => {
     // Distinguish Forward Replacement Order from the Original Order's Reverse/Replacement Request
     const isReplacementForwardOrder = String(details.orderNumber || '').endsWith('-REP') || Boolean(details.original_order_number);
 
+    const returnTypeStr = (details.return_type || details.returnType || '').toLowerCase();
+    const isExplicitReturn = returnTypeStr === 'return' || 
+      currentStatusStr.includes('return') || 
+      Boolean(details.is_returned_order);
+
     // Is this parent order in an exchange/replacement intent?
-    const isReplacementIntent = !isReplacementForwardOrder && Boolean(
-      details.replacement_size ||
+    const isReplacementIntent = !isReplacementForwardOrder && !isExplicitReturn && Boolean(
+      returnTypeStr.includes('replace') ||
+      returnTypeStr.includes('exchange') ||
+      currentStatusStr.includes('replace') ||
       details.replacement_order_number ||
       details.replacement_order_id ||
-      currentStatusStr.includes('replace') ||
-      (details.cancel_reason || '').toLowerCase().includes('replace') ||
-      (details.cancel_reason || '').toLowerCase().includes('exchange') ||
-      (details.return_reason || '').toLowerCase().includes('replace') ||
-      (details.return_reason || '').toLowerCase().includes('exchange')
+      (details.replacement_size && !details.refund_bank_account)
     );
 
     // Mixed Return & Replacement (Simultaneous Items)
     const isMixedReturnReplace = !isReplacementForwardOrder && Boolean(
-      (details.return_type || '').toLowerCase().includes('mixed') ||
+      returnTypeStr.includes('mixed') ||
       currentStatusStr.includes('& replacement') ||
       currentStatusStr.includes('returned & replaced') ||
       (
@@ -1827,7 +1849,13 @@ export const Checkout = () => {
     );
 
     // 1. Return Flow States (Post-Delivery only, Mutually exclusive from Replacement)
-    const isReturnRequested = !isReplacementIntent && (currentStatusStr === 'return requested' || currentStatusStr === 'return request processing' || logLower === 'return initiated' || logLower === 'return requested');
+    const isReturnRequested = !isReplacementIntent && (
+      currentStatusStr === 'return requested' || 
+      currentStatusStr === 'return request processing' || 
+      logLower === 'return initiated' || 
+      logLower === 'return requested' ||
+      (isExplicitReturn && !currentStatusStr.includes('delivered'))
+    );
     const isReturnApproved = !isReplacementIntent && (currentStatusStr === 'return approved' || currentStatusStr === 'return pickup scheduled' || (currentStatusStr.includes('pickup scheduled') && (currentStatusStr.includes('return') || logLower.includes('return'))) || logLower.includes('return pickup scheduled'));
     const isReturnCollected = !isReplacementIntent && (currentStatusStr.includes('collected') || currentStatusStr.includes('in transit to') || currentStatusStr.includes('reverse transit') || logLower.includes('collected') || logLower.includes('reverse transit'));
     const isReceivedAtUrvaah = !isReplacementIntent && (currentStatusStr === 'received at house of urvaah' || currentStatusStr === 'received at urvaah house' || currentStatusStr === 'received at homved' || logLower.includes('received at house of urvaah'));
@@ -2240,20 +2268,56 @@ export const Checkout = () => {
       });
 
       if (hasReturnItem) {
-        if (!returnBankDetails.accountNumber.trim()) {
-          setItemReturnError('Please enter your Bank Account Number for the refund transfer.');
-          return;
-        }
-        if (returnBankDetails.accountNumber.trim() !== returnBankDetails.confirmAccountNumber.trim()) {
-          setItemReturnError('Bank Account Numbers do not match. Please verify.');
-          return;
-        }
-        if (!returnBankDetails.ifscCode.trim()) {
-          setItemReturnError('Please enter your Bank IFSC code.');
-          return;
-        }
-        if (!returnBankDetails.holderName.trim()) {
+        const cleanHolder = (returnBankDetails.holderName || '').trim();
+        const cleanIfsc = (returnBankDetails.ifscCode || '').trim().toUpperCase();
+        const cleanAccount = (returnBankDetails.accountNumber || '').trim();
+        const cleanConfirm = (returnBankDetails.confirmAccountNumber || '').trim();
+
+        if (!cleanHolder) {
           setItemReturnError('Please enter the Account Holder Name.');
+          return;
+        }
+        if (cleanHolder.length < 3 || !/^[a-zA-Z\s.]{3,70}$/.test(cleanHolder)) {
+          setItemReturnError('Account Holder Name must be at least 3 characters and contain only letters.');
+          return;
+        }
+
+        if (!cleanIfsc) {
+          setItemReturnError('Please enter your Bank IFSC Code.');
+          return;
+        }
+        if (cleanIfsc.length !== 11) {
+          setItemReturnError(`Bank IFSC Code must be exactly 11 characters (currently ${cleanIfsc.length} characters). Example: HDFC0008718.`);
+          return;
+        }
+        if (cleanIfsc[4] !== '0') {
+          setItemReturnError('Invalid IFSC Code: The 5th character must be the digit 0 (zero), not the letter O.');
+          return;
+        }
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+          setItemReturnError('Invalid Bank IFSC Code format. Must be 4 letters, followed by 0, followed by 6 alphanumeric characters (e.g. HDFC0008718).');
+          return;
+        }
+
+        if (!cleanAccount) {
+          setItemReturnError('Please enter your Bank Account Number.');
+          return;
+        }
+        if (!/^\d+$/.test(cleanAccount)) {
+          setItemReturnError('Bank Account Number must contain numbers only.');
+          return;
+        }
+        if (cleanAccount.length < 9 || cleanAccount.length > 18) {
+          setItemReturnError(`Bank Account Number must be between 9 and 18 digits (currently ${cleanAccount.length} digits).`);
+          return;
+        }
+
+        if (!cleanConfirm) {
+          setItemReturnError('Please confirm your Bank Account Number.');
+          return;
+        }
+        if (cleanAccount !== cleanConfirm) {
+          setItemReturnError('Bank Account Numbers do not match. Please verify and re-enter.');
           return;
         }
       }
@@ -2262,7 +2326,15 @@ export const Checkout = () => {
       setItemReturnError('');
 
       try {
-        const orderNum = details?.orderNumber || placedOrderNumber;
+        const orderNum = details?.id || details?.orderNumber || placedOrderNumber;
+        const reqType = (hasReturnItem && nonKeepItems.some(it => {
+          const key = it.id || it.product_id;
+          const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id];
+          return st?.action === 'Replace';
+        }))
+          ? 'Partial Return & Exchange'
+          : hasReturnItem ? 'Return' : 'Replacement';
+
         const formattedItems = currentItems.map(it => {
           const key = it.id || it.product_id;
           const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id] || { action: 'Keep' };
@@ -2279,10 +2351,11 @@ export const Checkout = () => {
         const res = await apiClient(`/api/orders/${orderNum}/return-request`, {
           method: 'POST',
           body: JSON.stringify({
+            type: reqType,
             items: formattedItems,
             bankDetails: hasReturnItem ? returnBankDetails : null,
             comments: returnComments,
-            reason: returnComments || 'Customer return / exchange request'
+            reason: returnComments || (reqType === 'Return' ? 'Customer return request' : reqType === 'Replacement' ? 'Customer exchange request' : 'Customer return / exchange request')
           })
         });
 
@@ -2955,12 +3028,27 @@ export const Checkout = () => {
                       <span>-{formatPrice(details.discount)}</span>
                     </div>
                   )}
-                  {(details.tax > 0 || details.taxRate) && (
-                    <div className="flex justify-between items-center text-neutral-600">
-                      <span className="uppercase tracking-wider">GST / Tax ({details.taxRate || (details.subtotal > 2500 ? 18 : 5)}%)</span>
-                      <span className="font-semibold text-black">+{formatPrice(details.tax || Math.round(details.subtotal * ((details.subtotal > 2500 ? 18 : 5) / 100)))}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const baseSub = Number(details.subtotal || 0);
+                    const disc = Number(details.discount || 0);
+                    const ship = Number(details.shippingFee || 0);
+                    const tot = Number(details.totalPaid || 0);
+                    const computedDiff = Math.max(0, Math.round(tot - (baseSub - disc) - ship));
+                    const effectiveTax = Number(details.tax) > 0 ? Number(details.tax) : computedDiff;
+                    const effectiveRate = details.taxRate || (effectiveTax > 0 && (baseSub - disc) > 0
+                      ? Math.round((effectiveTax / (baseSub - disc)) * 100)
+                      : (baseSub > 2500 ? 18 : 5));
+
+                    if (effectiveTax > 0) {
+                      return (
+                        <div className="flex justify-between items-center text-neutral-600">
+                          <span className="uppercase tracking-wider">GST ({effectiveRate}%)</span>
+                          <span className="font-semibold text-black">+{formatPrice(effectiveTax)}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="flex justify-between items-center">
                     <span className="uppercase tracking-wider">Shipping</span>
                     <span className="font-semibold text-black">
@@ -3721,8 +3809,8 @@ export const Checkout = () => {
                     CONTINUE SHOPPING
                   </Link>
 
-                  {/* Pre-Delivery Cancel Order Button */}
-                  {!isDelivered && !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && !isReplacementForwardOrder && (
+                  {/* Pre-Dispatch Cancel Order Button (cannot cancel once shipped or out for delivery) */}
+                  {!isDelivered && !isShipped && !isOutForDelivery && !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && !isReplacementForwardOrder && (
                     <button
                       type="button"
                       onClick={handleCancelOrder}
@@ -4114,7 +4202,7 @@ export const Checkout = () => {
                 </div>
 
                 {/* Scrollable Body */}
-                <form onSubmit={handleConfirmItemReturn} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+                <form onSubmit={handleConfirmItemReturn} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1 no-scrollbar scrollbar-none">
                   {itemReturnError && (
                     <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -4229,7 +4317,7 @@ export const Checkout = () => {
                                     : 'bg-white text-neutral-700 border-neutral-300 hover:border-purple-800 hover:text-purple-900'
                                 }`}
                               >
-                                Exchange Size
+                                Replace Product
                               </button>
                             </div>
 
@@ -4357,7 +4445,7 @@ export const Checkout = () => {
                           )}
                           {repC > 0 && (
                             <span className="px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded-md text-[11px] font-semibold">
-                              {repC} Exchange Piece(s)
+                              {repC} Replace Product(s)
                             </span>
                           )}
                         </div>
@@ -4376,7 +4464,8 @@ export const Checkout = () => {
                         Please provide your verified bank account details so our finance desk can disburse your refund directly via secure IMPS / NEFT transfer upon return arrival.
                       </p>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Account Holder Name */}
                         <div>
                           <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
                             Account Holder Name <span className="text-red-500">*</span>
@@ -4385,12 +4474,20 @@ export const Checkout = () => {
                             type="text"
                             required
                             value={returnBankDetails.holderName}
-                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, holderName: e.target.value }))}
-                            placeholder="e.g. Aditi Sharma"
-                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
+                              setReturnBankDetails(prev => ({ ...prev, holderName: val }));
+                              setItemReturnError('');
+                            }}
+                            placeholder="e.g. Kuldeep Mahajan"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-amber-500"
                           />
+                          <span className="text-[10px] text-neutral-400 mt-1 block">
+                            Name as per bank records (letters only)
+                          </span>
                         </div>
 
+                        {/* Bank IFSC Code */}
                         <div>
                           <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
                             Bank IFSC Code <span className="text-red-500">*</span>
@@ -4398,13 +4495,40 @@ export const Checkout = () => {
                           <input
                             type="text"
                             required
+                            maxLength={11}
                             value={returnBankDetails.ifscCode}
-                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, ifscCode: e.target.value.toUpperCase() }))}
-                            placeholder="e.g. HDFC0001234"
-                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none"
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11);
+                              setReturnBankDetails(prev => ({ ...prev, ifscCode: val }));
+                              setItemReturnError('');
+                            }}
+                            placeholder="e.g. HDFC0008718"
+                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none font-mono ${
+                              returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                                ? 'border-red-400 bg-red-50/20'
+                                : 'border-neutral-300 focus:border-amber-500'
+                            }`}
                           />
+                          <span className={`text-[10px] mt-1 block ${
+                            returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                              ? 'text-emerald-700 font-medium'
+                              : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                              ? 'text-red-600 font-medium'
+                              : 'text-neutral-400'
+                          }`}>
+                            {returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                              ? '✓ Valid IFSC format'
+                              : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                              ? '⚠ 5th character must be 0 (zero)'
+                              : returnBankDetails.ifscCode?.length > 0
+                              ? `${returnBankDetails.ifscCode.length}/11 characters (e.g. HDFC0008718)`
+                              : '11 characters, 5th character must be 0'}
+                          </span>
                         </div>
 
+                        {/* Bank Account Number */}
                         <div>
                           <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
                             Bank Account Number <span className="text-red-500">*</span>
@@ -4412,13 +4536,36 @@ export const Checkout = () => {
                           <input
                             type="text"
                             required
+                            maxLength={18}
                             value={returnBankDetails.accountNumber}
-                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
-                            placeholder="e.g. 50100234567890"
-                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                              setReturnBankDetails(prev => ({ ...prev, accountNumber: val }));
+                              setItemReturnError('');
+                            }}
+                            placeholder="e.g. 47854908579056756"
+                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
+                              returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : returnBankDetails.accountNumber?.length > 0
+                                ? 'border-amber-400'
+                                : 'border-neutral-300 focus:border-amber-500'
+                            }`}
                           />
+                          <span className={`text-[10px] mt-1 block ${
+                            returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                              ? 'text-emerald-700 font-medium'
+                              : 'text-neutral-400'
+                          }`}>
+                            {returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                              ? `✓ Valid account number (${returnBankDetails.accountNumber.length} digits)`
+                              : returnBankDetails.accountNumber?.length > 0
+                              ? `${returnBankDetails.accountNumber.length}/18 digits (minimum 9 digits)`
+                              : '9 to 18 digits (numbers only)'}
+                          </span>
                         </div>
 
+                        {/* Confirm Account Number */}
                         <div>
                           <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
                             Confirm Account Number <span className="text-red-500">*</span>
@@ -4426,11 +4573,35 @@ export const Checkout = () => {
                           <input
                             type="text"
                             required
+                            maxLength={18}
                             value={returnBankDetails.confirmAccountNumber}
-                            onChange={(e) => setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: e.target.value }))}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                              setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
+                              setItemReturnError('');
+                            }}
                             placeholder="Re-enter Account Number"
-                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none"
+                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
+                              returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : returnBankDetails.confirmAccountNumber
+                                ? 'border-red-400 bg-red-50/20'
+                                : 'border-neutral-300 focus:border-amber-500'
+                            }`}
                           />
+                          <span className={`text-[10px] mt-1 block ${
+                            returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                              ? 'text-emerald-700 font-medium'
+                              : returnBankDetails.confirmAccountNumber
+                              ? 'text-red-600 font-medium'
+                              : 'text-neutral-400'
+                          }`}>
+                            {returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                              ? '✓ Account numbers match'
+                              : returnBankDetails.confirmAccountNumber
+                              ? '⚠ Numbers do not match'
+                              : 'Re-enter same account number'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -5852,7 +6023,7 @@ export const Checkout = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto no-scrollbar scrollbar-none"
             onClick={() => {
               if (!isPlacingOrder) setIsConfirmOrderModalOpen(false);
             }}
@@ -5893,7 +6064,7 @@ export const Checkout = () => {
               </div>
 
               {/* Scrollable Content Body */}
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 divide-y divide-neutral-100">
+              <div className="p-5 sm:p-6 overflow-y-auto no-scrollbar scrollbar-none space-y-6 flex-1 divide-y divide-neutral-100">
                 {/* Section 1: Order Items Summary */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -5958,7 +6129,7 @@ export const Checkout = () => {
                       type="button"
                       disabled={isPlacingOrder}
                       onClick={() => setIsConfirmOrderModalOpen(false)}
-                      className="text-[11px] font-bold tracking-wider uppercase text-neutral-600 hover:text-black underline cursor-pointer disabled:opacity-40"
+                      className="text-[11px] font-bold tracking-wider uppercase text-neutral-600 hover:text-black cursor-pointer disabled:opacity-40"
                     >
                       Change
                     </button>
@@ -6019,7 +6190,7 @@ export const Checkout = () => {
                       type="button"
                       disabled={isPlacingOrder}
                       onClick={() => setIsConfirmOrderModalOpen(false)}
-                      className="text-[11px] font-bold tracking-wider uppercase text-neutral-600 hover:text-black underline shrink-0 ml-3 cursor-pointer disabled:opacity-40"
+                      className="text-[11px] font-bold tracking-wider uppercase text-neutral-600 hover:text-black shrink-0 ml-3 cursor-pointer disabled:opacity-40"
                     >
                       Change
                     </button>

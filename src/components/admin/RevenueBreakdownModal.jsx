@@ -251,8 +251,16 @@ export const RevenueBreakdownModal = ({ isOpen, onClose, period = '30d' }) => {
 
                           {/* STATUS PILL */}
                           <td className="py-3 px-5 text-center">
-                            <span className={`inline-block text-[11px] font-semibold px-3 py-0.5 rounded-full border ${statusClass}`}>
-                              {o.status}
+                            <span className={`inline-block text-[11px] font-semibold px-3 py-0.5 rounded-full border whitespace-nowrap ${statusClass}`}>
+                              {(() => {
+                                const st = String(o.status || '');
+                                const s = st.toLowerCase();
+                                if (s.includes('received at house of urvaah') || s.includes('received at homved')) return 'Received at HOU';
+                                if (s.includes('in transit to house of urvaah')) return 'In Transit to HOU';
+                                if (s.includes('replacement request processing') || s.includes('replace requested') || s.includes('replacement requested')) return 'Replacement Req.';
+                                if (s.includes('cancellation requested') || s.includes('cancel_requested')) return 'Cancel Req.';
+                                return st || 'Pending';
+                              })()}
                             </span>
                           </td>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { AlignLeft, List, Eye, Code, Sparkles, HelpCircle, RotateCcw } from 'lucide-react';
+import { AlignLeft, List, Eye, Code, Sparkles, HelpCircle, RotateCcw, Italic, Underline, Quote, Info, Type } from 'lucide-react';
 import RichTextRenderer from '../common/RichTextRenderer';
 
 export default function RichDescriptionEditor({
@@ -73,6 +73,48 @@ export default function RichDescriptionEditor({
         replacement = `<strong>${text}</strong>`;
         newCursorStart = start + (selectedText ? replacement.length : 8);
         newCursorEnd = start + (selectedText ? replacement.length : 8 + text.length);
+        break;
+      }
+      case 'semibold': {
+        const text = selectedText || 'semibold text';
+        replacement = `<span class="semibold">${text}</span>`;
+        newCursorStart = start + (selectedText ? replacement.length : 23);
+        newCursorEnd = start + (selectedText ? replacement.length : 23 + text.length);
+        break;
+      }
+      case 'italic': {
+        const text = selectedText || 'italic text';
+        replacement = `<em>${text}</em>`;
+        newCursorStart = start + (selectedText ? replacement.length : 4);
+        newCursorEnd = start + (selectedText ? replacement.length : 4 + text.length);
+        break;
+      }
+      case 'underline': {
+        const text = selectedText || 'underlined text';
+        replacement = `<u>${text}</u>`;
+        newCursorStart = start + (selectedText ? replacement.length : 3);
+        newCursorEnd = start + (selectedText ? replacement.length : 3 + text.length);
+        break;
+      }
+      case 'uppercase': {
+        const text = selectedText ? selectedText.toUpperCase() : 'UPPERCASE TEXT';
+        replacement = `<span class="uppercase-text">${text}</span>`;
+        newCursorStart = start + replacement.length;
+        newCursorEnd = start + replacement.length;
+        break;
+      }
+      case 'quote': {
+        const text = selectedText || 'Key highlight or styling note';
+        replacement = `\n<blockquote>${text}</blockquote>\n`;
+        newCursorStart = start + (selectedText ? replacement.length : 13);
+        newCursorEnd = start + (selectedText ? replacement.length : 13 + text.length);
+        break;
+      }
+      case 'box': {
+        const text = selectedText || 'Important product or fitting note...';
+        replacement = `\n<div class="highlight-box">${text}</div>\n`;
+        newCursorStart = start + (selectedText ? replacement.length : 29);
+        newCursorEnd = start + (selectedText ? replacement.length : 29 + text.length);
         break;
       }
       case 'list': {
@@ -198,6 +240,50 @@ export default function RichDescriptionEditor({
               B
             </button>
 
+            {/* Semibold Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => insertFormatting('semibold')}
+              title="Semibold text (weight 600)"
+              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-semibold shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+            >
+              Semibold
+            </button>
+
+            {/* Italic (I) Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => insertFormatting('italic')}
+              title="Italic text (<em>)"
+              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-medium italic shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+            >
+              <Italic className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Underline (U) Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => insertFormatting('underline')}
+              title="Underline text (<u>)"
+              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-medium shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+            >
+              <Underline className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Uppercase (TT) Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => insertFormatting('uppercase')}
+              title="Uppercase letters"
+              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+            >
+              TT
+            </button>
+
             {/* Divider */}
             <div className="h-5 w-px bg-neutral-200/80 mx-0.5 sm:mx-1 hidden xs:block" />
 
@@ -211,6 +297,18 @@ export default function RichDescriptionEditor({
             >
               <List className="w-3.5 h-3.5 stroke-[2.4] text-neutral-700" />
               <span>Bullet List</span>
+            </button>
+
+            {/* Highlight Box / Quote Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => insertFormatting('quote')}
+              title="Quote / Callout (<blockquote>)"
+              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs font-medium shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+            >
+              <Quote className="w-3.5 h-3.5 text-neutral-600" />
+              <span>Quote</span>
             </button>
           </div>
 
@@ -259,9 +357,9 @@ export default function RichDescriptionEditor({
             />
             {/* Quick helper footer */}
             <div className="px-3.5 py-2 bg-neutral-50/60 border-t border-neutral-100 flex flex-wrap items-center justify-between text-[11px] text-neutral-500 gap-2">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                Select text and click <strong className="font-semibold text-neutral-700">H2</strong>, <strong className="font-semibold text-neutral-700">H3</strong>, <strong className="font-semibold text-neutral-700">Paragraph</strong>, or <strong className="font-semibold text-neutral-700">Bullet List</strong> to apply styles.
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                Select text and click <strong className="font-semibold text-neutral-700">H2</strong>, <strong className="font-semibold text-neutral-700">H3</strong>, <strong className="font-semibold text-neutral-700">Paragraph</strong>, <strong className="font-semibold text-neutral-700">Bold</strong>, <strong className="font-semibold text-neutral-700">Semibold</strong>, <strong className="font-semibold text-neutral-700">Italic</strong>, <strong className="font-semibold text-neutral-700">Underline</strong>, or <strong className="font-semibold text-neutral-700">Bullet List</strong>.
               </span>
               <span className="tabular-nums font-mono text-[10px] text-neutral-400">
                 {value ? value.length : 0} chars

@@ -67,14 +67,6 @@ export const MobileMenu = () => {
         const rawCats = Array.isArray(catsRes) ? catsRes : (catsRes?.data || catsRes?.data?.data || []);
         let activeCats = rawCats.filter((c) => {
           if (!c || c.is_active === false || c.active === false) return false;
-          // Corset Tops visibility rule: hide from main navigation if fewer than 2 eligible products belong to it
-          const isCorsetCat =
-            (c.name || '').toLowerCase().includes('corset') ||
-            (c.slug || '').toLowerCase().includes('corset');
-          if (isCorsetCat) {
-            const count = Number(c.product_count !== undefined ? c.product_count : (c.eligible_count || 0));
-            if (count < 2) return false;
-          }
           return true;
         });
 
@@ -93,7 +85,10 @@ export const MobileMenu = () => {
           const slugB = (b.slug || b.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
           const idxA = CANONICAL_ORDER.findIndex(o => slugA.includes(o) || o.includes(slugA));
           const idxB = CANONICAL_ORDER.findIndex(o => slugB.includes(o) || o.includes(slugB));
-          return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return (a.name || '').localeCompare(b.name || '');
         });
 
         setCategories(activeCats);
@@ -107,13 +102,21 @@ export const MobileMenu = () => {
     fetchMenuData();
 
     const handleUpdate = () => fetchMenuData();
+    const handleStorage = (e) => {
+      if (e.key === 'urvaah_categories_updated') {
+        fetchMenuData();
+      }
+    };
+
     window.addEventListener('urvaah_categories_updated', handleUpdate);
+    window.addEventListener('storage', handleStorage);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_categories_updated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
     };
-  }, []);
+  }, [isMobileMenuOpen]);
 
   const toggleSection = (key) => {
     setExpandedSection((prev) => (prev === key ? null : key));

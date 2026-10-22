@@ -151,13 +151,21 @@ export const CategoryPage = ({ defaultCategory }) => {
     loadCategoryData();
 
     const handleUpdate = () => loadCategoryData();
+    const handleStorage = (e) => {
+      if (e.key === 'urvaah_categories_updated' || e.key === 'urvaah_products_updated') {
+        loadCategoryData();
+      }
+    };
+
     window.addEventListener('urvaah_categories_updated', handleUpdate);
     window.addEventListener('urvaah_products_updated', handleUpdate);
+    window.addEventListener('storage', handleStorage);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_categories_updated', handleUpdate);
       window.removeEventListener('urvaah_products_updated', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
@@ -185,6 +193,30 @@ export const CategoryPage = ({ defaultCategory }) => {
     if (!products.length) return [];
     return products.filter((p) => productMatchesCategory(p, currentSlug));
   }, [products, currentSlug]);
+
+  // Dynamically compute all collection pills: Canonical + dynamically created active categories
+  const collectionPills = useMemo(() => {
+    const list = [...CANONICAL_COLLECTIONS];
+
+    categories.forEach((cat) => {
+      if (!cat || cat.active === false || cat.is_active === false) return;
+      const rawSlug = (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+      // Check if this category is already represented in CANONICAL_COLLECTIONS
+      const alreadyIncluded = list.some(
+        (c) => c.slug === rawSlug || (c.slug && rawSlug.includes(c.slug)) || (c.slug && c.slug.includes(rawSlug))
+      );
+
+      if (!alreadyIncluded && cat.name) {
+        list.push({
+          slug: rawSlug,
+          path: `/category/${rawSlug}`,
+          label: cat.name.toUpperCase()
+        });
+      }
+    });
+
+    return list;
+  }, [categories]);
 
   // Check eligible products for Corset Tops visibility rule
   const corsetProductCount = useMemo(() => {
@@ -331,14 +363,7 @@ export const CategoryPage = ({ defaultCategory }) => {
         {/* Collection Switcher Navigation Pills */}
         <div className="border-y border-neutral-200 py-3 mb-6 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-2 min-w-max py-0.5">
-            {CANONICAL_COLLECTIONS.map((col) => {
-              // Corset Tops visibility rule: Hide from navigation until >= 2 eligible products belong to it
-              if (col.minProducts && corsetProductCount < col.minProducts) {
-                // If user is directly accessing this URL, allow it to display as active pill
-                if (currentSlug !== col.slug) {
-                  return null;
-                }
-              }
+            {collectionPills.map((col) => {
 
               const isSelected =
                 (col.slug === 'all' && (currentSlug === 'all' || !currentSlug)) ||
