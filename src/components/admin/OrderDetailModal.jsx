@@ -51,6 +51,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Cancellation Requested', label: 'Cancellation Requested' },
   { value: 'Cancelled', label: 'Cancelled' },
   { value: 'Return Requested', label: 'Return Requested' },
+  { value: 'Return Request Processing', label: 'Return Request Processing' },
   { value: 'Return Approved', label: 'Return Approved (Pickup Scheduled)' },
   { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah (Return In Transit)' },
   { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah (Atelier Restocked)' },
@@ -72,6 +73,7 @@ const ORDER_STATUS_OPTIONS = [
 
 const RETURN_RESTRICTED_STATUSES = [
   'Return Requested',
+  'Return Request Processing',
   'Return Approved',
   'Return Collected',
   'In Transit to House of Urvaah',
@@ -1875,9 +1877,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Post-Delivery Return Request Review Banner */}
-              {isRefundDesk && (['return requested', 'return request processing', 'return processing'].includes(
+              {((['return requested', 'return request processing', 'return processing'].includes(
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-              )) && !isOrderReplacementLifecycle(order, (confirmedRef.current.status || confirmedStatus || order?.status || '')) && (
+              )) && !isOrderReplacementLifecycle(order, (confirmedRef.current.status || confirmedStatus || order?.status || ''))) && (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
@@ -1920,6 +1922,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <p className="text-amber-950 font-medium mt-0.5">{order.cancel_reason || order.return_reason}</p>
                         </div>
                       )}
+
+                      {(order.refund_bank_account || order.refund_ifsc_code) && (
+                        <div className="mt-2 p-2.5 bg-white border border-amber-200 rounded-lg text-xs space-y-1">
+                          <span className="text-[10px] font-bold text-amber-900 uppercase block">Customer Refund Bank Details:</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] text-neutral-700">
+                            <div><span className="text-neutral-500 font-medium">Account:</span> <span className="font-mono font-bold">{order.refund_bank_account}</span></div>
+                            <div><span className="text-neutral-500 font-medium">IFSC:</span> <span className="font-mono font-bold uppercase">{order.refund_ifsc_code}</span></div>
+                            {order.refund_holder_name && <div><span className="text-neutral-500 font-medium">Holder:</span> <span className="font-bold">{order.refund_holder_name}</span></div>}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1956,7 +1969,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Customer Replacement Request Review Banner */}
-              {isRefundDesk && (['replacement request processing', 'replace requested', 'replacement requested'].includes(
+              {(['replacement request processing', 'replace requested', 'replacement requested'].includes(
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
               )) && (
                 <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
@@ -2019,7 +2032,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               )}
 
               {/* Customer Mixed Return & Replacement Review Banner */}
-              {isRefundDesk && Boolean(
+              {Boolean(
                 (order?.return_type || '').toLowerCase().includes('mixed') ||
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase().includes('& replacement') ||
                 (
@@ -2130,7 +2143,6 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   )
                 );
                 if (!isMixed) return null;
-                if (!isRefundDesk) return null;
 
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                 const curLog = (order?.logistics_status || '').toLowerCase();
@@ -2425,10 +2437,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const returnType = (order?.return_type || '').toLowerCase();
 
-                // Only show Exchange Journey inside the dedicated Refund Desk
-                if (!isRefundDesk) return null;
-
-                // Only show Exchange Journey when the order is in an exchange/replacement lifecycle
+                // Show Exchange Journey when the order is in an exchange/replacement lifecycle
                 const isReplacementRelated = isOrderReplacementLifecycle(order, curSt);
 
                 if (!isReplacementRelated) return null;
@@ -3077,9 +3086,6 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   ].includes(curSt)
                 ) && curSt !== 'cancelled' && curSt !== 'refunded' && !curSt.includes('replace');
 
-                // Only show Return Journey inside the dedicated Refund Desk
-                if (!isRefundDesk) return null;
-
                 if (!isReturnRelated) return null;
 
                 const isQCRejected = curSt === 'return qc rejected' || order?.return_qc_status === 'Rejected';
@@ -3560,7 +3566,6 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               <FileText className="w-3.5 h-3.5 text-neutral-600" />
                               <span>Pickup Manifest</span>
                             </button>
-                            {isRefundDesk && (
                               <button
                                 type="button"
                                 disabled={savingStatus}
@@ -3575,12 +3580,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 )}
                                 <span>Confirm Doorstep Pickup ➔ In Transit (Step 4)</span>
                               </button>
-                            )}
                           </>
                         )}
 
-                        {/* Step 4 Actions: If In Transit (Refund Desk Admin only) */}
-                        {isRefundDesk && (curSt.includes('transit') || curSt.includes('collected') || isS4Active) && (
+                        {/* Step 4 Actions: If In Transit */}
+                        {(curSt.includes('transit') || curSt.includes('collected') || isS4Active) && (
                           <button
                             type="button"
                             disabled={savingStatus}

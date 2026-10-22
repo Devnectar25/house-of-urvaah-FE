@@ -534,6 +534,7 @@ export const Checkout = () => {
   const [isConfirmOrderModalOpen, setIsConfirmOrderModalOpen] = useState(false);
   const [isItemReturnModalOpen, setIsItemReturnModalOpen] = useState(false);
   const [itemActionsState, setItemActionsState] = useState({});
+  const [productSizeStocks, setProductSizeStocks] = useState({});
   const [returnBankDetails, setReturnBankDetails] = useState({
     accountNumber: '',
     confirmAccountNumber: '',
@@ -2224,6 +2225,7 @@ export const Checkout = () => {
     const handleOpenReturnReplaceChoice = () => {
       const currentItems = details?.items || placedOrderDetails?.items || [];
       const initialMap = {};
+      const initialStocks = {};
 
       // If 1 item: default to Return
       // If 2 or 3 items: default to Keep, customer picks which one to return or replace!
@@ -2231,13 +2233,69 @@ export const Checkout = () => {
 
       currentItems.forEach((item, idx) => {
         const key = item.id || item.product_id || idx;
+        const sStock = item.size_stock || item.sizeStock || {};
+        initialStocks[key] = {
+          size_stock: sStock,
+          sizes: item.sizes || (sStock && Object.keys(sStock).length > 0 ? Object.keys(sStock) : null)
+        };
+
+        let initialRepSize = item.size || 'M';
+        if (sStock && typeof sStock === 'object' && Object.keys(sStock).length > 0) {
+          const inStockKey = Object.keys(sStock).find(sz => parseInt(sStock[sz] || 0, 10) > 0);
+          if (inStockKey) {
+            const origMatch = Object.keys(sStock).find(k => k.trim().toUpperCase() === initialRepSize.trim().toUpperCase());
+            if (!origMatch || parseInt(sStock[origMatch] || 0, 10) <= 0) {
+              initialRepSize = inStockKey;
+            }
+          }
+        }
+
         initialMap[key] = {
           action: defaultAction,
           reason: 'Size or fit issue',
-          replacementSize: item.size || 'M'
+          replacementSize: initialRepSize
         };
+
+        const prodId = item.product_id || item.productId;
+        if (prodId) {
+          apiClient(`/api/products/${prodId}`)
+            .then(res => {
+              const liveProd = res?.data || res;
+              if (liveProd && typeof liveProd === 'object') {
+                const liveStock = liveProd.size_stock || liveProd.sizeStock || {};
+                const liveSizes = liveProd.sizes || (liveStock && Object.keys(liveStock).length > 0 ? Object.keys(liveStock) : null);
+                setProductSizeStocks(prev => ({
+                  ...prev,
+                  [key]: {
+                    size_stock: liveStock,
+                    sizes: liveSizes
+                  }
+                }));
+
+                if (liveStock && typeof liveStock === 'object') {
+                  const liveInStockKey = Object.keys(liveStock).find(sz => parseInt(liveStock[sz] || 0, 10) > 0);
+                  if (liveInStockKey) {
+                    setItemActionsState(prevSt => {
+                      const cur = prevSt[key];
+                      if (cur) {
+                        const curMatch = Object.keys(liveStock).find(k => k.trim().toUpperCase() === (cur.replacementSize || '').trim().toUpperCase());
+                        if (!curMatch || parseInt(liveStock[curMatch] || 0, 10) <= 0) {
+                          return { ...prevSt, [key]: { ...cur, replacementSize: liveInStockKey } };
+                        }
+                      }
+                      return prevSt;
+                    });
+                  }
+                }
+              }
+            })
+            .catch(err => {
+              console.warn('[Checkout] Live stock fetch error:', err?.message);
+            });
+        }
       });
 
+      setProductSizeStocks(initialStocks);
       setItemActionsState(initialMap);
       setItemReturnError('');
       setReturnComments('');
@@ -2319,6 +2377,24 @@ export const Checkout = () => {
         if (cleanAccount !== cleanConfirm) {
           setItemReturnError('Bank Account Numbers do not match. Please verify and re-enter.');
           return;
+        }
+      }
+
+      // Verify each Replace item has an in-stock size selected
+      for (const it of nonKeepItems) {
+        const key = it.id || it.product_id;
+        const st = itemActionsState[key] || itemActionsState[it.id] || itemActionsState[it.product_id];
+        if (st?.action === 'Replace') {
+          const chosenSize = (st.replacementSize || 'M').trim().toUpperCase();
+          const sStock = productSizeStocks[key]?.size_stock || productSizeStocks[key]?.sizeStock || it.size_stock || it.sizeStock || {};
+          if (sStock && typeof sStock === 'object' && Object.keys(sStock).length > 0) {
+            const match = Object.keys(sStock).find(k => k.trim().toUpperCase() === chosenSize);
+            const stock = match ? parseInt(sStock[match] || 0, 10) : 0;
+            if (stock <= 0) {
+              setItemReturnError(`Size "${chosenSize}" for "${it.name || it.title || 'item'}" is currently Out of Stock. Please select an available in-stock size, or switch to Return & Refund.`);
+              return;
+            }
+          }
         }
       }
 
@@ -4353,57 +4429,133 @@ export const Checkout = () => {
                             )}
 
                             {/* Replace Specific Option */}
-                            {itemAction === 'Replace' && (
-                              <div className="mt-3 p-2.5 bg-white rounded-lg border border-purple-200 text-xs space-y-2 animate-in fade-in duration-150">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">
-                                      Preferred Replacement Size
-                                    </label>
-                                    <select
-                                      value={currentState.replacementSize || 'M'}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setItemActionsState(prev => ({
-                                          ...prev,
-                                          [itemKey]: { ...currentState, replacementSize: val }
-                                        }));
-                                      }}
-                                      className="w-full px-2.5 py-1.5 border border-neutral-300 rounded text-xs bg-white text-neutral-800 focus:outline-none"
-                                    >
-                                      {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
-                                        <option key={sz} value={sz}>{sz}</option>
-                                      ))}
-                                    </select>
+                            {itemAction === 'Replace' && (() => {
+                              const stockInfo = productSizeStocks[itemKey] || {
+                                size_stock: item.size_stock || item.sizeStock || {},
+                                sizes: item.sizes || null
+                              };
+                              const sizeStockObj = stockInfo.size_stock || {};
+                              const hasConfiguredStock = sizeStockObj && typeof sizeStockObj === 'object' && Object.keys(sizeStockObj).length > 0;
+
+                              const rawSizes = stockInfo.sizes && Array.isArray(stockInfo.sizes) && stockInfo.sizes.length > 0
+                                ? stockInfo.sizes
+                                : (hasConfiguredStock ? Object.keys(sizeStockObj) : ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
+
+                              const sizeList = Array.from(new Set(rawSizes.map(s => String(s).trim().toUpperCase())));
+
+                              const getStockForSize = (sz) => {
+                                if (!hasConfiguredStock) return null;
+                                const matchKey = Object.keys(sizeStockObj).find(k => k.trim().toUpperCase() === sz.toUpperCase());
+                                if (!matchKey) return 0;
+                                return parseInt(sizeStockObj[matchKey] || 0, 10);
+                              };
+
+                              const selectedSz = (currentState.replacementSize || 'M').trim().toUpperCase();
+                              const currentStock = getStockForSize(selectedSz);
+                              const isSelectedOutOfStock = currentStock !== null && currentStock <= 0;
+                              const allOutOfStock = hasConfiguredStock && sizeList.every(sz => getStockForSize(sz) <= 0);
+
+                              return (
+                                <div className="mt-3 p-3 bg-white rounded-xl border border-purple-200 text-xs space-y-3 animate-in fade-in duration-150">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-[10px] font-bold text-purple-900 uppercase">
+                                          Preferred Replacement Size
+                                        </label>
+                                        {currentStock !== null && currentStock > 0 && (
+                                          <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            In Stock ({currentStock})
+                                          </span>
+                                        )}
+                                      </div>
+                                      <select
+                                        value={currentState.replacementSize || (sizeList[0] || 'M')}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setItemActionsState(prev => ({
+                                            ...prev,
+                                            [itemKey]: { ...currentState, replacementSize: val }
+                                          }));
+                                        }}
+                                        className={`w-full px-2.5 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none transition-colors ${
+                                          isSelectedOutOfStock 
+                                            ? 'border-red-400 ring-1 ring-red-400 bg-red-50/20' 
+                                            : 'border-neutral-300 focus:border-purple-600'
+                                        }`}
+                                      >
+                                        {sizeList.map((sz) => {
+                                          const stockNum = getStockForSize(sz);
+                                          const isOOS = stockNum !== null && stockNum <= 0;
+                                          return (
+                                            <option 
+                                              key={sz} 
+                                              value={sz} 
+                                              disabled={isOOS}
+                                              className={isOOS ? "text-neutral-400 bg-neutral-100 font-normal" : "text-neutral-900 font-medium"}
+                                            >
+                                              {sz} {isOOS ? '— (Out of Stock)' : (stockNum !== null && stockNum <= 3 ? `(Only ${stockNum} left)` : '')}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+
+                                      {/* Dynamic Out of Stock Warning Banner */}
+                                      {isSelectedOutOfStock && (
+                                        <div className="mt-1.5 p-2 bg-red-50 border border-red-200 rounded-lg text-[11px] text-red-700 flex items-start gap-1.5 leading-snug animate-in fade-in">
+                                          <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                                          <div>
+                                            <span className="font-bold">Size {selectedSz} is Out of Stock.</span>
+                                            <span className="block text-[10px] text-red-600 mt-0.5">
+                                              Please choose another size or switch to <strong>Return & Refund</strong> above.
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">
+                                        Reason for Exchange
+                                      </label>
+                                      <select
+                                        value={currentState.reason || 'Size or fit issue - need different size'}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setItemActionsState(prev => ({
+                                            ...prev,
+                                            [itemKey]: { ...currentState, reason: val }
+                                          }));
+                                        }}
+                                        className="w-full px-2.5 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-purple-600"
+                                      >
+                                        <option value="Size or fit issue - need different size">Size or fit issue - need different size</option>
+                                        <option value="Defective or damaged piece received">Defective or damaged piece received</option>
+                                        <option value="Color or variant exchange">Color or variant exchange</option>
+                                        <option value="Other">Other</option>
+                                      </select>
+                                    </div>
                                   </div>
 
-                                  <div>
-                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">
-                                      Reason for Exchange
-                                    </label>
-                                    <select
-                                      value={currentState.reason || 'Size or fit issue - need different size'}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setItemActionsState(prev => ({
-                                          ...prev,
-                                          [itemKey]: { ...currentState, reason: val }
-                                        }));
-                                      }}
-                                      className="w-full px-2.5 py-1.5 border border-neutral-300 rounded text-xs bg-white text-neutral-800 focus:outline-none"
-                                    >
-                                      <option value="Size or fit issue - need different size">Size or fit issue - need different size</option>
-                                      <option value="Defective or damaged piece received">Defective or damaged piece received</option>
-                                      <option value="Color or variant exchange">Color or variant exchange</option>
-                                      <option value="Other">Other</option>
-                                    </select>
-                                  </div>
+                                  {allOutOfStock && (
+                                    <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 flex items-start gap-2">
+                                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                                      <div>
+                                        <p className="font-bold">All sizes for this garment are currently Out of Stock.</p>
+                                        <p className="text-[11px] mt-0.5 text-amber-800">
+                                          We cannot fulfill an immediate exchange. Please select <strong>Return & Refund</strong> above to receive a 100% refund.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <p className="text-[10px] text-purple-800">
+                                    Complimentary reverse pickup will collect this piece and your preferred size will be dispatched.
+                                  </p>
                                 </div>
-                                <p className="text-[10px] text-purple-800">
-                                  Complimentary reverse pickup will collect this piece and your preferred size will be dispatched.
-                                </p>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         </div>
                       );
