@@ -76,7 +76,7 @@ export const Sitemap = () => {
       title: 'Heritage & Company',
       icon: Info,
       links: [
-        { name: 'The Atelier Story', path: '/about' },
+        { name: 'The Maison Story', path: '/about' },
         { name: 'Sustainability & Artisans', path: '/about' },
         { name: 'Boutique Locations', path: '/contact' },
         { name: 'Careers & Atelier Apprenticeships', path: '/about' },

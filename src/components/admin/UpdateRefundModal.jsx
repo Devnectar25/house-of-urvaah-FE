@@ -14,14 +14,15 @@ import {
   Package,
   Check,
   Copy,
-  ChevronDown,
   ArrowRight,
   Zap,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Pencil
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+import { getReturnGstBreakdown, getItemGstBreakdown } from '../../utils/gstHelper';
 
 // Supported refund stages / statuses matching backend schema
 const REFUND_STATUS_OPTIONS = [
@@ -117,6 +118,13 @@ function renderPaymentIcon(method) {
 // Helper: Determine received status badge label for an item
 function getItemReceivedStatus(item, order) {
   const status = (item.status || order.status || '').toLowerCase();
+  const qcStatus = (order.return_qc_status || '').toLowerCase();
+  if (status.includes('qc reject') || qcStatus === 'rejected') {
+    return 'QC REJECTED';
+  }
+  if (status.includes('return rejected') || status.includes('denied')) {
+    return 'RETURN REJECTED';
+  }
   if (status.includes('received') || status.includes('restocked') || order.is_product_received) {
     return 'RECEIVED AT HOUSE OF URVAAH';
   }
@@ -150,6 +158,13 @@ export const UpdateRefundModal = ({
   const [refundAmountInput, setRefundAmountInput] = useState('');
   const [customerReasonInput, setCustomerReasonInput] = useState('');
   const [refundMethod, setRefundMethod] = useState('auto'); // 'auto' (Razorpay) or 'manual' (Bank transfer)
+  const [adminBankDetails, setAdminBankDetails] = useState({
+    holderName: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: ''
+  });
+  const [isEditingBankDetails, setIsEditingBankDetails] = useState(false);
 
   // Async data state
   const [fetchedItems, setFetchedItems] = useState(null);
@@ -238,7 +253,11 @@ export const UpdateRefundModal = ({
         refundOrder.reason ||
         '';
 
-      const defaultMethod = (refundOrder.refund_bank_account || refundOrder.payout_bank_account) ? 'manual' : 'auto';
+      const hasBankData = Boolean(
+        (refundOrder.refund_bank_account || refundOrder.payout_bank_account) &&
+        String(refundOrder.refund_bank_account || refundOrder.payout_bank_account).replace(/\D/g, '').length >= 9
+      );
+      const defaultMethod = hasBankData ? 'manual' : (refundOrder.razorpay_payment_id ? 'auto' : 'manual');
       setRefundMethod(defaultMethod);
 
       setSelectedStatus(initStatus);
@@ -247,6 +266,14 @@ export const UpdateRefundModal = ({
       setNotifyCustomer(initNotify);
       setRefundAmountInput(initAmtStr);
       setCustomerReasonInput(initReason);
+
+      setAdminBankDetails({
+        holderName: refundOrder.refund_holder_name || '',
+        accountNumber: refundOrder.refund_bank_account || '',
+        confirmAccountNumber: refundOrder.refund_bank_account || '',
+        ifscCode: refundOrder.refund_ifsc_code || ''
+      });
+      setIsEditingBankDetails(!hasBankData);
 
       setErrorMsg(null);
       setShowDiscardConfirm(false);
@@ -297,6 +324,14 @@ export const UpdateRefundModal = ({
             const data = res?.data || res;
             if (data) {
               setPayoutInfo(data);
+              if (data.raw_payout_bank_account || data.refund_bank_account) {
+                setAdminBankDetails(prev => ({
+                  holderName: prev.holderName || data.payout_holder_name || data.refund_holder_name || '',
+                  accountNumber: prev.accountNumber || data.raw_payout_bank_account || data.refund_bank_account || '',
+                  confirmAccountNumber: prev.confirmAccountNumber || data.raw_payout_bank_account || data.refund_bank_account || '',
+                  ifscCode: prev.ifscCode || data.payout_ifsc_code || data.refund_ifsc_code || ''
+                }));
+              }
             }
           })
           .catch((err) => {
@@ -352,34 +387,41 @@ export const UpdateRefundModal = ({
     ? refundOrder.items
     : [];
 
-  // Read-only Payout / Bank details
-  const holderName =
-    payoutInfo?.payout_holder_name ||
-    payoutInfo?.refund_holder_name ||
-    refundOrder.refund_holder_name ||
-    payoutInfo?.customer_name ||
-    refundOrder.customer_name ||
-    'Not Available';
+  const gstBreakdown = getReturnGstBreakdown(refundOrder, itemsList);
+  const currentRefundNum = parseFloat(refundAmountInput) || 0;
+  const computedBase = gstBreakdown.taxRate > 0
+    ? Math.round(currentRefundNum / (1 + (gstBreakdown.taxRate / 100)))
+    : currentRefundNum;
+  const computedGst = Math.max(0, currentRefundNum - computedBase);
 
+  // Payout / Bank details with admin live edit support
   const rawAccountNumber =
-    payoutInfo?.raw_payout_bank_account ||
-    payoutInfo?.payout_bank_account ||
-    payoutInfo?.refund_bank_account ||
-    refundOrder.refund_bank_account ||
+    (adminBankDetails.accountNumber || '').trim() ||
+    (payoutInfo?.raw_payout_bank_account || '').trim() ||
+    (payoutInfo?.refund_bank_account || '').trim() ||
+    (refundOrder.refund_bank_account || '').trim() ||
     '';
 
-  const accountNumber = rawAccountNumber || 'Not Available';
+  const cleanRawAcc = rawAccountNumber.replace(/\D/g, '');
+  const hasValidAccountNum = cleanRawAcc.length >= 9 && cleanRawAcc.length <= 18;
 
-  const ifscCode =
-    payoutInfo?.payout_ifsc_code ||
-    payoutInfo?.refund_ifsc_code ||
-    refundOrder.refund_ifsc_code ||
+  const holderName =
+    (adminBankDetails.holderName || '').trim() ||
+    (payoutInfo?.payout_holder_name || '').trim() ||
+    (payoutInfo?.refund_holder_name || '').trim() ||
+    (refundOrder.refund_holder_name || '').trim() ||
     'Not Available';
 
-  const hasBankData =
-    (holderName && holderName !== 'Not Available') ||
-    (accountNumber && accountNumber !== 'Not Available') ||
-    (ifscCode && ifscCode !== 'Not Available');
+  const accountNumber = hasValidAccountNum ? cleanRawAcc : 'Not Available';
+
+  const ifscCode =
+    (adminBankDetails.ifscCode || '').trim().toUpperCase() ||
+    (payoutInfo?.payout_ifsc_code || '').trim().toUpperCase() ||
+    (payoutInfo?.refund_ifsc_code || '').trim().toUpperCase() ||
+    (refundOrder.refund_ifsc_code || '').trim().toUpperCase() ||
+    'Not Available';
+
+  const hasBankData = hasValidAccountNum && ifscCode !== 'Not Available' && ifscCode !== 'CARD-ONLINE';
 
   // Check if form has unsaved modifications
   const hasUnsavedChanges =
@@ -436,6 +478,46 @@ export const UpdateRefundModal = ({
 
     const effectiveMethod = overrideMethod || refundMethod;
 
+    // Validation: Bank Details check when marking refund as Completed / Paid
+    if (selectedStatus === 'Completed') {
+      const currentAcc = (adminBankDetails.accountNumber || rawAccountNumber || '').trim().replace(/\D/g, '');
+      const hasValidAcc = currentAcc.length >= 9 && currentAcc.length <= 18;
+      const hasTxnRef = Boolean(txnId && txnId.trim() && !txnId.startsWith('RFND-MANUAL') && !txnId.startsWith('rfnd_mock_'));
+
+      if (!hasValidAcc && !hasTxnRef) {
+        setErrorMsg(
+          'Cannot mark refund as Completed / Paid: Customer bank account details are missing. Please enter customer bank account details or enter a valid bank transfer UTR number before completing the payout.'
+        );
+        setIsEditingBankDetails(true);
+        return;
+      }
+    }
+
+    // Validate admin-entered bank details if entered
+    if (adminBankDetails.accountNumber && adminBankDetails.accountNumber.trim()) {
+      const holder = (adminBankDetails.holderName || '').trim();
+      const ifsc = (adminBankDetails.ifscCode || '').trim().toUpperCase();
+      const acc = (adminBankDetails.accountNumber || '').trim();
+      const confirmAcc = (adminBankDetails.confirmAccountNumber || '').trim();
+
+      if (!holder || holder.length < 3 || !/^[a-zA-Z\s.]{3,70}$/.test(holder)) {
+        setErrorMsg('Please enter a valid Account Holder Name (minimum 3 characters, letters only).');
+        return;
+      }
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        setErrorMsg('Invalid Bank IFSC Code format. Must be 4 letters, followed by 0, followed by 6 alphanumeric characters (e.g. HDFC0008718).');
+        return;
+      }
+      if (!/^\d{9,18}$/.test(acc)) {
+        setErrorMsg('Bank Account Number must be between 9 and 18 digits.');
+        return;
+      }
+      if (confirmAcc && confirmAcc !== acc) {
+        setErrorMsg('Bank Account Numbers do not match. Please verify and re-enter.');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const payload = {
@@ -448,6 +530,14 @@ export const UpdateRefundModal = ({
         refundAmount: numAmount,
         customerReason: customerReasonInput.trim() || undefined
       };
+
+      if (adminBankDetails.accountNumber && adminBankDetails.accountNumber.trim()) {
+        payload.bankDetails = {
+          holderName: (adminBankDetails.holderName || '').trim(),
+          accountNumber: (adminBankDetails.accountNumber || '').trim(),
+          ifscCode: (adminBankDetails.ifscCode || '').trim().toUpperCase()
+        };
+      }
 
       const response = await apiClient(`/api/admin/refund/${refundOrder.id}/status`, {
         method: 'PATCH',
@@ -542,8 +632,10 @@ export const UpdateRefundModal = ({
 
         {/* ========================================================================= */}
         {/* SCROLLABLE CONTENT AREA                                                   */}
-        {/* ========================================================================= */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 sm:px-7 sm:py-6 space-y-5 bg-white font-sans text-xs">
+        <div 
+          className="flex-1 overflow-y-auto px-6 py-5 sm:px-7 sm:py-6 space-y-5 bg-white font-sans text-xs no-scrollbar scrollbar-none"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           
           {/* Unsaved Changes Confirmation Banner */}
           {showDiscardConfirm && (
@@ -635,6 +727,18 @@ export const UpdateRefundModal = ({
                       FULL REFUND
                     </span>
                   )}
+                </div>
+
+                {/* GST Tax Breakdown Detail */}
+                <div className="mt-2 flex items-center gap-2 text-[11px] text-neutral-600 font-sans flex-wrap bg-white/90 border border-neutral-200/80 px-2.5 py-1.5 rounded-lg shadow-2xs">
+                  <span>Item Base: <strong className="font-semibold text-brand-dark">₹{computedBase.toLocaleString('en-IN')}</strong></span>
+                  <span className="text-neutral-300">•</span>
+                  <span className="inline-flex items-center gap-1">
+                    GST ({gstBreakdown.taxRate}%):
+                    <strong className="font-semibold text-emerald-700">+₹{computedGst.toLocaleString('en-IN')}</strong>
+                  </span>
+                  <span className="text-neutral-300">•</span>
+                  <span>Total Refund: <strong className="font-semibold text-brand-dark">₹{currentRefundNum.toLocaleString('en-IN')}</strong></span>
                 </div>
               </div>
 
@@ -746,7 +850,10 @@ export const UpdateRefundModal = ({
                 )}
               </div>
 
-              <div className="divide-y divide-neutral-200/60 max-h-60 overflow-y-auto">
+              <div 
+                className="divide-y divide-neutral-200/60 max-h-60 overflow-y-auto no-scrollbar scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {loadingItems ? (
                   <div className="p-4 space-y-3 animate-pulse">
                     <div className="flex items-center gap-3">
@@ -801,6 +908,18 @@ export const UpdateRefundModal = ({
                               Qty: <strong className="text-brand-dark font-semibold">{qty}</strong>{' '}
                               × ₹{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
+                            {(() => {
+                              const itemGst = getItemGstBreakdown(item, gstBreakdown.gstInfo, itemsList.length === 1);
+                              return (
+                                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 mt-0.5 flex-wrap font-sans">
+                                  <span>Base: ₹{itemGst.baseTotal.toLocaleString('en-IN')}</span>
+                                  <span className="text-neutral-300">•</span>
+                                  <span className="text-emerald-700 font-medium">
+                                    GST ({itemGst.taxRate}%): +₹{itemGst.taxAmount.toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -891,14 +1010,141 @@ export const UpdateRefundModal = ({
                   )}
                 </button>
 
-                {hasBankData && (
+                {hasBankData ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold font-admin">
                     <ShieldCheck className="w-3 h-3 text-emerald-600" />
                     <span>VERIFIED</span>
                   </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300 text-[10px] font-semibold font-admin">
+                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                    <span>AWAITING DETAILS</span>
+                  </span>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditingBankDetails(!isEditingBankDetails)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-900 text-white hover:bg-black text-[10px] font-bold font-admin uppercase transition-colors cursor-pointer"
+                  title={isEditingBankDetails ? 'Close bank details form' : hasBankData ? 'Edit bank details' : 'Enter customer bank details'}
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                  <span>{isEditingBankDetails ? 'Close Form' : hasBankData ? 'Edit Details' : 'Enter Bank Details'}</span>
+                </button>
               </div>
             </div>
+
+            {/* If Bank Details Missing and not editing, show prominent Amber Notice */}
+            {!hasBankData && !isEditingBankDetails && !loadingPayout && (
+              <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-lg text-xs space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-amber-900 leading-relaxed font-sans">
+                    <strong className="font-semibold block mb-0.5">Customer Bank Details Missing</strong>
+                    Bank account details were not provided upon order cancellation. Before marking this refund as Completed / Paid, enter the customer's bank account details below or provide the bank transfer UTR number.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingBankDetails(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded-md text-[11px] font-bold font-admin tracking-wider uppercase transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Enter Customer Bank Details</span>
+                </button>
+              </div>
+            )}
+
+            {/* Editable Bank Form (when toggled) */}
+            {isEditingBankDetails && (
+              <div className="p-3.5 bg-neutral-50 border border-neutral-300 rounded-lg space-y-3 font-sans">
+                <div className="flex items-center justify-between pb-1 border-b border-neutral-200">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 font-admin">
+                    Customer Bank Account Information
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingBankDetails(false)}
+                    className="text-[11px] text-neutral-500 hover:text-black uppercase font-admin font-semibold cursor-pointer"
+                  >
+                    Done Editing
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                      Account Holder Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={adminBankDetails.holderName}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
+                        setAdminBankDetails(prev => ({ ...prev, holderName: val }));
+                      }}
+                      placeholder="e.g. Aditi Sharma"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-xs text-neutral-900 focus:outline-none focus:border-black"
+                    />
+                    <span className="text-[10px] text-neutral-400 mt-0.5 block">Name as per bank records</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                      Bank IFSC Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={11}
+                      value={adminBankDetails.ifscCode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11);
+                        setAdminBankDetails(prev => ({ ...prev, ifscCode: val }));
+                      }}
+                      placeholder="e.g. HDFC0008718"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-xs font-mono uppercase text-neutral-900 focus:outline-none focus:border-black"
+                    />
+                    <span className="text-[10px] text-neutral-400 mt-0.5 block">11 characters (5th character 0)</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                      Bank Account Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={18}
+                      value={adminBankDetails.accountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                        setAdminBankDetails(prev => ({ ...prev, accountNumber: val }));
+                      }}
+                      placeholder="e.g. 50100234567890"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-xs font-mono text-neutral-900 focus:outline-none focus:border-black"
+                    />
+                    <span className="text-[10px] text-neutral-400 mt-0.5 block">9 to 18 digits</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                      Confirm Account Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={18}
+                      value={adminBankDetails.confirmAccountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                        setAdminBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
+                      }}
+                      placeholder="Re-enter account number"
+                      className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-xs font-mono text-neutral-900 focus:outline-none focus:border-black"
+                    />
+                    <span className="text-[10px] text-neutral-400 mt-0.5 block">Must match account number</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Payout Data Grid: Account Holder / Acc No / IFSC (All Cards Always Copyable with Visible Copy Button) */}
             {loadingPayout ? (

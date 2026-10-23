@@ -38,7 +38,7 @@ export const AuthSection = () => {
             ATELIER MEMBERSHIP & CONCIERGE
           </span>
           <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark mb-5">
-            ACCESS THE ATELIER
+            ACCESS THE MAISON
           </h2>
           <div className="w-16 h-[1px] bg-neutral-900/30 mx-auto mb-5" />
           <p className="text-xs sm:text-sm md:text-base font-serif text-neutral-700 leading-relaxed font-light">

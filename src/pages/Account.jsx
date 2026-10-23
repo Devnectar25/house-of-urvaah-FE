@@ -54,6 +54,8 @@ const normalizeTabName = (raw) => {
   return VALID_TABS.find((t) => t.toUpperCase() === cleaned) || null;
 };
 
+export { getOrderGstInfo, getItemGstBreakdown, getReturnGstBreakdown } from '../utils/gstHelper';
+
 export const Account = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -213,14 +215,31 @@ export const Account = () => {
 
   const handleCancelOrderInAccount = (ord) => {
     setCancelModalOrder(ord);
-    setSelectedCancelItems([]);
+    const items = (ord.items && Array.isArray(ord.items) && ord.items.length > 0)
+      ? ord.items
+      : [
+          {
+            id: 'item-1',
+            name: ord.product_name || 'DARK BLUE WIDE LEG TAILORED SET',
+            quantity: ord.quantity || 1,
+            price: Number(ord.total || ord.total_amount || 0),
+            image: ord.image || ord.product_image || '/assets/Images/Blue02.png'
+          }
+        ];
+    setSelectedCancelItems(items.map((x, idx) => x.id || x._id || x.productId || `item-${idx}`));
     setCancelReason('');
     setCancelComments('');
 
     const savedBank = getSavedBank(ord);
     setReturnBankDetails(savedBank);
     setBankDetailsError('');
-    setIsEditingCancelBank(!savedBank.accountNumber); // Default to verified card view if saved bank details exist
+    const hasValidSavedBank = Boolean(
+      savedBank.accountNumber &&
+      /^\d{9,18}$/.test(String(savedBank.accountNumber).trim()) &&
+      /^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(savedBank.ifscCode || '').trim().toUpperCase()) &&
+      String(savedBank.holderName || '').trim().length >= 3
+    );
+    setIsEditingCancelBank(!hasValidSavedBank);
   };
 
   const handleCloseCancelModal = () => {
@@ -273,8 +292,18 @@ export const Account = () => {
     cancelModalOrder && (
       (cancelModalOrder.payment_method || '').toLowerCase().includes('cod') ||
       (cancelModalOrder.payment_method || '').toLowerCase().includes('cash') ||
+      (cancelModalOrder.payment_type || '').toLowerCase() === 'cod' ||
       (cancelModalOrder.paymentMethod || '').toLowerCase().includes('cod') ||
-      (cancelModalOrder.paymentMethod || '').toLowerCase().includes('cash')
+      (cancelModalOrder.paymentMethod || '').toLowerCase().includes('cash') ||
+      (cancelModalOrder.paymentType || '').toLowerCase() === 'cod'
+    )
+  );
+
+  const isPaidOrder = Boolean(
+    cancelModalOrder && (
+      (cancelModalOrder.payment_status || '').toLowerCase() === 'paid' ||
+      (cancelModalOrder.paymentStatus || '').toLowerCase() === 'paid' ||
+      Boolean(cancelModalOrder.razorpay_payment_id)
     )
   );
 
@@ -285,8 +314,22 @@ export const Account = () => {
     )
   );
 
-  // Refund Situation: Either post-delivery return (COD or Prepaid) OR pre-delivery online paid cancellation
-  const isRefundSituation = Boolean(cancelModalOrder && (isDeliveredModalOrder || !isCODOrder));
+  const isPrepaidOrder = Boolean(
+    cancelModalOrder && (
+      !isCODOrder ||
+      isPaidOrder ||
+      Boolean(cancelModalOrder.razorpay_payment_id) ||
+      ['upi', 'card', 'online', 'prepaid'].some(m =>
+        (cancelModalOrder.payment_method || '').toLowerCase().includes(m) ||
+        (cancelModalOrder.payment_type || '').toLowerCase().includes(m) ||
+        (cancelModalOrder.paymentMethod || '').toLowerCase().includes(m) ||
+        (cancelModalOrder.paymentType || '').toLowerCase().includes(m)
+      )
+    )
+  );
+
+  // Refund Situation: Either post-delivery return (COD or Prepaid) OR pre-delivery online/prepaid cancellation
+  const isRefundSituation = Boolean(cancelModalOrder && (isDeliveredModalOrder || isPrepaidOrder));
 
   const isBankValid = !isRefundSituation || (
     returnBankDetails.holderName.trim().length >= 3 &&
@@ -297,11 +340,18 @@ export const Account = () => {
   );
 
   const isFormFilled = selectedCancelItems.length > 0 && 
-                       cancelReason.trim().length > 0 && 
-                       isBankValid;
+                       cancelReason.trim().length > 0;
 
   const handleSubmitCancellation = async () => {
-    if (!cancelModalOrder || !isFormFilled) return;
+    if (!cancelModalOrder) return;
+    if (selectedCancelItems.length === 0) {
+      setBankDetailsError('Please select at least one product to cancel.');
+      return;
+    }
+    if (!cancelReason.trim()) {
+      setBankDetailsError('Please select a reason for cancellation.');
+      return;
+    }
 
     if (isRefundSituation) {
       const cleanHolder = (returnBankDetails.holderName || '').trim();
@@ -310,50 +360,61 @@ export const Account = () => {
       const cleanConfirm = (returnBankDetails.confirmAccountNumber || '').trim();
 
       if (!cleanHolder) {
-        setBankDetailsError('Please enter the Account Holder Name.');
+        setBankDetailsError('Please enter the Account Holder Name for your refund disbursement.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (cleanHolder.length < 3 || !/^[a-zA-Z\s.]{3,70}$/.test(cleanHolder)) {
         setBankDetailsError('Account Holder Name must be at least 3 characters and contain only letters.');
+        setIsEditingCancelBank(true);
         return;
       }
 
       if (!cleanIfsc) {
-        setBankDetailsError('Please enter your Bank IFSC Code.');
+        setBankDetailsError('Please enter your Bank IFSC Code for refund transfer.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (cleanIfsc.length !== 11) {
         setBankDetailsError(`Bank IFSC Code must be exactly 11 characters (currently ${cleanIfsc.length} characters). Example: HDFC0008718.`);
+        setIsEditingCancelBank(true);
         return;
       }
       if (cleanIfsc[4] !== '0') {
         setBankDetailsError('Invalid IFSC Code: The 5th character must be the digit 0 (zero), not the letter O.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
         setBankDetailsError('Invalid Bank IFSC Code format. Must be 4 letters, followed by 0, followed by 6 alphanumeric characters (e.g. HDFC0008718).');
+        setIsEditingCancelBank(true);
         return;
       }
 
       if (!cleanAccount) {
-        setBankDetailsError('Please enter your Bank Account Number.');
+        setBankDetailsError('Please enter your Bank Account Number for refund payout.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (!/^\d+$/.test(cleanAccount)) {
         setBankDetailsError('Bank Account Number must contain numbers only.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (cleanAccount.length < 9 || cleanAccount.length > 18) {
         setBankDetailsError(`Bank Account Number must be between 9 and 18 digits (currently ${cleanAccount.length} digits).`);
+        setIsEditingCancelBank(true);
         return;
       }
 
       if (!cleanConfirm) {
         setBankDetailsError('Please confirm your Bank Account Number.');
+        setIsEditingCancelBank(true);
         return;
       }
       if (cleanAccount !== cleanConfirm) {
         setBankDetailsError('Bank Account Numbers do not match. Please verify and re-enter.');
+        setIsEditingCancelBank(true);
         return;
       }
     }
@@ -383,6 +444,10 @@ export const Account = () => {
           bankDetails: cleanBankDetails
         })
       });
+      if (cleanBankDetails?.accountNumber) {
+        persistSavedBank(cleanBankDetails);
+      }
+
       setOrders((prev) =>
         prev.map((o) => (o.id === ord.id || o.order_number === orderNum ? {
           ...o,
@@ -1790,7 +1855,8 @@ export const Account = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative z-10 w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-9 border border-neutral-100 max-h-[90vh] overflow-y-auto text-left"
+              className="relative z-10 w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-9 border border-neutral-100 max-h-[90vh] overflow-y-auto no-scrollbar scrollbar-none text-left"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {/* Close Button */}
               <button
@@ -1815,7 +1881,7 @@ export const Account = () => {
               </div>
               <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
                 {isDeliveredModalOrder
-                  ? 'Request a return for your delivered atelier piece(s). Our concierge team will coordinate reverse pickup and process your 100% full refund.'
+                  ? 'Request a return for your delivered piece(s). Our concierge team will coordinate reverse pickup and process your 100% full refund.'
                   : "We're sorry to see you cancel. Please tell us why you're cancelling your order."}
               </p>
 
@@ -1837,7 +1903,10 @@ export const Account = () => {
                   </div>
 
                   {/* Products List */}
-                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                  <div 
+                    className="space-y-2.5 max-h-56 overflow-y-auto no-scrollbar scrollbar-none pr-1"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
                     {cancelModalItems.map((item, idx) => {
                       const itemId = item.id || item._id || item.productId || `item-${idx}`;
                       const isSelected = selectedCancelItems.includes(itemId);
@@ -2014,10 +2083,10 @@ export const Account = () => {
                                 confirmAccountNumber: prev.accountNumber
                               }));
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wider text-brand-dark hover:underline uppercase shrink-0 pt-0.5 cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wider text-brand-dark hover:opacity-75 no-underline hover:no-underline uppercase shrink-0 pt-0.5 cursor-pointer"
                           >
                             <Pencil className="w-3 h-3" />
-                            <span>CHANGE</span>
+                            <span className="no-underline">CHANGE</span>
                           </button>
                         </div>
                       </div>
@@ -2203,10 +2272,10 @@ export const Account = () => {
                     </span>
                     <p className="text-[11px] sm:text-xs leading-relaxed font-normal text-amber-950">
                       {isDeliveredModalOrder
-                        ? 'Your post-delivery cancellation request will be submitted to our atelier team for review. Upon approval, pickup back to House of Urvaah is scheduled and your refund will be processed via the Refund Desk.'
+                        ? 'Your post-delivery cancellation request will be submitted to our team for review. Upon approval, pickup back to House of Urvaah is scheduled and your refund will be processed via the Refund Desk.'
                         : isCODOrder
                         ? 'Your request will be submitted for admin review prior to delivery. Once approved, this Cash on Delivery order will be cancelled with no payment due.'
-                        : 'Your request will be submitted to our atelier team for approval. Upon approval, online/UPI payments will be routed directly to our Refund Desk for full disbursement.'}
+                        : 'Your request will be submitted to our team for approval. Upon approval, online/UPI payments will be routed directly to our Refund Desk for full disbursement.'}
                     </p>
                   </div>
                 </div>
@@ -2323,6 +2392,9 @@ export const Account = () => {
                         }
                       ];
 
+                  const gstInfo = getOrderGstInfo(returnReplaceModalOrder);
+                  const isSingle = currentItems.length === 1;
+
                   return (
                     <div className="space-y-3">
                       <span className="text-[11px] font-bold text-neutral-700 uppercase tracking-wider block">
@@ -2338,7 +2410,7 @@ export const Account = () => {
                         };
                         const itemAction = currentState.action;
                         const itemImg = getSupabaseMediaUrl(item.image || item.image_url || '/assets/Images/Blue02.png');
-                        const unitPrice = Number(item.price || item.unit_price || 0);
+                        const breakdown = getItemGstBreakdown(item, gstInfo, isSingle);
 
                         return (
                           <div
@@ -2366,15 +2438,27 @@ export const Account = () => {
                                 <div className="min-w-0">
                                   <p className="font-bold text-neutral-900 truncate">{item.name || item.title || item.product_name || 'Atelier Item'}</p>
                                   <p className="text-[11px] text-neutral-500">
-                                    Size: <strong className="text-neutral-800">{item.size || item.selectedSize || 'M'}</strong> • Qty: {item.quantity || 1}
+                                    Size: <strong className="text-neutral-800">{item.size || item.selectedSize || 'M'}</strong> • Qty: {breakdown.qty}
                                   </p>
                                 </div>
                               </div>
 
                               <div className="text-right shrink-0">
                                 <span className="font-bold text-neutral-900 block text-sm">
-                                  ₹{unitPrice.toLocaleString('en-IN')}
+                                  ₹{breakdown.totalWithTax.toLocaleString('en-IN')}
                                 </span>
+                                {breakdown.taxAmount > 0 ? (
+                                  <div className="text-[10px] text-neutral-500 font-sans leading-tight mt-0.5 space-y-0.5">
+                                    <div>
+                                      Base: <span className="font-medium text-neutral-700">₹{breakdown.baseTotal.toLocaleString('en-IN')}</span>
+                                    </div>
+                                    <div className="text-amber-900 font-semibold bg-amber-50/90 px-1.5 py-0.5 rounded border border-amber-200/80 inline-block">
+                                      + GST ({breakdown.taxRate}%): ₹{breakdown.taxAmount.toLocaleString('en-IN')}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-400 block mt-0.5">Incl. all taxes</span>
+                                )}
                               </div>
                             </div>
 
@@ -2435,7 +2519,7 @@ export const Account = () => {
 
                               {/* Return Specific Option */}
                               {itemAction === 'Return' && (
-                                <div className="mt-3 p-2.5 bg-white rounded-lg border border-amber-200 text-xs space-y-1.5 animate-in fade-in duration-150">
+                                <div className="mt-3 p-2.5 bg-white rounded-lg border border-amber-200 text-xs space-y-2 animate-in fade-in duration-150">
                                   <label className="block text-[10px] font-bold text-amber-900 uppercase">
                                     Reason for Returning
                                   </label>
@@ -2458,9 +2542,22 @@ export const Account = () => {
                                     <option value="Changed my mind">Changed my mind</option>
                                     <option value="Other">Other</option>
                                   </select>
-                                  <p className="text-[10px] text-amber-800">
-                                    Refund of ₹{unitPrice.toLocaleString('en-IN')} will be credited upon doorstep collection & atelier QC.
-                                  </p>
+                                  <div className="pt-1 text-[11px] text-amber-900 space-y-0.5">
+                                    <div className="flex items-center justify-between font-semibold">
+                                      <span>Refund Breakdown:</span>
+                                      <span className="font-bold text-amber-950">₹{breakdown.totalWithTax.toLocaleString('en-IN')} Total</span>
+                                    </div>
+                                    {breakdown.taxAmount > 0 && (
+                                      <div className="text-[10px] text-amber-800 flex items-center gap-1.5 font-medium">
+                                        <span>Base Price: ₹{breakdown.baseTotal.toLocaleString('en-IN')}</span>
+                                        <span>•</span>
+                                        <span className="text-emerald-800 font-bold">Refundable GST ({breakdown.taxRate}%): +₹{breakdown.taxAmount.toLocaleString('en-IN')}</span>
+                                      </div>
+                                    )}
+                                    <p className="text-[10px] text-amber-700 pt-0.5">
+                                      Refund of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (including ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST)` : ''} will be credited upon doorstep collection & atelier QC.
+                                    </p>
+                                  </div>
                                 </div>
                               )}
 
@@ -2587,9 +2684,15 @@ export const Account = () => {
                                       </div>
                                     )}
 
-                                    <p className="text-[10px] text-purple-800">
-                                      Complimentary reverse pickup will collect this piece and your preferred size will be dispatched.
-                                    </p>
+                                    <div className="pt-1 text-[10.5px] text-purple-900 space-y-0.5">
+                                      <div className="flex items-center justify-between text-[11px] font-semibold text-purple-950">
+                                        <span>Exchange Balance: ₹0 (No Additional Payment)</span>
+                                        <span className="text-[10px] bg-purple-100/90 text-purple-800 px-1.5 py-0.5 rounded font-medium">100% Value Transferred</span>
+                                      </div>
+                                      <p className="text-[10px] text-purple-700">
+                                        Complimentary reverse pickup will collect this piece. Full value of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (₹${breakdown.baseTotal.toLocaleString('en-IN')} item + ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST at ${breakdown.taxRate}%)` : ''} is carried over to your replacement piece.
+                                      </p>
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -2613,25 +2716,48 @@ export const Account = () => {
                         }
                       ];
 
+                  const gstInfo = getOrderGstInfo(returnReplaceModalOrder);
+                  const isSingle = currentItems.length === 1;
+
                   let keptC = 0;
                   let retC = 0;
                   let repC = 0;
-                  let refTotal = 0;
+                  let retBaseTotal = 0;
+                  let retGstTotal = 0;
+                  let repBaseTotal = 0;
+                  let repGstTotal = 0;
 
                   currentItems.forEach(it => {
                     const k = it.id || it.product_id;
                     const act = itemActionsState[k]?.action || (currentItems.length <= 1 ? 'Return' : 'Keep');
-                    const p = Number(it.price || 0) * (it.quantity || 1);
+                    const b = getItemGstBreakdown(it, gstInfo, isSingle);
                     if (act === 'Keep') keptC++;
-                    else if (act === 'Return') { retC++; refTotal += p; }
-                    else if (act === 'Replace') repC++;
+                    else if (act === 'Return') {
+                      retC++;
+                      retBaseTotal += b.baseTotal;
+                      retGstTotal += b.taxAmount;
+                    } else if (act === 'Replace') {
+                      repC++;
+                      repBaseTotal += b.baseTotal;
+                      repGstTotal += b.taxAmount;
+                    }
                   });
 
+                  const totalRefundAmount = retBaseTotal + retGstTotal;
+
                   return (
-                    <div className="p-3 bg-neutral-900 text-white rounded-xl text-xs space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
-                        REQUEST SUMMARY
-                      </span>
+                    <div className="p-3.5 bg-neutral-900 text-white rounded-xl text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                          REQUEST SUMMARY
+                        </span>
+                        {retC > 0 && gstInfo.taxRate > 0 && (
+                          <span className="text-[10px] text-amber-300 font-mono font-medium">
+                            GST Refund Included ({gstInfo.taxRate}%)
+                          </span>
+                        )}
+                      </div>
+
                       <div className="flex flex-wrap items-center gap-2 pt-0.5">
                         {keptC > 0 && (
                           <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-md text-[11px] font-semibold">
@@ -2640,7 +2766,7 @@ export const Account = () => {
                         )}
                         {retC > 0 && (
                           <span className="px-2 py-0.5 bg-amber-950 text-amber-300 border border-amber-800 rounded-md text-[11px] font-semibold">
-                            {retC} Return (Refund: ₹{refTotal.toLocaleString('en-IN')})
+                            {retC} Return (Refund: ₹{totalRefundAmount.toLocaleString('en-IN')})
                           </span>
                         )}
                         {repC > 0 && (
@@ -2649,6 +2775,37 @@ export const Account = () => {
                           </span>
                         )}
                       </div>
+
+                      {/* Financial Breakdown with GST */}
+                      {retC > 0 && (
+                        <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-sans">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-neutral-300">
+                            <span>Item Base: <strong className="text-white">₹{retBaseTotal.toLocaleString('en-IN')}</strong></span>
+                            <span>+</span>
+                            <span className="text-amber-300 font-semibold">
+                              GST ({gstInfo.taxRate}%): <strong>₹{retGstTotal.toLocaleString('en-IN')}</strong>
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-neutral-400 text-[10px] block">Total Refund to Bank:</span>
+                            <span className="text-emerald-400 font-bold text-sm">₹{totalRefundAmount.toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {repC > 0 && retC === 0 && (
+                        <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-sans">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-neutral-300">
+                            <span>Garment Value: <strong className="text-white">₹{repBaseTotal.toLocaleString('en-IN')}</strong></span>
+                            <span>+</span>
+                            <span>GST ({gstInfo.taxRate}%): <strong className="text-purple-300">₹{repGstTotal.toLocaleString('en-IN')}</strong></span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-neutral-400 text-[10px] block">Exchange Balance:</span>
+                            <span className="text-white font-bold text-sm">₹0 (Free Exchange)</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -2661,6 +2818,21 @@ export const Account = () => {
                   const hasReturn = currentItems.some(it => (itemActionsState[it.id || it.product_id]?.action || (currentItems.length <= 1 ? 'Return' : 'Keep')) === 'Return');
 
                   if (!hasReturn) return null;
+
+                  const gstInfo = getOrderGstInfo(returnReplaceModalOrder);
+                  const isSingle = currentItems.length === 1;
+                  let retBaseTotal = 0;
+                  let retGstTotal = 0;
+                  currentItems.forEach((it) => {
+                    const k = it.id || it.product_id;
+                    const act = itemActionsState[k]?.action || (currentItems.length <= 1 ? 'Return' : 'Keep');
+                    if (act === 'Return') {
+                      const b = getItemGstBreakdown(it, gstInfo, isSingle);
+                      retBaseTotal += b.baseTotal;
+                      retGstTotal += b.taxAmount;
+                    }
+                  });
+                  const totalRefundForBank = retBaseTotal + retGstTotal;
 
                   return (
                     <div className="p-3.5 sm:p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3 text-xs">
@@ -2675,7 +2847,14 @@ export const Account = () => {
                       </div>
 
                       <p className="text-[11px] text-neutral-600 leading-relaxed">
-                        Please verify your bank details so our finance desk can disburse your refund directly via secure IMPS / NEFT transfer upon return arrival.
+                        Please verify your bank details so our finance desk can disburse your full refund of{' '}
+                        <strong className="text-neutral-900 font-bold">
+                          ₹{totalRefundForBank.toLocaleString('en-IN')}
+                        </strong>
+                        {retGstTotal > 0 && (
+                          <span> (inclusive of ₹{retGstTotal.toLocaleString('en-IN')} GST at {gstInfo.taxRate}%)</span>
+                        )}{' '}
+                        directly via secure IMPS / NEFT transfer upon return arrival.
                       </p>
 
                       {/* Saved Bank Details Card View */}
@@ -2715,10 +2894,10 @@ export const Account = () => {
                                   confirmAccountNumber: prev.accountNumber
                                 }));
                               }}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wider text-brand-dark hover:underline uppercase shrink-0 pt-0.5 cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wider text-brand-dark hover:opacity-75 no-underline hover:no-underline uppercase shrink-0 pt-0.5 cursor-pointer"
                             >
                               <Pencil className="w-3 h-3" />
-                              <span>CHANGE</span>
+                              <span className="no-underline">CHANGE</span>
                             </button>
                           </div>
                         </div>
@@ -3891,52 +4070,63 @@ export const Account = () => {
                     statusLower.includes('return') ||
                     logLower.includes('return') ||
                     logLower.includes('reverse') ||
-                    ord.return_pickup_scheduled ||
-                    ord.return_reason
+                    ord.return_rejection_reason ||
+                    ord.return_qc_status ||
+                    (Array.isArray(ord.items) && ord.items.some(it => (it.status || '').toLowerCase().includes('return') || (it.return_action || '').toLowerCase() === 'return')) ||
+                    (ord.return_reason && !isReplacementIntent)
                   );
-
-                  const isReturnRequested = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                  const isReturnQcRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'return qc rejected' ||
+                    (ord.return_qc_status || '').toLowerCase() === 'rejected'
+                  );
+                  const isReturnRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'return rejected' ||
+                    isReturnQcRejected ||
+                    (statusLower === 'delivered' && (
+                      Boolean(ord.return_rejection_reason) ||
+                      Boolean(ord.rejection_reason)
+                    ) && !(
+                      (ord.return_type || '').toLowerCase().includes('replace') ||
+                      Boolean(ord.replacement_size) ||
+                      (ord.return_rejection_reason || '').toLowerCase().includes('replace') ||
+                      (ord.rejection_reason || '').toLowerCase().includes('replace')
+                    )) ||
+                    (Boolean(ord.return_rejection_reason) && !(ord.return_rejection_reason || '').toLowerCase().includes('replace'))
+                  );
+                  const isReturnRequested = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturnRejected && (
                     statusLower === 'return requested' || 
                     statusLower === 'return request processing' || 
-                    logLower === 'return initiated' ||
+                    logLower === 'return initiated' || 
                     logLower === 'return requested'
                   );
-                  const isReturnApproved = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                  const isReturnApproved = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturnRejected && (
                     statusLower === 'return approved' || 
                     statusLower === 'return pickup scheduled' || 
                     (statusLower.includes('pickup scheduled') && (statusLower.includes('return') || logLower.includes('return'))) || 
                     logLower.includes('return pickup scheduled') || 
                     logLower.includes('reverse pickup scheduled')
                   );
-                  const isReturnCollected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                  const isReturnCollected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturnRejected && (
                     statusLower.includes('collected') || 
                     statusLower.includes('in transit to') || 
                     statusLower.includes('reverse transit') || 
                     logLower.includes('reverse transit') || 
                     (logLower.includes('collected') && hasReturnIntent)
                   );
-                  const isReturned = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                  const isReturned = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturnRejected && (
                     statusLower === 'returned' || 
                     statusLower === 'return completed' || 
                     statusLower === 'refunded' ||
                     isRefundCompleted ||
                     (ord.refund_status && String(ord.refund_status).toLowerCase() === 'completed')
                   );
-                  const isReceivedAtUrvaah = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturned && (
+                  const isReceivedAtUrvaah = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturnRejected && !isReturned && (
                     statusLower === 'received at house of urvaah' || 
                     statusLower === 'received at urvaah house' || 
                     statusLower === 'received at homved' ||
                     logLower.includes('received at house of urvaah')
                   );
-                  const isReturnQcRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
-                    statusLower === 'return qc rejected' ||
-                    ord.return_qc_status === 'Rejected'
-                  );
-                  const isReturnRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
-                    statusLower === 'return rejected' ||
-                    isReturnQcRejected
-                  );
-                  const isInReturnFlow = hasReturnIntent && (isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned || isReturnRejected || isReturnQcRejected);
+                  const isInReturnFlow = hasReturnIntent && !isReturnRejected && (isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned);
 
                   // Post-delivery Replacement Flow States (Original parent order)
                   const isReplacementRequested = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replacement request processing' || statusLower === 'replace requested' || statusLower === 'replacement requested');
@@ -4060,6 +4250,8 @@ export const Account = () => {
                               ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
                               : isReplacementRejected
                               ? 'bg-rose-50 text-rose-900 border-rose-200'
+                              : isReturnRejected
+                              ? 'bg-rose-50 text-rose-900 border-rose-200 font-bold'
                               : isReturnRequested
                               ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
                               : isReturnApproved
@@ -4068,8 +4260,6 @@ export const Account = () => {
                               ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
                               : isReturned
                               ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
-                              : isReturnRejected
-                              ? 'bg-rose-50 text-rose-900 border-rose-200'
                               : isDelivered
                               ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                               : isOutForDelivery
@@ -4112,13 +4302,12 @@ export const Account = () => {
                               isReplacementQCReceived ? 'ATELIER QC VERIFIED' :
                               isReplaced ? 'REPLACEMENT DISPATCHED' :
                               isReplacementRejected ? 'REPLACEMENT REJECTED' :
+                              isReturnRejected ? (isReturnQcRejected ? 'RETURN REJECTED (QC FAILED)' : 'RETURN REJECTED') :
                               isReturnRequested ? 'RETURN REQUESTED' :
                               isReturnCollected ? 'RETURN IN TRANSIT' :
                               isReturnApproved ? 'RETURN PICKUP SCHEDULED' :
                               isReceivedAtUrvaah ? 'RECEIVED AT ATELIER' :
                               isReturned ? 'RETURNED & REFUNDED' :
-                              isReturnQcRejected ? 'QC REJECTED (WRONG/DAMAGED)' :
-                              isReturnRejected ? 'RETURN REJECTED' :
                               orderStatus
                             }</span>
                           </span>
@@ -4133,7 +4322,9 @@ export const Account = () => {
 
                           {/* Payment / Refund Status Badge */}
                           <span className={`px-3 py-1 text-[10px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border ${
-                            isCancelled
+                            isReturnQcRejected || (isReturnRejected && (ord.refund_status || '').toLowerCase() === 'cancelled')
+                              ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold'
+                              : isCancelled
                               ? (isPaid || isOnlinePayment)
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                 : 'bg-neutral-100 text-neutral-700 border-neutral-200'
@@ -4141,7 +4332,9 @@ export const Account = () => {
                               ? 'bg-neutral-900 text-white border-neutral-900'
                               : 'bg-neutral-100 text-neutral-700 border-neutral-200'
                           }`}>
-                            {isCancelled
+                            {isReturnQcRejected || (isReturnRejected && (ord.refund_status || '').toLowerCase() === 'cancelled')
+                              ? 'REFUND CANCELLED'
+                              : isCancelled
                               ? ((isPaid || isOnlinePayment)
                                   ? (['refunded', 'completed'].includes((ord.refund_status || '').toLowerCase()) ? 'REFUND SETTLED' : 'REFUND INITIATED')
                                   : 'COD • ZERO DUE')
@@ -4313,6 +4506,141 @@ export const Account = () => {
                             </p>
                             <p className="text-[11px] text-neutral-600 leading-relaxed pt-1">
                               Because the returned garment did not pass atelier quality verification, the replacement request has been declined and no forward exchange parcel will be dispatched.
+                            </p>
+                          </div>
+                        </div>
+                      ) : isReturnQcRejected ? (
+                        <div className="bg-[#FAF8F3] border border-rose-300 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-rose-950 uppercase font-semibold flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                              <span>RETURN REJECTED • QC FAILED • REFUND CANCELLED</span>
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-rose-800 font-bold px-2.5 py-0.5 bg-rose-100 rounded-full border border-rose-300">
+                              QC REJECTED
+                            </span>
+                          </div>
+
+                          {/* 4-Step Journey showing where the process was stopped */}
+                          <div className="grid grid-cols-4 gap-2 relative py-1">
+                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-neutral-900 via-indigo-600 to-rose-600 w-full" />
+                            </div>
+
+                            {/* Step 1: Return Requested */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-neutral-900 text-white ring-4 ring-neutral-200 text-xs shadow-xs">
+                                ✓
+                              </div>
+                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-neutral-900">
+                                REQUESTED
+                              </span>
+                            </div>
+
+                            {/* Step 2: Parcel Collected */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-indigo-700 text-white ring-4 ring-indigo-100 text-xs shadow-xs">
+                                ✓
+                              </div>
+                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-indigo-900">
+                                PICKED UP
+                              </span>
+                            </div>
+
+                            {/* Step 3: Atelier QC Failed */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-rose-600 text-white ring-4 ring-rose-100 text-xs shadow-xs">
+                                ✕
+                              </div>
+                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-rose-700 font-bold">
+                                QC REJECTED
+                              </span>
+                            </div>
+
+                            {/* Step 4: Refund Cancelled */}
+                            <div className="flex flex-col items-center text-center z-10">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-neutral-800 text-white ring-4 ring-neutral-200 text-xs shadow-xs">
+                                ✕
+                              </div>
+                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-rose-900 font-bold">
+                                REFUND CANCELLED
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Inspection Reason & Financial Cancelled Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                            <div className="bg-white border border-rose-200 rounded-xl p-3.5 space-y-2">
+                              <div className="flex items-center justify-between text-rose-950">
+                                <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>QC Inspection Findings:</span>
+                                </span>
+                                <span className="text-[10px] text-neutral-500">
+                                  {ord.updated_at ? new Date(ord.updated_at).toLocaleDateString('en-IN') : 'Recent'}
+                                </span>
+                              </div>
+                              <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded-lg border border-rose-200 leading-relaxed">
+                                "{ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason || 'Wrong or damaged product received during QC inspection'}"
+                              </p>
+                              <p className="text-[11px] text-neutral-600 leading-relaxed">
+                                The returned parcel arrived at the House of Urvaah atelier but failed quality inspection. The product was not accepted into inventory.
+                              </p>
+                            </div>
+
+                            <div className="bg-white border border-rose-200 rounded-xl p-3.5 space-y-2">
+                              <div className="flex items-center justify-between text-rose-950">
+                                <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                  <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>Financial Settlement:</span>
+                                </span>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 uppercase">
+                                  Refund Cancelled
+                                </span>
+                              </div>
+                              <div className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200 space-y-1 text-[11px]">
+                                <div className="flex justify-between text-neutral-600">
+                                  <span>Refund Amount:</span>
+                                  <span className="font-semibold text-neutral-400 line-through">₹{Number(ord.total || orderTotal).toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between text-rose-900 font-bold">
+                                  <span>Payable Refund:</span>
+                                  <span className="font-mono">₹0.00 (Cancelled)</span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-neutral-600 leading-relaxed">
+                                Because the returned garment did not pass quality check, the refund for this return has been cancelled. For further queries, please contact concierge care.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : isReturnRejected ? (
+                        <div className="bg-[#FAF8F3] border border-rose-300 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-rose-950 uppercase font-semibold flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                              <span>RETURN REQUEST DECLINED • ATELIER AUDIT</span>
+                            </h4>
+                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-rose-700 font-semibold px-2.5 py-0.5 bg-rose-100 rounded-full border border-rose-200">
+                              RETURN REJECTED
+                            </span>
+                          </div>
+
+                          <div className="p-3.5 bg-white border border-rose-200 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between text-rose-950">
+                              <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Return Request Status:</span>
+                              </span>
+                              <span className="text-[10px] text-neutral-500">
+                                {ord.updated_at ? new Date(ord.updated_at).toLocaleDateString('en-IN') : 'Recent'}
+                              </span>
+                            </div>
+                            <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded-lg border border-rose-200">
+                              "{ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason || 'Return request rejected by Admin / Not eligible for return'}"
+                            </p>
+                            <p className="text-[11px] text-neutral-600 leading-relaxed pt-1">
+                              Your return request for this order was reviewed and declined by the Maison admin team. This order remains marked as delivered and no reverse pickup will be scheduled.
                             </p>
                           </div>
                         </div>
@@ -4695,7 +5023,7 @@ export const Account = () => {
                               </span>
                             </div>
                             <p className="text-amber-900/90 leading-relaxed font-normal">
-                              Your returned garment has arrived at the atelier and passed quality inspection. Your replacement forward order is being prepared and dispatched.
+                              Your returned garment has arrived at the Maison and passed quality inspection. Your replacement forward order is being prepared and dispatched.
                             </p>
                           </div>
                         </div>
@@ -4717,7 +5045,7 @@ export const Account = () => {
                                 </span>
                               </div>
                               <p className="text-purple-900/90 leading-relaxed font-normal">
-                                Your replacement order has been placed in the atelier dispatch queue with 100% exchange credit. You can track its live forward journey below.
+                                Your replacement order has been placed in the Maison dispatch queue with 100% exchange credit. You can track its live forward journey below.
                               </p>
                               {ord.replacement_size && (
                                 <p className="text-[11px] text-purple-950 pt-0.5 font-medium">
@@ -4746,11 +5074,65 @@ export const Account = () => {
                               Replacement Request Not Approved
                             </h4>
                             <p className="text-rose-900/90 leading-relaxed font-normal">
-                              Your replacement request could not be approved by the atelier team. For further assistance or alternate sizing options, please contact our concierge care.
+                              Your replacement request could not be approved by the Maison team. For further assistance or alternate sizing options, please contact our concierge care.
                             </p>
                           </div>
                         </div>
                       )}
+
+                      {/* Post-Delivery Return Rejected / QC Rejected Banner */}
+                      {isReturnQcRejected ? (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return QC Failed — Refund Cancelled
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
+                                QC Rejected
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 uppercase">
+                                Refund Cancelled
+                              </span>
+                            </div>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              The returned parcel was inspected by our atelier QC team and could not be accepted into inventory. As per our store policy, the return has been rejected and the refund has been cancelled.
+                            </p>
+                            {(ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason) && (
+                              <p className="text-[11px] text-rose-800 pt-1 font-medium">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">QC Findings / Reason:</span> {ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : isReturnRejected ? (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Return Request Declined by Admin
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
+                                Request Declined
+                              </span>
+                            </div>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              Your return request for this order was reviewed and declined by the Maison admin team. This order remains delivered and no return pickup will be dispatched.
+                            </p>
+                            {(ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason) && (
+                              <p className="text-[11px] text-rose-800 pt-1 font-medium">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Reason:</span> {ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
 
                       {/* Post-Delivery Return Requested Review Banner */}
                       {isReturnRequested && (
@@ -4875,26 +5257,6 @@ export const Account = () => {
                             <p className="text-emerald-900/90 leading-relaxed font-normal">
                               Full refund of ₹{Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed{ord.refund_method ? ` via ${ord.refund_method}` : ''}.
                               {ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Transaction Reference / UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Return Rejected / QC Rejected Banner */}
-                      {isReturnRejected && (
-                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
-                            <AlertCircle className="w-5 h-5 text-rose-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
-                              {isReturnQcRejected ? 'Return Rejected During Atelier QC Inspection' : 'Return Request Not Approved'}
-                            </h4>
-                            <p className="text-rose-900/90 leading-relaxed font-normal">
-                              {isReturnQcRejected
-                                ? `The returned parcel received at our atelier was inspected by our QC team and could not be accepted${ord.return_rejection_reason ? `: "${ord.return_rejection_reason}".` : ' (wrong or damaged product received).'} As per our policy, the refund cannot be initiated for this return.`
-                                : (ord.return_rejection_reason || 'Your return request could not be approved by the atelier team. For questions regarding atelier policies, please reach out to customer care.')
-                              }
                             </p>
                           </div>
                         </div>
@@ -5228,7 +5590,7 @@ export const Account = () => {
                           )}
 
                           {/* Unified Return / Replace Button (Post-Delivery Only) */}
-                          {isDelivered && !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (
+                          {isDelivered && !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && !isReturnRejected && !isReplacementRejected && (
                             <button
                               type="button"
                               onClick={() => handleOpenReturnReplaceModal(ord)}
@@ -5311,6 +5673,20 @@ export const Account = () => {
                             <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Refund Completed</span>
+                            </span>
+                          )}
+
+                          {isReturnRejected && (
+                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Return Request Declined by Admin</span>
+                            </span>
+                          )}
+
+                          {isReplacementRejected && (
+                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Replacement Rejected</span>
                             </span>
                           )}
 
@@ -5807,7 +6183,8 @@ export const Account = () => {
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              className="relative z-10 w-full max-w-2xl bg-white rounded-2xl overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 text-left max-h-[85vh] overflow-y-auto border border-neutral-200"
+              className="relative z-10 w-full max-w-2xl bg-white rounded-2xl overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 text-left max-h-[85vh] overflow-y-auto no-scrollbar scrollbar-none border border-neutral-200"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b border-neutral-200">
