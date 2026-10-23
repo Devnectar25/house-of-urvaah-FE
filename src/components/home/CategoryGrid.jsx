@@ -289,7 +289,13 @@ export const CategoryGrid = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    addToCart(product);
+                    const sizeStock = product?.sizeStock || product?.size_stock || {};
+                    const sizes = Array.isArray(product?.sizes) && product.sizes.length > 0 ? product.sizes : ['XS', 'S', 'M', 'L', 'XL'];
+                    const sizeToUse = sizes.find(sz => {
+                      const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+                      return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : true;
+                    }) || 'M';
+                    addToCart(product, sizeToUse);
                   }}
                   className="absolute bottom-2.5 right-2.5 z-10 p-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-white/90 shadow-md text-brand-dark hover:bg-black hover:text-white transition-all transform hover:scale-105"
                   aria-label="Add to Shopping Bag"

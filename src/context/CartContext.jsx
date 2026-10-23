@@ -2,13 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import { supabase } from '../lib/supabase';
 import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, clearAuthSession } from '../lib/apiClient';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
+import { checkItemStockStatus } from '../utils/stockValidator';
 
 const CartContext = createContext();
 
 export const getCartItemKey = (item) => {
   if (!item) return '';
   const prodId = item.product?.id || item.id || item.productId || '';
-  const size = item.selectedSize || item.size || 'M';
+  const size = (item.selectedSize || item.size || 'M').trim().toUpperCase();
   return `${String(prodId).trim()}_${String(size).trim()}`;
 };
 
@@ -101,10 +102,25 @@ export const CartProvider = ({ children }) => {
       addresses: userData.addresses || [],
       memberSince: userData.memberSince || userData.member_since || null,
       avatar: userData.avatar || userData.avatar_url || '',
-      bankDetails: userData.bankDetails || {
-        accountNumber: userData.refund_bank_account || '',
-        ifscCode: userData.refund_ifsc_code || '',
-        holderName: userData.refund_holder_name || ''
+      bankDetails: {
+        accountNumber: userData.bankDetails?.accountNumber || userData.refund_bank_account || (() => {
+          try {
+            const raw = localStorage.getItem('urvaah_saved_bank');
+            return raw ? JSON.parse(raw)?.accountNumber || '' : '';
+          } catch (e) { return ''; }
+        })(),
+        ifscCode: userData.bankDetails?.ifscCode || userData.refund_ifsc_code || (() => {
+          try {
+            const raw = localStorage.getItem('urvaah_saved_bank');
+            return raw ? JSON.parse(raw)?.ifscCode || '' : '';
+          } catch (e) { return ''; }
+        })(),
+        holderName: userData.bankDetails?.holderName || userData.refund_holder_name || (() => {
+          try {
+            const raw = localStorage.getItem('urvaah_saved_bank');
+            return raw ? JSON.parse(raw)?.holderName || '' : '';
+          } catch (e) { return ''; }
+        })()
       }
     };
   };
@@ -120,6 +136,11 @@ export const CartProvider = ({ children }) => {
         if (formatted) {
           setUser(formatted);
           setStoredUser(formatted);
+          if (formatted.bankDetails?.accountNumber) {
+            try {
+              localStorage.setItem('urvaah_saved_bank', JSON.stringify(formatted.bankDetails));
+            } catch (e) {}
+          }
         }
       }
     } catch (err) {
@@ -147,6 +168,11 @@ export const CartProvider = ({ children }) => {
         });
         setUser(formatted);
         setStoredUser(formatted);
+        if (formatted?.bankDetails?.accountNumber) {
+          try {
+            localStorage.setItem('urvaah_saved_bank', JSON.stringify(formatted.bankDetails));
+          } catch (e) {}
+        }
         return { success: true };
       }
       return { success: false, error: res.message || 'Update failed' };
@@ -320,36 +346,80 @@ export const CartProvider = ({ children }) => {
       .then((res) => {
         if (res.success && Array.isArray(res.data)) {
           if (res.data.length > 0) {
-            const mappedBackendCart = res.data.map((item) => {
-              const sizeStock = item.sizeStock || item.size_stock || {};
-              const stock = (item.stockQuantity !== null && item.stockQuantity !== undefined)
-                ? Number(item.stockQuantity)
-                : ((item.stock_quantity !== null && item.stock_quantity !== undefined)
-                  ? Number(item.stock_quantity)
-                  : (Object.keys(sizeStock).length > 0
-                      ? Object.values(sizeStock).reduce((acc, v) => acc + (parseInt(v, 10) || 0), 0)
-                      : 0));
-              const clampedQty = stock > 0 ? Math.max(1, Math.min(Number(item.quantity || 1), stock)) : Number(item.quantity || 1);
-              return {
-                product: {
-                  id: String(item.productId || item.product_id || item.id),
-                  name: item.name || item.productname || item.title || 'Product',
-                  price: Number(item.price || 0),
-                  originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
-                  image: item.image || item.image_url || '/assets/Images/Brown01.png',
-                  brand: item.brand || 'House of Urvaah',
-                  category: item.category || 'CLOTHING',
-                  inStock: item.inStock ?? (stock > 0),
-                  instock: item.inStock ?? (stock > 0),
-                  stockQuantity: stock,
-                  stock_quantity: stock,
-                  sizeStock: sizeStock,
-                  size_stock: sizeStock
-                },
-                selectedSize: item.selectedSize || 'M',
-                quantity: clampedQty
-              };
-            });
+            let localCartMap = {};
+            try {
+              const localRaw = localStorage.getItem(cachedKey);
+              if (localRaw) {
+                const parsed = JSON.parse(localRaw);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach(it => {
+                    const pId = String(it.product?.id || it.productId || it.id);
+                    if (pId && it.selectedSize) {
+                      localCartMap[pId] = String(it.selectedSize).trim().toUpperCase();
+                    }
+                  });
+                }
+              }
+            } catch (e) {}
+
+            const mappedBackendCart = res.data
+              .map((item) => {
+                const sizeStock = item.sizeStock || item.size_stock || {};
+                const stock = (item.stockQuantity !== null && item.stockQuantity !== undefined)
+                  ? Number(item.stockQuantity)
+                  : ((item.stock_quantity !== null && item.stock_quantity !== undefined)
+                    ? Number(item.stock_quantity)
+                    : (Object.keys(sizeStock).length > 0
+                        ? Object.values(sizeStock).reduce((acc, v) => acc + (parseInt(v, 10) || 0), 0)
+                        : 0));
+
+                const pId = String(item.productId || item.product_id || item.id);
+                let chosenSize = (item.selectedSize || item.size || '').trim().toUpperCase();
+
+                // If backend returned default 'M' or empty, but size M is 0 in size_stock, check local cart
+                if (!chosenSize || (chosenSize === 'M' && sizeStock && typeof sizeStock === 'object' && sizeStock['M'] === 0)) {
+                  if (localCartMap[pId]) {
+                    chosenSize = localCartMap[pId];
+                  }
+                }
+
+                // If chosenSize is still empty or has 0 stock while other sizes exist, pick first in-stock size
+                if (!chosenSize || (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0 && (parseInt(sizeStock[chosenSize], 10) || 0) <= 0)) {
+                  const sizes = Array.isArray(item.sizes) && item.sizes.length > 0 ? item.sizes : ['XS', 'S', 'M', 'L', 'XL'];
+                  const inStockSize = sizes.find(sz => {
+                    const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+                    return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : false;
+                  });
+                  if (inStockSize) {
+                    chosenSize = inStockSize;
+                  } else {
+                    chosenSize = chosenSize || 'M';
+                  }
+                }
+
+                const clampedQty = stock > 0 ? Math.max(1, Math.min(Number(item.quantity || 1), stock)) : Number(item.quantity || 1);
+                return {
+                  product: {
+                    id: pId,
+                    name: item.name || item.productname || item.title || 'Product',
+                    price: Number(item.price || 0),
+                    originalPrice: Number(item.originalPrice || item.originalprice || item.price || 0),
+                    image: item.image || item.image_url || '/assets/Images/Brown01.png',
+                    brand: item.brand || 'House of Urvaah',
+                    category: item.category || 'CLOTHING',
+                    inStock: item.inStock ?? (stock > 0),
+                    instock: item.inStock ?? (stock > 0),
+                    stockQuantity: stock,
+                    stock_quantity: stock,
+                    sizeStock: sizeStock,
+                    size_stock: sizeStock
+                  },
+                  selectedSize: chosenSize,
+                  quantity: clampedQty
+                };
+              })
+              // Do not inject items that are strictly out of stock from outdated backend rows
+              .filter(cartItem => !checkItemStockStatus(cartItem).isOutOfStock);
 
             setCart(mappedBackendCart);
             localStorage.setItem(cachedKey, JSON.stringify(mappedBackendCart));
@@ -362,7 +432,7 @@ export const CartProvider = ({ children }) => {
                   if (numericId && !isNaN(numericId)) {
                     apiClient('/api/cart/add', {
                       method: 'POST',
-                      body: JSON.stringify({ userId, productId: numericId, quantity: cItem.quantity })
+                      body: JSON.stringify({ userId, productId: numericId, quantity: cItem.quantity, size: cItem.selectedSize })
                     }).catch(() => {});
                   }
                 }
@@ -605,35 +675,32 @@ export const CartProvider = ({ children }) => {
   };
 
   const addToCart = async (product, selectedSize, options = {}) => {
-    if (!product) return;
+    if (!product) return false;
 
-    // Defensive check: Do not add out-of-stock items to cart
-    const itemQty = Number(
-      product.stockQuantity !== undefined && product.stockQuantity !== null
-        ? product.stockQuantity
-        : (product.stock_quantity ?? product.stock ?? product.quantity ?? 0)
-    );
-
-    const sizeToUse = (typeof selectedSize === 'string' && selectedSize) ? selectedSize : (product.selectedSize || 'M');
+    // Resolve size to use
+    let sizeToUse = (typeof selectedSize === 'string' && selectedSize.trim()) ? selectedSize.trim().toUpperCase() : null;
     const sizeStock = product.sizeStock || product.size_stock || {};
-    let sizeSpecificStock = null;
-    if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
-      const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
-      if (matchKey !== undefined) {
-        sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
-      }
-    }
-    const effectiveStock = sizeSpecificStock !== null ? sizeSpecificStock : itemQty;
 
-    const isOutOfStock = Boolean(
-      effectiveStock <= 0 ||
-      itemQty <= 0 ||
-      (itemQty <= 0 && (product.inStock === false || product.instock === false)) ||
-      product.isOutOfStock === true ||
-      product.status === 'Out of Stock' ||
-      product.status === 'out_of_stock'
-    );
-    if (isOutOfStock) return;
+    if (!sizeToUse) {
+      const availableSizes = Array.isArray(product.sizes) && product.sizes.length > 0 ? product.sizes : ['XS', 'S', 'M', 'L', 'XL'];
+      const firstInStock = availableSizes.find(sz => {
+        const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+        return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : true;
+      });
+      sizeToUse = (firstInStock || (typeof product.selectedSize === 'string' && product.selectedSize) || 'M').trim().toUpperCase();
+    }
+
+    // Defensive check using authoritative stock validator
+    const stockStatus = checkItemStockStatus({
+      product,
+      selectedSize: sizeToUse,
+      quantity: options.quantity || 1
+    });
+
+    if (stockStatus.isOutOfStock) {
+      console.warn(`[CartContext] Prevented adding out of stock item: ${product.name || 'Product'} (Size: ${sizeToUse})`);
+      return false;
+    }
 
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
@@ -647,56 +714,31 @@ export const CartProvider = ({ children }) => {
       updateSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), targetItemKey])));
     }
 
+    const availableStock = stockStatus.availableStock || 99;
+
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(
-        (item) => String(item.product.id) === String(product.id) && item.selectedSize === sizeToUse
+        (item) => String(item.product.id) === String(product.id) && String(item.selectedSize).trim().toUpperCase() === sizeToUse
       );
 
       let updated;
       if (existingIndex > -1) {
         const existing = prevCart[existingIndex];
-        const existingSizeStock = existing.product?.sizeStock || existing.product?.size_stock || sizeStock || {};
-        let existingSizeSpecificStock = null;
-        if (existingSizeStock && typeof existingSizeStock === 'object' && Object.keys(existingSizeStock).length > 0) {
-          const matchKey = Object.keys(existingSizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
-          if (matchKey !== undefined) {
-            existingSizeSpecificStock = Math.max(0, parseInt(existingSizeStock[matchKey], 10) || 0);
-          }
-        }
-
-        const maxStock = existingSizeSpecificStock !== null
-          ? existingSizeSpecificStock
-          : Number(
-              (itemQty > 0 ? itemQty : null) ??
-              existing.product?.stockQuantity ??
-              existing.product?.stock_quantity ??
-              existing.product?.quantity ??
-              99
-            );
-
-        if (existing.quantity >= maxStock) {
-          // Max available stock already in cart!
+        if (existing.quantity >= availableStock) {
           return prevCart;
         }
 
         const qtyToAdd = options.quantity || 1;
-        const newQty = Math.min(existing.quantity + qtyToAdd, maxStock);
+        const newQty = Math.min(existing.quantity + qtyToAdd, availableStock);
 
         updated = [...prevCart];
         updated[existingIndex] = {
           ...existing,
-          product: {
-            ...existing.product,
-            stockQuantity: itemQty > 0 ? itemQty : existing.product?.stockQuantity,
-            sizeStock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.sizeStock,
-            size_stock: Object.keys(sizeStock).length > 0 ? sizeStock : existing.product?.size_stock,
-            inStock: !isOutOfStock
-          },
+          selectedSize: sizeToUse,
           quantity: newQty
         };
       } else {
-        const maxStock = effectiveStock > 0 ? effectiveStock : 1;
-        const qtyToAdd = Math.min(options.quantity || 1, maxStock);
+        const qtyToAdd = Math.min(options.quantity || 1, availableStock);
         updated = [
           ...prevCart,
           {
@@ -709,8 +751,8 @@ export const CartProvider = ({ children }) => {
               colors: product.colors || ['#111111'],
               brand: product.brand || 'House of Urvaah',
               category: product.category || 'CLOTHING',
-              inStock: !isOutOfStock,
-              stockQuantity: itemQty,
+              inStock: true,
+              stockQuantity: availableStock,
               sizeStock: sizeStock,
               size_stock: sizeStock
             },
@@ -735,23 +777,25 @@ export const CartProvider = ({ children }) => {
         try {
           await apiClient('/api/cart/add', {
             method: 'POST',
-            body: JSON.stringify({ userId, productId: numericId, quantity: 1 })
+            body: JSON.stringify({ userId, productId: numericId, quantity: options.quantity || 1, size: sizeToUse })
           });
         } catch (err) {
           console.warn('Cart add API sync warning:', err.message);
         }
       }
     }
+    return true;
   };
 
   const removeFromCart = async (productId, selectedSize) => {
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+    const cleanSize = (selectedSize ? String(selectedSize).trim().toUpperCase() : null);
 
     setCart((prevCart) => {
       const updated = prevCart.filter(
-        (item) => !(String(item.product.id) === String(productId) && item.selectedSize === selectedSize)
+        (item) => !(String(item.product.id) === String(productId) && (!cleanSize || String(item.selectedSize).trim().toUpperCase() === cleanSize))
       );
       localStorage.setItem(cachedKey, JSON.stringify(updated));
       return updated;
@@ -761,7 +805,8 @@ export const CartProvider = ({ children }) => {
       const numericId = parseInt(String(productId).replace(/\D/g, ''), 10);
       if (numericId && !isNaN(numericId)) {
         try {
-          await apiClient(`/api/cart/item/${numericId}`, {
+          const queryParam = cleanSize ? `?size=${encodeURIComponent(cleanSize)}` : '';
+          await apiClient(`/api/cart/item/${numericId}${queryParam}`, {
             method: 'DELETE'
           });
         } catch (err) {
@@ -791,28 +836,18 @@ export const CartProvider = ({ children }) => {
     const isGuest = !user && !getAuthToken();
     const userId = user?.id || getStoredUser()?.id || 'guest';
     const cachedKey = isGuest ? 'urvaah_guest_cart' : `urvaah_cart_${userId}`;
+    const cleanSize = (selectedSize ? String(selectedSize).trim().toUpperCase() : 'M');
     let newQty = 0;
 
     setCart((prevCart) => {
       const updated = prevCart
         .map((item) => {
-          if (String(item.product.id) === String(productId) && item.selectedSize === selectedSize) {
-            const sizeStock = item.product?.sizeStock || item.product?.size_stock || {};
-            let sizeSpecificStock = null;
-            if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
-              const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
-              if (matchKey !== undefined) {
-                sizeSpecificStock = Math.max(0, parseInt(sizeStock[matchKey], 10) || 0);
-              }
-            }
-
-            const maxStock = sizeSpecificStock !== null
-              ? sizeSpecificStock
-              : Number(
-                  item.product?.stockQuantity !== undefined && item.product?.stockQuantity !== null
-                    ? item.product.stockQuantity
-                    : (item.product?.stock_quantity ?? item.product?.stock ?? item.product?.quantity ?? 99)
-                );
+          if (
+            String(item.product.id) === String(productId) &&
+            String(item.selectedSize).trim().toUpperCase() === cleanSize
+          ) {
+            const stockStatus = checkItemStockStatus(item);
+            const maxStock = stockStatus.availableStock || 99;
 
             if (delta > 0 && item.quantity >= maxStock) {
               newQty = item.quantity;
@@ -836,11 +871,11 @@ export const CartProvider = ({ children }) => {
       if (numericId && !isNaN(numericId)) {
         try {
           if (newQty <= 0) {
-            await apiClient(`/api/cart/item/${numericId}`, { method: 'DELETE' });
+            await apiClient(`/api/cart/item/${numericId}?size=${encodeURIComponent(cleanSize)}`, { method: 'DELETE' });
           } else {
             await apiClient('/api/cart/update', {
               method: 'PATCH',
-              body: JSON.stringify({ userId, productId: numericId, quantity: newQty })
+              body: JSON.stringify({ userId, productId: numericId, quantity: newQty, size: cleanSize })
             });
           }
         } catch (err) {
@@ -936,7 +971,10 @@ export const CartProvider = ({ children }) => {
   }, [cart]);
 
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+    return cart.reduce((total, item) => {
+      if (checkItemStockStatus(item).isOutOfStock) return total;
+      return total + (Number(item.product?.price || 0) * Number(item.quantity || 1));
+    }, 0);
   }, [cart]);
 
   const freeShippingProgress = useMemo(() => {

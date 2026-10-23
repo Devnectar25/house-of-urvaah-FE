@@ -8,10 +8,25 @@ import { StockNotificationModal } from '../product/StockNotificationModal';
 
 export const QuickViewModal = () => {
   const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist, user } = useCart();
+  const availableSizes = Array.isArray(quickViewProduct?.sizes) && quickViewProduct.sizes.length > 0
+    ? quickViewProduct.sizes
+    : ['XS', 'S', 'M', 'L', 'XL'];
+
   const [selectedSize, setSelectedSize] = useState('M');
   const [addedSuccess, setAddedSuccess] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
+
+  useEffect(() => {
+    if (quickViewProduct) {
+      const sizeStock = quickViewProduct.sizeStock || quickViewProduct.size_stock || {};
+      const firstInStock = availableSizes.find(sz => {
+        const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+        return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : false;
+      });
+      setSelectedSize(firstInStock || availableSizes[0] || 'M');
+    }
+  }, [quickViewProduct?.id]);
 
   const totalStock = Number(
     quickViewProduct?.stockQuantity !== undefined && quickViewProduct?.stockQuantity !== null

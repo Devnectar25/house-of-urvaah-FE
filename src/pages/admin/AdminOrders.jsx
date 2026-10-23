@@ -34,7 +34,8 @@ const checkStatusMatches = (orderStatus, filterStatus, order = null) => {
   if (!filterStatus || filterStatus === 'all') return true;
   const o = (orderStatus || '').toLowerCase();
   const f = filterStatus.toLowerCase();
-  const isRep = Boolean(
+  const isChildRep = Boolean(order?.original_order_number) || (order?.order_number || '').includes('-REP');
+  const isRep = !isChildRep && Boolean(
     (order?.return_type || '').toLowerCase().includes('replace') ||
     (order?.return_type || '').toLowerCase().includes('exchange') ||
     Boolean(order?.replacement_size) ||
@@ -730,15 +731,6 @@ export const AdminOrders = () => {
       statusFilter: 'Confirmed'
     },
     {
-      key: 'processing',
-      label: 'Processing',
-      count: stats?.processing ?? 0,
-      icon: PackageCheck,
-      colorClass: 'bg-indigo-50 text-indigo-600 border-indigo-200',
-      badgeBg: 'bg-indigo-100 text-indigo-800',
-      statusFilter: 'Processing'
-    },
-    {
       key: 'shipped',
       label: 'Shipped',
       count: stats?.shipped ?? 0,
@@ -1409,7 +1401,14 @@ export const AdminOrders = () => {
                     >
                       {/* Order ID */}
                       <td className="py-3 px-4 font-admin font-bold text-xs text-brand-dark tracking-wide">
-                        {ord.order_number || ord.id?.slice(0, 8)}
+                        <div className="flex flex-col items-start gap-1">
+                          <span>{ord.order_number || ord.id?.slice(0, 8)}</span>
+                          {(Boolean(ord.original_order_number) || (ord.order_number || '').includes('-REP')) && (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-200 uppercase font-sans leading-none tracking-tight">
+                              Forward Replacement
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Customer Info */}
@@ -1603,6 +1602,10 @@ export const AdminOrders = () => {
         onOrderUpdated={handleOrderUpdatedInList}
         isShiprocketDesk={activeViewTab === 'shiprocket'}
         isRefundDesk={false}
+        onSwitchToShiprocketDesk={() => {
+          setIsDetailModalOpen(false);
+          handleTabChange('shiprocket');
+        }}
       />
     </div>
   );

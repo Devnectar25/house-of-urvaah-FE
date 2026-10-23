@@ -57,11 +57,24 @@ export const CartDrawer = () => {
     };
   }, []);
 
-  const allItemsOutOfStock = cart.length > 0 && cart.every(item => checkItemStockStatus(item).isOutOfStock);
+  const outOfStockItems = cart.filter(item => checkItemStockStatus(item).isOutOfStock);
+  const hasOutOfStockItems = outOfStockItems.length > 0;
+  const allItemsOutOfStock = cart.length > 0 && outOfStockItems.length === cart.length;
+
+  const handleRemoveOutOfStockItems = () => {
+    outOfStockItems.forEach(item => {
+      removeFromCart(item.product.id, item.selectedSize);
+    });
+    setFeedbackMsg('Out-of-stock items removed from shopping bag');
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackMsg('');
+    }, 3000);
+  };
 
   const handleProceedToCheckout = () => {
     if (isProceeding) return;
-    if (allItemsOutOfStock) {
+    if (hasOutOfStockItems) {
       setFeedbackMsg('Your bag contains out-of-stock items. Please remove them to proceed.');
       if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = setTimeout(() => {
@@ -194,6 +207,22 @@ export const CartDrawer = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Out-of-stock items warning banner */}
+            {hasOutOfStockItems && (
+              <div className="bg-rose-50 border-b border-rose-200 px-5 sm:px-6 py-2.5 flex items-center justify-between text-xs text-rose-800">
+                <span className="font-medium text-[11px] sm:text-xs">
+                  ⚠️ {outOfStockItems.length} item{outOfStockItems.length > 1 ? 's in your bag are' : ' in your bag is'} out of stock.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveOutOfStockItems}
+                  className="font-bold underline text-rose-700 hover:text-rose-900 uppercase tracking-wider text-[10px] sm:text-[11px] cursor-pointer shrink-0 ml-2"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
 
             {/* Cart Items List */}
             <div
@@ -390,7 +419,7 @@ export const CartDrawer = () => {
                 <Button
                   fullWidth
                   variant="primary"
-                  disabled={isProceeding || allItemsOutOfStock}
+                  disabled={isProceeding || hasOutOfStockItems}
                   className="group flex items-center justify-center gap-2.5 py-4 bg-[#111111] hover:bg-neutral-800 disabled:bg-neutral-700 text-white text-xs font-semibold tracking-[0.25em] uppercase transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
                   onClick={handleProceedToCheckout}
                 >
@@ -399,8 +428,8 @@ export const CartDrawer = () => {
                       <Loader2 className="w-4 h-4 animate-spin text-white flex-shrink-0" />
                       <span>REDIRECTING TO CHECKOUT...</span>
                     </>
-                  ) : allItemsOutOfStock ? (
-                    <span>OUT OF STOCK — UPDATE BAG</span>
+                  ) : hasOutOfStockItems ? (
+                    <span>REMOVE OUT OF STOCK ITEMS TO CHECKOUT</span>
                   ) : (
                     <>
                       <span>PROCEED TO CHECKOUT</span>

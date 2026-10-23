@@ -116,6 +116,20 @@ export const AdminShiprocketOrderDesk = () => {
       const hasAwb = Boolean(ord.tracking_number);
 
       if (stageFilter === 'all') return true;
+      if (stageFilter === 'reverse_logistics') {
+        const isChildReplacement = Boolean(ord.original_order_number) || (ord.order_number || '').includes('-REP');
+        if (isChildReplacement && !ord.return_request_at) {
+          return false; // Child replacement orders are forward shipments to customer, not reverse requests
+        }
+        return (
+          Boolean(ord.return_type) ||
+          Boolean(ord.replacement_order_number) ||
+          Boolean(ord.is_returned_order) ||
+          s.includes('return') ||
+          s.includes('replace') ||
+          s.includes('exchange')
+        );
+      }
       if (stageFilter === 'pending_awb') return !hasAwb && !['delivered', 'cancelled'].includes(s);
       if (stageFilter === 'awb_assigned') return hasAwb && ['pending', 'confirmed', 'processing'].includes(s);
       if (stageFilter === 'in_transit') return s === 'shipped' || s === 'dispatched' || s.includes('transit');
@@ -311,6 +325,7 @@ export const AdminShiprocketOrderDesk = () => {
               className="bg-neutral-50 border border-neutral-200 text-neutral-800 text-xs rounded-xl px-2.5 py-1.5 focus:outline-hidden font-medium cursor-pointer"
             >
               <option value="all">All Stages</option>
+              <option value="reverse_logistics">🔄 Return &amp; Exchange Requests</option>
               <option value="pending_awb">Pending AWB</option>
               <option value="awb_assigned">AWB Allocated</option>
               <option value="in_transit">In Transit</option>
@@ -364,8 +379,17 @@ export const AdminShiprocketOrderDesk = () => {
                   return (
                     <tr key={ord.id || ord.order_number} className="hover:bg-neutral-50/60 transition-colors">
                       {/* Order # */}
-                      <td className="py-3 px-3 font-mono font-bold text-neutral-900">
-                        #{ord.order_number}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-mono font-bold text-neutral-900">
+                            #{ord.order_number}
+                          </span>
+                          {(Boolean(ord.original_order_number) || (ord.order_number || '').includes('-REP')) && (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-200 uppercase leading-none tracking-tight">
+                              Forward Replacement
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Customer & City */}

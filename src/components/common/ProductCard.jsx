@@ -11,7 +11,6 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [hasSubscribedStock, setHasSubscribedStock] = useState(false);
   const [isSelectingSize, setIsSelectingSize] = useState(false);
-  const [selectedSize, setSelectedSize] = useState('M');
   const [isAdding, setIsAdding] = useState(false);
   const cardRef = useRef(null);
 
@@ -20,7 +19,6 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   const isWishlisted = Boolean(isInWishlist && product?.id && isInWishlist(product.id));
   const isModalOpen = Boolean(pdpProduct || quickViewProduct);
   const activeHover = isHovered && !isModalOpen && !isStockModalOpen;
-
 
   const qty = Number(
     product?.stockQuantity !== undefined && product?.stockQuantity !== null
@@ -39,6 +37,24 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   const availableSizes = Array.isArray(product?.sizes) && product.sizes.length > 0
     ? product.sizes
     : ['XS', 'S', 'M', 'L', 'XL'];
+
+  const getFirstInStockSize = () => {
+    const sizeStock = product?.sizeStock || product?.size_stock || {};
+    if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+      const matchInStock = availableSizes.find(sz => {
+        const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+        return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : false;
+      });
+      if (matchInStock) return matchInStock;
+    }
+    return availableSizes.includes('M') ? 'M' : availableSizes[0] || 'M';
+  };
+
+  const [selectedSize, setSelectedSize] = useState(() => getFirstInStockSize());
+
+  useEffect(() => {
+    setSelectedSize(getFirstInStockSize());
+  }, [product?.id, product?.size_stock, product?.sizeStock]);
 
   useEffect(() => {
     if (product?.id) {
@@ -90,9 +106,24 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   }, [isSelectingSize]);
 
   const handleAddSelectedSize = (overrideSize = null) => {
-    const sizeToUse = overrideSize || selectedSize || (availableSizes.includes('M') ? 'M' : availableSizes[0] || 'M');
+    const sizeToUse = overrideSize || selectedSize || getFirstInStockSize();
+
+    // Check if this size is actually in stock
+    const sizeStock = product?.sizeStock || product?.size_stock || {};
+    let isSizeOut = false;
+    if (sizeStock && typeof sizeStock === 'object' && Object.keys(sizeStock).length > 0) {
+      const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sizeToUse).trim().toUpperCase());
+      if (matchK !== undefined) {
+        isSizeOut = (parseInt(sizeStock[matchK], 10) || 0) <= 0;
+      }
+    }
+    if (isSizeOut || isOutOfStock) {
+      setIsSelectingSize(false);
+      setIsStockModalOpen(true);
+      return;
+    }
+
     setIsAdding(true);
-    // Add product to shopping bag with selected size
     addToCart(product, sizeToUse);
 
     setTimeout(() => {
@@ -267,8 +298,9 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
               onClick={(e) => {
                 e.stopPropagation();
                 setIsSelectingSize(true);
+                const bestSize = getFirstInStockSize();
                 if (!selectedSize || !availableSizes.includes(selectedSize)) {
-                  setSelectedSize(availableSizes.includes('M') ? 'M' : availableSizes[0] || 'M');
+                  setSelectedSize(bestSize);
                 }
               }}
               className="flex-1 bg-white text-brand-dark text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase py-2 px-2 sm:px-3 hover:bg-neutral-100 transition-colors flex items-center justify-center gap-1 shadow-md min-h-[36px] cursor-pointer"

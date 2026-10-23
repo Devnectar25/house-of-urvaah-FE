@@ -35,6 +35,7 @@ import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { InvoiceModal } from '../common/InvoiceModal';
 import { ShippingLabelModal } from './ShippingLabelModal';
 import { PickupManifestModal } from './PickupManifestModal';
+import { ShipmentTrackingModal } from '../common/ShipmentTrackingModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
 
 // Status options matching House of Urvaah lifecycle and policy values
@@ -49,6 +50,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Out for Delivery', label: 'Out for Delivery' },
   { value: 'Delivered', label: 'Delivered' },
   { value: 'Cancellation Requested', label: 'Cancellation Requested' },
+  { value: 'Cancellation Rejected', label: 'Cancellation Rejected' },
   { value: 'Cancelled', label: 'Cancelled' },
   { value: 'Return Requested', label: 'Return Requested' },
   { value: 'Return Request Processing', label: 'Return Request Processing' },
@@ -103,6 +105,32 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: 'Refunded', label: 'Refunded' }
 ];
 
+export const isPostDeliveryOrder = (ord, curStatus) => {
+  if (!ord) return false;
+  const curSt = (curStatus || ord.status || '').toString().trim();
+  const curStLower = curSt.toLowerCase();
+  const origStLower = (ord.original_status || '').toString().toLowerCase().trim();
+
+  // If status is explicitly Delivered or Replacement Delivered
+  if (curStLower === 'delivered' || curStLower === 'replacement delivered') return true;
+  if (origStLower === 'delivered' || origStLower === 'replacement delivered') return true;
+
+  // Timestamp or product received flag indicating delivery already completed
+  if (Boolean(ord.delivered_at) || Boolean(ord.is_product_received)) return true;
+
+  // Any status in RETURN_RESTRICTED_STATUSES (case-insensitive check)
+  const isReturnOrReplacement = RETURN_RESTRICTED_STATUSES.some(
+    st => st.toLowerCase() === curStLower
+  );
+  if (isReturnOrReplacement) return true;
+
+  if (curStLower.includes('return') || curStLower.includes('replace') || curStLower.includes('exchange') || curStLower.includes('house of urvaah')) {
+    return true;
+  }
+
+  return false;
+};
+
 const getRequestedReplacementSize = (ord) => {
   if (!ord) return 'M';
   const returnType = (ord.return_type || '').toLowerCase();
@@ -127,7 +155,24 @@ const getRequestedReplacementSize = (ord) => {
 export const isOrderReplacementLifecycle = (ord, curStatus = '') => {
   if (!ord) return false;
   const curSt = (curStatus || ord?.status || '').toLowerCase();
-  if (curSt === 'cancelled' || curSt === 'refunded') return false;
+  if (curSt === 'cancelled' || curSt === 'refunded' || curSt === 'replace rejected') return false;
+
+  // CRITICAL: Child forward replacement orders (e.g., HOU-123456-REP, or orders with original_order_number)
+  // are FORWARD delivery shipments sent TO the customer. They must NEVER show the reverse pickup & QC cycle!
+  const ordNum = String(ord?.order_number || '');
+  const isForwardReplacementOrder = Boolean(ord?.original_order_number || ord?.original_order_id) || ordNum.endsWith('-REP') || ordNum.includes('-REP');
+  if (isForwardReplacementOrder) {
+    // Only if customer explicitly requested a brand new return/replacement AFTER receiving the forward piece
+    const hasPostDeliveryReturn = Boolean(ord?.return_request_at) && ['replace requested', 'replacement requested', 'replacement request processing', 'return requested'].includes(curSt);
+    if (!hasPostDeliveryReturn) {
+      return false;
+    }
+  }
+
+  // If an order is delivered and has no replacement order number, it is not in active replacement lifecycle
+  if (curSt === 'delivered' && !ord?.replacement_order_number && !ord?.replacement_order_id) {
+    return false;
+  }
 
   const returnType = (ord?.return_type || '').toLowerCase();
   const returnReason = (ord?.return_reason || '').toLowerCase();
@@ -200,7 +245,7 @@ export const isOrderReplacementLifecycle = (ord, curStatus = '') => {
   return false;
 };
 
-export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false, isShiprocketDesk = false, isRefundDesk = false }) => {
+export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview, onStatusPreview, onStatusUpdated, onOrderUpdated, hideStatusManagement = false, isShiprocketDesk = false, isRefundDesk = false, onSwitchToShiprocketDesk = null }) => {
   // Lock background scrolling on body and admin container when modal is open
   useModalScrollLock(isOpen, onClose);
 
@@ -220,6 +265,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
+  const [showReverseTrackingModal, setShowReverseTrackingModal] = useState(false);
   const [customReplacementSize, setCustomReplacementSize] = useState('M');
   const [isRejectingReplacement, setIsRejectingReplacement] = useState(false);
   const [replacementRejectReason, setReplacementRejectReason] = useState('Wrong product returned by customer');
@@ -237,6 +283,12 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [showTrackingScans, setShowTrackingScans] = useState(false);
   const [loadingTracking, setLoadingTracking] = useState(false);
 
+  // Admin Direct Order Cancellation State
+  const [isAdminCancelModalOpen, setIsAdminCancelModalOpen] = useState(false);
+  const [adminCancelReason, setAdminCancelReason] = useState('Customer requested cancellation');
+  const [adminCancelCustomReason, setAdminCancelCustomReason] = useState('');
+  const [cancellingOrder, setCancellingOrder] = useState(false);
+
   // Synchronous Ref tracking confirmed status & payment status across async saves & modal closes
   const confirmedRef = React.useRef({ status: '', paymentStatus: '' });
 
@@ -253,6 +305,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setShowQCRejectForm(false);
     setQcRejectReason('Damaged / Torn / Stained product received');
     setQcCustomNote('');
+    setIsAdminCancelModalOpen(false);
+    setAdminCancelReason('Customer requested cancellation');
+    setAdminCancelCustomReason('');
+    setCancellingOrder(false);
     try {
       const response = await apiClient(`/api/orders/${orderId}`);
       const data = response?.data || response;
@@ -312,6 +368,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   // Optimistic Order Status Change Handler
   const handleOrderStatusChange = (newStatus) => {
+    // Delivered orders cannot be changed to Cancelled under any circumstances
+    if (['cancelled', 'cancellation requested', 'cancellation rejected'].includes(newStatus.toLowerCase()) && isPostDeliveryOrder(order, confirmedStatus)) {
+      setSaveError('Delivered orders cannot be cancelled. Once delivered, only Return or Replacement can be processed.');
+      setSelectedStatus(confirmedRef.current.status || confirmedStatus || order?.status);
+      return;
+    }
+
     setSelectedStatus(newStatus);
     setSaveError(null);
     setSaveSuccessMsg(null);
@@ -377,8 +440,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       return;
     }
 
-    if (!isRefundDesk && RETURN_RESTRICTED_STATUSES.includes(selectedStatus)) {
-      setSaveError('Permission denied: Only the Refund Desk Admin can update return and refund statuses.');
+    // Guard: Prevent saving Cancelled status for delivered / post-delivery orders
+    if (['cancelled', 'cancellation requested', 'cancellation rejected'].includes(selectedStatus.toLowerCase()) && isPostDeliveryOrder(order, confirmedStatus)) {
+      setSaveError('Delivered orders cannot be cancelled. Once delivered, only Return or Replacement can be processed.');
+      setSelectedStatus(confirmedRef.current.status || confirmedStatus || order?.status);
       return;
     }
 
@@ -530,27 +595,112 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  const handleAdminCancelOrder = async () => {
+    if (!order || cancellingOrder) return;
+    if (isPostDeliveryOrder(order, confirmedStatus)) {
+      setSaveError('Delivered orders cannot be cancelled. Once delivered, only Return or Replacement can be processed.');
+      setIsAdminCancelModalOpen(false);
+      return;
+    }
+    setCancellingOrder(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const finalReason = adminCancelReason === 'Other (Specify reason)'
+        ? (adminCancelCustomReason.trim() || 'Cancelled by Admin')
+        : adminCancelReason;
+
+      const isCod = (order.payment_method || '').toLowerCase() === 'cod' ||
+                    (order.payment_type || '').toLowerCase() === 'cod' ||
+                    (order.payment_method || '').toLowerCase().includes('cash');
+
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'Cancelled',
+          cancelReason: finalReason,
+          paymentStatus: isCod ? (order.payment_status || 'Pending') : 'Paid'
+        })
+      });
+
+      const updatedData = response?.data || response || {
+        ...order,
+        status: 'Cancelled',
+        cancel_reason: finalReason
+      };
+
+      confirmedRef.current.status = 'Cancelled';
+      setOrder(updatedData);
+      setConfirmedStatus('Cancelled');
+      setSelectedStatus('Cancelled');
+      setIsAdminCancelModalOpen(false);
+      setAdminCancelCustomReason('');
+      setSaveSuccessMsg('Order has been cancelled successfully. Inventory restocked and recorded.');
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview && order) {
+        notifyPreview({
+          id: order.id,
+          status: 'Cancelled',
+          payment_status: updatedData.payment_status || order.payment_status,
+          isPreview: false
+        });
+      }
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) {
+        notifyParent({
+          ...updatedData,
+          status: 'Cancelled',
+          cancel_reason: finalReason,
+          isPreview: false
+        });
+      }
+
+      broadcastOrderUpdate({
+        ...updatedData,
+        status: 'Cancelled',
+        cancel_reason: finalReason
+      });
+    } catch (err) {
+      console.error('Failed to cancel order as admin:', err);
+      setSaveError(err.message || 'Failed to cancel order. Please try again.');
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
+
   const handleRejectCancellation = async () => {
     if (!order) return;
     setSavingStatus(true);
     setSaveError(null);
     setSaveSuccessMsg(null);
     try {
-      const restoredStatus = order.original_status || 'Processing';
+      const restoredStatus = order.original_status || 'Confirmed';
+      const rejectionNote = 'Cancellation request rejected by Admin';
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: 'Restore',
-          cancelReason: 'Cancellation request rejected by Admin'
+          cancelReason: rejectionNote,
+          rejectionReason: rejectionNote
         })
       });
 
       const updatedData = response?.data || response || {
         ...order,
-        status: restoredStatus
+        status: restoredStatus,
+        cancel_reason: rejectionNote,
+        rejection_reason: rejectionNote
       };
 
-      setOrder(updatedData);
+      setOrder({
+        ...updatedData,
+        status: restoredStatus,
+        cancel_reason: rejectionNote,
+        rejection_reason: rejectionNote
+      });
       setConfirmedStatus(restoredStatus);
       setSelectedStatus(restoredStatus);
       confirmedRef.current.status = restoredStatus;
@@ -562,6 +712,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         notifyPreview({
           id: order.id,
           status: restoredStatus,
+          cancel_reason: rejectionNote,
+          rejection_reason: rejectionNote,
           payment_status: updatedData.payment_status || order.payment_status,
           isPreview: false
         });
@@ -572,13 +724,19 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         notifyParent({
           ...updatedData,
           status: restoredStatus,
+          cancel_reason: rejectionNote,
+          rejection_reason: rejectionNote,
           isPreview: false
         });
       }
 
       broadcastOrderUpdate({
         ...updatedData,
-        status: restoredStatus
+        id: order.id,
+        order_number: order.order_number,
+        status: restoredStatus,
+        cancel_reason: rejectionNote,
+        rejection_reason: rejectionNote
       });
     } catch (err) {
       console.error('Failed to reject cancellation:', err);
@@ -604,15 +762,21 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       const updatedData = response?.data || response || {
         ...order,
         status: 'Return Approved',
-        logistics_status: 'In Transit to House of Urvaah'
+        logistics_status: 'Return Pickup Scheduled'
       };
 
       setOrder(updatedData);
       setConfirmedStatus('Return Approved');
       setSelectedStatus('Return Approved');
       confirmedRef.current.status = 'Return Approved';
-      setSaveSuccessMsg('Return request approved! Courier reverse pickup initiated in transit to House of Urvaah.');
-      setTimeout(() => setSaveSuccessMsg(null), 3500);
+      
+      const revAwb = updatedData.reverse_tracking_number || updatedData.awb_code || updatedData.tracking_number;
+      setSaveSuccessMsg(
+        revAwb
+          ? `Return approved! Shiprocket reverse pickup created (AWB: ${revAwb}). Doorstep courier pickup scheduled with Delhivery.`
+          : 'Return request approved! Courier reverse pickup scheduled via Shiprocket.'
+      );
+      setTimeout(() => setSaveSuccessMsg(null), 5000);
 
       const notifyPreview = onOptimisticPreview || onStatusPreview;
       if (notifyPreview && order) {
@@ -632,6 +796,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           isPreview: false
         });
       }
+
+      broadcastOrderUpdate(updatedData);
     } catch (err) {
       console.error('Failed to approve return:', err);
       setSaveError(err.message || 'Failed to approve return request.');
@@ -869,10 +1035,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSaveError(null);
     setSaveSuccessMsg(null);
     try {
-      const selectedReason = customReason || replacementRejectReason || 'Wrong product returned by customer';
-      const finalReason = replacementRejectNotes && replacementRejectNotes.trim()
-        ? `${selectedReason} - ${replacementRejectNotes.trim()}`
-        : selectedReason;
+      const finalReason = typeof customReason === 'string' && customReason.trim()
+        ? customReason.trim()
+        : 'Replacement request rejected by Admin';
 
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
@@ -885,24 +1050,25 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
       const updatedData = response?.data || response || {
         ...order,
-        status: 'Replace Rejected',
+        status: 'Delivered',
         rejection_reason: finalReason,
-        cancel_reason: finalReason
+        cancel_reason: finalReason,
+        return_rejection_reason: finalReason
       };
 
       setOrder(updatedData);
-      setConfirmedStatus('Replace Rejected');
-      setSelectedStatus('Replace Rejected');
-      confirmedRef.current.status = 'Replace Rejected';
+      setConfirmedStatus('Delivered');
+      setSelectedStatus('Delivered');
+      confirmedRef.current.status = 'Delivered';
       setIsRejectingReplacement(false);
-      setSaveSuccessMsg('Replacement request rejected successfully (QC Failed / Wrong item).');
+      setSaveSuccessMsg('Replacement request rejected. Order remains Delivered.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyPreview = onOptimisticPreview || onStatusPreview;
       if (notifyPreview && order) {
         notifyPreview({
           id: order.id,
-          status: 'Replace Rejected',
+          status: 'Delivered',
           payment_status: updatedData.payment_status || order.payment_status,
           isPreview: false
         });
@@ -912,7 +1078,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       if (notifyParent) {
         notifyParent({
           ...updatedData,
-          status: 'Replace Rejected',
+          status: 'Delivered',
           rejection_reason: finalReason,
           isPreview: false
         });
@@ -920,7 +1086,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
       broadcastOrderUpdate({
         ...updatedData,
-        status: 'Replace Rejected',
+        status: 'Delivered',
         rejection_reason: finalReason
       });
     } catch (err) {
@@ -1291,10 +1457,6 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
   const handleSimulateDoorstepHandover = async () => {
     if (!order) return;
-    if (!isRefundDesk) {
-      setSaveError('Permission denied: Only the Refund Desk Admin can confirm doorstep pickups.');
-      return;
-    }
     setSavingStatus(true);
     setSaveError(null);
     try {
@@ -1624,6 +1786,23 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const discountAmount = parseFloat(order?.discount_amount || order?.discount || 0);
   const totalAmount = parseFloat(order?.total || 0);
 
+  const curOrderStatus = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+  const isReplacementRejected = Boolean(
+    curOrderStatus === 'replace rejected' ||
+    (curOrderStatus === 'delivered' && (
+      Boolean(order?.rejection_reason) ||
+      Boolean(order?.return_rejection_reason) ||
+      (Array.isArray(order?.items) && order.items.some(it => (it.status || '').toLowerCase() === 'replace rejected'))
+    ) && (
+      (order?.return_type || '').toLowerCase().includes('replace') ||
+      Boolean(order?.replacement_size) ||
+      (order?.rejection_reason || '').toLowerCase().includes('replace') ||
+      (order?.cancel_reason || '').toLowerCase().includes('replace') ||
+      (Array.isArray(order?.items) && order.items.some(it => (it.return_action || '').toLowerCase() === 'replace'))
+    )) ||
+    (Array.isArray(order?.items) && order.items.some(it => (it.status || '').toLowerCase() === 'replace rejected'))
+  );
+
   return (
     <>
       <div
@@ -1654,6 +1833,34 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {order && (() => {
+              const curSt = (confirmedStatus || order.status || '').toLowerCase();
+              const isCancelled = curSt === 'cancelled' || curSt === 'canceled';
+              const isPostDelivery = isPostDeliveryOrder(order, confirmedStatus);
+              if (isCancelled) {
+                return (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-100/90 text-rose-800 text-xs font-admin font-bold tracking-wide">
+                    <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Cancelled</span>
+                  </span>
+                );
+              }
+              // Never render Cancel Order button once an order has been delivered or is post-delivery
+              if (!isPostDelivery) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminCancelModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-admin font-semibold tracking-wide transition-colors cursor-pointer shadow-2xs"
+                    title="Cancel this order as Administrator"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Cancel Order</span>
+                  </button>
+                );
+              }
+              return null;
+            })()}
             <button
               type="button"
               onClick={() => setIsInvoiceOpen(true)}
@@ -1703,6 +1910,55 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
           ) : order ? (
             <>
+              {/* Forward Replacement Order Banner */}
+              {(() => {
+                const ordNum = String(order?.order_number || '');
+                const isForwardReplacement = Boolean(order?.original_order_number || order?.original_order_id) || ordNum.endsWith('-REP') || ordNum.includes('-REP');
+                if (!isForwardReplacement) return null;
+                const origNum = order.original_order_number;
+
+                return (
+                  <div className="bg-purple-50/80 border-2 border-purple-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-purple-100 rounded-lg text-purple-900 shrink-0 mt-0.5">
+                        <PackageCheck className="w-5 h-5 text-purple-700" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs sm:text-sm font-admin font-bold text-purple-950 uppercase tracking-wide">
+                            Forward Replacement Fulfillment Order
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
+                            Exchange Piece
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                            ₹0 (Prepaid Exchange Credit)
+                          </span>
+                        </div>
+                        <p className="text-xs text-purple-900/90 leading-relaxed">
+                          This is the <strong>forward replacement parcel</strong> to be dispatched to customer doorstep.
+                          {origNum && (
+                            <span> Generated against exchange request for Original Order <strong className="text-purple-950">#{origNum}</strong>.</span>
+                          )}
+                          <br className="hidden sm:inline" />
+                          Pack and dispatch via Shiprocket/Delhivery courier below, then mark as Delivered upon arrival.
+                        </p>
+                      </div>
+                    </div>
+                    {origNum && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReplacementOrder(origNum)}
+                        className="px-3.5 py-2 bg-purple-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 shrink-0"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>View Original #{origNum}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* 2-Column Top Section: Order Information + Shipping Address */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Card 1: Order Information */}
@@ -1789,7 +2045,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               </div>
 
               {/* Customer Cancellation Request Review & Approval Card */}
-              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'cancellation requested') && (
+              {((confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase() === 'cancellation requested') && !isPostDeliveryOrder(order, confirmedStatus) && (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-100 rounded-lg text-amber-800 shrink-0 mt-0.5">
@@ -1891,11 +2147,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           Customer Return Request (Post-Delivery)
                         </h4>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
-                          Action Required
+                          {!isShiprocketDesk ? 'Action Required' : 'Managed in Admin Orders'}
                         </span>
                       </div>
                       <p className="text-xs text-amber-900/90 leading-relaxed">
-                        The customer has requested to return this delivered order. Approving will initiate the courier reverse pickup back to the House of Urvaah atelier.
+                        {!isShiprocketDesk
+                          ? 'The customer has requested to return this delivered order. Approving will initiate the courier reverse pickup back to the House of Urvaah atelier.'
+                          : 'The customer has requested to return this delivered order. Return request review and approval are managed directly in the Admin Orders panel.'}
                       </p>
 
                       <div className="mt-2 p-3 bg-white/90 border border-amber-200 rounded-lg text-xs space-y-1.5">
@@ -1936,42 +2194,48 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </div>
                   </div>
 
-                  {/* Approve / Reject Return Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-200">
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleRejectReturn}
-                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Reject Return
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleApproveReturn}
-                      className="px-5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Processing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve Return Request</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {/* Actions: Admin Approval & Rejection for Customer Return Request */}
+                  {!isShiprocketDesk ? (
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-200">
+                      <button
+                        type="button"
+                        disabled={savingStatus}
+                        onClick={handleRejectReturn}
+                        className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Reject Return
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingStatus}
+                        onClick={handleApproveReturn}
+                        className="px-5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {savingStatus ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Approve Return Request</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between pt-2 border-t border-amber-200 text-xs">
+                      <span className="text-amber-900 font-medium italic">
+                        Return request approval is managed in Admin Orders (Forward Desk is for fulfillment only).
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Customer Replacement Request Review Banner */}
-              {(['replacement request processing', 'replace requested', 'replacement requested'].includes(
-                (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
-              )) && (
+              {(['replacement request processing', 'replace requested', 'replacement requested'].includes(curOrderStatus) && !isReplacementRejected) && (
                 <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg text-purple-800 shrink-0 mt-0.5">
@@ -1983,11 +2247,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           Customer Replacement Request (Delivered Order Exchange)
                         </h4>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
-                          Action Required
+                          {!isShiprocketDesk ? 'Action Required' : 'Managed in Admin Orders'}
                         </span>
                       </div>
                       <p className="text-xs text-purple-900/90 leading-relaxed">
-                        The customer has requested an exchange / replacement for this delivered piece. Approving will confirm the requested replacement piece and coordinate reverse pickup of the delivered item.
+                        {!isShiprocketDesk
+                          ? `The customer has requested an exchange / replacement for size ${customReplacementSize || getRequestedReplacementSize(order) || order.replacement_size || 'requested size'}. Approving will confirm the requested replacement piece and coordinate reverse pickup of the delivered item.`
+                          : `The customer has requested an exchange / replacement for size ${customReplacementSize || getRequestedReplacementSize(order) || order.replacement_size || 'requested size'}. Replacement request review and approval are managed directly in the Admin Orders panel.`}
                       </p>
 
                       {(order.cancel_reason || order.return_reason) && (
@@ -1999,34 +2265,180 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </div>
                   </div>
 
-                  {/* Approve / Reject Replacement Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-purple-200">
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleRejectReplacement}
-                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Reject Replacement
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleApproveReplacement}
-                      className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Processing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve Replacement</span>
-                        </>
-                      )}
-                    </button>
+                  {/* Actions: On Admin side show Approve/Reject; in Shiprocket Forward Desk show notice */}
+                  {!isShiprocketDesk ? (
+                    isRejectingReplacement ? (
+                      <div className="p-3.5 bg-rose-50/90 border border-rose-200 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-rose-200 pb-2">
+                          <span className="text-xs font-bold text-rose-950 uppercase tracking-wide">
+                            Select Reason to Reject Replacement:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsRejectingReplacement(false)}
+                            className="text-xs text-neutral-500 hover:text-neutral-800 font-semibold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {[
+                            'Out of replacement / exchange policy window',
+                            'Requested size / product unavailable in atelier inventory',
+                            'Item was marked as Final Sale / Non-exchangeable',
+                            'Exchange limit exceeded for this order',
+                            'Replacement request rejected by Admin',
+                            'Other reason (Specified below)'
+                          ].map((rsn) => (
+                            <button
+                              key={rsn}
+                              type="button"
+                              onClick={() => setReplacementRejectReason(rsn)}
+                              className={`p-2 rounded-lg border text-left font-medium transition-all cursor-pointer ${
+                                replacementRejectReason === rsn
+                                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                  : 'bg-white text-neutral-700 border-rose-200 hover:border-rose-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-3 h-3 rounded-full border flex items-center justify-center shrink-0 ${
+                                  replacementRejectReason === rsn ? 'border-white bg-white' : 'border-neutral-400 bg-white'
+                                }`}>
+                                  {replacementRejectReason === rsn && <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />}
+                                </span>
+                                <span className="text-[11px] leading-tight">{rsn}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div>
+                          <input
+                            type="text"
+                            value={replacementRejectNotes}
+                            onChange={(e) => setReplacementRejectNotes(e.target.value)}
+                            placeholder="Optional remarks (e.g. customer contacted, agreed on keeping size)"
+                            className="w-full text-xs p-2 rounded-lg border border-rose-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-rose-500 placeholder:text-neutral-400"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-rose-200">
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => setIsRejectingReplacement(false)}
+                            className="px-3.5 py-1.5 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => handleRejectReplacement(replacementRejectNotes ? `${replacementRejectReason} - ${replacementRejectNotes}` : replacementRejectReason)}
+                            className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            {savingStatus ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                            <span>Confirm Rejection</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-3 pt-2 border-t border-purple-200">
+                        <button
+                          type="button"
+                          disabled={savingStatus}
+                          onClick={() => setIsRejectingReplacement(true)}
+                          className="px-4 py-2 bg-white border border-rose-300 hover:bg-rose-50 text-rose-700 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Reject Replacement</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingStatus}
+                          onClick={handleApproveReplacement}
+                          className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {savingStatus ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve Replacement</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex items-center justify-between pt-2 border-t border-purple-200/70 text-xs">
+                      <span className="text-purple-900 font-medium italic">
+                        Replacement request approval is managed in Admin Orders (Forward Desk is for fulfillment only).
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Customer Replacement Request Rejected Banner */}
+              {isReplacementRejected && (
+                <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-rose-100 rounded-lg text-rose-700 shrink-0 mt-0.5">
+                      <XCircle className="w-5 h-5 text-rose-600" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-admin font-bold text-rose-950 uppercase tracking-wide">
+                          Replacement Request Rejected
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase">
+                          REJECTED
+                        </span>
+                      </div>
+                      <p className="text-xs text-rose-900/90 leading-relaxed">
+                        The customer's request for replacement (exchange for size <strong className="font-bold text-rose-950">{customReplacementSize || getRequestedReplacementSize(order) || order.replacement_size || 'requested size'}</strong>) was rejected. No reverse courier pickup will be scheduled and forward replacement order will NOT be dispatched. Order remains Delivered.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Recorded Rejection Reason */}
+                  <div className="p-3 bg-white/90 border border-rose-200 rounded-lg text-xs space-y-1.5">
+                    <div className="flex items-center justify-between text-rose-950">
+                      <span className="font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Recorded Rejection Reason:</span>
+                      </span>
+                      <span className="text-[10px] text-neutral-500">
+                        {order.updated_at ? new Date(order.updated_at).toLocaleString('en-IN') : 'Recent'}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded border border-rose-200">
+                      "{order.rejection_reason || order.cancel_reason || order.return_rejection_reason || 'Replacement request rejected by Admin'}"
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-rose-200 text-xs">
+                    <span className="text-[11px] text-rose-700 font-medium">Customer order status reflects Replacement Rejected / Delivered.</span>
+                    {!isShiprocketDesk && (
+                      <button
+                        type="button"
+                        disabled={savingStatus}
+                        onClick={handleApproveReplacement}
+                        className="px-3.5 py-1.5 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 text-[11px] font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-2xs"
+                        title="Re-open replacement request and schedule pickup"
+                      >
+                        Re-open &amp; Approve Replacement
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -2054,11 +2466,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <span>Customer Mixed Return & Replacement Request (Simultaneous)</span>
                         </h4>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
-                          Action Required
+                          {!isShiprocketDesk ? 'Action Required' : 'Managed in Admin Orders'}
                         </span>
                       </div>
                       <p className="text-xs text-indigo-900/90 leading-relaxed">
-                        The customer has requested to return 1 or more items for a refund and exchange 1 or more items for a different size simultaneously. Approving will confirm both actions and coordinate a single reverse pickup with Delhivery for the customer doorstep.
+                        {!isShiprocketDesk
+                          ? 'The customer has requested to return 1 or more items for a refund and exchange 1 or more items for a different size simultaneously. Approving will confirm both actions and coordinate a single reverse pickup with Delhivery for the customer doorstep.'
+                          : 'The customer has requested to return 1 or more items for a refund and exchange 1 or more items for a different size simultaneously. Return & replacement approvals are managed directly in the Admin Orders panel.'}
                       </p>
 
                       {/* Itemised Breakdown Card */}
@@ -2098,35 +2512,43 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-2 border-t border-indigo-200">
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleRejectMixedReturnReplace}
-                      className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Reject Request
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingStatus}
-                      onClick={handleApproveMixedReturnReplace}
-                      className="px-5 py-2 bg-indigo-900 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {savingStatus ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Processing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-indigo-200" />
-                          <span>Approve Return & Replacement (Schedule Pickup)</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  {/* Action Buttons: On Admin side show Approve/Reject; in Shiprocket Forward Desk show note */}
+                  {!isShiprocketDesk ? (
+                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-indigo-200">
+                      <button
+                        type="button"
+                        disabled={savingStatus}
+                        onClick={handleRejectMixedReturnReplace}
+                        className="px-4 py-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Reject Request
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingStatus}
+                        onClick={handleApproveMixedReturnReplace}
+                        className="px-5 py-2 bg-indigo-900 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {savingStatus ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-200" />
+                            <span>Approve Return & Replacement (Schedule Pickup)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between pt-2 border-t border-indigo-200 text-xs">
+                      <span className="text-indigo-900 font-medium italic">
+                        Return & replacement approvals are managed in Admin Orders (Forward Desk is for fulfillment only).
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2145,6 +2567,43 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 if (!isMixed) return null;
 
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
+
+                // Only Shiprocket Order Desk and Refund Desk show the interactive Mixed cycle ("niche ki cycle")
+                if (!isShiprocketDesk && !isRefundDesk) {
+                  const isPendingReview = ['return & replacement processing', 'return and replacement processing', 'return & replacement requested'].includes(curSt);
+                  if (isPendingReview) return null; // Handled exclusively in Customer Mixed Request review banner above!
+
+                  return (
+                    <div className="bg-gradient-to-r from-purple-50 via-sky-50 to-indigo-50 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-indigo-100 rounded-lg text-indigo-800 shrink-0 mt-0.5">
+                          <RefreshCw className="w-5 h-5 text-indigo-700" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs sm:text-sm font-admin font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-2">
+                            <span>Mixed Return &amp; Replacement in Progress</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-200 text-indigo-900 border border-indigo-300 uppercase">
+                              {order.status}
+                            </span>
+                          </h4>
+                          <p className="text-xs text-indigo-900/90 leading-relaxed">
+                            Reverse courier collection, atelier QC, and replacement dispatch are managed via the <strong>Shiprocket Order Desk</strong>.
+                          </p>
+                        </div>
+                      </div>
+                      {onSwitchToShiprocketDesk && (
+                        <button
+                          type="button"
+                          onClick={onSwitchToShiprocketDesk}
+                          className="px-3.5 py-1.5 bg-indigo-950 hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open Shiprocket Desk</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const repOrderNum = order?.replacement_order_number;
 
@@ -2440,7 +2899,65 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 // Show Exchange Journey when the order is in an exchange/replacement lifecycle
                 const isReplacementRelated = isOrderReplacementLifecycle(order, curSt);
 
-                if (!isReplacementRelated) return null;
+                if (!isReplacementRelated || isReplacementRejected) return null;
+
+                // Only Shiprocket Order Desk and Refund Desk show the interactive Exchange cycle ("niche ki cycle")
+                if (!isShiprocketDesk && !isRefundDesk) {
+                  const isPendingReview = ['replacement request processing', 'replace requested', 'replacement requested'].includes(curSt);
+                  if (isPendingReview) return null; // Handled exclusively in the Customer Replacement Request review banner above!
+
+                  const repOrderNum = order?.replacement_order_number;
+                  const reqSize = customReplacementSize || getRequestedReplacementSize(order);
+
+                  return (
+                    <div className="bg-purple-50/70 border-2 border-purple-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg text-purple-800 shrink-0 mt-0.5">
+                          <RefreshCw className="w-5 h-5 text-purple-700" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs sm:text-sm font-admin font-bold text-purple-950 uppercase tracking-wide flex items-center gap-2">
+                            <span>Replacement Request Approved • Reverse Logistics in Progress</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-200 text-purple-900 border border-purple-300 uppercase">
+                              {order.status}
+                            </span>
+                          </h4>
+                          <p className="text-xs text-purple-900/90 leading-relaxed">
+                            Exchange for size <strong className="font-bold text-purple-950">{reqSize}</strong> is active. Reverse courier pickup, atelier QC, and replacement order fulfillment are managed from the <strong>Shiprocket Order Desk</strong>.
+                            {repOrderNum && (
+                              <span className="block mt-1 text-emerald-800 font-semibold">
+                                ✓ Replacement Forward Order: #{repOrderNum}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {repOrderNum && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReplacementOrder(repOrderNum)}
+                            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>View Order #{repOrderNum}</span>
+                          </button>
+                        )}
+                        {onSwitchToShiprocketDesk && (
+                          <button
+                            type="button"
+                            onClick={onSwitchToShiprocketDesk}
+                            className="px-3.5 py-2 bg-purple-950 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open Shiprocket Desk</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
 
                 const repOrderNum = order?.replacement_order_number;
                 const isRejected = curSt === 'replace rejected';
@@ -2631,7 +3148,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     )}
 
                     {/* A. If Requested (Step 1/2 Active) */}
-                    {(curSt === 'replacement request processing' || curSt === 'replace requested' || (!isS2 && !isRejected)) && (
+                    {(['replacement request processing', 'replace requested', 'replacement requested'].includes(curSt)) && (
                       <div className="bg-white border border-purple-200 rounded-xl p-4 space-y-3">
                         <div className="space-y-1">
                           <h5 className="text-xs font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
@@ -2643,26 +3160,32 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
-                          <button
-                            type="button"
-                            disabled={savingStatus}
-                            onClick={() => setIsRejectingReplacement(true)}
-                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                          >
-                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Reject Request</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={savingStatus}
-                            onClick={handleApproveReplacement}
-                            className="px-4 py-2 bg-purple-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span>Approve Replacement & Schedule Pickup</span>
-                          </button>
-                        </div>
+                        {isShiprocketDesk ? (
+                          <div className="pt-2 border-t border-purple-100 text-xs text-purple-900 font-medium italic">
+                            Replacement request review is pending in Admin Orders. Reverse logistics will activate upon Admin approval.
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={() => setIsRejectingReplacement(true)}
+                              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Reject Request</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={handleApproveReplacement}
+                              className="px-4 py-2 bg-purple-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              <span>Approve Replacement &amp; Schedule Pickup</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -3043,6 +3566,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                 const curLog = (order?.logistics_status || '').toLowerCase();
                 const returnType = (order?.return_type || '').toLowerCase();
+                const isQCRejected = curSt === 'return qc rejected' || order?.return_qc_status === 'Rejected';
 
                 const isMixed = Boolean(
                   (order?.return_type || '').toLowerCase().includes('mixed') ||
@@ -3088,7 +3612,57 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                 if (!isReturnRelated) return null;
 
-                const isQCRejected = curSt === 'return qc rejected' || order?.return_qc_status === 'Rejected';
+                // Only Shiprocket Order Desk and Refund Desk show the interactive Return cycle ("niche ki cycle")
+                if (!isShiprocketDesk && !isRefundDesk) {
+                  const isPendingReview = ['return requested', 'return request processing', 'return processing'].includes(curSt);
+                  if (isPendingReview) return null; // Handled exclusively in the Customer Return Request review banner above!
+
+                  return (
+                    <div className="bg-sky-50/70 border-2 border-sky-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-sky-100 rounded-lg text-sky-800 shrink-0 mt-0.5">
+                          <RotateCcw className="w-5 h-5 text-sky-700" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-xs sm:text-sm font-admin font-bold text-sky-950 uppercase tracking-wide flex items-center gap-2">
+                            <span>Return Request Approved • Reverse Logistics in Progress</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-200 text-sky-900 border border-sky-300 uppercase">
+                              {order.status}
+                            </span>
+                          </h4>
+                          <p className="text-xs text-sky-900/90 leading-relaxed">
+                            Return request has been approved. Doorstep reverse pickup, in-transit tracking, and atelier parcel receiving are managed from the <strong>Shiprocket Order Desk</strong>.
+                            {(order.refund_eligible_amount || order.total) && (
+                              <span className="block mt-1 text-emerald-800 font-semibold">
+                                ✓ Refund Amount: ₹{Number(order.refund_eligible_amount || order.total || 0).toLocaleString('en-IN')} (Routed to Refund Desk upon atelier QC)
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {onSwitchToShiprocketDesk && (
+                          <button
+                            type="button"
+                            onClick={onSwitchToShiprocketDesk}
+                            className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open Shiprocket Desk</span>
+                          </button>
+                        )}
+                        <a
+                          href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                          className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                        >
+                          <Banknote className="w-3.5 h-3.5" />
+                          <span>Refund Desk</span>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                }
                 const isQCPassed = (['received at house of urvaah', 'received at homved', 'returned'].includes(curSt) && !isQCRejected && (order?.return_qc_status === 'Accepted' || (curSt === 'returned' && order?.return_qc_status !== 'Pending QC')));
 
                 const isS2 = ['return approved', 'return collected', 'in transit to house of urvaah', 'received at house of urvaah', 'received at homved', 'returned', 'return qc rejected'].includes(curSt) || (curLog.includes('reverse') && (curLog.includes('pickup') || curLog.includes('awb')));
@@ -3223,11 +3797,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 {isQCRejected ? '✕' : isS5 ? '✓' : '5'}
                               </div>
                               <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">
-                                {isQCRejected ? '5. QC Rejected' : '5. QC Check'}
+                                {isQCRejected ? '5. QC Rejected' : isQCPassed ? '5. QC Approved' : '5. QC Check'}
                               </span>
                             </div>
                             <p className="text-[10px] text-neutral-600 mt-1 pl-6">
-                              {isQCRejected ? 'Damaged/Wrong' : isS5 ? 'Acceptable & Restocked' : isS5Active ? 'Awaiting Check' : 'Pending'}
+                              {isQCRejected ? 'Damaged/Wrong' : isQCPassed ? 'Acceptable & Restocked' : isS5Active ? 'Awaiting QC Approval' : 'Pending'}
                             </p>
                           </div>
 
@@ -3271,16 +3845,27 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             Doorstep Courier Collection Details
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {isS2 ? (
                             <>
                               <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 Reverse AWB Assigned
                               </span>
                               {(order.reverse_tracking_number || order.reverse_awb || order.tracking_number || order.awb_code) && (
-                                <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
-                                  {order.reverse_tracking_number || order.reverse_awb || order.tracking_number || order.awb_code}
-                                </span>
+                                <>
+                                  <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
+                                    {order.reverse_tracking_number || order.reverse_awb || order.tracking_number || order.awb_code}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowReverseTrackingModal(true)}
+                                    className="px-2.5 py-1 bg-sky-900 hover:bg-black text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                    title="Track Reverse Parcel via Shiprocket"
+                                  >
+                                    <RotateCcw className="w-3 h-3 text-sky-200" />
+                                    <span>Track Reverse Parcel (Shiprocket)</span>
+                                  </button>
+                                </>
                               )}
                             </>
                           ) : (
@@ -3387,33 +3972,52 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             )}
                           </p>
 
-                          {/* Admin Actions */}
+                          {/* Admin Actions: Approve or Reject QC */}
                           {!isQCPassed && !isQCRejected && (
                             <div className="pt-1 flex flex-wrap items-center gap-2.5">
                               <button
                                 type="button"
                                 disabled={savingStatus}
                                 onClick={() => handleConfirmParcelQC(true)}
-                                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
-                                title="Confirm parcel is received and acceptable. Unlocks refund disbursement."
+                                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                                title="Approve QC: Confirm parcel is acceptable and restock into inventory"
                               >
                                 {savingStatus ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
                                   <Check className="w-3.5 h-3.5" />
                                 )}
-                                <span>Confirm Parcel Acceptable &amp; Start Refund</span>
+                                <span>✓ Approve QC (Accept Parcel &amp; Restock)</span>
                               </button>
 
                               <button
                                 type="button"
                                 disabled={savingStatus}
                                 onClick={() => setShowQCRejectForm(prev => !prev)}
-                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-                                title="Reject return if wrong or damaged product received"
+                                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                                title="Reject QC if wrong or damaged product received"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
-                                <span>{showQCRejectForm ? 'Close Rejection Form' : 'Reject Parcel (Wrong / Damaged)'}</span>
+                                <span>{showQCRejectForm ? 'Close Rejection Form' : '✕ Reject QC (Damaged / Wrong Item)'}</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {isQCPassed && !isS6 && (
+                            <div className="pt-1 flex flex-wrap items-center gap-2.5">
+                              <span className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1 mr-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                QC Approved: Parcel accepted &amp; restocked.
+                              </span>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setShowQCRejectForm(prev => !prev)}
+                                className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                title="Re-inspect QC and reject return if damage or wrong product was found"
+                              >
+                                <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>{showQCRejectForm ? 'Close Rejection Form' : 'Re-inspect QC: Reject Parcel'}</span>
                               </button>
                             </div>
                           )}
@@ -3424,11 +4028,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 type="button"
                                 disabled={savingStatus}
                                 onClick={() => handleConfirmParcelQC(true)}
-                                className="px-3.5 py-2 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
                                 title="Re-inspect and override rejection to accept parcel"
                               >
-                                <RotateCcw className="w-3.5 h-3.5 text-neutral-600" />
-                                <span>Override Rejection &amp; Accept Parcel</span>
+                                <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Override Rejection &amp; Approve QC</span>
                               </button>
                             </div>
                           )}
@@ -3525,26 +4129,32 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-sky-100">
                         {/* Step 1 Actions: If Return Requested or Processing */}
                         {['return requested', 'return request processing', 'return processing'].includes(curSt) && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={savingStatus}
-                              onClick={handleRejectReturn}
-                              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              <span>Reject Return</span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={savingStatus}
-                              onClick={handleApproveReturn}
-                              className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-sky-200" />
-                              <span>Approve Return &amp; Schedule Pickup (Step 2/3)</span>
-                            </button>
-                          </>
+                          isShiprocketDesk ? (
+                            <span className="text-xs text-amber-800 font-medium italic">
+                              Return request approval is pending in Admin Orders. Reverse logistics will activate upon Admin approval.
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={handleRejectReturn}
+                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Reject Return</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={handleApproveReturn}
+                                className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-sky-200" />
+                                <span>Approve Return &amp; Schedule Pickup (Step 2/3)</span>
+                              </button>
+                            </>
+                          )
                         )}
 
                         {/* Step 3 Actions: If Return Approved (Awaiting Doorstep Handover) */}
@@ -3590,7 +4200,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             disabled={savingStatus}
                             onClick={handleMarkReceivedAtUrvaah}
                             className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-                            title="Advance to Step 5: Item delivered back to atelier and restocked"
+                            title="Advance to Step 5: Item delivered back to atelier for QC inspection"
                           >
                             {savingStatus ? (
                               <>
@@ -3600,7 +4210,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             ) : (
                               <>
                                 <PackageCheck className="w-4 h-4 text-emerald-400" />
-                                <span>Mark Received at Atelier &amp; Restock (Step 5)</span>
+                                <span>Mark Parcel Received ➔ QC Inspection (Step 5)</span>
                               </>
                             )}
                           </button>
@@ -3608,15 +4218,27 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                         {/* Step 6 Actions: Only when parcel is confirmed acceptable by admin QC - Process exclusively via Refund Desk */}
                         {(['received at house of urvaah', 'received at homved'].includes(curSt) || isS5Active || isS5) && isQCPassed && !isQCRejected && (
-                          <a
-                            href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
-                            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
-                            title="Open Refund Desk to settle payout"
-                          >
-                            <Banknote className="w-4 h-4 text-emerald-200" />
-                            <span>Process in Refund Desk (₹{(order.refund_eligible_amount || order.total || 0).toLocaleString('en-IN')})</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-300" />
-                          </a>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <a
+                              href={`/admin/refund-desk?search=${encodeURIComponent(order.order_number || order.id)}`}
+                              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                              title="Open Refund Desk to settle payout"
+                            >
+                              <Banknote className="w-4 h-4 text-emerald-200" />
+                              <span>Process in Refund Desk (₹{(order.refund_eligible_amount || order.total || 0).toLocaleString('en-IN')})</span>
+                              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-300" />
+                            </a>
+                            <button
+                              type="button"
+                              disabled={savingStatus}
+                              onClick={() => setShowQCRejectForm(true)}
+                              className="px-3 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                              title="Re-open QC inspection to reject parcel if defect is detected"
+                            >
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Re-evaluate QC</span>
+                            </button>
+                          </div>
                         )}
 
                         {/* If QC Rejected */}
@@ -3745,10 +4367,19 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
                       >
                         {ORDER_STATUS_OPTIONS.filter((opt) => {
-                          if (isRefundDesk) return true;
-                          if (RETURN_RESTRICTED_STATUSES.includes(opt.value)) {
+                          const isPostDelivery = isPostDeliveryOrder(order, confirmedStatus);
+                          // For any order after delivery, cancellation options are strictly disallowed
+                          if (isPostDelivery && ['Cancelled', 'Cancellation Requested', 'Cancellation Rejected'].includes(opt.value)) {
                             return opt.value === (confirmedStatus || order?.status);
                           }
+
+                          if (isShiprocketDesk) {
+                            // Shiprocket forward desk is exclusively for forward fulfillment
+                            if (RETURN_RESTRICTED_STATUSES.includes(opt.value)) {
+                              return opt.value === (confirmedStatus || order?.status);
+                            }
+                          }
+                          // Admin side and Refund Desk have full unrestricted access to all statuses
                           return true;
                         }).map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -3756,10 +4387,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </option>
                         ))}
                       </select>
-                      {!isRefundDesk && RETURN_RESTRICTED_STATUSES.includes(confirmedStatus || order?.status) && (
+                      {isShiprocketDesk && RETURN_RESTRICTED_STATUSES.includes(confirmedStatus || order?.status) && (
                         <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1.5 flex items-center gap-1.5 leading-normal">
                           <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>Return &amp; replacement delivery cycles can only be updated in the Refund / Shiprocket Desk.</span>
+                          <span>Return &amp; replacement lifecycles are approved and managed directly in Admin Orders.</span>
                         </p>
                       )}
                     </div>
@@ -3903,10 +4534,30 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   {/* Forward Logistics Actions */}
                 {(() => {
                   const hasAwb = Boolean((order.tracking_number || order.trackingNumber || order.awb_code || order.awb || '').toString().trim());
+                  const curSt = (confirmedStatus || order.status || '').toLowerCase();
+                  const isOrderCancelled = curSt === 'cancelled' || curSt === 'canceled';
+                  const isPostDelivery = isPostDeliveryOrder(order, confirmedStatus);
+
+                  if (isOrderCancelled) {
+                    return (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>
+                            Order has been cancelled ({order.cancel_reason || 'Cancelled by Admin'}). Forward shipping and courier pickup are disabled.
+                          </span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-rose-200/90 text-rose-900 rounded-full shrink-0">
+                          Order Cancelled
+                        </span>
+                      </div>
+                    );
+                  }
+
                   return (
                     <>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {(!hasAwb || ['placed', 'confirmed', 'pending', 'processing'].includes((order.status || '').toLowerCase())) ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {(!hasAwb || ['placed', 'confirmed', 'pending', 'processing'].includes(curSt)) && (
                           <button
                             type="button"
                             disabled={logisticsLoading}
@@ -3916,82 +4567,82 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             {logisticsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
                             <span>Generate AWB &amp; Mark Shipped</span>
                           </button>
-                        ) : null}
+                        )}
 
-                        <button
-                          type="button"
-                          disabled={logisticsLoading || !hasAwb}
-                          onClick={handleDownloadLabel}
-                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
-                            !hasAwb
-                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
-                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer'
-                          }`}
-                          title={!hasAwb ? "Generate AWB first to download shipping label" : "Download Official Courier Shipping Label (PDF)"}
-                        >
-                          <FileText className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
-                          <span>Shipping Label (PDF)</span>
-                        </button>
+                        {!isPostDelivery && !isOrderCancelled && (
+                          <button
+                            type="button"
+                            disabled={logisticsLoading}
+                            onClick={() => setIsAdminCancelModalOpen(true)}
+                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                            title="Cancel Order as Administrator"
+                          >
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Cancel Order</span>
+                          </button>
+                        )}
 
-                        <button
-                          type="button"
-                          disabled={logisticsLoading || !hasAwb}
-                          onClick={handleDownloadManifest}
-                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
-                            !hasAwb
-                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
-                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer'
-                          }`}
-                          title={!hasAwb ? "Generate AWB first to download pickup manifest" : "Download Courier Pickup Manifest (PDF)"}
-                        >
-                          <FileText className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
-                          <span>Pickup Manifest</span>
-                        </button>
+                        {hasAwb && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={logisticsLoading}
+                              onClick={handleDownloadLabel}
+                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer"
+                              title="Download Official Courier Shipping Label (PDF)"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                              <span>Shipping Label (PDF)</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          disabled={logisticsLoading || !hasAwb}
-                          onClick={handleSchedulePickup}
-                          className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
-                            !hasAwb
-                              ? 'bg-neutral-200 text-neutral-400 border border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
-                              : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
-                                ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
-                                : 'bg-neutral-900 hover:bg-black text-white cursor-pointer'
-                          }`}
-                          title={!hasAwb ? "Generate AWB first before scheduling courier pickup" : (order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment")}
-                        >
-                          {!hasAwb ? (
-                            <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                          ) : logisticsLoading ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                          ) : (
-                            <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                          )}
-                          <span>
-                            {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
-                              ? `Pickup Scheduled${order.pickup_token ? ` (${order.pickup_token})` : ''}`
-                              : 'Schedule Courier Pickup'}
-                          </span>
-                        </button>
+                            <button
+                              type="button"
+                              disabled={logisticsLoading}
+                              onClick={handleDownloadManifest}
+                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer"
+                              title="Download Courier Pickup Manifest (PDF)"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-neutral-600" />
+                              <span>Pickup Manifest</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          disabled={!hasAwb}
-                          onClick={handleFetchTracking}
-                          className={`px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors ml-auto shadow-2xs ${
-                            !hasAwb
-                              ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none pointer-events-auto'
-                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border-neutral-300 cursor-pointer'
-                          }`}
-                          title={!hasAwb ? "Generate AWB first to view live scans" : "View Live Courier Tracking Scans"}
-                        >
-                          <Truck className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-700'}`} />
-                          <span>{showTrackingScans ? 'Hide Scans' : 'Live Courier Scans'}</span>
-                          {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
+                            <button
+                              type="button"
+                              disabled={logisticsLoading}
+                              onClick={handleSchedulePickup}
+                              className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
+                                (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
+                                  ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                                  : 'bg-neutral-900 hover:bg-black text-white cursor-pointer'
+                              }`}
+                              title={order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment"}
+                            >
+                              {logisticsLoading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled') ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                              ) : (
+                                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                              )}
+                              <span>
+                                {(order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
+                                  ? `Pickup Scheduled${order.pickup_token ? ` (${order.pickup_token})` : ''}`
+                                  : 'Schedule Courier Pickup'}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleFetchTracking}
+                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors ml-auto shadow-2xs bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border-neutral-300 cursor-pointer"
+                              title="View Live Courier Tracking Scans"
+                            >
+                              <Truck className="w-3.5 h-3.5 text-neutral-700" />
+                              <span>{showTrackingScans ? 'Hide Scans' : 'Live Courier Scans'}</span>
+                              {showTrackingScans ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       {/* Live Scans Timeline Drawer */}
@@ -4025,7 +4676,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       )}
 
                       {/* 1-Click Milestone Testing Strip (Shiprocket Forward Desk Only) */}
-                      {isShiprocketDesk && (
+                      {isShiprocketDesk && hasAwb && (
                         <div className="pt-2 border-t border-neutral-200/60">
                           <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
                             Testing Suite: Simulate Shiprocket Webhook Milestones
@@ -4294,6 +4945,153 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
         onClose={() => setIsManifestModalOpen(false)}
         order={order}
       />
+
+      {/* Official Shiprocket Reverse Logistics Tracking Modal */}
+      <ShipmentTrackingModal
+        isOpen={showReverseTrackingModal}
+        onClose={() => setShowReverseTrackingModal(false)}
+        awb={order?.reverse_tracking_number || order?.reverse_awb || order?.tracking_number || order?.awb_code}
+        orderNumber={order?.order_number}
+        isReturn={true}
+        fallbackStatus={order?.logistics_status || 'Return Pickup Scheduled'}
+      />
+
+      {/* Admin Direct Order Cancellation Confirmation Modal */}
+      {isAdminCancelModalOpen && order && !isPostDeliveryOrder(order, confirmedStatus) && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+          onClick={() => !cancellingOrder && setIsAdminCancelModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-neutral-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-admin font-bold text-rose-950 uppercase tracking-wide">
+                    Cancel Order #{order.order_number || order.id?.slice(0, 8)}
+                  </h3>
+                  <p className="text-[11px] text-rose-800/80">
+                    Administrator Order Cancellation
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={cancellingOrder}
+                onClick={() => setIsAdminCancelModalOpen(false)}
+                className="text-neutral-400 hover:text-neutral-700 disabled:opacity-40 p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs font-admin">
+              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-1.5">
+                <div className="flex justify-between text-neutral-600">
+                  <span>Customer:</span>
+                  <span className="font-semibold text-brand-dark">{order.customer_name || order.user_id || 'Customer'}</span>
+                </div>
+                <div className="flex justify-between text-neutral-600">
+                  <span>Order Total:</span>
+                  <span className="font-bold text-brand-dark">₹{Number(order.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-neutral-600">
+                  <span>Payment Method:</span>
+                  <span className="font-semibold text-brand-dark uppercase">{order.payment_method || order.payment_type || 'COD'}</span>
+                </div>
+                <div className="flex justify-between text-neutral-600">
+                  <span>Current Status:</span>
+                  <span className="font-semibold text-brand-dark">{order.status}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                  Cancellation Reason <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={adminCancelReason}
+                  onChange={(e) => setAdminCancelReason(e.target.value)}
+                  disabled={cancellingOrder}
+                  className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2.5 text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer"
+                >
+                  <option value="Customer requested cancellation">Customer requested cancellation</option>
+                  <option value="Item out of stock / Inventory mismatch">Item out of stock / Inventory mismatch</option>
+                  <option value="Quality defect / fabric issue during inspection">Quality defect / fabric issue during inspection</option>
+                  <option value="Unreachable customer / invalid delivery address">Unreachable customer / invalid delivery address</option>
+                  <option value="Suspected fraudulent / unverified order">Suspected fraudulent / unverified order</option>
+                  <option value="Other (Specify reason)">Other (Specify custom reason)</option>
+                </select>
+              </div>
+
+              {adminCancelReason === 'Other (Specify reason)' && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                    Specific Reason / Notes <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adminCancelCustomReason}
+                    onChange={(e) => setAdminCancelCustomReason(e.target.value)}
+                    disabled={cancellingOrder}
+                    placeholder="Enter details on why this order is being cancelled..."
+                    className="w-full bg-white border border-neutral-300 rounded-xl p-3 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
+                  />
+                </div>
+              )}
+
+              <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Important:</strong> Cancelling this order will release all reserved line items back to inventory and stop courier pickup.
+                  {((order.payment_method || '').toLowerCase() !== 'cod') && (
+                    <span className="block mt-1 text-emerald-800 font-medium">
+                      This order was paid online (₹{Number(order.total || 0).toLocaleString('en-IN')}). It will be automatically routed to the <strong>Refund Desk</strong> for processing.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={cancellingOrder}
+                onClick={() => setIsAdminCancelModalOpen(false)}
+                className="px-4 py-2 border border-neutral-300 text-neutral-700 hover:bg-neutral-100 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                disabled={cancellingOrder}
+                onClick={handleAdminCancelOrder}
+                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {cancellingOrder ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cancelling Order...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5 text-white" />
+                    <span>Confirm Cancel Order</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
