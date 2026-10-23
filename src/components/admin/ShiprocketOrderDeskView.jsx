@@ -29,6 +29,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
 import { OrderDetailModal } from './OrderDetailModal';
+import { getOrderGstInfo } from '../../utils/gstHelper';
 
 export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = false }) => {
   // State: Orders & Filters
@@ -435,7 +436,7 @@ export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = fal
 
                       {/* Amount */}
                       <td className="py-3 px-3 font-bold text-neutral-900">
-                        ₹{Number(ord.total || ord.subtotal || 0).toLocaleString('en-IN')}
+                        ₹{Number(getOrderGstInfo(ord).total || ord.total || 0).toLocaleString('en-IN')}
                       </td>
 
                       {/* Actions */}

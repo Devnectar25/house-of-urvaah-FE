@@ -30,6 +30,7 @@ import {
 import { apiClient } from '../../lib/apiClient';
 import { shippingApi } from '../../services/shippingApi';
 import { ReturnOrderDetailModal } from './ReturnOrderDetailModal';
+import { getOrderGstInfo } from '../../utils/gstHelper';
 
 export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = false }) => {
   // State: Orders & Filters
@@ -676,7 +677,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
                       {/* Amount & Payout */}
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-neutral-900 block">
-                          ₹{Number(ord.total || ord.subtotal || 0).toLocaleString('en-IN')}
+                          ₹{Number(getOrderGstInfo(ord).total || ord.total || 0).toLocaleString('en-IN')}
                         </span>
                         <span className="text-[10px] text-neutral-400 uppercase">
                           {ord.payment_method === 'cod' ? 'Cash on Delivery' : 'Prepaid (Online)'}

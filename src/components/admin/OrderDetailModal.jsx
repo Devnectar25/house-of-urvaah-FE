@@ -1898,10 +1898,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
-  const subtotal = parseFloat(order?.subtotal || order?.original_total || 0);
+  const orderGst = getOrderGstInfo(order);
+  const subtotal = parseFloat(order?.subtotal || order?.original_total || 0) || orderGst.subtotal;
   const shippingCost = parseFloat(order?.shipping_cost || order?.shipping || 0);
   const discountAmount = parseFloat(order?.discount_amount || order?.discount || 0);
-  const totalAmount = parseFloat(order?.total || 0);
+  const effectiveTax = orderGst.totalTax;
+  const totalAmount = Math.max(
+    parseFloat(order?.total || 0),
+    orderGst.total,
+    (subtotal - discountAmount) + effectiveTax + shippingCost
+  );
 
   const curOrderStatus = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
   const isInReplacementFlow = isOrderReplacementLifecycle(order, curOrderStatus);
@@ -3792,7 +3798,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
                       <p className="text-xs text-emerald-900/90 leading-relaxed">
                         This order was cancelled before courier dispatch. Shiprocket courier pickup was voided with ₹0 freight charge.
-                        {isRefundCompleted && ` Full 100% refund of ₹${Number(order.total || 0).toLocaleString('en-IN')} has been disbursed.`}
+                        {isRefundCompleted && ` Full 100% refund of ₹${Number(totalAmount).toLocaleString('en-IN')} has been disbursed.`}
                         {order.refund_txn_id && ` Transaction Reference / UTR: ${order.refund_txn_id}`}
                       </p>
                       {order.cancel_reason && (
@@ -3878,7 +3884,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             Return request has been approved. Doorstep reverse pickup, in-transit tracking, and atelier parcel receiving are managed from the <strong>Shiprocket Order Desk</strong>.
                             {(order.refund_eligible_amount || order.total) && (
                               <span className="block mt-1 text-emerald-800 font-semibold">
-                                ✓ Refund Amount: ₹{Number(order.refund_eligible_amount || order.total || 0).toLocaleString('en-IN')} (Routed to Refund Desk upon atelier QC)
+                                ✓ Refund Amount: ₹{Number(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN')} (Routed to Refund Desk upon atelier QC)
                               </span>
                             )}
                           </p>
@@ -5162,21 +5168,16 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </div>
                 )}
 
-                {(() => {
-                  const orderGst = getOrderGstInfo(order);
-                  if (orderGst.totalTax > 0) {
-                    return (
-                      <div className="flex justify-between text-neutral-700 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          <span>GST ({orderGst.taxRate}%)</span>
-                          <span className="px-1.5 py-0.2 rounded text-[9px] bg-neutral-200 text-neutral-700 font-bold uppercase">Included</span>
-                        </span>
-                        <span>₹{orderGst.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                {effectiveTax > 0 && (
+                  <div className="flex justify-between text-neutral-700 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span>GST ({orderGst.taxRate}%)</span>
+                    </span>
+                    <span className="font-semibold text-neutral-800">
+                      +₹{effectiveTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
 
                 <div className="pt-2.5 border-t border-neutral-200 flex justify-between items-center text-sm font-admin font-bold">
                   <span className="text-brand-dark tracking-wide">TOTAL AMOUNT</span>
@@ -5278,7 +5279,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 </div>
                 <div className="flex justify-between text-neutral-600">
                   <span>Order Total:</span>
-                  <span className="font-bold text-brand-dark">₹{Number(order.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="font-bold text-brand-dark">₹{Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-neutral-600">
                   <span>Payment Method:</span>
@@ -5331,7 +5332,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   <strong>Important:</strong> Cancelling this order will release all reserved line items back to inventory and stop courier pickup.
                   {((order.payment_method || '').toLowerCase() !== 'cod') && (
                     <span className="block mt-1 text-emerald-800 font-medium">
-                      This order was paid online (₹{Number(order.total || 0).toLocaleString('en-IN')}). It will be automatically routed to the <strong>Refund Desk</strong> for processing.
+                      This order was paid online (₹{Number(totalAmount).toLocaleString('en-IN')}). It will be automatically routed to the <strong>Refund Desk</strong> for processing.
                     </span>
                   )}
                 </div>

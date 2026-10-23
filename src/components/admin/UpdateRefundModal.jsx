@@ -17,7 +17,8 @@ import {
   ArrowRight,
   Zap,
   Image as ImageIcon,
-  Pencil
+  Pencil,
+  ChevronDown
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';

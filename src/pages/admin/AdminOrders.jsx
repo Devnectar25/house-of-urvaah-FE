@@ -29,6 +29,7 @@ import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../../lib/orderSync';
 import { ShiprocketOrderDeskView } from '../../components/admin/ShiprocketOrderDeskView';
+import { getOrderGstInfo } from '../../utils/gstHelper';
 
 const checkStatusMatches = (orderStatus, filterStatus, order = null) => {
   if (!filterStatus || filterStatus === 'all') return true;
@@ -1395,8 +1396,10 @@ export const AdminOrders = () => {
                   const itemsList = Array.isArray(ord.items) ? ord.items : [];
                   const itemCount = itemsList.length || 1;
                   const dateTimeInfo = formatOrderDateTime(ord.created_at);
-                  const formattedTotal = ord.total
-                    ? `₹${parseFloat(ord.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  const ordGst = getOrderGstInfo(ord);
+                  const effectiveOrdTotal = Math.max(parseFloat(ord.total || 0), ordGst.total);
+                  const formattedTotal = effectiveOrdTotal > 0
+                    ? `₹${effectiveOrdTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                     : '₹0.00';
 
                   return (
