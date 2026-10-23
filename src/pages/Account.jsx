@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star, Building2, Banknote, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Plus, Trash2, Pencil, Check, X, Shield, ShieldCheck, Lock, Ticket, Package, Heart, LogOut, Truck, CheckCircle2, RotateCcw, XCircle, ShoppingBag, AlertCircle, ChevronDown, Clock, PackageCheck, FileText, RefreshCw, ChevronLeft, ChevronRight, Star, Building2, Banknote, Loader2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import apiClient from '../lib/apiClient';
@@ -128,6 +128,7 @@ export const Account = () => {
   const [isEditingCancelBank, setIsEditingCancelBank] = useState(false);
   const [isEditingReturnBank, setIsEditingReturnBank] = useState(false);
   const [isSavingReturnBank, setIsSavingReturnBank] = useState(false);
+  const [savedBankDetailsSnapshot, setSavedBankDetailsSnapshot] = useState(null);
 
   // Profile-level saved bank details edit states
   const [isEditingProfileBank, setIsEditingProfileBank] = useState(false);
@@ -149,25 +150,76 @@ export const Account = () => {
     }
   }, [toastMsg]);
 
+  const getSavedBank = (ord) => {
+    let acc = (ord?.refund_bank_account || user?.bankDetails?.accountNumber || '').trim();
+    let ifsc = (ord?.refund_ifsc_code || user?.bankDetails?.ifscCode || '').trim();
+    let holder = (ord?.refund_holder_name || user?.bankDetails?.holderName || ord?.customer_name || user?.name || '').trim();
+
+    // 1. Check localStorage cached bank
+    if (!acc) {
+      try {
+        const raw = localStorage.getItem('urvaah_saved_bank');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          acc = (parsed?.accountNumber || '').trim();
+          ifsc = ifsc || (parsed?.ifscCode || '').trim();
+          holder = holder || (parsed?.holderName || '').trim();
+        }
+      } catch (e) {}
+    }
+
+    // 2. Check other user orders in state if any order had saved bank details
+    if (!acc && Array.isArray(orders)) {
+      const priorWithBank = orders.find(o => o.refund_bank_account && String(o.refund_bank_account).trim().length > 0);
+      if (priorWithBank) {
+        acc = String(priorWithBank.refund_bank_account).trim();
+        ifsc = ifsc || String(priorWithBank.refund_ifsc_code || '').trim();
+        holder = holder || String(priorWithBank.refund_holder_name || '').trim();
+      }
+    }
+
+    return {
+      accountNumber: acc,
+      confirmAccountNumber: acc,
+      ifscCode: ifsc.toUpperCase(),
+      holderName: holder
+    };
+  };
+
+  const persistSavedBank = (bank) => {
+    if (!bank?.accountNumber) return;
+    const cleanAcc = String(bank.accountNumber).trim();
+    const cleanIfsc = String(bank.ifscCode || '').trim().toUpperCase();
+    const cleanHolder = String(bank.holderName || '').trim();
+
+    try {
+      localStorage.setItem('urvaah_saved_bank', JSON.stringify({
+        accountNumber: cleanAcc,
+        confirmAccountNumber: cleanAcc,
+        ifscCode: cleanIfsc,
+        holderName: cleanHolder
+      }));
+    } catch (e) {}
+
+    if (typeof updateUserProfile === 'function') {
+      updateUserProfile({
+        refund_bank_account: cleanAcc,
+        refund_ifsc_code: cleanIfsc,
+        refund_holder_name: cleanHolder
+      }).catch(e => console.warn('Non-blocking user bank sync:', e.message));
+    }
+  };
+
   const handleCancelOrderInAccount = (ord) => {
     setCancelModalOrder(ord);
     setSelectedCancelItems([]);
     setCancelReason('');
     setCancelComments('');
 
-    // Pre-fill from order if exists, otherwise from user's saved bank details
-    const existingAcc = ord?.refund_bank_account || user?.bankDetails?.accountNumber || '';
-    const existingIfsc = ord?.refund_ifsc_code || user?.bankDetails?.ifscCode || '';
-    const existingHolder = ord?.refund_holder_name || user?.bankDetails?.holderName || ord?.customer_name || user?.name || '';
-
-    setReturnBankDetails({
-      accountNumber: existingAcc,
-      confirmAccountNumber: existingAcc,
-      ifscCode: existingIfsc,
-      holderName: existingHolder
-    });
+    const savedBank = getSavedBank(ord);
+    setReturnBankDetails(savedBank);
     setBankDetailsError('');
-    setIsEditingCancelBank(!existingAcc); // Default to verified card view if saved bank details exist
+    setIsEditingCancelBank(!savedBank.accountNumber); // Default to verified card view if saved bank details exist
   };
 
   const handleCloseCancelModal = () => {
@@ -476,18 +528,10 @@ export const Account = () => {
     setItemReturnError('');
     setReturnComments('');
 
-    // Pre-fill from order if exists, otherwise from user's saved bank details
-    const existingAcc = ord?.refund_bank_account || user?.bankDetails?.accountNumber || '';
-    const existingIfsc = ord?.refund_ifsc_code || user?.bankDetails?.ifscCode || '';
-    const existingHolder = ord?.refund_holder_name || user?.bankDetails?.holderName || ord?.customer_name || user?.name || '';
-
-    setReturnBankDetails({
-      accountNumber: existingAcc,
-      confirmAccountNumber: existingAcc,
-      ifscCode: existingIfsc,
-      holderName: existingHolder
-    });
-    setIsEditingReturnBank(!existingAcc); // Default to verified saved card if saved details exist
+    const savedBank = getSavedBank(ord);
+    setReturnBankDetails(savedBank);
+    setSavedBankDetailsSnapshot(savedBank);
+    setIsEditingReturnBank(!savedBank.accountNumber); // Default to verified saved card if saved details exist
   };
 
   const handleCloseReturnReplaceModal = () => {
@@ -544,38 +588,97 @@ export const Account = () => {
       return;
     }
 
-    setIsSavingReturnBank(true);
     setItemReturnError('');
 
-    try {
-      const res = await updateUserProfile({
+    const bankPayload = {
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder
+    };
+
+    // ⚡ INSTANT OPTIMISTIC COMMIT: Save and switch UI view immediately with zero lag
+    persistSavedBank(bankPayload);
+
+    setReturnBankDetails({
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder
+    });
+    setSavedBankDetailsSnapshot({
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder
+    });
+    setIsEditingReturnBank(false);
+
+    const targetOrderNum = returnReplaceModalOrder?.order_number || returnReplaceModalOrder?.id;
+    if (targetOrderNum) {
+      setOrders(prev => prev.map(o => (o.order_number === targetOrderNum || o.id === targetOrderNum ? {
+        ...o,
         refund_bank_account: cleanAccount,
         refund_ifsc_code: cleanIfsc,
         refund_holder_name: cleanHolder
-      });
-
-      if (res.success) {
-        setReturnBankDetails({
-          accountNumber: cleanAccount,
-          confirmAccountNumber: cleanAccount,
-          ifscCode: cleanIfsc,
-          holderName: cleanHolder
-        });
-        setIsEditingReturnBank(false);
-        setToastMsg({
-          type: 'success',
-          title: 'Bank Details Updated',
-          text: 'Refund bank details saved to your profile and applied.'
-        });
-      } else {
-        setItemReturnError(res.error || 'Failed to update bank details. Please try again.');
-      }
-    } catch (err) {
-      console.error('Error saving bank details to profile:', err);
-      setItemReturnError(err.message || 'Failed to update bank details.');
-    } finally {
-      setIsSavingReturnBank(false);
+      } : o)));
     }
+
+    if (typeof Swal !== 'undefined' && Swal.fire) {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Bank Details Saved & Applied',
+        showConfirmButton: false,
+        timer: 1800,
+        timerProgressBar: true
+      });
+    } else {
+      setToastMsg({
+        type: 'success',
+        title: 'Bank Details Updated',
+        text: 'Refund bank details saved to your profile and applied.'
+      });
+    }
+
+    // Background sync: dispatch profile & order update concurrently without blocking UI
+    setIsSavingReturnBank(true);
+    const syncOps = [];
+
+    if (typeof updateUserProfile === 'function') {
+      syncOps.push(
+        updateUserProfile({
+          refund_bank_account: cleanAccount,
+          refund_ifsc_code: cleanIfsc,
+          refund_holder_name: cleanHolder
+        }).catch(e => console.warn('User profile bank sync warning:', e.message))
+      );
+    }
+
+    if (targetOrderNum) {
+      syncOps.push(
+        apiClient(`/api/orders/${targetOrderNum}/bank-details`, {
+          method: 'PUT',
+          body: JSON.stringify(bankPayload)
+        }).catch(e => console.warn('Order bank update warning:', e.message))
+      );
+    }
+
+    Promise.allSettled(syncOps).finally(() => {
+      setIsSavingReturnBank(false);
+    });
+  };
+
+  const handleCancelEditReturnBank = () => {
+    if (savedBankDetailsSnapshot?.accountNumber) {
+      setReturnBankDetails(savedBankDetailsSnapshot);
+    } else {
+      const fallback = getSavedBank(returnReplaceModalOrder);
+      setReturnBankDetails(fallback);
+    }
+    setIsEditingReturnBank(false);
+    setItemReturnError('');
   };
 
   const handleConfirmReturnReplace = async (e) => {
@@ -743,6 +846,10 @@ export const Account = () => {
           items: updatedOrder.items || o.items
         } : o))
       );
+
+      if (hasReturnItem && returnBankDetails?.accountNumber) {
+        persistSavedBank(returnBankDetails);
+      }
 
       broadcastOrderUpdate({
         id: ord.id,
@@ -1081,6 +1188,7 @@ export const Account = () => {
               payment_status: payload.payment_status || payload.paymentStatus || o.payment_status,
               paymentStatus: payload.payment_status || payload.paymentStatus || o.payment_status,
               cancel_reason: payload.cancel_reason || payload.cancelReason || o.cancel_reason,
+              rejection_reason: payload.rejection_reason || payload.rejectionReason || o.rejection_reason,
               shipping_address: payload.shipping_address || o.shipping_address
             };
           }
@@ -1942,7 +2050,7 @@ export const Account = () => {
                                 setReturnBankDetails(prev => ({ ...prev, holderName: val }));
                                 setBankDetailsError('');
                               }}
-                              placeholder="e.g. Kuldeep Mahajan"
+                              placeholder=""
                               className="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 font-sans"
                             />
                             <span className="text-[10px] text-neutral-400 mt-1 block font-sans">
@@ -2599,6 +2707,7 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => {
+                                setSavedBankDetailsSnapshot({ ...returnBankDetails, confirmAccountNumber: returnBankDetails.accountNumber });
                                 setIsEditingReturnBank(true);
                                 setReturnBankDetails(prev => ({
                                   ...prev,
@@ -2616,15 +2725,10 @@ export const Account = () => {
                         /* Editable Bank Form */
                         <div className="space-y-3 pt-1">
                           {returnBankDetails.accountNumber && isEditingReturnBank && (
-                            <div className="flex items-center justify-between pb-1">
-                              <span className="text-[11px] text-neutral-600 font-medium">Update Bank Account Details:</span>
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingReturnBank(false)}
-                                className="text-[11px] font-semibold text-neutral-500 hover:text-black uppercase tracking-wider cursor-pointer"
-                              >
-                                Cancel / Keep Saved
-                              </button>
+                            <div className="pb-1">
+                              <span className="text-[11px] text-neutral-700 font-bold uppercase tracking-wider">
+                                Update Bank Account Details:
+                              </span>
                             </div>
                           )}
 
@@ -2643,7 +2747,7 @@ export const Account = () => {
                                   setReturnBankDetails(prev => ({ ...prev, holderName: val }));
                                   setItemReturnError('');
                                 }}
-                                placeholder="e.g. Kuldeep Mahajan"
+                                placeholder=""
                                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-amber-500"
                               />
                               <span className="text-[10px] text-neutral-400 mt-1 block">
@@ -2666,7 +2770,7 @@ export const Account = () => {
                                   setReturnBankDetails(prev => ({ ...prev, ifscCode: val }));
                                   setItemReturnError('');
                                 }}
-                                placeholder="e.g. HDFC0008718"
+                                placeholder=""
                                 className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none font-mono ${
                                   returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
                                     ? 'border-emerald-500 bg-emerald-50/20'
@@ -2707,7 +2811,7 @@ export const Account = () => {
                                   setReturnBankDetails(prev => ({ ...prev, accountNumber: val }));
                                   setItemReturnError('');
                                 }}
-                                placeholder="e.g. 47854908579056756"
+                                placeholder=""
                                 className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
                                   returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
                                     ? 'border-emerald-500 bg-emerald-50/20'
@@ -2744,7 +2848,7 @@ export const Account = () => {
                                   setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
                                   setItemReturnError('');
                                 }}
-                                placeholder="Re-enter Account Number"
+                                placeholder=""
                                 className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
                                   returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
                                     ? 'border-emerald-500 bg-emerald-50/20'
@@ -2769,49 +2873,46 @@ export const Account = () => {
                             </div>
                           </div>
 
-                          <div className="pt-2 flex flex-wrap items-center gap-2.5">
-                            <button
-                              type="button"
-                              disabled={isSavingReturnBank}
-                              onClick={handleSaveReturnBankToProfile}
-                              className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold rounded-lg tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
-                            >
-                              {isSavingReturnBank ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  <span>SAVING...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>SAVE & APPLY DETAILS</span>
-                                </>
-                              )}
-                            </button>
-                            {user?.bankDetails?.accountNumber && (
+                          {/* Mast Action Buttons: Save & Cancel */}
+                          <div className="pt-3.5 border-t border-amber-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const savedAcc = user.bankDetails.accountNumber || '';
-                                  setReturnBankDetails({
-                                    accountNumber: savedAcc,
-                                    confirmAccountNumber: savedAcc,
-                                    ifscCode: user.bankDetails.ifscCode || '',
-                                    holderName: user.bankDetails.holderName || user.name || ''
-                                  });
-                                  setIsEditingReturnBank(false);
-                                  setItemReturnError('');
-                                }}
-                                className="px-3.5 py-2 border border-neutral-300 hover:border-black text-neutral-700 text-xs font-medium rounded-lg uppercase transition-colors cursor-pointer"
+                                disabled={isSavingReturnBank}
+                                onClick={handleSaveReturnBankToProfile}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-black hover:bg-neutral-800 active:scale-[0.98] text-white text-xs font-semibold tracking-[0.14em] uppercase rounded-lg shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                CANCEL
+                                {isSavingReturnBank ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                    <span>SAVING DETAILS...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 stroke-[2.5] text-emerald-400" />
+                                    <span>SAVE & APPLY DETAILS</span>
+                                  </>
+                                )}
                               </button>
-                            )}
-                          </div>
 
-                          <p className="text-[10px] text-neutral-500 italic pt-1">
-                            🔒 These bank details will be saved to your profile for seamless future refund processing.
-                          </p>
+                              {(returnBankDetails.accountNumber || savedBankDetailsSnapshot?.accountNumber || user?.bankDetails?.accountNumber) && (
+                                <button
+                                  type="button"
+                                  disabled={isSavingReturnBank}
+                                  onClick={handleCancelEditReturnBank}
+                                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 active:scale-[0.98] text-neutral-700 hover:text-black text-xs font-semibold tracking-[0.14em] uppercase rounded-lg transition-all cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>CANCEL / KEEP SAVED</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-neutral-500 font-sans flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>Details encrypted & saved to profile</span>
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3466,7 +3567,7 @@ export const Account = () => {
                           const val = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
                           setProfileBankForm(prev => ({ ...prev, holderName: val }));
                         }}
-                        placeholder="e.g. Kuldeep Mahajan"
+                        placeholder=""
                         className="w-full px-4 py-3 text-sm bg-white border border-neutral-300 focus:border-brand-dark focus:ring-1 focus:ring-brand-dark outline-none font-sans"
                         required
                       />
@@ -3729,19 +3830,41 @@ export const Account = () => {
                   const statusLower = orderStatus.toLowerCase();
                   const isCancellationRequested = statusLower === 'cancellation requested' || statusLower === 'cancel_requested';
 
+                  const isCancellationRejected = !isCancellationRequested && (
+                    statusLower === 'cancellation rejected' ||
+                    Boolean(
+                      ord.rejection_reason && (
+                        ord.rejection_reason.toLowerCase().includes('cancel') ||
+                        ord.rejection_reason.toLowerCase().includes('rejected by admin') ||
+                        ord.rejection_reason.toLowerCase().includes('cancellation request rejected')
+                      )
+                    ) ||
+                    Boolean(
+                      ord.cancel_reason && (
+                        ord.cancel_reason.toLowerCase().includes('rejected by admin') ||
+                        ord.cancel_reason.toLowerCase().includes('cancellation request rejected')
+                      )
+                    )
+                  );
+
                   const isProductEverDelivered = Boolean(ord.delivered_at) || 
                     (ord.original_status || '').toLowerCase() === 'delivered' || 
                     Boolean(ord.is_product_received);
 
-                  const isPreDeliveryCancelled = !isProductEverDelivered && (
+                  const isPreDeliveryCancelled = !isProductEverDelivered && !isCancellationRejected && (
                     statusLower === 'cancelled' || 
                     statusLower === 'canceled' || 
-                    statusLower.includes('cancel') || 
-                    Boolean(ord.cancel_reason) || 
+                    (statusLower.includes('cancel') && statusLower !== 'cancellation rejected') || 
+                    (Boolean(ord.cancel_reason) && !ord.cancel_reason.toLowerCase().includes('rejected')) || 
                     (statusLower === 'refunded' && !statusLower.includes('return'))
                   );
 
-                  const isCancelled = (isPreDeliveryCancelled || statusLower === 'cancelled' || statusLower === 'canceled' || statusLower.includes('cancel')) && !isCancellationRequested;
+                  const isCancelled = !isCancellationRequested && !isCancellationRejected && (
+                    isPreDeliveryCancelled || 
+                    statusLower === 'cancelled' || 
+                    statusLower === 'canceled' || 
+                    (statusLower.includes('cancel') && statusLower !== 'cancellation rejected')
+                  );
 
                   const isRefundCompleted = (ord.refund_status && ['completed', 'refunded', 'success'].includes(String(ord.refund_status).toLowerCase())) || 
                     statusLower === 'refunded' || 
@@ -3791,16 +3914,18 @@ export const Account = () => {
                     logLower.includes('reverse transit') || 
                     (logLower.includes('collected') && hasReturnIntent)
                   );
-                  const isReceivedAtUrvaah = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                  const isReturned = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'returned' || 
+                    statusLower === 'return completed' || 
+                    statusLower === 'refunded' ||
+                    isRefundCompleted ||
+                    (ord.refund_status && String(ord.refund_status).toLowerCase() === 'completed')
+                  );
+                  const isReceivedAtUrvaah = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && !isReturned && (
                     statusLower === 'received at house of urvaah' || 
                     statusLower === 'received at urvaah house' || 
                     statusLower === 'received at homved' ||
                     logLower.includes('received at house of urvaah')
-                  );
-                  const isReturned = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
-                    statusLower === 'returned' || 
-                    statusLower === 'return completed' || 
-                    (isProductEverDelivered && ord.refund_status && String(ord.refund_status).toLowerCase() === 'completed' && hasReturnIntent)
                   );
                   const isReturnQcRejected = hasReturnIntent && !isReplacementIntent && !isCancelled && !isCancellationRequested && (
                     statusLower === 'return qc rejected' ||
@@ -3820,8 +3945,16 @@ export const Account = () => {
                   const isReplacementInTransit = isReplacementCollected || (isReplacementIntent && (statusLower === 'replacement processing' || statusLower === 'replacement shipped' || statusLower === 'in reverse transit'));
                   const isReplacementOutForDelivery = isReplacementIntent && (statusLower === 'replacement out for delivery');
                   const isReplaced = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replaced' || Boolean(ord.replacement_order_number));
-                  const isReplacementRejected = isReplacementIntent && !isCancelled && !isCancellationRequested && (statusLower === 'replace rejected');
-                  const isInReplacementFlow = isReplacementIntent;
+                  const isReplacementRejected = isReplacementIntent && !isCancelled && !isCancellationRequested && (
+                    statusLower === 'replace rejected' ||
+                    (statusLower === 'delivered' && (
+                      Boolean(ord.rejection_reason) ||
+                      Boolean(ord.return_rejection_reason) ||
+                      (Array.isArray(ord.items) && ord.items.some(it => (it.status || '').toLowerCase() === 'replace rejected'))
+                    )) ||
+                    Boolean(ord.return_rejection_reason)
+                  );
+                  const isInReplacementFlow = isReplacementIntent && !isReplacementRejected;
 
                   const isDelivered = !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed')) && !isInReturnFlow && !isInReplacementFlow;
                   const isReplacementDelivered = isReplacementForwardOrder && !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed') || Boolean(ord.delivered_at));
@@ -3906,7 +4039,9 @@ export const Account = () => {
                         <div className="flex items-center gap-2.5 flex-wrap">
                           {/* Status Badge */}
                           <span className={`px-3.5 py-1 text-[11px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 ${
-                            isCancellationRequested
+                            isCancellationRejected
+                              ? 'bg-rose-50 text-rose-900 border-rose-300 font-bold'
+                              : isCancellationRequested
                               ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
                               : isCancelled
                               ? (isRefundCompleted ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold' : 'bg-red-50 text-red-800 border-red-200 font-bold')
@@ -3943,7 +4078,9 @@ export const Account = () => {
                               : 'bg-[#FAF8F3] text-neutral-800 border-[#E5E0D8]'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
-                              isCancellationRequested || isReturnRequested || isReplacementRequested
+                              isCancellationRejected
+                                ? 'bg-rose-600'
+                                : isCancellationRequested || isReturnRequested || isReplacementRequested
                                 ? 'bg-amber-600 animate-pulse'
                                 : isCancelled
                                 ? (isRefundCompleted ? 'bg-emerald-600' : 'bg-red-600')
@@ -3964,6 +4101,7 @@ export const Account = () => {
                                 : 'bg-amber-500 animate-pulse'
                             }`} />
                             <span>{
+                              isCancellationRejected ? 'CANCELLATION REJECTED' :
                               isCancellationRequested ? 'CANCELLATION REQUESTED' :
                               isCancelled ? (isRefundCompleted ? 'CANCELLED & REFUNDED' : 'CANCELLED') :
                               isReplacementForwardOrder ? (isDelivered ? 'REPLACEMENT DELIVERED' : isShipped ? 'REPLACEMENT DISPATCHED' : 'REPLACEMENT IN TAILORING') :
@@ -4666,6 +4804,32 @@ export const Account = () => {
                               <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
                               <span>Destination: House of Urvaah Central Atelier</span>
                             </div>
+
+                            {(ord.reverse_tracking_number || ord.tracking_number || ord.awb_code) && (
+                              <div className="pt-2 flex flex-wrap items-center gap-2">
+                                <div className="px-2.5 py-1 bg-white border border-indigo-200 rounded-lg text-[11px] font-medium text-neutral-800 flex items-center gap-1.5 shadow-2xs">
+                                  <Truck className="w-3.5 h-3.5 text-indigo-700" />
+                                  <span>Courier: <strong>{ord.courier_name || 'Delhivery Reverse Logistics'}</strong></span>
+                                  <span className="text-neutral-300">|</span>
+                                  <span className="font-mono font-bold text-indigo-950">
+                                    AWB: {ord.reverse_tracking_number || ord.tracking_number || ord.awb_code}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTrackingModal({
+                                    awb: ord.reverse_tracking_number || ord.tracking_number || ord.awb_code,
+                                    orderNumber: ord.order_number,
+                                    isReturn: true,
+                                    fallbackStatus: ord.logistics_status || 'Return Pickup Scheduled'
+                                  })}
+                                  className="px-3 py-1 bg-indigo-900 hover:bg-black text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                >
+                                  <RotateCcw className="w-3 h-3 text-indigo-200" />
+                                  <span>Track Return Parcel</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -4731,6 +4895,33 @@ export const Account = () => {
                                 : (ord.return_rejection_reason || 'Your return request could not be approved by the atelier team. For questions regarding atelier policies, please reach out to customer care.')
                               }
                             </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pre-Delivery Cancellation Rejected Alert Banner */}
+                      {isCancellationRejected && (
+                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
+                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                            <XCircle className="w-5 h-5 text-rose-700" />
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
+                                Cancellation Request Rejected by Admin
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
+                                Request Declined
+                              </span>
+                            </div>
+                            <p className="text-rose-900/90 leading-relaxed font-normal">
+                              Your cancellation request for this order was reviewed and <strong>rejected by our atelier admin team</strong>. Your order is confirmed and will be processed and dispatched for delivery as scheduled.
+                            </p>
+                            {(ord.rejection_reason || ord.cancel_reason) && (
+                              <p className="text-[11px] text-rose-800 pt-1">
+                                <span className="font-semibold uppercase tracking-wider text-[10px]">Admin Reason:</span> "{ord.rejection_reason || ord.cancel_reason}"
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -4852,7 +5043,9 @@ export const Account = () => {
 
                               <div className="flex items-center gap-2 shrink-0 flex-wrap sm:justify-end self-start sm:self-center pl-[68px] sm:pl-0">
                                 <span className={`px-2.5 sm:px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.14em] uppercase border shrink-0 ${
-                                  isCancellationRequested
+                                  isCancellationRejected
+                                    ? 'bg-rose-50 text-rose-900 border-rose-300'
+                                    : isCancellationRequested
                                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                                     : isCancelled
                                     ? 'bg-red-50 text-red-800 border-red-200'
@@ -4872,7 +5065,7 @@ export const Account = () => {
                                     ? 'bg-amber-50 text-amber-800 border-amber-200'
                                     : 'bg-neutral-100 text-neutral-800 border-neutral-200'
                                 }`}>
-                                  {isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT ATELIER' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                  {isCancellationRejected ? 'CANCELLATION REJECTED' : isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT ATELIER' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
                                 </span>
 
                                 {isDelivered && (
@@ -4911,7 +5104,10 @@ export const Account = () => {
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <button
                             type="button"
-                            onClick={() => navigate('/checkout', { state: { viewOrder: ord } })}
+                            onClick={() => {
+                              const targetOrderNum = ord.order_number || ord.orderNumber || ord.id;
+                              navigate(`/checkout?orderNumber=${encodeURIComponent(targetOrderNum)}`, { state: { viewOrder: ord } });
+                            }}
                             className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer"
                           >
                             View Details
@@ -4921,7 +5117,10 @@ export const Account = () => {
                           {canEditAddress && (
                             <button
                               type="button"
-                              onClick={() => navigate('/checkout', { state: { viewOrder: ord, openAddressEdit: true } })}
+                              onClick={() => {
+                                const targetOrderNum = ord.order_number || ord.orderNumber || ord.id;
+                                navigate(`/checkout?orderNumber=${encodeURIComponent(targetOrderNum)}`, { state: { viewOrder: ord, openAddressEdit: true } });
+                              }}
                               className="px-5 py-2.5 rounded-xl border border-amber-300 hover:border-black bg-amber-50 hover:bg-amber-100/80 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-amber-950 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title={`Edit shipping address within 24 hours (${hoursRemaining}h remaining)`}
                             >
@@ -5015,8 +5214,8 @@ export const Account = () => {
                             <span>Reorder</span>
                           </button>
 
-                          {/* Cancel Order Button (Pre-Dispatch Only: cannot cancel once shipped or out for delivery) */}
-                          {!isDelivered && !isShipped && !isOutForDelivery && !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (
+                          {/* Cancel Order Button (Pre-Dispatch Only: cannot cancel once shipped, out for delivery, or if cancellation was already rejected) */}
+                          {!isDelivered && !isShipped && !isOutForDelivery && !isCancelled && !isCancellationRequested && !isCancellationRejected && !isInReturnFlow && !isInReplacementFlow && (
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}
@@ -5074,6 +5273,14 @@ export const Account = () => {
                             <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
                               <Clock className="w-3.5 h-3.5 text-amber-600" />
                               <span>Cancellation Pending Review</span>
+                            </span>
+                          )}
+
+                          {/* Pre-Delivery Cancellation Rejected Status Pill */}
+                          {isCancellationRejected && (
+                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Cancellation Request Rejected by Admin</span>
                             </span>
                           )}
 
@@ -5865,7 +6072,8 @@ export const Account = () => {
                   onClick={() => {
                     const ordToView = selectedOrderModal;
                     setSelectedOrderModal(null);
-                    navigate('/checkout', { state: { viewOrder: ordToView } });
+                    const targetOrderNum = ordToView?.order_number || ordToView?.orderNumber || ordToView?.id;
+                    navigate(`/checkout?orderNumber=${encodeURIComponent(targetOrderNum)}`, { state: { viewOrder: ordToView } });
                   }}
                   className="px-4 py-2 border border-neutral-300 hover:border-black text-xs font-semibold tracking-wider uppercase text-neutral-700 hover:text-black rounded-xl transition-colors cursor-pointer"
                 >

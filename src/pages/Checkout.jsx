@@ -55,10 +55,6 @@ const readCachedOrder = (expectedOrderParam) => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.orderNumber) return null;
-    // If cached order is replacement order with 0 total, bypass cache to fetch true price from backend
-    if (String(parsed.orderNumber).endsWith('-REP') && Number(parsed.totalPaid || 0) === 0) {
-      return null;
-    }
     if (expectedOrderParam) {
       const exp = String(expectedOrderParam).trim().toLowerCase();
       if (
@@ -205,6 +201,8 @@ const formatOrderDetails = (ord, currentUser) => {
     isProductReceived: ord.is_product_received ?? ord.isProductReceived ?? false,
     cancel_reason: ord.cancel_reason || ord.cancelReason || null,
     cancelReason: ord.cancel_reason || ord.cancelReason || null,
+    rejection_reason: ord.rejection_reason || ord.rejectionReason || null,
+    rejectionReason: ord.rejection_reason || ord.rejectionReason || null,
     return_reason: ord.return_reason || ord.returnReason || null,
     returnReason: ord.return_reason || ord.returnReason || null,
     logistics_status: ord.logistics_status || ord.logisticsStatus || null,
@@ -217,7 +215,20 @@ const formatOrderDetails = (ord, currentUser) => {
     replacement_order_number: ord.replacement_order_number || ord.replacementOrderNumber || null,
     original_order_id: ord.original_order_id || ord.originalOrderId || null,
     original_order_number: ord.original_order_number || ord.originalOrderNumber || null,
-    replacement_size: ord.replacement_size || ord.replacementSize || null
+    replacement_size: ord.replacement_size || ord.replacementSize || null,
+    refund_bank_account: ord.refund_bank_account || ord.refundBankAccount || null,
+    refund_ifsc_code: ord.refund_ifsc_code || ord.refundIfscCode || null,
+    refund_holder_name: ord.refund_holder_name || ord.refundHolderName || null,
+    return_type: ord.return_type || ord.returnType || null,
+    returnType: ord.return_type || ord.returnType || null,
+    is_returned_order: ord.is_returned_order ?? ord.isReturnedOrder ?? false,
+    isReturnedOrder: ord.is_returned_order ?? ord.isReturnedOrder ?? false,
+    return_qc_status: ord.return_qc_status || ord.returnQcStatus || null,
+    returnQcStatus: ord.return_qc_status || ord.returnQcStatus || null,
+    refund_eligible_amount: ord.refund_eligible_amount || ord.refundEligibleAmount || null,
+    refundEligibleAmount: ord.refund_eligible_amount || ord.refundEligibleAmount || null,
+    refund_processed_at: ord.refund_processed_at || ord.refundProcessedAt || null,
+    refundProcessedAt: ord.refund_processed_at || ord.refundProcessedAt || null
   };
 };
 
@@ -241,11 +252,18 @@ export const Checkout = () => {
     selectedCartItemKeys,
     setSelectedCartItemKeys,
     syncCartStock,
+    updateUserProfile,
+    getCartItemKey,
   } = useCart();
+
+  const getItemKey = React.useCallback((it) => {
+    if (typeof getCartItemKey === 'function') return getCartItemKey(it);
+    return `${it?.product?.id || it?.id}_${String(it?.selectedSize || it?.size || 'M').trim().toUpperCase()}`;
+  }, [getCartItemKey]);
 
   // Active selected purchase items vs other bag items
   const activeSelectedKeys = React.useMemo(() => {
-    const cartKeys = (cart || []).map((it) => `${it.product?.id}_${it.selectedSize}`);
+    const cartKeys = (cart || []).map((it) => getItemKey(it));
     if (selectedCartItemKeys && selectedCartItemKeys.length > 0) {
       const valid = selectedCartItemKeys.filter((k) => cartKeys.includes(k));
       if (valid.length > 0) return valid;
@@ -253,18 +271,18 @@ export const Checkout = () => {
     // Fallback: If no keys explicitly selected, select ONLY the most recent item added (last item in cart)
     if (cart && cart.length > 0) {
       const last = cart[cart.length - 1];
-      return [`${last.product?.id}_${last.selectedSize}`];
+      return [getItemKey(last)];
     }
     return [];
-  }, [selectedCartItemKeys, cart]);
+  }, [selectedCartItemKeys, cart, getItemKey]);
 
   const selectedItems = React.useMemo(() => {
-    return (cart || []).filter((item) => activeSelectedKeys.includes(`${item.product?.id}_${item.selectedSize}`));
-  }, [cart, activeSelectedKeys]);
+    return (cart || []).filter((item) => activeSelectedKeys.includes(getItemKey(item)));
+  }, [cart, activeSelectedKeys, getItemKey]);
 
   const unselectedItems = React.useMemo(() => {
-    return (cart || []).filter((item) => !activeSelectedKeys.includes(`${item.product?.id}_${item.selectedSize}`));
-  }, [cart, activeSelectedKeys]);
+    return (cart || []).filter((item) => !activeSelectedKeys.includes(getItemKey(item)));
+  }, [cart, activeSelectedKeys, getItemKey]);
 
   const orderSubtotal = React.useMemo(() => {
     return selectedItems.reduce(
@@ -354,17 +372,17 @@ export const Checkout = () => {
       showToast(msg, 'error');
       return;
     }
-    const key = `${item.product?.id}_${item.selectedSize}`;
+    const key = getItemKey(item);
     setSelectedCartItemKeys((prev) => Array.from(new Set([...(prev || []), key])));
   };
 
   const handleExcludeItemFromOrder = (item) => {
-    const key = `${item.product?.id}_${item.selectedSize}`;
+    const key = getItemKey(item);
     setSelectedCartItemKeys((prev) => (prev || []).filter((k) => k !== key));
   };
 
   const handleDeleteItem = (item) => {
-    const key = `${item.product?.id}_${item.selectedSize}`;
+    const key = getItemKey(item);
     setSelectedCartItemKeys((prev) => (prev || []).filter((k) => k !== key));
     removeFromCart(item.product?.id, item.selectedSize);
   };
@@ -541,9 +559,196 @@ export const Checkout = () => {
     ifscCode: '',
     holderName: ''
   });
+  const [isEditingReturnBank, setIsEditingReturnBank] = useState(false);
+  const [isSavingReturnBank, setIsSavingReturnBank] = useState(false);
+  const [savedBankDetailsSnapshot, setSavedBankDetailsSnapshot] = useState(null);
   const [returnComments, setReturnComments] = useState('');
   const [isSubmittingItemReturn, setIsSubmittingItemReturn] = useState(false);
   const [itemReturnError, setItemReturnError] = useState('');
+
+  const getSavedBank = (ord) => {
+    let acc = (ord?.refund_bank_account || details?.refund_bank_account || placedOrderDetails?.refund_bank_account || user?.bankDetails?.accountNumber || '').trim();
+    let ifsc = (ord?.refund_ifsc_code || details?.refund_ifsc_code || placedOrderDetails?.refund_ifsc_code || user?.bankDetails?.ifscCode || '').trim();
+    let holder = (ord?.refund_holder_name || details?.refund_holder_name || placedOrderDetails?.refund_holder_name || user?.bankDetails?.holderName || details?.shippingAddress?.name || user?.name || '').trim();
+
+    if (!acc) {
+      try {
+        const raw = localStorage.getItem('urvaah_saved_bank');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          acc = (parsed?.accountNumber || '').trim();
+          ifsc = ifsc || (parsed?.ifscCode || '').trim();
+          holder = holder || (parsed?.holderName || '').trim();
+        }
+      } catch (e) {}
+    }
+
+    return {
+      accountNumber: acc,
+      confirmAccountNumber: acc,
+      ifscCode: ifsc.toUpperCase(),
+      holderName: holder
+    };
+  };
+
+  const persistSavedBank = (bank) => {
+    if (!bank?.accountNumber) return;
+    const cleanAcc = String(bank.accountNumber).trim();
+    const cleanIfsc = String(bank.ifscCode || '').trim().toUpperCase();
+    const cleanHolder = String(bank.holderName || '').trim();
+
+    try {
+      localStorage.setItem('urvaah_saved_bank', JSON.stringify({
+        accountNumber: cleanAcc,
+        confirmAccountNumber: cleanAcc,
+        ifscCode: cleanIfsc,
+        holderName: cleanHolder
+      }));
+    } catch (e) {}
+
+    if (typeof updateUserProfile === 'function') {
+      updateUserProfile({
+        refund_bank_account: cleanAcc,
+        refund_ifsc_code: cleanIfsc,
+        refund_holder_name: cleanHolder
+      }).catch(e => console.warn('Non-blocking user bank sync:', e.message));
+    }
+  };
+
+  const handleSaveReturnBank = async () => {
+    const cleanHolder = (returnBankDetails.holderName || '').trim();
+    const cleanIfsc = (returnBankDetails.ifscCode || '').trim().toUpperCase();
+    const cleanAccount = (returnBankDetails.accountNumber || '').trim();
+    const cleanConfirm = (returnBankDetails.confirmAccountNumber || '').trim();
+
+    if (!cleanHolder) {
+      setItemReturnError('Please enter Account Holder Name.');
+      return;
+    }
+    if (cleanHolder.length < 2 || !/^[a-zA-Z\s.]{2,70}$/.test(cleanHolder)) {
+      setItemReturnError('Account Holder Name must be at least 2 characters (letters, spaces, and periods only).');
+      return;
+    }
+    if (!cleanIfsc) {
+      setItemReturnError('Please enter Bank IFSC Code.');
+      return;
+    }
+    if (cleanIfsc.length !== 11) {
+      setItemReturnError(`Bank IFSC Code must be exactly 11 characters (currently ${cleanIfsc.length}).`);
+      return;
+    }
+    if (cleanIfsc[4] !== '0') {
+      setItemReturnError('Invalid IFSC Code: The 5th character must be the digit 0 (zero).');
+      return;
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+      setItemReturnError('Invalid Bank IFSC Code format (e.g. HDFC0008718).');
+      return;
+    }
+    if (!cleanAccount) {
+      setItemReturnError('Please enter Bank Account Number.');
+      return;
+    }
+    if (!/^\d+$/.test(cleanAccount) || cleanAccount.length < 9 || cleanAccount.length > 18) {
+      setItemReturnError(`Bank Account Number must be between 9 and 18 digits (currently ${cleanAccount.length} digits).`);
+      return;
+    }
+    if (!cleanConfirm) {
+      setItemReturnError('Please confirm your Bank Account Number.');
+      return;
+    }
+    if (cleanAccount !== cleanConfirm) {
+      setItemReturnError('Bank Account Numbers do not match. Please verify and re-enter.');
+      return;
+    }
+
+    setItemReturnError('');
+
+    const bankPayload = {
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder,
+      refund_bank_account: cleanAccount,
+      refund_ifsc_code: cleanIfsc,
+      refund_holder_name: cleanHolder
+    };
+
+    // ⚡ INSTANT OPTIMISTIC COMMIT: Save and switch UI view immediately with zero lag
+    persistSavedBank(bankPayload);
+
+    setReturnBankDetails({
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder
+    });
+    setSavedBankDetailsSnapshot({
+      accountNumber: cleanAccount,
+      confirmAccountNumber: cleanAccount,
+      ifscCode: cleanIfsc,
+      holderName: cleanHolder
+    });
+    setIsEditingReturnBank(false);
+
+    setPlacedOrderDetails(prev => prev ? ({
+      ...prev,
+      refund_bank_account: cleanAccount,
+      refund_ifsc_code: cleanIfsc,
+      refund_holder_name: cleanHolder
+    }) : prev);
+
+    if (typeof Swal !== 'undefined' && Swal.fire) {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Bank Details Saved & Applied',
+        showConfirmButton: false,
+        timer: 1800,
+        timerProgressBar: true
+      });
+    }
+
+    // Background sync: dispatch profile & order update concurrently without blocking UI
+    setIsSavingReturnBank(true);
+    const targetOrderNumber = details?.orderNumber || details?.id || placedOrderNumber;
+    const syncOps = [];
+
+    if (typeof updateUserProfile === 'function') {
+      syncOps.push(
+        updateUserProfile({
+          refund_bank_account: cleanAccount,
+          refund_ifsc_code: cleanIfsc,
+          refund_holder_name: cleanHolder
+        }).catch(e => console.warn('User profile bank sync:', e.message))
+      );
+    }
+
+    if (targetOrderNumber) {
+      syncOps.push(
+        apiClient(`/api/orders/${targetOrderNumber}/bank-details`, {
+          method: 'PUT',
+          body: JSON.stringify(bankPayload)
+        }).catch(orderErr => console.warn('Order bank update warning:', orderErr.message))
+      );
+    }
+
+    Promise.allSettled(syncOps).finally(() => {
+      setIsSavingReturnBank(false);
+    });
+  };
+
+  const handleCancelEditReturnBank = () => {
+    if (savedBankDetailsSnapshot?.accountNumber) {
+      setReturnBankDetails(savedBankDetailsSnapshot);
+    } else {
+      const fallback = getSavedBank(placedOrderDetails || details);
+      setReturnBankDetails(fallback);
+    }
+    setIsEditingReturnBank(false);
+    setItemReturnError('');
+  };
 
   // Real-time Shiprocket Pincode Serviceability & Courier Check (Optimized to avoid duplicate requests)
   const lastCheckedPinRef = useRef('');
@@ -758,6 +963,9 @@ export const Checkout = () => {
         try {
           sessionStorage.setItem(ORDER_SESSION_KEY, JSON.stringify(formatted));
         } catch (e) {}
+        if (!orderParam || orderParam !== formatted.orderNumber) {
+          navigate(`/checkout?orderNumber=${encodeURIComponent(formatted.orderNumber)}`, { replace: true, state: location.state });
+        }
       }
     } else if (orderParam) {
       const cached = readCachedOrder(orderParam);
@@ -835,11 +1043,14 @@ export const Checkout = () => {
             ...prev,
             status: payload.status,
             paymentStatus: payload.payment_status || payload.paymentStatus || prev.paymentStatus,
-            cancel_reason: payload.cancel_reason || payload.cancelReason || prev.cancel_reason
+            cancel_reason: payload.cancel_reason || payload.cancelReason || prev.cancel_reason,
+            rejection_reason: payload.rejection_reason || payload.rejectionReason || prev.rejection_reason
           };
         });
         if (payload.status === 'Cancelled') {
           setOrderCancelled(true);
+        } else if (payload.status === 'Cancellation Rejected' || payload.status === 'Restore' || (payload.status && !payload.status.toLowerCase().includes('cancel'))) {
+          setOrderCancelled(false);
         }
       }
 
@@ -905,8 +1116,15 @@ export const Checkout = () => {
       if (ord) {
         const formatted = formatOrderDetails(ord, user);
         setPlacedOrderDetails(formatted);
-        if (['cancelled', 'refunded'].includes((ord.status || '').toLowerCase()) || ord.cancel_reason) {
+        const stLower = (ord.status || '').toLowerCase();
+        const isRej = stLower === 'cancellation rejected' || 
+          Boolean(ord.rejection_reason && (ord.rejection_reason.toLowerCase().includes('cancel') || ord.rejection_reason.toLowerCase().includes('rejected'))) ||
+          Boolean(ord.cancel_reason && ord.cancel_reason.toLowerCase().includes('rejected'));
+
+        if (!isRej && (['cancelled', 'refunded'].includes(stLower) || (ord.cancel_reason && !ord.cancel_reason.toLowerCase().includes('rejected')))) {
           setOrderCancelled(true);
+        } else {
+          setOrderCancelled(false);
         }
         showToast('Order details refreshed.', 'success');
       }
@@ -1810,18 +2028,18 @@ export const Checkout = () => {
     const isReplacementForwardOrder = String(details.orderNumber || '').endsWith('-REP') || Boolean(details.original_order_number);
 
     const returnTypeStr = (details.return_type || details.returnType || '').toLowerCase();
-    const isExplicitReturn = returnTypeStr === 'return' || 
-      currentStatusStr.includes('return') || 
-      Boolean(details.is_returned_order);
+    const returnReasonStr = (details.return_reason || details.returnReason || '').toLowerCase();
 
     // Is this parent order in an exchange/replacement intent?
-    const isReplacementIntent = !isReplacementForwardOrder && !isExplicitReturn && Boolean(
+    const isReplacementIntent = !isReplacementForwardOrder && Boolean(
       returnTypeStr.includes('replace') ||
       returnTypeStr.includes('exchange') ||
       currentStatusStr.includes('replace') ||
-      details.replacement_order_number ||
-      details.replacement_order_id ||
-      (details.replacement_size && !details.refund_bank_account)
+      Boolean(details.replacement_order_number) ||
+      Boolean(details.replacement_order_id) ||
+      Boolean(details.replacement_size && !details.refund_bank_account) ||
+      returnReasonStr.includes('replace') ||
+      returnReasonStr.includes('exchange')
     );
 
     // Mixed Return & Replacement (Simultaneous Items)
@@ -1849,19 +2067,55 @@ export const Checkout = () => {
         : null
     );
 
-    // 1. Return Flow States (Post-Delivery only, Mutually exclusive from Replacement)
-    const isReturnRequested = !isReplacementIntent && (
+    // Financial Settlement & Refund Status
+    const isRefundCompleted = (details.refund_status && ['completed', 'refunded', 'success'].includes(String(details.refund_status).toLowerCase())) || 
+      currentStatusStr === 'refunded' || 
+      ((details.payment_status || details.paymentStatus || '').toLowerCase() === 'refunded');
+
+    const isExplicitReturn = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && (
+      returnTypeStr === 'return' || 
+      currentStatusStr.includes('return') || 
+      currentStatusStr.includes('received at house of urvaah') ||
+      currentStatusStr.includes('received at urvaah house') ||
+      currentStatusStr.includes('received at homved') ||
+      Boolean(details.is_returned_order) ||
+      Boolean(details.return_reason || details.returnReason)
+    );
+
+    // 1. Return Flow States (Post-Delivery only, Mutually exclusive from Replacement and Forward orders)
+    const isReturned = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && (
+      currentStatusStr === 'returned' || 
+      currentStatusStr === 'return completed' ||
+      currentStatusStr === 'refunded' ||
+      isRefundCompleted
+    );
+    const isReceivedAtUrvaah = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && !isReturned && (
+      currentStatusStr === 'received at house of urvaah' || 
+      currentStatusStr === 'received at urvaah house' || 
+      currentStatusStr === 'received at homved' || 
+      logLower.includes('received at house of urvaah')
+    );
+    const isReturnCollected = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && !isReturned && !isReceivedAtUrvaah && (
+      currentStatusStr.includes('collected') || 
+      currentStatusStr.includes('in transit to') || 
+      currentStatusStr.includes('reverse transit') || 
+      logLower.includes('collected') || 
+      logLower.includes('reverse transit')
+    );
+    const isReturnApproved = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && !isReturned && !isReceivedAtUrvaah && !isReturnCollected && (
+      currentStatusStr === 'return approved' || 
+      currentStatusStr === 'return pickup scheduled' || 
+      (currentStatusStr.includes('pickup scheduled') && (currentStatusStr.includes('return') || logLower.includes('return'))) || 
+      logLower.includes('return pickup scheduled')
+    );
+    const isReturnRequested = !isReplacementForwardOrder && !isReplacementIntent && !isMixedReturnReplace && !isReturned && !isReceivedAtUrvaah && !isReturnCollected && !isReturnApproved && (
       currentStatusStr === 'return requested' || 
       currentStatusStr === 'return request processing' || 
       logLower === 'return initiated' || 
       logLower === 'return requested' ||
       (isExplicitReturn && !currentStatusStr.includes('delivered'))
     );
-    const isReturnApproved = !isReplacementIntent && (currentStatusStr === 'return approved' || currentStatusStr === 'return pickup scheduled' || (currentStatusStr.includes('pickup scheduled') && (currentStatusStr.includes('return') || logLower.includes('return'))) || logLower.includes('return pickup scheduled'));
-    const isReturnCollected = !isReplacementIntent && (currentStatusStr.includes('collected') || currentStatusStr.includes('in transit to') || currentStatusStr.includes('reverse transit') || logLower.includes('collected') || logLower.includes('reverse transit'));
-    const isReceivedAtUrvaah = !isReplacementIntent && (currentStatusStr === 'received at house of urvaah' || currentStatusStr === 'received at urvaah house' || currentStatusStr === 'received at homved' || logLower.includes('received at house of urvaah'));
-    const isReturned = !isReplacementIntent && (currentStatusStr === 'returned' || currentStatusStr === 'return completed');
-    const isInReturnFlow = isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned;
+    const isInReturnFlow = !isReplacementForwardOrder && (isReturnRequested || isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned);
     const returnAwb = details.tracking_number || details.trackingNumber || details.awb_code;
     const returnCourier = details.courier_name || 'Delhivery Reverse Logistics (Doorstep QC)';
 
@@ -1876,14 +2130,25 @@ export const Checkout = () => {
     const isReplacementRejected = isReplacementIntent && (currentStatusStr === 'replace rejected');
     const isInReplacementFlow = isReplacementIntent;
 
-    // 3. Pre-Delivery Cancellation States (Customer requested vs Admin approved)
+    // 3. Pre-Delivery Cancellation States (Customer requested vs Admin approved/rejected)
     const isCancellationRequested = !isInReturnFlow && !isInReplacementFlow && (currentStatusStr === 'cancellation requested' || currentStatusStr === 'cancel_requested');
-    const isOrderCancelled = !isInReturnFlow && !isInReplacementFlow && !isCancellationRequested && (orderCancelled || currentStatusStr === 'cancelled' || currentStatusStr === 'canceled');
-
-    // 4. Financial Settlement
-    const isRefundCompleted = (details.refund_status && ['completed', 'refunded', 'success'].includes(String(details.refund_status).toLowerCase())) || 
-      currentStatusStr === 'refunded' || 
-      ((details.payment_status || details.paymentStatus || '').toLowerCase() === 'refunded');
+    const isCancellationRejected = !isInReturnFlow && !isInReplacementFlow && !isCancellationRequested && (
+      currentStatusStr === 'cancellation rejected' ||
+      Boolean(
+        (details.rejection_reason || details.rejectionReason) && (
+          (details.rejection_reason || details.rejectionReason).toLowerCase().includes('cancel') ||
+          (details.rejection_reason || details.rejectionReason).toLowerCase().includes('rejected by admin') ||
+          (details.rejection_reason || details.rejectionReason).toLowerCase().includes('cancellation request rejected')
+        )
+      ) ||
+      Boolean(
+        (details.cancel_reason || details.cancelReason) && (
+          (details.cancel_reason || details.cancelReason).toLowerCase().includes('rejected by admin') ||
+          (details.cancel_reason || details.cancelReason).toLowerCase().includes('cancellation request rejected')
+        )
+      )
+    );
+    const isOrderCancelled = !isInReturnFlow && !isInReplacementFlow && !isCancellationRequested && !isCancellationRejected && (orderCancelled || currentStatusStr === 'cancelled' || currentStatusStr === 'canceled');
 
     // 5. Delivery and Forward Logistics States
     const isProductEverDelivered = Boolean(details.delivered_at || details.deliveredAt) || 
@@ -2299,6 +2564,10 @@ export const Checkout = () => {
       setItemActionsState(initialMap);
       setItemReturnError('');
       setReturnComments('');
+      const savedBank = getSavedBank(details || placedOrderDetails);
+      setReturnBankDetails(savedBank);
+      setSavedBankDetailsSnapshot(savedBank);
+      setIsEditingReturnBank(!savedBank.accountNumber);
       setIsItemReturnModalOpen(true);
     };
 
@@ -2451,6 +2720,10 @@ export const Checkout = () => {
           } catch (e) {}
           return next;
         });
+
+        if (hasReturnItem && returnBankDetails?.accountNumber) {
+          persistSavedBank(returnBankDetails);
+        }
 
         broadcastOrderUpdate({
           orderNumber: orderNum,
@@ -2741,7 +3014,9 @@ export const Checkout = () => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4 }}
               className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm ${
-                isOrderCancelled
+                isCancellationRejected
+                  ? 'bg-rose-700 text-white'
+                  : isOrderCancelled
                   ? 'bg-red-600 text-white'
                   : isCancellationRequested
                   ? 'bg-amber-600 text-white'
@@ -2752,7 +3027,9 @@ export const Checkout = () => {
                   : 'bg-brand-dark text-white'
               }`}
             >
-              {isOrderCancelled ? (
+              {isCancellationRejected ? (
+                <XCircle className="w-8 h-8 stroke-[2.5]" />
+              ) : isOrderCancelled ? (
                 <X className="w-8 h-8 stroke-[2.5]" />
               ) : isCancellationRequested ? (
                 <Clock className="w-8 h-8 stroke-[2.5]" />
@@ -2766,16 +3043,18 @@ export const Checkout = () => {
             </motion.div>
 
             <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-500 block mb-1.5 font-serif font-semibold">
-              {isOrderCancelled
+              {isCancellationRejected
+                ? 'CANCELLATION REQUEST REJECTED BY ADMIN'
+                : isOrderCancelled
                 ? (isRefundCompleted ? 'ORDER CANCELLED & 100% REFUND COMPLETED' : 'ORDER CANCELLED & SHIPROCKET SHIPMENT VOIDED')
                 : isCancellationRequested
                 ? 'CANCELLATION REQUEST UNDER REVIEW'
                 : isMixedReturnReplace
                 ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED & REFUND PROCESSED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT ATELIER • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'EXCHANGE & RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'SIMULTANEOUS RETURN & REPLACEMENT UNDER REVIEW')
+                : isReplacementForwardOrder
+                ? (isDelivered ? 'REPLACEMENT ORDER DELIVERED' : isShipped ? 'REPLACEMENT ORDER DISPATCHED' : 'REPLACEMENT IN TAILORING')
                 : isInReturnFlow
                 ? (isReturned ? 'RETURN COMPLETED & 100% REFUND SETTLED' : isReceivedAtUrvaah ? 'RETURN RECEIVED AT ATELIER • QC IN PROGRESS' : isReturnApproved ? 'RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'RETURN REQUEST UNDER ATELIER REVIEW')
-                : isReplacementForwardOrder
-                ? 'REPLACEMENT ORDER CONFIRMED & PROCESSING'
                 : isInReplacementFlow
                 ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT ATELIER • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'REPLACEMENT APPROVED • REVERSE PICKUP SCHEDULED' : 'REPLACEMENT REQUEST UNDER REVIEW')
                 : isDelivered
@@ -2783,16 +3062,18 @@ export const Checkout = () => {
                 : 'ORDER CONFIRMED & PROCESSING'}
             </span>
             <h1 className="text-2xl sm:text-4xl font-serif tracking-[0.12em] uppercase text-black font-semibold mb-2">
-              {isOrderCancelled
+              {isCancellationRejected
+                ? 'CANCELLATION REQUEST DECLINED'
+                : isOrderCancelled
                 ? 'THIS ORDER HAS BEEN CANCELLED'
                 : isCancellationRequested
                 ? 'CANCELLATION REQUEST SUBMITTED'
                 : isMixedReturnReplace
                 ? (isReplaced || Boolean(details.replacement_order_number) ? 'EXCHANGE DISPATCHED & RETURN SETTLED' : 'EXCHANGE & RETURN IN MOTION')
+                : isReplacementForwardOrder
+                ? `REPLACEMENT PIECE #${details.orderNumber}`
                 : isInReturnFlow
                 ? (isReturned ? 'RETURN & REFUND COMPLETED' : isReceivedAtUrvaah ? 'PIECE RECEIVED AT HOUSE OF URVAAH' : isReturnApproved ? 'RETURN APPROVED BY ATELIER' : 'RETURN REQUEST SUBMITTED')
-                : isReplacementForwardOrder
-                ? `REPLACEMENT ORDER #${details.orderNumber}`
                 : isInReplacementFlow
                 ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER PLACED & DISPATCHED' : 'EXCHANGE / REPLACEMENT IN MOTION')
                 : isDelivered
@@ -2800,7 +3081,9 @@ export const Checkout = () => {
                 : 'THANK YOU FOR YOUR ORDER'}
             </h1>
             <p className="text-xs font-sans text-neutral-500 tracking-wider uppercase">
-              {isOrderCancelled ? (
+              {isCancellationRejected ? (
+                <>Your cancellation request was reviewed and <strong className="text-black font-medium">rejected by our atelier admin team</strong>. Your order remains confirmed and will be processed for delivery.{(details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.rejection_reason || details.cancel_reason}"` : ''}</>
+              ) : isOrderCancelled ? (
                 isRefundCompleted ? (
                   <>Shiprocket courier pickup was voided prior to dispatch. 100% full refund of <strong className="text-black font-medium">{formatPrice(details.totalPaid)}</strong> has been disbursed to your original payment method{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
                 ) : (
@@ -2820,6 +3103,8 @@ export const Checkout = () => {
                 ) : (
                   <>Your simultaneous exchange and return request is active. Our concierge is coordinating doorstep collection for both items, replacement dispatch, and refund settlement of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong>.</>
                 )
+              ) : isReplacementForwardOrder ? (
+                <>Our atelier is crafting your replacement piece{details.replacement_size ? ` in size ${details.replacement_size}` : ''} for delivered Order #{details.original_order_number || 'original'}. 100% exchange credit applied (₹0 balance).</>
               ) : isInReturnFlow ? (
                 isReturned ? (
                   <>Your delivered piece was received back at House of Urvaah and passed inspection. 100% full refund of <strong className="text-black font-medium">{formatPrice(details.totalPaid)}</strong> has been settled to your account{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
@@ -2830,8 +3115,6 @@ export const Checkout = () => {
                 ) : (
                   <>Your return request has been received and is pending admin verification. Upon approval, reverse doorstep pickup will be scheduled. Refund will be processed upon QC inspection at our atelier.</>
                 )
-              ) : isReplacementForwardOrder ? (
-                <>Our atelier is crafting your replacement piece{details.replacement_size ? ` in size ${details.replacement_size}` : ''} for delivered Order #{details.original_order_number || 'original'}. 100% exchange credit applied (₹0 balance).</>
               ) : isInReplacementFlow ? (
                 isReplaced || Boolean(details.replacement_order_number) ? (
                   <>Your replacement order #{details.replacement_order_number || `${details.orderNumber}-REP`} has been generated and placed in the atelier dispatch queue with 100% exchange credit.</>
@@ -2882,6 +3165,11 @@ export const Checkout = () => {
                       Replacement {details.original_order_number ? `(#${details.original_order_number})` : ''}
                     </span>
                   )}
+                  {isReplaced && details.replacement_order_number && (
+                    <span className="px-2 py-0.5 text-[9px] font-sans font-bold tracking-wider uppercase rounded-full bg-purple-100 text-purple-900 border border-purple-200 shadow-2xs">
+                      Exchanged for #{details.replacement_order_number}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -2903,7 +3191,7 @@ export const Checkout = () => {
               </div>
               <div className="font-sans flex-1">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  {isOrderCancelled ? 'Shiprocket Logistics' : isMixedReturnReplace ? 'Mixed Reverse Logistics' : isInReturnFlow ? 'Reverse Logistics' : isInReplacementFlow ? 'Exchange Logistics' : isCancellationRequested ? 'Logistics Status' : 'Tracking Number'}
+                  {isOrderCancelled ? 'Shiprocket Logistics' : isMixedReturnReplace ? 'Mixed Reverse Logistics' : isReplacementForwardOrder ? 'Courier Partner / Tracking' : isInReturnFlow ? 'Reverse Logistics' : isInReplacementFlow ? 'Exchange Reverse Logistics' : isCancellationRequested ? 'Logistics Status' : 'Tracking Number'}
                 </span>
                 <span className={`text-sm sm:text-base font-semibold font-serif tracking-[0.06em] block ${
                   isOrderCancelled
@@ -2924,10 +3212,12 @@ export const Checkout = () => {
                     ? 'Cancellation Under Review'
                     : isMixedReturnReplace
                     ? (returnAwb ? `Reverse AWB: ${returnAwb}` : (isReplacementApproved ? 'Reverse Pickup Scheduled' : 'Reverse Pickup Active'))
+                    : isReplacementForwardOrder
+                    ? (details.trackingNumber || 'Processing Forward Transit')
                     : isInReturnFlow
                     ? (returnAwb ? `Reverse AWB: ${returnAwb}` : (isReturnApproved ? 'Pickup Scheduled' : 'Reverse Pickup Pending Approval'))
                     : isInReplacementFlow
-                    ? 'Reverse Pickup & Exchange Active'
+                    ? (returnAwb ? `Reverse AWB: ${returnAwb}` : (isReplacementApproved ? 'Reverse Pickup Scheduled' : 'Reverse Pickup & Exchange Active'))
                     : details.trackingNumber}
                 </span>
               </div>
@@ -2942,17 +3232,19 @@ export const Checkout = () => {
                   ? 'bg-amber-600'
                   : isMixedReturnReplace
                   ? 'bg-purple-900'
+                  : isReplacementForwardOrder
+                  ? 'bg-brand-dark'
                   : isInReturnFlow
                   ? (isReturned ? 'bg-emerald-700' : 'bg-indigo-900')
                   : isInReplacementFlow
                   ? 'bg-purple-900'
                   : 'bg-brand-dark'
               }`}>
-                {isOrderCancelled || isInReturnFlow ? <RotateCcw className="w-5 h-5 stroke-[1.8]" /> : isCancellationRequested ? <Clock className="w-5 h-5 stroke-[1.8]" /> : isInReplacementFlow ? <RefreshCw className="w-5 h-5 stroke-[1.8]" /> : <Calendar className="w-5 h-5 stroke-[1.8]" />}
+                {isOrderCancelled || isInReturnFlow ? <RotateCcw className="w-5 h-5 stroke-[1.8]" /> : isCancellationRequested ? <Clock className="w-5 h-5 stroke-[1.8]" /> : isReplacementForwardOrder ? <Calendar className="w-5 h-5 stroke-[1.8]" /> : isInReplacementFlow ? <RefreshCw className="w-5 h-5 stroke-[1.8]" /> : <Calendar className="w-5 h-5 stroke-[1.8]" />}
               </div>
               <div className="font-sans">
                 <span className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 font-semibold block mb-0.5">
-                  {isOrderCancelled || isInReturnFlow || isCancellationRequested ? 'Financial Settlement' : isMixedReturnReplace ? 'Exchange & Refund' : isInReplacementFlow ? 'Exchange Fulfillment' : 'Estimated Delivery'}
+                  {isOrderCancelled || isInReturnFlow || isCancellationRequested ? 'Financial Settlement' : isMixedReturnReplace ? 'Exchange & Refund' : isReplacementForwardOrder ? 'Exchange Settlement' : isInReplacementFlow ? 'Exchange Fulfillment' : 'Estimated Delivery'}
                 </span>
                 <span className="text-xs sm:text-sm font-bold text-black font-sans tracking-tight">
                   {isOrderCancelled
@@ -2961,15 +3253,44 @@ export const Checkout = () => {
                     ? 'Refund Pending Admin Approval'
                     : isMixedReturnReplace
                     ? (isReplaced || Boolean(details.replacement_order_number) ? `Dispatched + Refund ${formatPrice(mixedRefundAmount)}` : `Exchange Piece + Refund ${formatPrice(mixedRefundAmount)}`)
+                    : isReplacementForwardOrder
+                    ? '100% Exchange Credit Applied (₹0 Balance)'
                     : isInReturnFlow
-                    ? (isReturned ? '100% Refund Disbursed (Completed)' : isReceivedAtUrvaah ? 'QC Inspection • Refund Queued' : `Refund Pending QC (${formatPrice(details.totalPaid)})`)
+                    ? (isReturned ? (details.refund_txn_id ? `100% Refund Disbursed (UTR: ${details.refund_txn_id})` : '100% Refund Disbursed (Completed)') : isReceivedAtUrvaah ? 'QC Inspection • Refund Queued' : `Refund Pending QC (${formatPrice(details.totalPaid)})`)
                     : isInReplacementFlow
-                    ? 'Exchange Piece In Preparation'
+                    ? (details.replacement_order_number ? `Replacement Piece #${details.replacement_order_number} Dispatched (₹0 Balance)` : 'Exchange Piece In Preparation')
                     : details.estimatedDelivery}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Pre-Delivery Cancellation Rejected Alert Banner */}
+          {isCancellationRejected && (
+            <div className="mb-8 bg-rose-50/90 border border-rose-200/90 rounded-2xl p-5 sm:p-6 flex items-start gap-4 shadow-sm text-left">
+              <div className="p-2.5 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                <XCircle className="w-6 h-6 text-rose-700" />
+              </div>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-sm sm:text-base">
+                    Cancellation Request Rejected by Admin
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase">
+                    Request Declined
+                  </span>
+                </div>
+                <p className="text-rose-900/90 leading-relaxed font-sans text-xs sm:text-sm">
+                  Your cancellation request for this order was reviewed and <strong>rejected by our atelier admin team</strong>. Your order remains confirmed and will be processed and dispatched for delivery as scheduled.
+                </p>
+                {(details.rejection_reason || details.cancel_reason) && (
+                  <p className="text-xs text-rose-800 font-sans pt-1">
+                    <span className="font-semibold uppercase tracking-wider text-[11px]">Admin Reason:</span> "{details.rejection_reason || details.cancel_reason}"
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* TWO COLUMN MAIN CONTENT */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -3136,7 +3457,14 @@ export const Checkout = () => {
                 {/* Total */}
                 <div className="pt-6 border-t border-neutral-200 mt-6 flex justify-between items-baseline font-serif">
                   <span className="text-xl sm:text-2xl tracking-[0.1em] uppercase font-semibold text-black">TOTAL</span>
-                  <span className="text-xl sm:text-2xl font-bold text-black">{formatPrice(details.totalPaid || details.subtotal)}</span>
+                  {isReplacementForwardOrder ? (
+                    <div className="text-right">
+                      <span className="text-xl sm:text-2xl font-bold text-black font-serif">₹0</span>
+                      <span className="text-[10px] font-sans font-bold text-purple-700 block tracking-wider uppercase mt-0.5">100% Exchange Credit Applied</span>
+                    </div>
+                  ) : (
+                    <span className="text-xl sm:text-2xl font-bold text-black font-serif">{formatPrice(details.totalPaid || details.subtotal)}</span>
+                  )}
                 </div>
               </div>
 
@@ -3695,7 +4023,7 @@ export const Checkout = () => {
                           {isReplacementForwardOrder ? 'REPLACEMENT ORDER PLACED' : 'ORDER PLACED'}
                         </h4>
                         <span className={`text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-1 ${isShipped ? 'text-black' : 'text-yellow-700'}`}>
-                          {isReplacementForwardOrder ? `EXCHANGE CONFIRMED (${formatPrice(details.totalPaid || details.subtotal)})` : (isShipped ? 'COMPLETED' : 'IN PROGRESS')}
+                          {isReplacementForwardOrder ? '100% EXCHANGE CREDIT APPLIED' : (isShipped ? 'COMPLETED' : 'IN PROGRESS')}
                         </span>
                       </div>
                     </div>
@@ -3774,7 +4102,9 @@ export const Checkout = () => {
                       </span>
                     )}
                     <span className={`px-2.5 py-1 font-sans text-[10px] font-semibold tracking-[0.16em] uppercase rounded-full ${
-                      isOrderCancelled
+                      isCancellationRejected
+                        ? 'bg-rose-700 text-white font-bold'
+                      : isOrderCancelled
                         ? (isRefundCompleted ? 'bg-emerald-700 text-white font-bold' : 'bg-red-900 text-white font-bold')
                       : isCancellationRequested
                         ? 'bg-amber-600 text-white font-bold'
@@ -3804,7 +4134,9 @@ export const Checkout = () => {
                         ? 'bg-amber-500 text-black'
                         : 'bg-yellow-400 text-black'
                     }`}>
-                      {isOrderCancelled
+                      {isCancellationRejected
+                        ? 'CANCELLATION REJECTED'
+                        : isOrderCancelled
                         ? (isRefundCompleted ? 'CANCELLED & REFUNDED' : 'CANCELLED')
                         : isCancellationRequested
                         ? 'CANCELLATION REQUESTED'
@@ -3885,8 +4217,8 @@ export const Checkout = () => {
                     CONTINUE SHOPPING
                   </Link>
 
-                  {/* Pre-Dispatch Cancel Order Button (cannot cancel once shipped or out for delivery) */}
-                  {!isDelivered && !isShipped && !isOutForDelivery && !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && !isReplacementForwardOrder && (
+                  {/* Pre-Dispatch Cancel Order Button (cannot cancel once shipped, out for delivery, or if cancellation was already rejected) */}
+                  {!isDelivered && !isShipped && !isOutForDelivery && !isOrderCancelled && !isCancellationRequested && !isCancellationRejected && !isInReturnFlow && !isInReplacementFlow && !isReplacementForwardOrder && (
                     <button
                       type="button"
                       onClick={handleCancelOrder}
@@ -4029,6 +4361,14 @@ export const Checkout = () => {
                     <div className="w-full py-3 px-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
                       <Clock className="w-4 h-4 text-amber-700" />
                       <span>Cancellation Pending Admin Approval</span>
+                    </div>
+                  )}
+
+                  {/* Pre-Delivery Cancellation Rejected Pill */}
+                  {isCancellationRejected && (
+                    <div className="w-full py-3 px-4 bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
+                      <XCircle className="w-4 h-4 text-rose-700" />
+                      <span>Cancellation Request Rejected by Admin</span>
                     </div>
                   )}
 
@@ -4607,155 +4947,259 @@ export const Checkout = () => {
 
                   {/* Bank Details for Refund (if any return items selected) */}
                   {(details?.items || placedOrderDetails?.items || []).some(it => itemActionsState[it.id || it.product_id]?.action === 'Return') && (
-                    <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3 text-xs">
-                      <div className="flex items-center gap-2 text-amber-900 font-bold uppercase text-[11px]">
-                        <Banknote className="w-4 h-4 text-amber-700" />
-                        <span>Bank Details for Refund Disbursement (IMPS / NEFT)</span>
+                    <div className="p-3.5 sm:p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
+                        <div className="flex items-center gap-2 text-amber-900 font-bold uppercase text-[11px]">
+                          <Banknote className="w-4 h-4 text-amber-700" />
+                          <span>Bank Details for Refund Disbursement (IMPS / NEFT)</span>
+                        </div>
+                        <span className="text-[10px] font-sans font-bold text-amber-900 uppercase tracking-widest bg-white border border-amber-300 px-2 py-0.5 rounded-full">
+                          Required for Refund
+                        </span>
                       </div>
-                      <p className="text-[11px] text-neutral-600">
-                        Please provide your verified bank account details so our finance desk can disburse your refund directly via secure IMPS / NEFT transfer upon return arrival.
+
+                      <p className="text-[11px] text-neutral-600 leading-relaxed">
+                        Please verify your bank details so our finance desk can disburse your refund directly via secure IMPS / NEFT transfer upon return arrival.
                       </p>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Account Holder Name */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                            Account Holder Name <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={returnBankDetails.holderName}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
-                              setReturnBankDetails(prev => ({ ...prev, holderName: val }));
-                              setItemReturnError('');
-                            }}
-                            placeholder="e.g. Kuldeep Mahajan"
-                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-amber-500"
-                          />
-                          <span className="text-[10px] text-neutral-400 mt-1 block">
-                            Name as per bank records (letters only)
-                          </span>
-                        </div>
+                      {/* Saved Bank Details Card View */}
+                      {returnBankDetails.accountNumber && !isEditingReturnBank ? (
+                        <div className="bg-white border border-emerald-300/80 rounded-xl p-3.5 shadow-2xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1 font-sans">
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">✓</span>
+                                <span className="text-[11px] font-bold tracking-wider uppercase text-emerald-800">
+                                  Saved Bank Account
+                                </span>
+                              </div>
+                              <div className="text-sm font-semibold text-neutral-900">
+                                {returnBankDetails.holderName || user?.name || details?.shippingAddress?.name || 'Account Holder'}
+                              </div>
+                              <div className="text-xs text-neutral-600 font-mono flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span>
+                                  A/C: •••• •••• •••• {String(returnBankDetails.accountNumber).slice(-4)}
+                                </span>
+                                <span>
+                                  IFSC: <span className="font-bold uppercase text-neutral-800">{returnBankDetails.ifscCode}</span>
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-neutral-400 font-sans pt-0.5">
+                                This saved account will be used automatically for your refund payout.
+                              </p>
+                            </div>
 
-                        {/* Bank IFSC Code */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                            Bank IFSC Code <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={11}
-                            value={returnBankDetails.ifscCode}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11);
-                              setReturnBankDetails(prev => ({ ...prev, ifscCode: val }));
-                              setItemReturnError('');
-                            }}
-                            placeholder="e.g. HDFC0008718"
-                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none font-mono ${
-                              returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
-                                ? 'border-emerald-500 bg-emerald-50/20'
-                                : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
-                                ? 'border-red-400 bg-red-50/20'
-                                : 'border-neutral-300 focus:border-amber-500'
-                            }`}
-                          />
-                          <span className={`text-[10px] mt-1 block ${
-                            returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
-                              ? 'text-emerald-700 font-medium'
-                              : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
-                              ? 'text-red-600 font-medium'
-                              : 'text-neutral-400'
-                          }`}>
-                            {returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
-                              ? '✓ Valid IFSC format'
-                              : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
-                              ? '⚠ 5th character must be 0 (zero)'
-                              : returnBankDetails.ifscCode?.length > 0
-                              ? `${returnBankDetails.ifscCode.length}/11 characters (e.g. HDFC0008718)`
-                              : '11 characters, 5th character must be 0'}
-                          </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSavedBankDetailsSnapshot({ ...returnBankDetails, confirmAccountNumber: returnBankDetails.accountNumber });
+                                setIsEditingReturnBank(true);
+                                setReturnBankDetails(prev => ({
+                                  ...prev,
+                                  confirmAccountNumber: prev.accountNumber
+                                }));
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wider text-brand-dark hover:underline uppercase shrink-0 pt-0.5 cursor-pointer"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              <span>CHANGE</span>
+                            </button>
+                          </div>
                         </div>
+                      ) : (
+                        /* Editable Bank Form */
+                        <div className="space-y-3 pt-1">
+                          {returnBankDetails.accountNumber && isEditingReturnBank && (
+                            <div className="pb-1">
+                              <span className="text-[11px] text-neutral-700 font-bold uppercase tracking-wider">
+                                Update Bank Account Details:
+                              </span>
+                            </div>
+                          )}
 
-                        {/* Bank Account Number */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                            Bank Account Number <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={18}
-                            value={returnBankDetails.accountNumber}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').slice(0, 18);
-                              setReturnBankDetails(prev => ({ ...prev, accountNumber: val }));
-                              setItemReturnError('');
-                            }}
-                            placeholder="e.g. 47854908579056756"
-                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
-                              returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
-                                ? 'border-emerald-500 bg-emerald-50/20'
-                                : returnBankDetails.accountNumber?.length > 0
-                                ? 'border-amber-400'
-                                : 'border-neutral-300 focus:border-amber-500'
-                            }`}
-                          />
-                          <span className={`text-[10px] mt-1 block ${
-                            returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
-                              ? 'text-emerald-700 font-medium'
-                              : 'text-neutral-400'
-                          }`}>
-                            {returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
-                              ? `✓ Valid account number (${returnBankDetails.accountNumber.length} digits)`
-                              : returnBankDetails.accountNumber?.length > 0
-                              ? `${returnBankDetails.accountNumber.length}/18 digits (minimum 9 digits)`
-                              : '9 to 18 digits (numbers only)'}
-                          </span>
-                        </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Account Holder Name */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                                Account Holder Name <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={returnBankDetails.holderName}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^a-zA-Z\s.]/g, '');
+                                  setReturnBankDetails(prev => ({ ...prev, holderName: val }));
+                                  setItemReturnError('');
+                                }}
+                                placeholder=""
+                                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs bg-white text-neutral-800 focus:outline-none focus:border-amber-500"
+                              />
+                              <span className="text-[10px] text-neutral-400 mt-1 block">
+                                Name as per bank records (letters only)
+                              </span>
+                            </div>
 
-                        {/* Confirm Account Number */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                            Confirm Account Number <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={18}
-                            value={returnBankDetails.confirmAccountNumber}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').slice(0, 18);
-                              setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
-                              setItemReturnError('');
-                            }}
-                            placeholder="Re-enter Account Number"
-                            className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
-                              returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
-                                ? 'border-emerald-500 bg-emerald-50/20'
-                                : returnBankDetails.confirmAccountNumber
-                                ? 'border-red-400 bg-red-50/20'
-                                : 'border-neutral-300 focus:border-amber-500'
-                            }`}
-                          />
-                          <span className={`text-[10px] mt-1 block ${
-                            returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
-                              ? 'text-emerald-700 font-medium'
-                              : returnBankDetails.confirmAccountNumber
-                              ? 'text-red-600 font-medium'
-                              : 'text-neutral-400'
-                          }`}>
-                            {returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
-                              ? '✓ Account numbers match'
-                              : returnBankDetails.confirmAccountNumber
-                              ? '⚠ Numbers do not match'
-                              : 'Re-enter same account number'}
-                          </span>
+                            {/* Bank IFSC Code */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                                Bank IFSC Code <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={11}
+                                value={returnBankDetails.ifscCode}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11);
+                                  setReturnBankDetails(prev => ({ ...prev, ifscCode: val }));
+                                  setItemReturnError('');
+                                }}
+                                placeholder=""
+                                className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 uppercase focus:outline-none font-mono ${
+                                  returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                                    ? 'border-emerald-500 bg-emerald-50/20'
+                                    : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                                    ? 'border-red-400 bg-red-50/20'
+                                    : 'border-neutral-300 focus:border-amber-500'
+                                }`}
+                              />
+                              <span className={`text-[10px] mt-1 block ${
+                                returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                                  ? 'text-emerald-700 font-medium'
+                                  : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                                  ? 'text-red-600 font-medium'
+                                  : 'text-neutral-400'
+                              }`}>
+                                {returnBankDetails.ifscCode?.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(returnBankDetails.ifscCode)
+                                  ? '✓ Valid IFSC format'
+                                  : returnBankDetails.ifscCode?.length >= 5 && returnBankDetails.ifscCode[4] !== '0'
+                                  ? '⚠ 5th character must be 0 (zero)'
+                                  : returnBankDetails.ifscCode?.length > 0
+                                  ? `${returnBankDetails.ifscCode.length}/11 characters (e.g. HDFC0008718)`
+                                  : '11 characters, 5th character must be 0'}
+                              </span>
+                            </div>
+
+                            {/* Bank Account Number */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                                Bank Account Number <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={18}
+                                value={returnBankDetails.accountNumber}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                                  setReturnBankDetails(prev => ({ ...prev, accountNumber: val }));
+                                  setItemReturnError('');
+                                }}
+                                placeholder=""
+                                className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
+                                  returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                                    ? 'border-emerald-500 bg-emerald-50/20'
+                                    : returnBankDetails.accountNumber?.length > 0
+                                    ? 'border-amber-400'
+                                    : 'border-neutral-300 focus:border-amber-500'
+                                }`}
+                              />
+                              <span className={`text-[10px] mt-1 block ${
+                                returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                                  ? 'text-emerald-700 font-medium'
+                                  : 'text-neutral-400'
+                              }`}>
+                                {returnBankDetails.accountNumber?.length >= 9 && returnBankDetails.accountNumber?.length <= 18
+                                  ? `✓ Valid account number (${returnBankDetails.accountNumber.length} digits)`
+                                  : returnBankDetails.accountNumber?.length > 0
+                                  ? `${returnBankDetails.accountNumber.length}/18 digits (minimum 9 digits)`
+                                  : '9 to 18 digits (numbers only)'}
+                              </span>
+                            </div>
+
+                            {/* Confirm Account Number */}
+                            <div>
+                              <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
+                                Confirm Account Number <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                maxLength={18}
+                                value={returnBankDetails.confirmAccountNumber}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 18);
+                                  setReturnBankDetails(prev => ({ ...prev, confirmAccountNumber: val }));
+                                  setItemReturnError('');
+                                }}
+                                placeholder=""
+                                className={`w-full px-3 py-2 border rounded-lg text-xs bg-white text-neutral-800 focus:outline-none font-mono ${
+                                  returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                                    ? 'border-emerald-500 bg-emerald-50/20'
+                                    : returnBankDetails.confirmAccountNumber
+                                    ? 'border-red-400 bg-red-50/20'
+                                    : 'border-neutral-300 focus:border-amber-500'
+                                }`}
+                              />
+                              <span className={`text-[10px] mt-1 block ${
+                                returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                                  ? 'text-emerald-700 font-medium'
+                                  : returnBankDetails.confirmAccountNumber
+                                  ? 'text-red-600 font-medium'
+                                  : 'text-neutral-400'
+                              }`}>
+                                {returnBankDetails.confirmAccountNumber && returnBankDetails.confirmAccountNumber === returnBankDetails.accountNumber
+                                  ? '✓ Account numbers match'
+                                  : returnBankDetails.confirmAccountNumber
+                                  ? '⚠ Numbers do not match'
+                                  : 'Re-enter same account number'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Mast Action Buttons: Save & Cancel */}
+                          <div className="pt-3.5 border-t border-amber-200/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <button
+                                type="button"
+                                disabled={isSavingReturnBank}
+                                onClick={handleSaveReturnBank}
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-black hover:bg-neutral-800 active:scale-[0.98] text-white text-xs font-semibold tracking-[0.14em] uppercase rounded-lg shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isSavingReturnBank ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                    <span>SAVING DETAILS...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 stroke-[2.5] text-emerald-400" />
+                                    <span>SAVE & APPLY DETAILS</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {(returnBankDetails.accountNumber || savedBankDetailsSnapshot?.accountNumber) && (
+                                <button
+                                  type="button"
+                                  disabled={isSavingReturnBank}
+                                  onClick={handleCancelEditReturnBank}
+                                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 active:scale-[0.98] text-neutral-700 hover:text-black text-xs font-semibold tracking-[0.14em] uppercase rounded-lg transition-all cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>CANCEL / KEEP SAVED</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-neutral-500 font-sans flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>Details encrypted & saved to profile</span>
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -4878,7 +5322,7 @@ export const Checkout = () => {
                       type="text"
                       value={addressEditForm.name}
                       onChange={(e) => setAddressEditForm({ ...addressEditForm, name: e.target.value })}
-                      placeholder="e.g. Kuldeep Mahajan"
+                      placeholder=""
                       required
                       className="w-full px-3.5 py-2.5 border border-neutral-300 rounded text-xs focus:outline-none focus:border-black font-sans"
                     />

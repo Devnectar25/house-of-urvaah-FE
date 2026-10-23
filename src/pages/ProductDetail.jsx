@@ -551,7 +551,12 @@ export const ProductDetail = () => {
         setSelectedImage(gallery[0]);
       }
       if (availableSizes && availableSizes.length > 0) {
-        setSelectedSize(availableSizes[1] || availableSizes[0]);
+        const sizeStock = product.sizeStock || product.size_stock || {};
+        const firstInStock = availableSizes.find(sz => {
+          const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+          return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : false;
+        });
+        setSelectedSize(firstInStock || availableSizes[0] || 'M');
       }
     }
   }, [product?.id]);
@@ -591,6 +596,18 @@ export const ProductDetail = () => {
   const isWishlisted = isInWishlist(product.id);
 
   const handleAddToCart = () => {
+    // Check if the currently selected size is in stock
+    const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
+    const sizeStock = product.sizeStock || product.size_stock || {};
+    const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
+    const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
+    const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
+
+    if (isSelectedSizeOut) {
+      setIsStockModalOpen(true);
+      return;
+    }
+
     addToCart(product, selectedSize, { selectOnlyThis: true });
     setIsAdded(true);
     setIsCartOpen(true);

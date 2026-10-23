@@ -488,7 +488,14 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   };
 
   const handleAddToCart = () => {
-    addToCart(look.product, 'M');
+    const sizeStock = look.product?.sizeStock || look.product?.size_stock || {};
+    const sizes = Array.isArray(look.product?.sizes) && look.product.sizes.length > 0 ? look.product.sizes : ['XS', 'S', 'M', 'L', 'XL'];
+    const sizeToUse = sizes.find(sz => {
+      const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
+      return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : true;
+    }) || 'M';
+
+    addToCart(look.product, sizeToUse);
     setIsAdded(true);
     setTimeout(() => {
       setIsAdded(false);
