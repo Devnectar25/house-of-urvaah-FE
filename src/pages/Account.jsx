@@ -1,3 +1,4 @@
+import { getProductUrl } from '../utils/productUrl';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';

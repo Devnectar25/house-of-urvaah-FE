@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 
 import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../services/productApi';
+import { getProductUrl } from '../../utils/productUrl';
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
@@ -250,14 +251,8 @@ export const CategoryGrid = () => {
               {/* Product Photo Container */}
               <div
                 onClick={() => {
-                  if (product.id) {
-                    let targetId = product.id;
-                    if (product.id === 'bs-101' || product.id === '101' || product.id === '105' || product.id === 'prod-105' || product.id === 'bs-105' || (product.name && (product.name.toUpperCase().includes('CHESTNUT BLOOM SET') || product.name.toUpperCase().includes('MOCHA BROWN EMBROIDERED CO-ORD SET')))) {
-                      targetId = 'bs-101';
-                    } else if (product.id === 'bs-103' || product.id === '103' || product.id === '106' || product.id === 'prod-102' || product.id === 'bs-106' || (product.name && (product.name.toUpperCase().includes('SAGE BLOOM EMBROIDERED CORSET') || product.name.toUpperCase().includes('GILDED MIST CORSET') || product.name.toUpperCase().includes('PEACH BLOOM CORSET SET')))) {
-                      targetId = 'bs-103';
-                    }
-                    navigate(`/product/${targetId}`);
+                  if (product) {
+                    navigate(getProductUrl(product));
                     window.scrollTo({ top: 0, behavior: 'instant' });
                   }
                 }}
@@ -307,14 +302,8 @@ export const CategoryGrid = () => {
               {/* Product Info Below Image */}
               <div
                 onClick={() => {
-                  if (product.id) {
-                    let targetId = product.id;
-                    if (product.id === 'bs-101' || product.id === '101' || product.id === '105' || product.id === 'prod-105' || product.id === 'bs-105' || (product.name && (product.name.toUpperCase().includes('CHESTNUT BLOOM SET') || product.name.toUpperCase().includes('MOCHA BROWN EMBROIDERED CO-ORD SET')))) {
-                      targetId = 'bs-101';
-                    } else if (product.id === 'bs-103' || product.id === '103' || product.id === '106' || product.id === 'prod-102' || product.id === 'bs-106' || (product.name && (product.name.toUpperCase().includes('SAGE BLOOM EMBROIDERED CORSET') || product.name.toUpperCase().includes('GILDED MIST CORSET') || product.name.toUpperCase().includes('PEACH BLOOM CORSET SET')))) {
-                      targetId = 'bs-103';
-                    }
-                    navigate(`/product/${targetId}`);
+                  if (product) {
+                    navigate(getProductUrl(product));
                     window.scrollTo({ top: 0, behavior: 'instant' });
                   }
                 }}

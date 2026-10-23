@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { apiFetch } from '../../services/api';
+import { getProductUrl } from '../../utils/productUrl';
 
 const QUICK_SUGGESTIONS = [
   'Show trending corsets',
@@ -331,8 +332,8 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
       // fire-and-forget
     }
 
-    if (product?.id) {
-      navigate(`/product/${product.id}`);
+    if (product) {
+      navigate(getProductUrl(product));
       window.scrollTo({ top: 0, behavior: 'instant' });
     } else if (setPdpProduct) {
       setPdpProduct(product);

@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from '
 import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
+import { getProductUrl } from '../../utils/productUrl';
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -505,8 +506,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   const navigate = useNavigate();
 
   const handleMoreInfo = () => {
-    if (look.product?.id) {
-      navigate(`/product/${look.product.id}`);
+    if (look.product) {
+      navigate(getProductUrl(look.product));
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
     onClose();

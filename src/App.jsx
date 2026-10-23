@@ -150,6 +150,7 @@ export function StorefrontLayout() {
           <Route path="/returns" element={<ReturnRefundPolicy />} />
           <Route path="/returns-exchanges" element={<ReturnRefundPolicy />} />
           <Route path="/stock-notifications/unsubscribe" element={<StockUnsubscribe />} />
+          <Route path="/product/:id/:slug" element={<ProductDetail />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/category/:slug" element={<CategoryPage />} />
           <Route path="/category" element={<CategoryPage defaultCategory="all" />} />

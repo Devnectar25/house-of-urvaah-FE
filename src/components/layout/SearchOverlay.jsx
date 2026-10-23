@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
+import { getProductUrl } from '../../utils/productUrl';
 
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen } = useCart();
@@ -462,7 +463,7 @@ export const SearchOverlay = () => {
                             product={product}
                             onQuickView={(p) => {
                               handleCloseSearch();
-                              navigate(`/product/${p.id}`);
+                              navigate(getProductUrl(p));
                               window.scrollTo({ top: 0, behavior: 'instant' });
                             }}
                           />
