@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
+import { getProductUrl } from '../../utils/productUrl';
 
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen } = useCart();
@@ -437,7 +438,7 @@ export const SearchOverlay = () => {
                     {isSearching && (
                       <span className="flex items-center gap-1.5 text-xs text-neutral-400 tracking-wider font-sans uppercase">
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-500" />
-                        Searching atelier...
+                        Searching...
                       </span>
                     )}
                   </div>
@@ -445,7 +446,7 @@ export const SearchOverlay = () => {
                   {filteredProducts.length === 0 ? (
                     <div className="py-12 text-center">
                       <p className="text-sm text-neutral-500 tracking-wider uppercase mb-2">
-                        {isSearching ? `SEARCHING ATELIER FOR "${searchTerm}"...` : `NO PRODUCTS FOUND MATCHING "${searchTerm}"`}
+                        {isSearching ? `SEARCHING FOR "${searchTerm}"...` : `NO PRODUCTS FOUND MATCHING "${searchTerm}"`}
                       </p>
                       <p className="text-xs text-neutral-400 font-sans tracking-wide">
                         Try searching by silhouette, color, fabric (e.g., silk, corset, co-ord), or product name.
@@ -462,7 +463,7 @@ export const SearchOverlay = () => {
                             product={product}
                             onQuickView={(p) => {
                               handleCloseSearch();
-                              navigate(`/product/${p.id}`);
+                              navigate(getProductUrl(p));
                               window.scrollTo({ top: 0, behavior: 'instant' });
                             }}
                           />

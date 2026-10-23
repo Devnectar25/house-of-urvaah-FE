@@ -397,13 +397,6 @@ export const EditorialBanner = () => {
                 );
               })}
               </div>
-
-              {/* Slide Counter / Hint */}
-              {videos.length > 3 && (
-                <div className="absolute bottom-2.5 right-3 z-20 bg-neutral-950/75 backdrop-blur-md text-white/90 text-[8.5px] font-sans tracking-[0.2em] uppercase px-2.5 py-0.5 rounded-full pointer-events-none select-none shadow-sm">
-                  {videos.length} Fabric Videos &bull; Use Arrows
-                </div>
-              )}
             </div>
           </motion.div>
 

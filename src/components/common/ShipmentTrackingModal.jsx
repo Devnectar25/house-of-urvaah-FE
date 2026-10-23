@@ -188,7 +188,10 @@ export const ShipmentTrackingModal = ({
           </div>
 
           {/* Modal Body */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+          <div
+            className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-5 sm:p-6 space-y-6"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {loading ? (
               <div className="py-16 text-center space-y-3">
                 <RefreshCw className="w-7 h-7 text-neutral-400 animate-spin mx-auto" />

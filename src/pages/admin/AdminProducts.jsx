@@ -18,6 +18,7 @@ import { apiClient } from '../../lib/apiClient';
 import { EditProductModal } from '../../components/admin/EditProductModal';
 import { AddProductModal } from '../../components/admin/AddProductModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { getProductUrl } from '../../utils/productUrl';
 
 
 const DEFAULT_CATEGORIES = [
@@ -536,7 +537,7 @@ const ProductTableRow = ({
             </span>
           )}
           <a
-            href={`/product/${product.id}`}
+            href={getProductUrl(product)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-neutral-400 hover:text-brand-dark inline-flex items-center text-[11px] ml-1"

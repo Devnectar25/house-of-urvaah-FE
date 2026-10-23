@@ -4,6 +4,7 @@ import { Heart, Eye, ShoppingBag, Bell, X, Check, CheckCircle2 } from 'lucide-re
 import { useCart } from '../../context/CartContext';
 import { StockNotificationModal } from '../product/StockNotificationModal';
 import { getSwatchCss } from '../../utils/colorValidator';
+import { getProductUrl } from '../../utils/productUrl';
 
 export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOriginalPrice = false }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -134,14 +135,8 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
 
   const handleCardClick = () => {
     if (isStockModalOpen) return;
-    if (product?.id) {
-      let targetId = product.id;
-      if (product.id === 'bs-101' || product.id === '101' || product.id === '105' || product.id === 'prod-105' || product.id === 'bs-105' || (product.name && (product.name.toUpperCase().includes('CHESTNUT BLOOM SET') || product.name.toUpperCase().includes('MOCHA BROWN EMBROIDERED CO-ORD SET')))) {
-        targetId = 'bs-101';
-      } else if (product.id === 'bs-103' || product.id === '103' || product.id === '106' || product.id === 'prod-102' || product.id === 'bs-106' || (product.name && (product.name.toUpperCase().includes('SAGE BLOOM EMBROIDERED CORSET') || product.name.toUpperCase().includes('GILDED MIST CORSET') || product.name.toUpperCase().includes('PEACH BLOOM CORSET SET')))) {
-        targetId = 'bs-103';
-      }
-      navigate(`/product/${targetId}`);
+    if (product) {
+      navigate(getProductUrl(product));
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   };

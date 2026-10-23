@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getSupabaseMediaUrl, CDN_BASE_URL } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
+import { getProductUrl } from '../../utils/productUrl';
 
 const SUPABASE_CDN = CDN_BASE_URL || 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media';
 
@@ -126,7 +127,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            onClick={() => navigate(topLeftData?.link || '/product/bs-102')}
+            onClick={() => navigate(getProductUrl(topLeftData?.link || 'bs-102'))}
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {blueImages.map((src, i) => (
@@ -148,7 +149,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            onClick={() => navigate(bottomLeftData?.link || '/product/bs-104')}
+            onClick={() => navigate(getProductUrl(bottomLeftData?.link || 'bs-104'))}
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {peachImages.map((src, i) => (
@@ -177,7 +178,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-            onClick={() => navigate(topRightData?.link || '/product/bs-101')}
+            onClick={() => navigate(getProductUrl(topRightData?.link || 'bs-101'))}
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {brownImages.map((src, i) => (
@@ -199,7 +200,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-            onClick={() => navigate(bottomRightData?.link || '/product/bs-103')}
+            onClick={() => navigate(getProductUrl(bottomRightData?.link || 'bs-103'))}
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {corsetImages.map((src, i) => (

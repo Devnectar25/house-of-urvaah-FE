@@ -5,14 +5,13 @@ import { X, User, Search, Heart, ShoppingBag, ArrowRight, ChevronDown } from 'lu
 import { useCart } from '../../context/CartContext';
 import { productApi } from '../../services/productApi';
 import { apiClient } from '../../lib/apiClient';
-import { Logo } from '../common/Logo';
 
 const TABS = ['WOMAN'];
 
 const WEBSITE_SECTIONS = [
   {
     id: 'discover',
-    title: 'DISCOVER THE ATELIER',
+    title: 'DISCOVER THE MAISON',
     items: [
       { label: 'BEST SELLERS', target: 'best-sellers' },
       { label: 'TRENDING ON THE GRAM', target: 'trending' },
@@ -25,7 +24,7 @@ const WEBSITE_SECTIONS = [
     id: 'concierge',
     title: 'CLIENT CONCIERGE & CARE',
     items: [
-      { label: 'ABOUT US / ATELIER STORY', isRoute: true, to: '/about' },
+      { label: 'ABOUT US / OUR STORY', isRoute: true, to: '/about' },
       { label: 'CONTACT US / CONCIERGE', isRoute: true, to: '/contact' },
       { label: 'FREQUENTLY ASKED QUESTIONS', isRoute: true, to: '/faqs' },
       { label: 'MY WISHLIST', isRoute: true, to: '/wishlist' },
@@ -305,7 +304,7 @@ export const MobileMenu = () => {
               <div className="divide-y divide-neutral-100">
                 <div className="pb-2">
                   <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block">
-                    ATELIER COLLECTIONS
+                    COLLECTIONS
                   </span>
                 </div>
 
@@ -413,20 +412,6 @@ export const MobileMenu = () => {
               </div>
             </div>
 
-            {/* BOTTOM FOOTER INFO */}
-            <div className="py-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] flex items-center justify-start">
-              <Link
-                to="/"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'instant' });
-                }}
-                className="flex items-center justify-start hover:opacity-80 transition-opacity"
-                aria-label="House of Urvaah Home"
-              >
-                <Logo className="h-14 sm:h-16" />
-              </Link>
-            </div>
           </motion.div>
         </>
       )}

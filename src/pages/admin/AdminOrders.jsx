@@ -605,6 +605,9 @@ export const AdminOrders = () => {
   const formatOrderStatusDisplay = (status) => {
     if (!status) return 'Pending';
     const s = String(status).toLowerCase();
+    if (s.includes('return qc rejected')) {
+      return 'QC Rejected';
+    }
     if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
       return 'Received at HOU';
     }
@@ -658,6 +661,9 @@ export const AdminOrders = () => {
     }
     if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
       return 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold';
+    }
+    if (s.includes('return rejected') || s.includes('return qc rejected')) {
+      return 'bg-rose-50 text-rose-700 border-rose-200 font-bold';
     }
     if (s.includes('return')) {
       return 'bg-orange-50 text-orange-700 border-orange-200';
@@ -1452,19 +1458,26 @@ export const AdminOrders = () => {
 
                       {/* Order Status Pill */}
                       <td className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center justify-center gap-1.5">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${getOrderStatusPill(
-                              ord.status
-                            )}`}
-                          >
-                            {formatOrderStatusDisplay(ord.status)}
-                          </span>
-                          {ord.isPreview && (
+                        <div className="inline-flex flex-col items-center justify-center gap-1">
+                          <div className="inline-flex items-center justify-center gap-1.5">
                             <span
-                              className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
-                              title="Unsaved Preview — Click Save Status Changes in Modal to persist"
-                            />
+                              className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${getOrderStatusPill(
+                                ord.status
+                              )}`}
+                            >
+                              {formatOrderStatusDisplay(ord.status)}
+                            </span>
+                            {ord.isPreview && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
+                                title="Unsaved Preview — Click Save Status Changes in Modal to persist"
+                              />
+                            )}
+                          </div>
+                          {Boolean(ord.return_rejection_reason) && (
+                            <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase font-sans leading-none tracking-tight">
+                              Return Rejected
+                            </span>
                           )}
                         </div>
                       </td>

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { getProductUrl } from '../../utils/productUrl';
 
 export const ProductDetailModal = () => {
   const { pdpProduct, setPdpProduct } = useCart();
@@ -8,11 +9,8 @@ export const ProductDetailModal = () => {
 
   useEffect(() => {
     if (pdpProduct) {
-      const prodId = typeof pdpProduct === 'object' ? pdpProduct.id : pdpProduct;
-      if (prodId) {
-        navigate(`/product/${prodId}`);
-        window.scrollTo({ top: 0, behavior: 'instant' });
-      }
+      navigate(getProductUrl(pdpProduct));
+      window.scrollTo({ top: 0, behavior: 'instant' });
       setPdpProduct(null);
     }
   }, [pdpProduct, navigate, setPdpProduct]);

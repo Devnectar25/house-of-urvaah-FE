@@ -397,7 +397,7 @@ export const AdminHeroSection = () => {
             Boutiques & Atelier Concierge Settings
           </h3>
           <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
-            Dynamically update the Atelier Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
+            Dynamically update the Maison Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
           </p>
         </div>
         <Link

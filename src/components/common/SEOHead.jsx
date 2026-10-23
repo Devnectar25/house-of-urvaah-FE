@@ -17,7 +17,8 @@ export const SEOHead = ({
   canonicalUrl,
   ogImage = DEFAULT_IMAGE,
   ogType = 'website',
-  noindex = false
+  noindex = false,
+  schema = null
 }) => {
   const location = useLocation();
 
@@ -89,7 +90,21 @@ export const SEOHead = ({
       setMetaTag('name', 'twitter:image', fullOgImage);
     }
 
-  }, [title, description, keywords, canonicalUrl, ogImage, ogType, noindex, location.pathname]);
+    // JSON-LD Structured Data
+    let schemaScript = document.querySelector('script[data-seo="json-ld"]');
+    if (schema) {
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.setAttribute('type', 'application/ld+json');
+        schemaScript.setAttribute('data-seo', 'json-ld');
+        document.head.appendChild(schemaScript);
+      }
+      schemaScript.textContent = typeof schema === 'string' ? schema : JSON.stringify(schema);
+    } else if (schemaScript) {
+      schemaScript.remove();
+    }
+
+  }, [title, description, keywords, canonicalUrl, ogImage, ogType, noindex, schema, location.pathname]);
 
   return null;
 };

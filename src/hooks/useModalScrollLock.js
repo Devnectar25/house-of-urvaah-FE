@@ -36,11 +36,12 @@ if (typeof window !== 'undefined') {
   );
 }
 
-export const forceUnlockScroll = () => {
+export const forceUnlockScroll = (resetToTop = false) => {
   activeLocksCount = 0;
   escapeHandlersStack.length = 0;
   if (typeof document !== 'undefined') {
-    const restoreY = lockedScrollY;
+    const restoreY = resetToTop ? 0 : lockedScrollY;
+    lockedScrollY = 0;
     document.body.removeAttribute('data-modal-open');
     document.documentElement.removeAttribute('data-modal-open');
     document.documentElement.style.overflow = '';
@@ -64,7 +65,9 @@ export const forceUnlockScroll = () => {
       adminScrollEl.style.overflow = '';
     }
 
-    if (restoreY) {
+    if (resetToTop) {
+      window.scrollTo(0, 0);
+    } else if (restoreY) {
       window.scrollTo(0, restoreY);
     }
   }

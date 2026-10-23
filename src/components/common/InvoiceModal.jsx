@@ -434,7 +434,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
 
   return (
     <div
-      className="invoice-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain"
+      className="invoice-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain no-scrollbar scrollbar-none"
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) {
@@ -453,6 +454,20 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         #urvaah-invoice-print-area,
         #urvaah-invoice-print-area * {
           font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        }
+
+        .invoice-modal-overlay,
+        .invoice-modal-scroll {
+          -ms-overflow-style: none !important;
+          scrollbar-width: none !important;
+        }
+
+        .invoice-modal-overlay::-webkit-scrollbar,
+        .invoice-modal-scroll::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          background: transparent !important;
         }
 
         @media print {
@@ -631,7 +646,10 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         </div>
 
         {/* Scrollable Document Container */}
-        <div className="invoice-modal-scroll overflow-y-auto p-4 sm:p-8 bg-[#f5f4ef] flex justify-center">
+        <div
+          className="invoice-modal-scroll overflow-y-auto no-scrollbar scrollbar-none p-4 sm:p-8 bg-[#f5f4ef] flex justify-center"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {loading ? (
             <div className="py-24 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-neutral-700 mx-auto mb-3" />
