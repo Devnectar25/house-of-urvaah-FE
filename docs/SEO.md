@@ -51,8 +51,34 @@ This document details the technical SEO implementation, guidelines, and roadmap 
 - [x] Twitter Card meta tags (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`)
 - [x] Noindex protection on private pages (`/account`, `/cart`, `/wishlist`)
 
-### Phase 2: Structured Data (Schema.org / JSON-LD) + Sitemap & Robots.txt
-- [ ] Product Schema (JSON-LD) on Product Detail pages (`name`, `image`, `description`, `sku`, `brand`, `offers` with price, currency, availability)
+### Phase 2: SEO Product URLs & Structured Data (Schema.org / JSON-LD) — COMPLETED
+
+| SEO Feature | Details | File Location(s) |
+| :--- | :--- | :--- |
+| **SEO-Friendly Product URLs** | Deterministic canonical URL mappings and dynamic slug resolution. Format: `/product/:id/:slug`. Auto-redirects bare `/product/:id` or legacy aliases to authoritative SEO URLs. | [`src/utils/productUrl.js`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/utils/productUrl.js), [`src/App.jsx`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/App.jsx), [`src/pages/ProductDetail.jsx`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/pages/ProductDetail.jsx) |
+| **Canonical Product Mappings** | `bs-101` → `/product/bs-101/mocha-brown-embroidered-co-ord-set`<br>`bs-102` → `/product/bs-102/teal-embroidered-floral-co-ord-set`<br>`bs-104` → `/product/bs-104/blush-pink-embroidered-floral-co-ord-set`<br>`bs-103` → `/product/bs-103/sage-bloom-embroidered-corset`<br>`109` → `/product/109/ivory-heart-corset-kurti` | [`src/utils/productUrl.js`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/utils/productUrl.js) |
+| **Product Schema (JSON-LD)** | Injected in `<head>` via `SEOHead.jsx` with Product, Brand, Offer (price in INR, in-stock availability), seller info. | [`src/components/common/SEOHead.jsx`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/components/common/SEOHead.jsx), [`src/pages/ProductDetail.jsx`](file:///c:/workspace/Urvaah%20latest/house-of-urvaah-FE/src/pages/ProductDetail.jsx) |
+
+---
+
+## 3. SEO Implementation Phase Checklist
+
+### Phase 1: Meta Tags + Open Graph & Twitter Cards
+- [x] Unique `<title>` per page
+- [x] Unique `<meta name="description">` per page (150–160 chars)
+- [x] `<meta name="keywords">` per page
+- [x] Dynamic `<link rel="canonical">` per route
+- [x] Full Open Graph support (`og:title`, `og:description`, `og:image`, `og:url`, `og:type`)
+- [x] Dynamic `og:image` using actual product image on Product Detail pages
+- [x] Twitter Card meta tags (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`)
+- [x] Noindex protection on private pages (`/account`, `/cart`, `/wishlist`)
+
+### Phase 2: SEO Product URLs & Structured Data (Schema.org / JSON-LD)
+- [x] SEO Product URLs (`/product/:id/:slug`) with backward compatibility for `/product/:id`
+- [x] Redirect old/bare product URLs to canonical slug URLs
+- [x] Update product link generation throughout store to SEO URLs
+- [x] Canonical tags pointing strictly to primary SEO URLs
+- [x] Product Schema (JSON-LD) on Product Detail pages (`name`, `image`, `description`, `sku`, `brand`, `offers` with price, currency, availability)
 - [ ] Organization Schema (JSON-LD) on Homepage (`name`, `logo`, `url`, `sameAs`)
 - [ ] BreadcrumbList Schema (JSON-LD) on product and category routes
 - [ ] `sitemap.xml` listing all public routes and products

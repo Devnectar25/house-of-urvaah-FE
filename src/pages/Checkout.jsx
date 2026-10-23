@@ -46,6 +46,7 @@ import { shippingApi } from '../services/shippingApi';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
 import Swal from 'sweetalert2';
+import { getProductUrl } from '../utils/productUrl';
 
 const ORDER_SESSION_KEY = 'urvaah_last_placed_order';
 
@@ -4253,7 +4254,7 @@ export const Checkout = () => {
                           const item = items[0];
                           const prodId = item?.product_id || item?.productId || (item?.product && (item.product.id || item.product.product_id)) || item?.id;
                           if (prodId) {
-                            navigate(`/product/${prodId}?openReview=true#customer-reviews`);
+                            navigate(getProductUrl(prodId, 'openReview=true#customer-reviews'));
                           }
                           return;
                         }
@@ -4290,7 +4291,7 @@ export const Checkout = () => {
                                 const targetPid = btn.getAttribute('data-prod-id');
                                 Swal.close();
                                 if (targetPid) {
-                                  navigate(`/product/${targetPid}?openReview=true#customer-reviews`);
+                                  navigate(getProductUrl(targetPid, 'openReview=true#customer-reviews'));
                                 }
                               });
                             });

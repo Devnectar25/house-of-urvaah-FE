@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Heart,
   ShoppingBag,
@@ -41,6 +41,7 @@ import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWi
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import RichTextRenderer from '../components/common/RichTextRenderer';
+import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
 
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
@@ -62,27 +63,63 @@ const PRODUCT_COUPONS = [
 
 const findLocalProduct = (id) => {
   if (!id) return null;
-  const strId = String(id).trim();
+  const strId = String(id).trim().toLowerCase();
   const numId = strId.replace(/\D/g, '');
 
-  if (strId === '109' || strId === 'bs-109' || strId === 'prod-109') {
-    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-105') || null;
+  // 1. Mocha Brown Embroidered Co-Ord Set (bs-101)
+  if (
+    strId === 'bs-101' || strId === '101' || strId === '105' || strId === 'prod-101' || strId === 'prod-105' ||
+    strId === 'mocha-brown-embroidered-co-ord-set'
+  ) {
+    const p = ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-101');
+    return p ? { ...p, id: 'bs-101' } : null;
   }
+
+  // 2. Teal Embroidered Floral Co-Ord Set (bs-102)
+  if (
+    strId === 'bs-102' || strId === '102' ||
+    strId === 'teal-embroidered-floral-co-ord-set'
+  ) {
+    const p = ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-102');
+    return p ? { ...p, id: 'bs-102' } : null;
+  }
+
+  // 3. Blush Pink Embroidered Floral Co-Ord Set (bs-104)
+  if (
+    strId === 'bs-104' || strId === '104' ||
+    strId === 'blush-pink-embroidered-floral-co-ord-set'
+  ) {
+    const p = ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-104');
+    return p ? { ...p, id: 'bs-104' } : null;
+  }
+
+  // 4. Sage Bloom Embroidered Corset (bs-103)
+  if (
+    strId === 'bs-103' || strId === '103' || strId === '106' || strId === 'prod-102' || strId === 'bs-106' ||
+    strId === 'sage-bloom-embroidered-corset'
+  ) {
+    const p = ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-103');
+    return p ? { ...p, id: 'bs-103' } : null;
+  }
+
+  // 5. Ivory Heart Corset Kurti (109)
+  if (
+    strId === '109' || strId === 'bs-105' || strId === 'prod-109' || strId === 'bs-109' ||
+    strId === 'ivory-heart-corset-kurti'
+  ) {
+    const p = ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-105');
+    return p ? { ...p, id: '109' } : null;
+  }
+
   if (strId === '108' || strId === 'bs-108') {
     return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'prod-105') || null;
   }
   if (strId === '107' || strId === 'bs-107') {
     return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'prod-103') || null;
   }
-  if (strId === '106' || strId === 'bs-106') {
-    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-103' || p.id === 'prod-102') || null;
-  }
-  if (strId === '105') {
-    return ALL_CATALOG_PRODUCTS.find((p) => p.id === 'bs-101' || p.id === 'prod-101') || null;
-  }
 
   return ALL_CATALOG_PRODUCTS.find((p) => {
-    const pStrId = String(p.id).trim();
+    const pStrId = String(p.id).trim().toLowerCase();
     const pNumId = pStrId.replace(/\D/g, '');
     if (pStrId === strId) return true;
     if (numId && pNumId && numId === pNumId) return true;
@@ -162,12 +199,59 @@ const formatAdditionalInfoRows = (product) => {
 };
 
 export const ProductDetail = () => {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { cart, addToCart, toggleWishlist, isInWishlist, setIsCartOpen, openAuthModal, user } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Authoritative canonical SEO URL and metadata resolution
+  const canonicalInfo = useMemo(() => {
+    return resolveProductCanonical(product || id);
+  }, [product, id]);
+
+  // Dynamic Product Structured Data (JSON-LD) for Rich Snippets & Search Engines
+  const productSchema = useMemo(() => {
+    if (!product) return null;
+    const price = product.price || 8990;
+    const canonical = canonicalInfo?.canonicalUrl || `https://houseofurvaah.com/product/${product.id}`;
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      image: [product.image].filter(Boolean),
+      description: canonicalInfo?.description || product.description,
+      sku: String(product.id),
+      brand: {
+        '@type': 'Brand',
+        name: 'House of Urvaah'
+      },
+      offers: {
+        '@type': 'Offer',
+        url: canonical,
+        priceCurrency: 'INR',
+        price: price,
+        availability: (product.inStock !== false && (product.stockQuantity ?? 1) > 0)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        seller: {
+          '@type': 'Organization',
+          name: 'House of Urvaah'
+        }
+      }
+    };
+  }, [product, canonicalInfo]);
+
+  // Seamlessly redirect old or non-canonical product URLs (e.g., /product/bs-101 -> /product/bs-101/mocha-brown-embroidered-co-ord-set)
+  useEffect(() => {
+    if (canonicalInfo?.url && (product || !loading)) {
+      if (location.pathname !== canonicalInfo.url) {
+        navigate(`${canonicalInfo.url}${location.search}${location.hash}`, { replace: true });
+      }
+    }
+  }, [canonicalInfo?.url, product, loading, location.pathname, location.search, location.hash, navigate]);
 
   // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
@@ -246,11 +330,13 @@ export const ProductDetail = () => {
       }
 
       // 2. Fetch from backend API to ensure authoritative product data
+      const lookupId = canonicalInfo?.id || id;
       productApi
-        .getProductById(id)
+        .getProductById(lookupId)
         .then((data) => {
           if (isMounted && data && (data.name || data.title)) {
-            const isCorsetSet = String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
+            const canonicalData = resolveProductCanonical(data) || canonicalInfo;
+            const isCorsetSet = canonicalData?.id === 'bs-103' || String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
             const corsetGallery = [
               '/assets/Images/Corset01.png',
               '/assets/Images/Corset02.png',
@@ -261,7 +347,7 @@ export const ProductDetail = () => {
             setProduct((prev) => ({
               ...prev,
               ...data,
-              id: String(data.id || id),
+              id: canonicalData?.id || String(data.id || id),
               name: isCorsetSet ? 'Sage Bloom Embroidered Corset' : (data.name || data.title || prev?.name),
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
@@ -876,9 +962,11 @@ export const ProductDetail = () => {
   return (
     <div className="w-full bg-white font-serif text-brand-dark min-h-screen pt-24 sm:pt-28 pb-20 selection:bg-brand-dark selection:text-white">
       <SEOHead
-        title={`${product.name} | House of Urvaah`}
-        description={product.description || `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`}
-        keywords={`${product.name}, ${product.category || 'Luxury Fashion'}, House of Urvaah apparel`}
+        title={canonicalInfo?.title || `${product.name} | House of Urvaah`}
+        description={canonicalInfo?.description || product.description || `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`}
+        keywords={canonicalInfo?.keywords || `${product.name}, ${product.category || 'Luxury Fashion'}, House of Urvaah apparel`}
+        canonicalUrl={canonicalInfo?.canonicalUrl}
+        schema={productSchema}
         ogImage={product.image || (gallery && gallery[0])}
         ogType="product"
       />
