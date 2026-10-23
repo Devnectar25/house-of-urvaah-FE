@@ -7,25 +7,38 @@
 export const getOrderGstInfo = (ord) => {
   if (!ord) return { taxRate: 18, totalTax: 0, subtotal: 0, total: 0, taxRatio: 0.18 };
   const subtotal = Number(ord.subtotal || ord.original_total || ord.originalTotal || 0);
-  const total = Number(ord.total || ord.totalPaid || ord.total_amount || 0);
+  const rawTotal = Number(ord.total || ord.totalPaid || ord.total_amount || 0);
+  const discount = Number(ord.discount_amount || ord.discount || 0);
+  const shipping = Number(ord.shipping || ord.shipping_cost || ord.shipping_fee || ord.shippingFee || 0);
   let tax = Number(ord.tax || ord.tax_amount || ord.taxAmount || 0);
   let taxRate = Number(ord.tax_rate || ord.taxRate || ord.gst_percentage || 0);
 
-  if (!tax && total > subtotal && subtotal > 0) {
-    tax = Math.max(0, Math.round(total - subtotal - Number(ord.shipping || ord.shipping_cost || ord.shipping_fee || ord.shippingFee || 0)));
+  const netTaxable = Math.max(0, subtotal - discount);
+
+  // If tax is not directly provided, check if rawTotal has tax difference above netTaxable
+  if (!tax && rawTotal > netTaxable && netTaxable > 0) {
+    tax = Math.max(0, Math.round(rawTotal - netTaxable - shipping));
   }
 
+  // Determine tax rate: fallback to 18% for luxury items > 2500, else 5%
   if (!taxRate) {
-    if (tax > 0 && subtotal > 0) {
-      taxRate = Math.round((tax / subtotal) * 100);
+    if (tax > 0 && netTaxable > 0) {
+      taxRate = Math.round((tax / netTaxable) * 100);
     } else {
-      taxRate = subtotal > 2500 ? 18 : 5;
+      taxRate = netTaxable > 2500 ? 18 : (netTaxable > 0 ? 5 : 18);
     }
   }
 
-  const taxRatio = subtotal > 0 && tax > 0 ? (tax / subtotal) : (taxRate / 100);
+  // If tax is still 0 or unrecorded, compute tax from netTaxable using applicable rate
+  if (!tax && netTaxable > 0) {
+    tax = Math.round(netTaxable * (taxRate / 100));
+  }
 
-  return { taxRate, totalTax: tax, subtotal, total, taxRatio };
+  const computedTotal = netTaxable + tax + shipping;
+  const effectiveTotal = Math.max(rawTotal, computedTotal);
+  const taxRatio = netTaxable > 0 && tax > 0 ? (tax / netTaxable) : (taxRate / 100);
+
+  return { taxRate, totalTax: tax, subtotal, total: effectiveTotal, taxRatio };
 };
 
 export const getItemGstBreakdown = (item, orderGstInfo, isSingleItem = false) => {
