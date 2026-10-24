@@ -4,8 +4,27 @@ import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
+import { resolveProductCanonical } from '../../utils/productUrl';
 
 const ALL_FALLBACK_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
+
+// DB and mock catalog use different ids for the same piece (e.g. '105' vs 'bs-101'),
+// so compare on the canonical product id instead of the raw id.
+const getProductKey = (p) => {
+  if (!p) return '';
+  const canonicalId = resolveProductCanonical(p)?.id;
+  return String(canonicalId || p.id || p.product_id || p.name || '').toLowerCase();
+};
+
+const dedupeProducts = (list, excludeKey) => {
+  const seen = new Set(excludeKey ? [excludeKey] : []);
+  return list.filter((p) => {
+    const key = getProductKey(p);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 const TARGET_POOL_SIZE = 16;
 const ITEMS_PER_BATCH = 4;
 const REFRESH_INTERVAL_MS = 15000; // 15 seconds
@@ -56,32 +75,29 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
           };
         });
 
-        // Filter out the current product itself
-        normalizedList = normalizedList.filter((p) => String(p.id) !== currentIdStr);
+        // Filter out the current product itself and any duplicate pieces
+        const currentKey = getProductKey(currentProduct);
+        normalizedList = dedupeProducts(normalizedList, currentKey);
 
         // Backfill up to target pool size from catalog for rich multi-batch rotation
         if (normalizedList.length < TARGET_POOL_SIZE) {
-          const existingIds = new Set([currentIdStr, ...normalizedList.map((p) => String(p.id))]);
+          const existingKeys = new Set([currentKey, ...normalizedList.map(getProductKey)]);
 
           // Priority 1: same category in catalog
           const sameCat = ALL_FALLBACK_PRODUCTS.filter(
             (p) =>
-              !existingIds.has(String(p.id)) &&
               currentCategory &&
               p.category &&
               p.category.toLowerCase().includes(String(currentCategory).toLowerCase())
           );
 
           // Priority 2: other catalog products
-          const otherItems = ALL_FALLBACK_PRODUCTS.filter(
-            (p) => !existingIds.has(String(p.id))
-          );
-
-          const backfills = [...sameCat, ...otherItems];
+          const backfills = [...sameCat, ...ALL_FALLBACK_PRODUCTS];
           for (const item of backfills) {
             if (normalizedList.length >= TARGET_POOL_SIZE) break;
-            if (!existingIds.has(String(item.id))) {
-              existingIds.add(String(item.id));
+            const key = getProductKey(item);
+            if (key && !existingKeys.has(key)) {
+              existingKeys.add(key);
               normalizedList.push(item);
             }
           }
@@ -93,8 +109,7 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
         }
       } catch (err) {
         console.error('Error fetching related products:', err);
-        const currentId = String(currentProduct?.id || '');
-        const fallbackList = ALL_FALLBACK_PRODUCTS.filter((p) => String(p.id) !== currentId);
+        const fallbackList = dedupeProducts(ALL_FALLBACK_PRODUCTS, getProductKey(currentProduct));
         if (isMounted) {
           setAllProducts(fallbackList);
           setLoading(false);

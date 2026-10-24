@@ -6,7 +6,14 @@ import { useCart } from '../../context/CartContext';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
-import { getProductUrl } from '../../utils/productUrl';
+import { getProductUrl, resolveProductCanonical } from '../../utils/productUrl';
+
+// DB and mock catalog use different ids for the same piece (e.g. '105' vs 'bs-101'),
+// so dedupe on the canonical product id instead of the raw id.
+const getDedupeKey = (p) => {
+  const canonicalId = resolveProductCanonical(p)?.id;
+  return String(canonicalId || p.id || p.product_id || p.productId || p.name || '').toLowerCase();
+};
 
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen } = useCart();
@@ -98,13 +105,12 @@ export const SearchOverlay = () => {
     // 1. Initial mock products
     for (const p of [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS]) {
       if (!p) continue;
-      const key = String(p.id).toLowerCase();
-      map.set(key, p);
+      map.set(getDedupeKey(p), p);
     }
     // 2. Overwrite/supplement with real active products from database
     for (const p of liveProducts) {
       if (!p) continue;
-      const key = String(p.id || p.product_id || p.productId || '').toLowerCase();
+      const key = getDedupeKey(p);
       if (key) map.set(key, p);
     }
     return Array.from(map.values());
@@ -121,8 +127,8 @@ export const SearchOverlay = () => {
     if (Array.isArray(apiSearchResults)) {
       for (const p of apiSearchResults) {
         if (!p) continue;
-        const key = String(p.id || p.product_id || p.productId || p.name);
-        map.set(key, p);
+        const key = getDedupeKey(p);
+        if (!map.has(key)) map.set(key, p);
       }
     }
 
@@ -133,7 +139,7 @@ export const SearchOverlay = () => {
 
     for (const p of allCatalog) {
       if (!p) continue;
-      const key = String(p.id || p.product_id || p.productId || p.name);
+      const key = getDedupeKey(p);
       if (map.has(key)) continue;
 
       const searchableText = [

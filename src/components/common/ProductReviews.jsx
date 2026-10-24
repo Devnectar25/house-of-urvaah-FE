@@ -27,7 +27,6 @@ export const ProductReviews = ({ productId, productName, autoOpenReview = false,
   const [formHoverRating, setFormHoverRating] = useState(0);
   const [formName, setFormName] = useState(''); // Empty by default
   const [formComment, setFormComment] = useState('');
-  const [formFit, setFormFit] = useState('True to Size');
   const [formError, setFormError] = useState('');
   const [successToast, setSuccessToast] = useState(false);
 
@@ -115,7 +114,7 @@ export const ProductReviews = ({ productId, productName, autoOpenReview = false,
         productId: cleanId,
         username: formName.trim() || 'Verified Patron',
         rating: formRating,
-        review: formFit ? `[Fit: ${formFit}] ${formComment.trim()}` : formComment.trim(),
+        review: formComment.trim(),
         images: []
       };
 
@@ -572,28 +571,7 @@ export const ProductReviews = ({ productId, productName, autoOpenReview = false,
                   />
                 </div>
 
-                {/* Fit pill selection */}
-                <div>
-                  <label className="block text-xs font-bold tracking-wider uppercase text-neutral-800 mb-1.5">
-                    FIT FEEDBACK
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Runs Small', 'True to Size', 'Runs Large'].map((fit) => (
-                      <button
-                        key={fit}
-                        type="button"
-                        onClick={() => setFormFit(fit)}
-                        className={`py-2 px-2 text-center text-[11px] font-semibold uppercase tracking-wider rounded-xl border transition-all cursor-pointer ${
-                          formFit === fit
-                            ? 'bg-black text-white border-black'
-                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
-                        }`}
-                      >
-                        {fit}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
 
                 {/* Comments */}
                 <div>

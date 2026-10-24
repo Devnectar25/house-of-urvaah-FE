@@ -28,6 +28,7 @@ import {
   POPULAR_FASHION_COLORS
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
+import { richTextToProductDetails } from '../../utils/productDetailsContent';
 
 
 const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
@@ -52,7 +53,7 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
     description: '',
     fullDescription: '',
     nameOptions: [''],
-    productDetails: [{ label: '', value: '' }],
+    productDetailsText: '',
     originalPrice: '',
     discountPercent: '',
     price: '',
@@ -305,28 +306,6 @@ const DEFAULT_CATEGORIES = [
     }));
   };
 
-  // Product Details Handlers
-  const handleAddProductDetail = () => {
-    setFormData(prev => ({
-      ...prev,
-      productDetails: [...prev.productDetails, { label: '', value: '' }]
-    }));
-  };
-
-  const handleProductDetailChange = (index, field, value) => {
-    setFormData(prev => {
-      const updated = [...prev.productDetails];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, productDetails: updated };
-    });
-  };
-
-  const handleRemoveProductDetail = (indexToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      productDetails: prev.productDetails.filter((_, idx) => idx !== indexToRemove)
-    }));
-  };
 
   // Specification / Additional Information Key-Value Pair Handlers
   const handleAddSpecification = () => {
@@ -573,7 +552,7 @@ const DEFAULT_CATEGORIES = [
       // Filter out empty specifications, name options, and product details
       const validSpecs = formData.specifications.filter(s => s.label.trim() || s.value.trim());
       const validNameOptions = formData.nameOptions.map(n => n.trim()).filter(Boolean);
-      const validProductDetails = formData.productDetails.filter(d => d.label.trim() || d.value.trim());
+      const validProductDetails = richTextToProductDetails(formData.productDetailsText);
 
       const payload = {
         title: formData.name.trim(),
@@ -587,8 +566,9 @@ const DEFAULT_CATEGORIES = [
         full_description: (formData.fullDescription || formData.description || '').trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
-        productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
-        product_details: validSpecs.length > 0 ? validSpecs : validProductDetails,
+        // Product Details are independent of Additional Information (specifications)
+        productDetails: validProductDetails,
+        product_details: validProductDetails,
         originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
         discountPercent: Number(formData.discountPercent) || 0,
@@ -822,53 +802,16 @@ const DEFAULT_CATEGORIES = [
                 </div>
               </div>
 
-              {/* Product Details (Dynamic Key/Value List) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
-                    Product Details (Bullet Points)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddProductDetail}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {formData.productDetails.length === 0 ? (
-                    <p className="text-xs text-neutral-400 italic">No product details added.</p>
-                  ) : (
-                    formData.productDetails.map((detail, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={detail.label}
-                          onChange={(e) => handleProductDetailChange(idx, 'label', e.target.value)}
-                          placeholder="Label (e.g. Fabric)"
-                          className="w-1/3 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={detail.value}
-                          onChange={(e) => handleProductDetailChange(idx, 'value', e.target.value)}
-                          placeholder="Value (e.g. Cora cotton - breathable)"
-                          className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveProductDetail(idx)}
-                          className="p-2 text-neutral-400 hover:text-rose-600 transition-colors"
-                          title="Remove detail"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+              {/* Product Details (Rich Editor) - hidden on the storefront when left empty */}
+              <RichDescriptionEditor
+                id="productDetails"
+                value={formData.productDetailsText || ''}
+                onChange={(val) => setFormData(prev => ({ ...prev, productDetailsText: val }))}
+                placeholder="Fabric, fit, lining, closure, care notes... Use headings and bullet lists to structure the details."
+                title="PRODUCT DETAILS"
+                badgeText="RICH EDITOR"
+                rows={5}
+              />
             </div>
 
             {/* 5. Pricing & Stock Row */}
@@ -1522,6 +1465,7 @@ const DEFAULT_CATEGORIES = [
                   <video
                     src={formData.video_url}
                     controls
+                    muted
                     playsInline
                     className="w-full max-h-56 object-contain bg-black"
                   />

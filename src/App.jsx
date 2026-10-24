@@ -65,16 +65,11 @@ function PermissionGuard({ moduleKey, children }) {
   const isSuperAdmin = !user?.role || user?.role === 'super_admin' || user?.username === 'Admin';
   const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
 
+  // Sub-admins only reach modules explicitly granted to them (Sub-Admin Management permissions)
   const hasAccess =
     isSuperAdmin ||
     permissions.includes(moduleKey) ||
-    moduleKey === 'modify-ui' ||
-    moduleKey === 'faqs' ||
-    moduleKey === 'stock-notifications' ||
-    moduleKey === 'error-monitoring' ||
-    moduleKey === 'email-notifications' ||
-    moduleKey === 'newsletter' ||
-    (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
+    (moduleKey === 'refunds' && permissions.includes('refund-desk'));
 
   if (hasAccess) {
     return children;

@@ -8,7 +8,7 @@ import { validateEmailClient } from '../../utils/emailValidator';
 
 export const AuthSection = () => {
   const navigate = useNavigate();
-  const { user, openAuthModal, logoutUser } = useCart();
+  const { user, openAuthModal } = useCart();
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -80,13 +80,6 @@ export const AuthSection = () => {
                 <span className="text-sm font-semibold tracking-wider text-black block mt-0.5">ACTIVE</span>
               </div>
             </div>
-
-            <button
-              onClick={logoutUser}
-              className="bg-[#111111] text-white text-xs font-semibold tracking-[0.25em] uppercase px-8 py-3.5 hover:bg-neutral-800 transition-colors inline-flex items-center gap-2 cursor-pointer"
-            >
-              SIGN OUT OF ATELIER
-            </button>
           </motion.div>
         ) : (
           /* SINGLE OTP LOGIN CARD */

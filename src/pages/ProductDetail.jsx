@@ -42,6 +42,7 @@ import { StockNotificationModal } from '../components/product/StockNotificationM
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import RichTextRenderer from '../components/common/RichTextRenderer';
 import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
+import { getLegacyDetailRows, productDetailsToRichText, hasVisibleRichText } from '../utils/productDetailsContent';
 
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
@@ -141,8 +142,8 @@ const formatAdditionalInfoRows = (product) => {
     if (valid.length > 0) return valid;
   }
 
-  // 2. Check if productDetails or product_details array exists
-  const prodDetails = product.productDetails || product.product_details;
+  // 2. Check if productDetails or product_details array exists (legacy label/value rows only)
+  const prodDetails = getLegacyDetailRows(product.productDetails || product.product_details);
   if (Array.isArray(prodDetails) && prodDetails.length > 0) {
     const valid = prodDetails
       .filter((s) => s && ((s.label && s.label.trim()) || (s.value && s.value.trim()) || (s.title && s.title.trim())))
@@ -206,6 +207,8 @@ export const ProductDetail = () => {
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Route id that `product` was loaded for; guards against acting on the previous product during navigation
+  const loadedIdRef = useRef(null);
 
   // Authoritative canonical SEO URL and metadata resolution
   const canonicalInfo = useMemo(() => {
@@ -246,12 +249,15 @@ export const ProductDetail = () => {
 
   // Seamlessly redirect old or non-canonical product URLs (e.g., /product/bs-101 -> /product/bs-101/mocha-brown-embroidered-co-ord-set)
   useEffect(() => {
-    if (canonicalInfo?.url && (product || !loading)) {
+    // While navigating to another product, `product` still holds the previous one —
+    // redirecting then would bounce the user back to the product they just left.
+    const productMatchesRoute = product ? loadedIdRef.current === id : !loading;
+    if (canonicalInfo?.url && productMatchesRoute) {
       if (location.pathname !== canonicalInfo.url) {
         navigate(`${canonicalInfo.url}${location.search}${location.hash}`, { replace: true });
       }
     }
-  }, [canonicalInfo?.url, product, loading, location.pathname, location.search, location.hash, navigate]);
+  }, [canonicalInfo?.url, product, loading, id, location.pathname, location.search, location.hash, navigate]);
 
   // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
@@ -288,6 +294,7 @@ export const ProductDetail = () => {
       findLocalProduct(productId) ||
       BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-101') ||
       BEST_SELLERS_PRODUCTS[0];
+    loadedIdRef.current = productId;
     setProduct(found);
   };
 
@@ -322,20 +329,20 @@ export const ProductDetail = () => {
     setMobileSlideIndex(0);
 
     if (id) {
-      // 1. Try local catalog first for instant response
+      // Local catalog entry is only used to fill gaps / as a fallback. Rendering it first and
+      // then swapping in the API gallery made every image change twice (visible flicker).
       const local = findLocalProduct(id);
-      if (local) {
-        setProduct(local);
-        setLoading(false);
-      }
 
-      // 2. Fetch from backend API to ensure authoritative product data
-      const lookupId = canonicalInfo?.id || id;
+      // Fetch from backend API to ensure authoritative product data
+      // Resolve from the route id only — `canonicalInfo` is derived from the product still in
+      // state, which is the PREVIOUS product right after clicking a related/similar item.
+      const routeCanonical = resolveProductCanonical(id);
+      const lookupId = routeCanonical?.id || id;
       productApi
         .getProductById(lookupId)
         .then((data) => {
           if (isMounted && data && (data.name || data.title)) {
-            const canonicalData = resolveProductCanonical(data) || canonicalInfo;
+            const canonicalData = resolveProductCanonical(data) || routeCanonical;
             const isCorsetSet = canonicalData?.id === 'bs-103' || String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
             const corsetGallery = [
               '/assets/Images/Corset01.png',
@@ -344,7 +351,10 @@ export const ProductDetail = () => {
               '/assets/Images/Corset04.png'
             ];
 
-            setProduct((prev) => ({
+            // Merge onto the local entry for THIS product only (never the previously viewed product)
+            const prev = local;
+            loadedIdRef.current = id;
+            setProduct({
               ...prev,
               ...data,
               id: canonicalData?.id || String(data.id || id),
@@ -361,23 +371,21 @@ export const ProductDetail = () => {
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
               specifications: (Array.isArray(data.specifications) && data.specifications.length > 0)
                 ? data.specifications
-                : (Array.isArray(data.productDetails) && data.productDetails.length > 0)
-                  ? data.productDetails
-                  : (Array.isArray(data.product_details) && data.product_details.length > 0)
-                    ? data.product_details
-                    : prev?.specifications || [],
+                : getLegacyDetailRows(data.productDetails || data.product_details).length > 0
+                  ? getLegacyDetailRows(data.productDetails || data.product_details)
+                  : prev?.specifications || [],
               careInstructions: data.careInstructions || data.care_instructions || prev?.careInstructions || '',
               description: (data.description !== undefined && data.description !== '') ? data.description : (prev?.description || ''),
               fullDescription: (data.fullDescription !== undefined && data.fullDescription !== '') ? data.fullDescription : (data.full_description || prev?.fullDescription || ''),
               full_description: (data.full_description !== undefined && data.full_description !== '') ? data.full_description : (data.fullDescription || prev?.full_description || ''),
               additionalInfo: (data.additionalInfo !== undefined && data.additionalInfo !== '') ? data.additionalInfo : (data.additional_info || prev?.additionalInfo || '')
-            }));
-          } else if (isMounted && !local) {
+            });
+          } else if (isMounted) {
             fallbackProduct(id);
           }
         })
         .catch(() => {
-          if (isMounted && !local) {
+          if (isMounted) {
             fallbackProduct(id);
           }
         })
@@ -398,14 +406,7 @@ export const ProductDetail = () => {
         ? product.gallery
         : (product?.images && product.images.length > 0
             ? product.images
-            : [
-                product?.image,
-                product?.hoverImage,
-                '/assets/Images/Brown02.png',
-                '/assets/Images/Brown03.png',
-                '/assets/Images/Brown04.png',
-                '/assets/Images/Brown01.png'
-              ]
+            : [product?.image, product?.hoverImage]
           )
       ).filter(Boolean)
     )
@@ -932,6 +933,13 @@ export const ProductDetail = () => {
   // Structured key-value rows for the Additional Information table
   const additionalInfoList = formatAdditionalInfoRows(product);
 
+  // Rich Product Details content from the admin panel (section hidden when empty)
+  const productDetailsHtml = productDetailsToRichText(
+    product.productDetails || product.product_details,
+    product.specifications
+  );
+  const hasProductDetails = hasVisibleRichText(productDetailsHtml);
+
   const accordionItems = [
     {
       title: 'SIZE DETAILS',
@@ -1027,6 +1035,7 @@ export const ProductDetail = () => {
                     <video
                       src={productVideo}
                       controls
+                      muted
                       playsInline
                       className="w-full h-full object-contain bg-white"
                     />
@@ -1145,6 +1154,7 @@ export const ProductDetail = () => {
                   <video
                     src={productVideo}
                     controls
+                    muted
                     autoPlay
                     loop
                     playsInline
@@ -1599,9 +1609,8 @@ export const ProductDetail = () => {
               </div>
 
 
-              {/* Product Details (Dynamic Bullet Points) */}
-              {Array.isArray(product.productDetails || product.product_details) &&
-                (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
+              {/* Product Details (Dynamic Bullet Points) - only shown when admin has added content */}
+              {hasProductDetails && (
                   <div className="border-b border-neutral-200 pb-2.5 pt-1">
                     <button
                       type="button"
@@ -1613,51 +1622,13 @@ export const ProductDetail = () => {
                       {openAccordions['pdetails'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                     </button>
                     {openAccordions['pdetails'] && (
-                      <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2">
-                        <ul className="space-y-1.5">
-                          {(product.productDetails || product.product_details)
-                            .filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim()))
-                            .map((detail, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
-                                <div>
-                                  {detail.label && detail.label.trim() && (
-                                    <strong className="font-semibold text-neutral-900">{detail.label.trim()}: </strong>
-                                  )}
-                                  <span>{detail.value}</span>
-                                </div>
-                              </li>
-                            ))}
-                        </ul>
-                      </div>
+                      <RichTextRenderer
+                        content={productDetailsHtml}
+                        className="mt-2 text-xs sm:text-sm pr-2"
+                      />
                     )}
                   </div>
                 )}
-
-              {/* Specifications Accordion */}
-              {Array.isArray(product.specifications) && product.specifications.length > 0 && (
-                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleAccordion('specs')}
-                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                    aria-expanded={Boolean(openAccordions['specs'])}
-                  >
-                    <span>SPECIFICATIONS</span>
-                    {openAccordions['specs'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                  </button>
-                  {openAccordions['specs'] && (
-                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
-                      {product.specifications.map((sp, idx) => (
-                        <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-0.5">
-                          <span className="font-semibold text-neutral-700">{sp.label}:</span>
-                          <span className="text-neutral-600">{sp.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Care Instructions Accordion */}
               {(product.careInstructions || product.care_instructions) && (
@@ -1980,6 +1951,7 @@ export const ProductDetail = () => {
                 <video
                   src={productVideo}
                   controls
+                  muted
                   autoPlay
                   playsInline
                   className="max-w-[85vw] max-h-[75vh] object-contain drop-shadow-2xl"

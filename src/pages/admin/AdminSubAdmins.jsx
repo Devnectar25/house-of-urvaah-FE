@@ -13,7 +13,10 @@ import {
   Lock,
   UserCheck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Circle
 } from 'lucide-react';
 import {
   fetchSubAdmins,
@@ -22,21 +25,26 @@ import {
   deleteSubAdmin
 } from '../../services/subAdminService';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import {
+  PERMISSION_GROUPS,
+  PERMISSION_IDS,
+  PASSWORD_RULES,
+  getPermissionLabel,
+  validateUsername,
+  validatePassword,
+  validatePermissions,
+  MAX_SUB_ADMINS
+} from '../../constants/adminPermissions';
 
-// Available permission modules in House of Urvaah Admin Panel
-const PERMISSION_OPTIONS = [
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'categories', label: 'Categories' },
-  { id: 'products', label: 'Products' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'refunds', label: 'Refund Desk' },
-  // { id: 'coupons', label: 'Coupons' },
-  { id: 'customers', label: 'Customers' },
-  { id: 'leads', label: 'Leads' },
-  { id: 'newsletter', label: 'Newsletter' },
-  { id: 'reviews', label: 'Reviews' },
-  { id: 'settings', label: 'Settings' }
-];
+const EMPTY_FORM = { username: '', password: '', confirmPassword: '', permissions: [] };
+
+// Legacy ids saved before the permission list was unified
+const normalizePermissions = (perms) =>
+  Array.from(new Set(
+    (Array.isArray(perms) ? perms : [])
+      .map((p) => (p === 'refund-desk' ? 'refunds' : p))
+      .filter((p) => PERMISSION_IDS.includes(p))
+  ));
 
 export const AdminSubAdmins = () => {
   const [subAdmins, setSubAdmins] = useState([]);
@@ -47,11 +55,9 @@ export const AdminSubAdmins = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubAdmin, setEditingSubAdmin] = useState(null);
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    permissions: []
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
   // Action Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,23 +95,28 @@ export const AdminSubAdmins = () => {
     loadSubAdmins();
   }, [loadSubAdmins]);
 
+  const isAtSubAdminLimit = subAdmins.length >= MAX_SUB_ADMINS;
+  const subAdminLimitMessage = `Sub-admin limit reached (${MAX_SUB_ADMINS}/${MAX_SUB_ADMINS}). Delete an existing sub-admin to add a new one.`;
+
   // Open Modal for Create or Edit
   const openModal = (subAdmin = null) => {
+    if (!subAdmin && isAtSubAdminLimit) {
+      showToast(subAdminLimitMessage, 'error');
+      return;
+    }
     setModalError(null);
+    setFieldErrors({});
+    setShowPassword(false);
     if (subAdmin) {
       setEditingSubAdmin(subAdmin);
       setFormData({
+        ...EMPTY_FORM,
         username: subAdmin.username || '',
-        password: '',
-        permissions: Array.isArray(subAdmin.permissions) ? [...subAdmin.permissions] : []
+        permissions: normalizePermissions(subAdmin.permissions)
       });
     } else {
       setEditingSubAdmin(null);
-      setFormData({
-        username: '',
-        password: '',
-        permissions: []
-      });
+      setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
   };
@@ -114,8 +125,15 @@ export const AdminSubAdmins = () => {
     if (isSubmitting) return;
     setIsModalOpen(false);
     setEditingSubAdmin(null);
-    setFormData({ username: '', password: '', permissions: [] });
+    setFormData(EMPTY_FORM);
+    setFieldErrors({});
     setModalError(null);
+  };
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear a field's error as soon as the admin edits it
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: null }));
   };
 
   // Handle permission checkbox/toggle select
@@ -128,6 +146,36 @@ export const AdminSubAdmins = () => {
         return { ...prev, permissions: [...current, permId] };
       }
     });
+    if (fieldErrors.permissions) setFieldErrors((prev) => ({ ...prev, permissions: null }));
+  };
+
+  const setAllPermissions = (selectAll) => {
+    setFormData((prev) => ({ ...prev, permissions: selectAll ? [...PERMISSION_IDS] : [] }));
+    if (selectAll && fieldErrors.permissions) setFieldErrors((prev) => ({ ...prev, permissions: null }));
+  };
+
+  // Validate every field; returns true when the form can be submitted
+  const validateForm = () => {
+    const otherUsernames = subAdmins
+      .filter((sa) => !editingSubAdmin || sa.id !== editingSubAdmin.id)
+      .map((sa) => sa.username);
+
+    const errors = {};
+    errors.username = validateUsername(formData.username, otherUsernames);
+
+    const isPasswordRequired = !editingSubAdmin || formData.password.length > 0 || formData.confirmPassword.length > 0;
+    if (isPasswordRequired) {
+      errors.password = validatePassword(formData.password, formData.username);
+      if (!errors.password && formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match.';
+      }
+    }
+
+    errors.permissions = validatePermissions(formData.permissions);
+
+    const cleaned = Object.fromEntries(Object.entries(errors).filter(([, v]) => v));
+    setFieldErrors(cleaned);
+    return Object.keys(cleaned).length === 0;
   };
 
   // Submit Add / Edit Form
@@ -135,18 +183,8 @@ export const AdminSubAdmins = () => {
     e.preventDefault();
     setModalError(null);
 
-    if (!formData.username.trim()) {
-      setModalError('Username is required.');
-      return;
-    }
-
-    if (!editingSubAdmin && !formData.password.trim()) {
-      setModalError('Password is required for new sub-admin.');
-      return;
-    }
-
-    if (formData.permissions.length === 0) {
-      setModalError('Please select at least one permission module.');
+    if (!validateForm()) {
+      setModalError('Please fix the highlighted fields.');
       return;
     }
 
@@ -158,8 +196,8 @@ export const AdminSubAdmins = () => {
           username: formData.username.trim(),
           permissions: formData.permissions
         };
-        if (formData.password.trim()) {
-          payload.password = formData.password.trim();
+        if (formData.password) {
+          payload.password = formData.password;
         }
         await updateSubAdmin(editingSubAdmin.id, payload);
         showToast(`Sub-admin "${formData.username.trim()}" updated successfully!`);
@@ -167,7 +205,7 @@ export const AdminSubAdmins = () => {
         // Create new sub-admin
         const payload = {
           username: formData.username.trim(),
-          password: formData.password.trim(),
+          password: formData.password,
           permissions: formData.permissions
         };
         await createSubAdmin(payload);
@@ -293,7 +331,9 @@ export const AdminSubAdmins = () => {
             <button
               type="button"
               onClick={() => openModal()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#111111] hover:bg-neutral-800 active:bg-black text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer"
+              disabled={loading || isAtSubAdminLimit}
+              title={isAtSubAdminLimit ? subAdminLimitMessage : `Add a sub-admin (${subAdmins.length}/${MAX_SUB_ADMINS} used)`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#111111] hover:bg-neutral-800 active:bg-black text-white rounded-xl text-sm font-bold tracking-tight shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#111111]"
             >
               <UserPlus className="w-4.5 h-4.5 stroke-[2.2]" />
               <span>Add Sub-Admin</span>
@@ -301,6 +341,14 @@ export const AdminSubAdmins = () => {
           </>
         }
       />
+
+      {/* Sub-admin limit notice */}
+      {!loading && isAtSubAdminLimit && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+          <span>{subAdminLimitMessage}</span>
+        </div>
+      )}
 
       {/* Main Sub-Admins Card */}
       <div className="bg-white rounded-2xl border border-neutral-200/90 shadow-2xs overflow-hidden">
@@ -310,6 +358,16 @@ export const AdminSubAdmins = () => {
             All Sub-Admins
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-600 font-semibold">
               {filteredSubAdmins.length}
+            </span>
+            <span
+              className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                isAtSubAdminLimit
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-white text-neutral-500 border-neutral-200'
+              }`}
+              title={`Maximum ${MAX_SUB_ADMINS} sub-admins`}
+            >
+              {subAdmins.length} / {MAX_SUB_ADMINS} used
             </span>
           </h2>
 
@@ -388,9 +446,9 @@ export const AdminSubAdmins = () => {
                           subAdmin.permissions.map((perm) => (
                             <span
                               key={perm}
-                              className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200/80 font-admin capitalize"
+                              className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200/80 font-admin"
                             >
-                              {perm}
+                              {getPermissionLabel(perm)}
                             </span>
                           ))
                         ) : (
@@ -577,7 +635,7 @@ export const AdminSubAdmins = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 font-sans">
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 font-sans">
               <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
                 {/* Error message inside modal */}
                 {modalError && (
@@ -594,12 +652,25 @@ export const AdminSubAdmins = () => {
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="Enter username or email"
+                    autoComplete="off"
+                    maxLength={50}
+                    placeholder="e.g. priya.ops or priya@houseofurvaah.com"
                     value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all font-admin font-semibold"
+                    onChange={(e) => updateField('username', e.target.value)}
+                    onBlur={() => {
+                      const others = subAdmins.filter((sa) => !editingSubAdmin || sa.id !== editingSubAdmin.id).map((sa) => sa.username);
+                      setFieldErrors((prev) => ({ ...prev, username: validateUsername(formData.username, others) }));
+                    }}
+                    aria-invalid={Boolean(fieldErrors.username)}
+                    className={`w-full px-4 py-2.5 bg-white border rounded-xl text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-black/10 transition-all font-admin font-semibold ${
+                      fieldErrors.username ? 'border-red-400 focus:border-red-500' : 'border-neutral-300 focus:border-black'
+                    }`}
                   />
+                  {fieldErrors.username ? (
+                    <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.username}</p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-neutral-400">3–50 characters: letters, numbers, . _ - @ (no spaces).</p>
+                  )}
                 </div>
 
                 {/* Password Field */}
@@ -609,47 +680,139 @@ export const AdminSubAdmins = () => {
                   </label>
                   <div className="relative">
                     <input
-                      type="password"
-                      placeholder="Enter password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      maxLength={64}
+                      placeholder={editingSubAdmin ? 'Enter a new password to change it' : 'Create a strong password'}
                       value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-neutral-50/80 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-black transition-all"
+                      onChange={(e) => updateField('password', e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      className={`w-full pl-4 pr-10 py-2.5 bg-neutral-50/80 border rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 transition-all ${
+                        fieldErrors.password ? 'border-red-400 focus:border-red-500' : 'border-neutral-200 focus:border-black'
+                      }`}
                     />
-                    <Lock className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-neutral-400 hover:text-neutral-800 cursor-pointer"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
+                  {fieldErrors.password && (
+                    <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.password}</p>
+                  )}
+
+                  {/* Live password requirement checklist */}
+                  {(!editingSubAdmin || formData.password.length > 0) && (
+                    <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                      {PASSWORD_RULES.map((rule) => {
+                        const ok = rule.test(formData.password);
+                        return (
+                          <li key={rule.id} className={`flex items-center gap-1.5 text-[11px] ${ok ? 'text-emerald-700' : 'text-neutral-400'}`}>
+                            {ok ? <Check className="w-3 h-3 stroke-[3]" /> : <Circle className="w-3 h-3" />}
+                            <span>{rule.label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
 
-                {/* Permissions Radio/Checkbox Options */}
+                {/* Confirm Password Field */}
+                {(!editingSubAdmin || formData.password.length > 0) && (
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin mb-1.5">
+                      Confirm Password *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        maxLength={64}
+                        placeholder="Re-enter the password"
+                        value={formData.confirmPassword}
+                        onChange={(e) => updateField('confirmPassword', e.target.value)}
+                        aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                        className={`w-full pl-4 pr-10 py-2.5 bg-neutral-50/80 border rounded-xl text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/10 transition-all ${
+                          fieldErrors.confirmPassword ? 'border-red-400 focus:border-red-500' : 'border-neutral-200 focus:border-black'
+                        }`}
+                      />
+                      <Lock className="w-4 h-4 text-neutral-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    </div>
+                    {fieldErrors.confirmPassword ? (
+                      <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.confirmPassword}</p>
+                    ) : formData.confirmPassword && formData.confirmPassword === formData.password ? (
+                      <p className="mt-1 text-[11px] font-semibold text-emerald-700">Passwords match.</p>
+                    ) : null}
+                  </div>
+                )}
+
+                {/* Permissions (grouped) */}
                 <div>
-                  <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin mb-2">
-                    Permissions *
-                  </label>
-                  <div className="space-y-2">
-                    {PERMISSION_OPTIONS.map((opt) => {
-                      const isSelected = formData.permissions.includes(opt.id);
-                      return (
-                        <div
-                          key={opt.id}
-                          onClick={() => togglePermission(opt.id)}
-                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                            isSelected
-                              ? 'bg-neutral-100 border-neutral-900 text-neutral-950 font-semibold shadow-2xs'
-                              : 'bg-white border-neutral-200/80 text-neutral-700 hover:bg-neutral-50'
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected
-                                ? 'bg-black border-black text-white'
-                                : 'border-neutral-300 bg-white'
-                            }`}
-                          >
-                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                          </div>
-                          <span className="text-sm font-semibold font-admin">{opt.label}</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider font-admin">
+                      Permissions * <span className="text-neutral-400 normal-case font-semibold">({formData.permissions.length} selected)</span>
+                    </label>
+                    <div className="flex items-center gap-2 text-[11px] font-semibold">
+                      <button type="button" onClick={() => setAllPermissions(true)} className="text-neutral-700 hover:text-black underline-offset-2 hover:underline cursor-pointer">
+                        Select all
+                      </button>
+                      <span className="text-neutral-300">|</span>
+                      <button type="button" onClick={() => setAllPermissions(false)} className="text-neutral-500 hover:text-red-600 underline-offset-2 hover:underline cursor-pointer">
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  {fieldErrors.permissions && (
+                    <p className="mb-2 text-[11px] font-semibold text-red-600">{fieldErrors.permissions}</p>
+                  )}
+                  <div className="space-y-3">
+                    {PERMISSION_GROUPS.map((group) => (
+                      <div key={group.group}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">{group.group}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {group.options.map((opt) => {
+                            const isSelected = formData.permissions.includes(opt.id);
+                            return (
+                              <div
+                                key={opt.id}
+                                role="checkbox"
+                                aria-checked={isSelected}
+                                tabIndex={0}
+                                onClick={() => togglePermission(opt.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === ' ' || e.key === 'Enter') {
+                                    e.preventDefault();
+                                    togglePermission(opt.id);
+                                  }
+                                }}
+                                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                                  isSelected
+                                    ? 'bg-neutral-100 border-neutral-900 text-neutral-950 font-semibold shadow-2xs'
+                                    : fieldErrors.permissions
+                                    ? 'bg-white border-red-200 text-neutral-700 hover:bg-neutral-50'
+                                    : 'bg-white border-neutral-200/80 text-neutral-700 hover:bg-neutral-50'
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                                    isSelected
+                                      ? 'bg-black border-black text-white'
+                                      : 'border-neutral-300 bg-white'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                </div>
+                                <span className="text-sm font-semibold font-admin">{opt.label}</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

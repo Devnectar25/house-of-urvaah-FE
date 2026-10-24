@@ -16,11 +16,17 @@ import {
   Loader2,
   RefreshCw,
   Building2,
-  ExternalLink
+  ExternalLink,
+  Smartphone,
+  Monitor
 } from 'lucide-react';
 import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
+import { getSupabaseMediaUrl } from '../../../lib/supabase';
+
+// Storefront plays this on phones when a slide has no mobile video (see components/home/Hero.jsx)
+const DEFAULT_MOBILE_HERO_VIDEO = getSupabaseMediaUrl('HOU_mobile');
 
 export const AdminHeroSection = () => {
   const [slides, setSlides] = useState([]);
@@ -54,7 +60,12 @@ export const AdminHeroSection = () => {
     is_active: true
   });
   const [uploadingFile, setUploadingFile] = useState(false);
+  // Which media slot is uploading: 'desktop' | 'mobile' (null when idle)
+  const [uploadingTarget, setUploadingTarget] = useState(null);
   const [uploadError, setUploadError] = useState(null);
+  // Slides list: which device's hero media to show / replace
+  const [heroViewMode, setHeroViewMode] = useState('desktop'); // 'desktop' | 'mobile'
+  const [quickUpload, setQuickUpload] = useState(null); // { slideId, target } while uploading from the list
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -118,7 +129,70 @@ export const AdminHeroSection = () => {
     setIsModalOpen(true);
   };
 
-  const handleFileUpload = async (e, type) => {
+  // Upload a media file to the CDN and return its URL
+  const uploadMediaFile = async (file) => {
+    const isVideo = file.type.startsWith('video/');
+    const uploadData = new FormData();
+    uploadData.append(isVideo ? 'video' : 'file', file);
+    if (!isVideo) uploadData.append('folder', 'hero');
+
+    const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+    const token = localStorage.getItem('urvaah_token');
+    const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: uploadData
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'File upload failed');
+    }
+    const uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
+    if (!uploadedUrl) throw new Error('No media URL returned by server');
+    return uploadedUrl;
+  };
+
+  // List view: replace a slide's desktop or mobile video directly and save it immediately
+  const handleQuickReplace = async (slide, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const target = heroViewMode;
+    if (!file.type.startsWith('video/')) {
+      showToast('error', 'Please select a valid video file (MP4, WebM, QuickTime).');
+      return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      showToast('error', `Video is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed: 100MB.`);
+      return;
+    }
+
+    setQuickUpload({ slideId: slide.id, target });
+    try {
+      const uploadedUrl = await uploadMediaFile(file);
+      const patch = target === 'mobile'
+        ? { mobile_image: uploadedUrl }
+        : { desktop_image: uploadedUrl, media_type: 'video' };
+      const res = await apiClient(`/api/ui/admin/hero/${slide.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(patch)
+      });
+      if (!res?.success) throw new Error(res?.message || 'Update failed');
+      setSlides((prev) => prev.map((s) => (s.id === slide.id ? { ...s, ...patch } : s)));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('urvaah_hero_updated'));
+      showToast('success', `${target === 'mobile' ? 'Mobile' : 'Desktop'} hero video updated!`);
+    } catch (err) {
+      console.error('Hero quick replace error:', err);
+      showToast('error', err.message || 'Upload failed');
+    } finally {
+      setQuickUpload(null);
+    }
+  };
+
+  // target: 'desktop' fills desktop_image (and media_type); 'mobile' fills mobile_image only
+  const handleFileUpload = async (e, type, target = 'desktop') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -143,40 +217,27 @@ export const AdminHeroSection = () => {
     }
 
     setUploadingFile(true);
+    setUploadingTarget(target);
     try {
-      const uploadData = new FormData();
-      uploadData.append(isVideo ? 'video' : 'file', file);
-      if (!isVideo) uploadData.append('folder', 'hero');
+      const uploadedUrl = await uploadMediaFile(file);
 
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
-      const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'File upload failed');
+      if (target === 'mobile') {
+        setFormData((prev) => ({ ...prev, mobile_image: uploadedUrl }));
+        showToast('success', `Mobile ${isVideo ? 'video' : 'image'} uploaded successfully!`);
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          desktop_image: uploadedUrl,
+          media_type: isVideo ? 'video' : 'image'
+        }));
+        showToast('success', `${isVideo ? 'Video' : 'Image'} uploaded successfully!`);
       }
-
-      const uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
-      if (!uploadedUrl) throw new Error('No media URL returned by server');
-
-      setFormData((prev) => ({
-        ...prev,
-        desktop_image: uploadedUrl,
-        media_type: isVideo ? 'video' : 'image'
-      }));
-      showToast('success', `${isVideo ? 'Video' : 'Image'} uploaded successfully!`);
     } catch (err) {
       console.error('Hero file upload error:', err);
       setUploadError(err.message || 'Upload failed');
     } finally {
       setUploadingFile(false);
+      setUploadingTarget(null);
       e.target.value = '';
     }
   };
@@ -386,39 +447,44 @@ export const AdminHeroSection = () => {
         }
       />
 
-      {/* Boutiques & Concierge quick navigation banner */}
-      <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Client Services & Store Locations</span>
-          </span>
-          <h3 className="text-base font-serif font-bold tracking-wide uppercase">
-            Boutiques & Atelier Concierge Settings
-          </h3>
-          <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
-            Dynamically update the Maison Concierge email, hotline, operating hours, and manage flagship boutique locations shown on the Contact page and global footer.
-          </p>
-        </div>
-        <Link
-          to="/admin/modify-ui/boutiques-concierge"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-neutral-100 transition-colors shrink-0 shadow-sm"
-        >
-          <span>Manage Boutiques & Concierge</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </Link>
-      </div>
+
 
       {/* Hero Slides List */}
       <div className="bg-white border border-neutral-200/90 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
+        <div className="p-5 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-admin font-bold text-neutral-950 uppercase tracking-wider">
               Configured Hero Media & Slides ({slides.length})
             </h2>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Reorder slides or edit content. When multiple active slides exist, storefront can carousel through them.
+              {heroViewMode === 'mobile'
+                ? 'Mobile view: video shown to phone visitors (screens under 768px). Upload a vertical 9:16 video.'
+                : 'Desktop view: video shown on laptops, desktops and tablets.'}
             </p>
+          </div>
+
+          {/* Desktop / Mobile view switch */}
+          <div className="inline-flex items-center p-1 bg-neutral-100 border border-neutral-200 rounded-xl self-start sm:self-auto shrink-0" role="tablist">
+            {[
+              { id: 'desktop', label: 'Desktop View', icon: Monitor },
+              { id: 'mobile', label: 'Mobile View', icon: Smartphone }
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={heroViewMode === id}
+                onClick={() => setHeroViewMode(id)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  heroViewMode === id
+                    ? 'bg-white text-neutral-950 shadow-xs border border-neutral-200'
+                    : 'text-neutral-500 hover:text-neutral-900'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -449,11 +515,18 @@ export const AdminHeroSection = () => {
         ) : (
           <div className="divide-y divide-neutral-100">
             {slides.map((slide, idx) => {
-              const isVideo =
+              const isMobileView = heroViewMode === 'mobile';
+              const hasOwnMobileVideo = Boolean(slide.mobile_image);
+              // Media currently served for the selected device
+              const viewMediaUrl = isMobileView
+                ? (slide.mobile_image || DEFAULT_MOBILE_HERO_VIDEO)
+                : slide.desktop_image;
+              const isVideo = isMobileView ||
                 slide.media_type === 'video' ||
                 slide.desktop_image?.endsWith('.mp4') ||
                 slide.desktop_image?.includes('/videos/');
               const isLiveStorefront = slide.is_active && idx === firstActiveIdx;
+              const isQuickUploading = quickUpload?.slideId === slide.id;
 
                 return (
                   <div
@@ -466,25 +539,35 @@ export const AdminHeroSection = () => {
                     <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
                       {/* Media Thumbnail Container with Preview Trigger */}
                       <div
-                        onClick={() => setPreviewMediaUrl(slide.desktop_image)}
-                        className={`relative w-28 sm:w-36 h-20 rounded-xl bg-neutral-900 overflow-hidden shrink-0 border group cursor-pointer shadow-2xs ${
+                        onClick={() => setPreviewMediaUrl(viewMediaUrl)}
+                        className={`relative rounded-xl bg-neutral-900 overflow-hidden shrink-0 border group cursor-pointer shadow-2xs ${
+                          isMobileView ? 'w-[68px] h-[120px]' : 'w-28 sm:w-36 h-20'
+                        } ${
                           isLiveStorefront ? 'border-emerald-400 ring-2 ring-emerald-400/20' : 'border-neutral-200'
                         }`}
-                        title="Click to preview media"
+                        title={`Click to preview ${isMobileView ? 'mobile' : 'desktop'} media`}
                       >
                         {isVideo ? (
                           <video
-                            src={slide.desktop_image}
+                            key={viewMediaUrl}
+                            src={viewMediaUrl}
                             className="w-full h-full object-cover opacity-80"
                             muted
                             loop
+                            playsInline
+                            preload="metadata"
                           />
                         ) : (
                           <img
-                            src={slide.desktop_image}
+                            src={viewMediaUrl}
                             alt={slide.heading || 'Hero'}
                             className="w-full h-full object-cover"
                           />
+                        )}
+                        {isQuickUploading && (
+                          <div className="absolute inset-0 z-10 bg-black/60 flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                          </div>
                         )}
                         <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
                           {isVideo ? (
@@ -524,16 +607,49 @@ export const AdminHeroSection = () => {
                         {slide.heading || `Hero Looping Background Slide #${idx + 1}`}
                       </h3>
 
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-neutral-400">
-                        <span className="truncate max-w-[240px] sm:max-w-md font-mono text-[11px] text-neutral-500">
-                          {slide.desktop_image}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-neutral-400">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                          isMobileView
+                            ? (hasOwnMobileVideo ? 'bg-sky-50 text-sky-800 border-sky-200' : 'bg-amber-50 text-amber-800 border-amber-200')
+                            : 'bg-neutral-50 text-neutral-600 border-neutral-200'
+                        }`}>
+                          {isMobileView ? <Smartphone className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                          {isMobileView ? (hasOwnMobileVideo ? 'Custom mobile video' : 'Using default mobile video') : 'Desktop media'}
+                        </span>
+                        <span className="truncate max-w-[220px] sm:max-w-md font-mono text-[11px] text-neutral-500">
+                          {isMobileView ? (slide.mobile_image || 'No mobile video uploaded yet') : slide.desktop_image}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Actions: Reorder + Toggle + Edit + Delete */}
-                  <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+                  {/* Right Actions: Upload New + Toggle + Edit + Delete */}
+                  <div className="flex flex-wrap items-center gap-2 self-end lg:self-center shrink-0">
+                    {/* Upload a new video for the selected view (saved immediately) */}
+                    <label
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs ${
+                        quickUpload
+                          ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
+                          : 'bg-neutral-950 hover:bg-black text-white border-neutral-950 cursor-pointer'
+                      }`}
+                      title={`Upload a new ${isMobileView ? 'mobile (9:16)' : 'desktop'} hero video for this slide`}
+                    >
+                      {isQuickUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                      <span>
+                        {isQuickUploading
+                          ? 'Uploading...'
+                          : isMobileView
+                          ? (hasOwnMobileVideo ? 'Replace Mobile Video' : 'Upload Mobile Video')
+                          : 'Replace Desktop Video'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime"
+                        className="hidden"
+                        disabled={Boolean(quickUpload)}
+                        onChange={(e) => handleQuickReplace(slide, e)}
+                      />
+                    </label>
 
 
                     {/* Toggle Switch */}
@@ -619,8 +735,9 @@ export const AdminHeroSection = () => {
 
               {/* Media Upload / URL Section */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-neutral-900 uppercase tracking-wider font-admin">
-                  Hero Media Asset (Video or Image) *
+                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-900 uppercase tracking-wider font-admin">
+                  <Monitor className="w-3.5 h-3.5" />
+                  Desktop Hero Media (Video or Image) *
                 </label>
 
                 {/* Upload Buttons */}
@@ -628,7 +745,7 @@ export const AdminHeroSection = () => {
                   <label className="flex items-center justify-center gap-2 p-3.5 border-2 border-dashed border-neutral-200 hover:border-neutral-900 rounded-xl cursor-pointer bg-neutral-50/70 hover:bg-neutral-50 transition-all">
                     <Video className="w-4 h-4 text-neutral-600" />
                     <span className="text-xs font-semibold text-neutral-800">
-                      {uploadingFile ? 'Uploading Video...' : 'Upload Video (.mp4, max 100MB)'}
+                      {uploadingTarget === 'desktop' ? 'Uploading Video...' : 'Upload Video (.mp4, max 100MB)'}
                     </span>
                     <input
                       type="file"
@@ -642,7 +759,7 @@ export const AdminHeroSection = () => {
                   <label className="flex items-center justify-center gap-2 p-3.5 border-2 border-dashed border-neutral-200 hover:border-neutral-900 rounded-xl cursor-pointer bg-neutral-50/70 hover:bg-neutral-50 transition-all">
                     <ImageIcon className="w-4 h-4 text-neutral-600" />
                     <span className="text-xs font-semibold text-neutral-800">
-                      {uploadingFile ? 'Uploading Image...' : 'Upload Image (JPEG/PNG/WebP)'}
+                      {uploadingTarget === 'desktop' ? 'Uploading Image...' : 'Upload Image (JPEG/PNG/WebP)'}
                     </span>
                     <input
                       type="file"
@@ -654,7 +771,7 @@ export const AdminHeroSection = () => {
                   </label>
                 </div>
 
-                {uploadingFile && (
+                {uploadingTarget === 'desktop' && (
                   <div className="flex items-center gap-2 text-xs text-neutral-600 pt-1">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-900" />
                     <span>Processing file upload to Supabase CDN... Please wait.</span>
@@ -708,6 +825,90 @@ export const AdminHeroSection = () => {
                           className="w-full h-full object-cover"
                         />
                       )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Hero Video (shown on screens narrower than 768px) */}
+              <div className="space-y-2 pt-4 border-t border-neutral-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-900 uppercase tracking-wider font-admin">
+                      <Smartphone className="w-3.5 h-3.5" />
+                      Mobile Hero Video (Optional)
+                    </label>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Shown to phone visitors instead of the desktop media. Use a vertical (9:16) video for best fit.
+                      If left empty, phones show the default House of Urvaah mobile video.
+                    </p>
+                  </div>
+                  {formData.mobile_image && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, mobile_image: '' }))}
+                      className="shrink-0 text-[11px] font-semibold text-neutral-500 hover:text-rose-600 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <label className={`flex items-center justify-center gap-2 p-3.5 border-2 border-dashed rounded-xl transition-all ${
+                  uploadingFile ? 'border-neutral-200 bg-neutral-50 cursor-not-allowed opacity-60' : 'border-neutral-200 hover:border-neutral-900 bg-neutral-50/70 hover:bg-neutral-50 cursor-pointer'
+                }`}>
+                  <Smartphone className="w-4 h-4 text-neutral-600" />
+                  <span className="text-xs font-semibold text-neutral-800">
+                    {uploadingTarget === 'mobile'
+                      ? 'Uploading Mobile Video...'
+                      : formData.mobile_image ? 'Replace Mobile Video (.mp4, max 100MB)' : 'Upload Mobile Video (.mp4, max 100MB)'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    className="hidden"
+                    disabled={uploadingFile}
+                    onChange={(e) => handleFileUpload(e, 'video', 'mobile')}
+                  />
+                </label>
+
+                {uploadingTarget === 'mobile' && (
+                  <div className="flex items-center gap-2 text-xs text-neutral-600 pt-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-900" />
+                    <span>Uploading mobile video to Supabase CDN... Please wait.</span>
+                  </div>
+                )}
+
+                <div className="mt-2">
+                  <span className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                    Or specify direct mobile video URL / asset path:
+                  </span>
+                  <input
+                    type="text"
+                    value={formData.mobile_image}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, mobile_image: e.target.value }))}
+                    placeholder="https://... or videos/hero-mobile.mp4"
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all font-mono"
+                  />
+                </div>
+
+                {formData.mobile_image && (
+                  <div className="mt-3 p-3 bg-neutral-100 rounded-xl border border-neutral-200 flex items-start gap-3">
+                    <div className="w-28 aspect-[9/16] rounded-lg bg-neutral-900 overflow-hidden shrink-0">
+                      <video
+                        key={formData.mobile_image}
+                        src={formData.mobile_image}
+                        className="w-full h-full object-cover"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                      />
+                    </div>
+                    <div className="text-[11px] text-neutral-500 space-y-1 pt-1 min-w-0">
+                      <p className="font-semibold text-neutral-700">Mobile Live Preview</p>
+                      <p>Phone visitors (screens under 768px) will see this video as the hero background.</p>
+                      <p className="font-mono text-[10px] break-all text-neutral-400">{formData.mobile_image}</p>
                     </div>
                   </div>
                 )}
@@ -819,7 +1020,7 @@ export const AdminHeroSection = () => {
               <X className="w-5 h-5" />
             </button>
             <div className="aspect-video w-full flex items-center justify-center bg-black">
-              {previewMediaUrl.endsWith('.mp4') || previewMediaUrl.includes('/videos/') ? (
+              {previewMediaUrl.endsWith('.mp4') || previewMediaUrl.includes('/videos/') || /\.(webm|mov|m4v)(\?.*)?$/i.test(previewMediaUrl) || previewMediaUrl === DEFAULT_MOBILE_HERO_VIDEO || heroViewMode === 'mobile' ? (
                 <video
                   src={previewMediaUrl}
                   controls
