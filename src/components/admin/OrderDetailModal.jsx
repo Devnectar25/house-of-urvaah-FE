@@ -132,6 +132,16 @@ export const isPostDeliveryOrder = (ord, curStatus) => {
   return false;
 };
 
+// The size the customer explicitly chose for the exchange (no 'M' fallback); null when not recorded.
+const getCustomerChosenReplacementSize = (ord) => {
+  if (!ord) return null;
+  const fromItem = Array.isArray(ord.items)
+    ? ord.items.find(it => (it.return_action || '').toLowerCase() === 'replace' && it.replacement_size)?.replacement_size
+    : null;
+  const size = ord.replacement_size || fromItem;
+  return size ? String(size).trim().toUpperCase() : null;
+};
+
 const getRequestedReplacementSize = (ord) => {
   if (!ord) return 'M';
   const returnType = (ord.return_type || '').toLowerCase();
@@ -151,6 +161,26 @@ const getRequestedReplacementSize = (ord) => {
     if (ord.items && ord.items[0] && ord.items[0].size) return ord.items[0].size;
   }
   return 'M';
+};
+
+/**
+ * True only for a genuine pre-dispatch cancellation. cancel_reason alone is not enough: return /
+ * replacement requests and admin rejections also write their reason into cancel_reason.
+ */
+export const isPreDispatchCancellation = (ord, curSt = '') => {
+  if (!ord) return false;
+  const st = (curSt || ord.status || '').toLowerCase();
+  const hasPostDeliveryRequest = Boolean(
+    ord.return_type || ord.return_request_at || ord.is_returned_order || ord.replacement_size ||
+    st.includes('return') || st.includes('replace') || st.includes('received at') || st === 'in transit to house of urvaah'
+  );
+  const isProductEverDelivered = Boolean(ord.delivered_at) ||
+    (ord.original_status || '').toLowerCase() === 'delivered' ||
+    Boolean(ord.is_product_received) ||
+    st === 'delivered' ||
+    hasPostDeliveryRequest;
+  if (isProductEverDelivered) return false;
+  return st === 'cancelled' || st === 'refunded' || st.includes('cancel') || Boolean(ord.cancel_reason);
 };
 
 export const isOrderReplacementLifecycle = (ord, curStatus = '') => {
@@ -1300,6 +1330,37 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  // Return reverse-pickup cycle: advance the parcel (collected -> in transit -> received at atelier)
+  const handleAdvanceReturnStage = async (nextStatus, successMsg) => {
+    if (!order) return;
+    setSavingStatus(true);
+    setSaveError(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextStatus })
+      });
+
+      const updatedData = response?.data || response || { ...order, status: nextStatus };
+
+      setOrder(updatedData);
+      setConfirmedStatus(nextStatus);
+      setSelectedStatus(nextStatus);
+      confirmedRef.current.status = nextStatus;
+      setSaveSuccessMsg(successMsg);
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) notifyParent(updatedData);
+      broadcastOrderUpdate(updatedData);
+    } catch (err) {
+      console.error('Failed to update return pickup stage:', err);
+      setSaveError(err.message || 'Failed to update return pickup status.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handleConfirmReplacementQCReceived = async () => {
     if (!order) return;
     setSavingStatus(true);
@@ -1988,8 +2049,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </span>
                 );
               }
-              // Never render Cancel Order button once an order has been delivered or is post-delivery or replacement is shipped
-              if (!isPostDelivery && !(isInReplacementFlow && isReplacementShipped)) {
+              // Never render Cancel Order button once an order has been delivered or is post-delivery or replacement is shipped.
+              // Cancellation is not offered from the Shiprocket Forward Desk (managed in Admin Orders).
+              if (!isShiprocketDesk && !isPostDelivery && !(isInReplacementFlow && isReplacementShipped)) {
                 return (
                   <button
                     type="button"
@@ -3033,26 +3095,36 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                     Garment Size for Replacement:
                                   </span>
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
+                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => {
+                                      // Locked to the size the customer chose; other sizes shown disabled
+                                      const chosen = getCustomerChosenReplacementSize(order);
+                                      const isLocked = Boolean(chosen) && sz !== chosen;
+                                      const isActive = chosen ? sz === chosen : customReplacementSize === sz;
+                                      return (
                                       <button
                                         key={sz}
                                         type="button"
+                                        disabled={isLocked}
                                         onClick={() => setCustomReplacementSize(sz)}
-                                        className={`px-2.5 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
-                                          customReplacementSize === sz
-                                            ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                        title={isLocked ? `Customer requested size ${chosen}` : undefined}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-md border transition-all ${
+                                          isActive
+                                            ? 'bg-purple-900 text-white border-purple-900 shadow-xs cursor-pointer'
+                                            : isLocked
+                                            ? 'bg-neutral-100 text-neutral-300 border-neutral-200 cursor-not-allowed line-through'
+                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400 cursor-pointer'
                                         }`}
                                       >
                                         {sz}
                                       </button>
-                                    ))}
+                                    );
+                                    })}
                                   </div>
                                 </div>
                                 <button
                                   type="button"
                                   disabled={savingStatus}
-                                  onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
+                                  onClick={() => handleGenerateReplacementOrder(getCustomerChosenReplacementSize(order) || customReplacementSize)}
                                   className="w-full py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
                                   {savingStatus ? (
@@ -3641,20 +3713,30 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                     Replacement Garment Size:
                                   </span>
                                   <div className="flex items-center gap-2">
-                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => (
-                                      <button
-                                        key={sz}
-                                        type="button"
-                                        onClick={() => setCustomReplacementSize(sz)}
-                                        className={`px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer ${
-                                          customReplacementSize === sz
-                                            ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
-                                        }`}
-                                      >
-                                        {sz}
-                                      </button>
-                                    ))}
+                                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((sz) => {
+                                      // Locked to the size the customer chose; other sizes shown disabled
+                                      const chosen = getCustomerChosenReplacementSize(order);
+                                      const isLocked = Boolean(chosen) && sz !== chosen;
+                                      const isActive = chosen ? sz === chosen : customReplacementSize === sz;
+                                      return (
+                                        <button
+                                          key={sz}
+                                          type="button"
+                                          disabled={isLocked}
+                                          onClick={() => setCustomReplacementSize(sz)}
+                                          title={isLocked ? `Customer requested size ${chosen}` : undefined}
+                                          className={`px-3 py-1 text-xs font-bold rounded-md border transition-all ${
+                                            isActive
+                                              ? 'bg-purple-900 text-white border-purple-900 shadow-xs cursor-pointer'
+                                              : isLocked
+                                              ? 'bg-neutral-100 text-neutral-300 border-neutral-200 cursor-not-allowed line-through'
+                                              : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400 cursor-pointer'
+                                          }`}
+                                        >
+                                          {sz}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -3671,7 +3753,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 <button
                                   type="button"
                                   disabled={savingStatus}
-                                  onClick={() => handleGenerateReplacementOrder(customReplacementSize)}
+                                  onClick={() => handleGenerateReplacementOrder(getCustomerChosenReplacementSize(order) || customReplacementSize)}
                                   className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
                                 >
                                   {savingStatus ? (
@@ -3682,7 +3764,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                   ) : (
                                     <>
                                       <PackagePlus className="w-4 h-4 text-purple-300" />
-                                      <span>Approve QC & Dispatch Replacement Order (Size {customReplacementSize || reqSize})</span>
+                                      <span>Approve QC & Dispatch Replacement Order (Size {getCustomerChosenReplacementSize(order) || customReplacementSize || reqSize})</span>
                                     </>
                                   )}
                                 </button>
@@ -3771,13 +3853,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
               {/* Pre-Delivery Cancelled & Refunded Banner */}
               {(() => {
                 const curSt = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
-                const isProductEverDelivered = Boolean(order?.delivered_at) || 
-                  (order?.original_status || '').toLowerCase() === 'delivered' || 
-                  Boolean(order?.is_product_received);
-                const isPreDeliveryCancellation = !isProductEverDelivered && (
-                  curSt === 'cancelled' || curSt === 'refunded' || curSt.includes('cancel') || Boolean(order?.cancel_reason)
-                );
-                if (!isPreDeliveryCancellation) return null;
+                if (!isPreDispatchCancellation(order, curSt)) return null;
                 const isRefundCompleted = (order?.refund_status && ['completed', 'refunded', 'success'].includes(String(order.refund_status).toLowerCase())) || 
                   curSt === 'refunded' || 
                   ((order?.payment_status || '').toLowerCase() === 'refunded');
@@ -3834,13 +3910,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                 const isReplacementRelated = isOrderReplacementLifecycle(order, curSt);
                 if (isReplacementRelated) return null;
 
-                const isProductEverDelivered = Boolean(order?.delivered_at) || 
-                  (order?.original_status || '').toLowerCase() === 'delivered' || 
-                  Boolean(order?.is_product_received);
-                const isPreDeliveryCancellation = !isProductEverDelivered && (
-                  curSt === 'cancelled' || curSt === 'refunded' || curSt.includes('cancel') || Boolean(order?.cancel_reason)
-                );
-                if (isPreDeliveryCancellation) return null;
+                if (isPreDispatchCancellation(order, curSt)) return null;
 
                 // Explicit Return & Refund Lifecycle check (never triggered by generic forward pickup or forward AWB)
                 const isReturnRelated = (
@@ -4169,6 +4239,42 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           return 'Customer has requested a return. Review and approve the request to dispatch reverse courier pickup.';
                         })()}
                       </div>
+
+                      {/* Step 3: Doorstep pickup assigned -> mark collected (same cycle as replacements) */}
+                      {isS3Active && !isQCRejected && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100">
+                          <span className="text-[11px] text-neutral-600">
+                            When the customer hands the parcel to the rider, mark it collected:
+                          </span>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => handleAdvanceReturnStage('In Transit to House of Urvaah', 'Parcel collected from customer! Return is now in reverse transit to House of Urvaah atelier.')}
+                            className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            {savingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4 text-emerald-400" />}
+                            <span>Mark Parcel Collected from Customer</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Step 4: In reverse transit -> mark received at atelier (unlocks Step 5 QC below) */}
+                      {isS4Active && !isQCRejected && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100">
+                          <span className="text-[11px] text-neutral-600">
+                            Once the parcel physically arrives at the Maison, mark it received to start QC:
+                          </span>
+                          <button
+                            type="button"
+                            disabled={savingStatus}
+                            onClick={() => handleAdvanceReturnStage('Received at House of Urvaah', 'Return parcel received at House of Urvaah atelier. Please complete the QC inspection.')}
+                            className="px-4 py-2 bg-blue-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            {savingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building className="w-4 h-4 text-blue-200" />}
+                            <span>Mark Parcel Received at Atelier</span>
+                          </button>
+                        </div>
+                      )}
 
                       {/* Step 5: Admin QC Inspection & Confirmation Box (Parcel Received & Acceptable vs Rejected) */}
                       {(isS4 || ['received at house of urvaah', 'received at homved'].includes(curSt) || isQCRejected) && (
@@ -4806,6 +4912,18 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   const isOrderCancelled = curSt === 'cancelled' || curSt === 'canceled';
                   const isPostDelivery = isPostDeliveryOrder(order, confirmedStatus);
 
+                  // The 'SR-...-SHP-' value saved at checkout is only a shipment reference, not a courier AWB.
+                  // Label / manifest / pickup unlock only after "Generate AWB & Mark Shipped" (or a later stage).
+                  const trackingNo = (order.tracking_number || order.trackingNumber || order.awb_code || order.awb || '').toString().trim();
+                  const isShipmentRefOnly = /^SR-(MOCK-)?SHP-/i.test(trackingNo);
+                  const logisticsLower = `${order.logistics_status || ''} ${order.shipment_status || ''}`.toLowerCase();
+                  const isAwbGenerated = hasAwb && (
+                    !isShipmentRefOnly ||
+                    ['awb assigned', 'pickup scheduled', 'picked up', 'shipped', 'in transit', 'out for delivery', 'delivered'].some(s => logisticsLower.includes(s)) ||
+                    ['shipped', 'in transit', 'out for delivery', 'delivered'].some(s => curSt.includes(s))
+                  );
+                  const awbLockTitle = 'Generate AWB & Mark Shipped first';
+
                   if (isOrderCancelled) {
                     return (
                       <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-between gap-3">
@@ -4825,7 +4943,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   return (
                     <>
                       <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {(!hasAwb || ['placed', 'confirmed', 'pending', 'processing'].includes(curSt)) && (
+                        {(!isAwbGenerated || ['placed', 'confirmed', 'pending', 'processing'].includes(curSt)) && (
                           <button
                             type="button"
                             disabled={logisticsLoading}
@@ -4837,27 +4955,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           </button>
                         )}
 
-                        {!isPostDelivery && !isOrderCancelled && (
-                          <button
-                            type="button"
-                            disabled={logisticsLoading}
-                            onClick={() => setIsAdminCancelModalOpen(true)}
-                            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                            title="Cancel Order as Administrator"
-                          >
-                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Cancel Order</span>
-                          </button>
-                        )}
-
                         {hasAwb && (
                           <>
                             <button
                               type="button"
-                              disabled={logisticsLoading}
+                              disabled={logisticsLoading || !isAwbGenerated}
                               onClick={handleDownloadLabel}
-                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer"
-                              title="Download Official Courier Shipping Label (PDF)"
+                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                              title={isAwbGenerated ? 'Download Official Courier Shipping Label (PDF)' : awbLockTitle}
                             >
                               <FileText className="w-3.5 h-3.5 text-neutral-600" />
                               <span>Shipping Label (PDF)</span>
@@ -4865,10 +4970,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                             <button
                               type="button"
-                              disabled={logisticsLoading}
+                              disabled={logisticsLoading || !isAwbGenerated}
                               onClick={handleDownloadManifest}
-                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer"
-                              title="Download Courier Pickup Manifest (PDF)"
+                              className="px-3 py-2 border text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+                              title={isAwbGenerated ? 'Download Courier Pickup Manifest (PDF)' : awbLockTitle}
                             >
                               <FileText className="w-3.5 h-3.5 text-neutral-600" />
                               <span>Pickup Manifest</span>
@@ -4876,14 +4981,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                             <button
                               type="button"
-                              disabled={logisticsLoading}
+                              disabled={logisticsLoading || !isAwbGenerated}
                               onClick={handleSchedulePickup}
-                              className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs ${
+                              className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed ${
                                 (order.pickup_token || order.logistics_status === 'Pickup Scheduled' || order.shipment_status === 'Pickup Scheduled')
                                   ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
                                   : 'bg-neutral-900 hover:bg-black text-white cursor-pointer'
                               }`}
-                              title={order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment"}
+                              title={!isAwbGenerated ? awbLockTitle : order.pickup_token ? `Pickup Scheduled (Token: ${order.pickup_token})` : "Request courier rider to pick up shipment"}
                             >
                               {logisticsLoading ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -4949,7 +5054,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-2">
                             Testing Suite: Simulate Shiprocket Webhook Milestones
                           </span>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className={`grid grid-cols-2 gap-2 ${isShiprocketDesk ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
                             <button
                               type="button"
                               disabled={logisticsLoading || !hasAwb}
@@ -4995,6 +5100,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               <span>Mark Delivered</span>
                             </button>
 
+                            {!isShiprocketDesk && (
                             <button
                               type="button"
                               disabled={logisticsLoading || !hasAwb}
@@ -5009,6 +5115,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               <XCircle className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-rose-600'}`} />
                               <span>Void / Cancel</span>
                             </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -5552,11 +5659,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           onClick={() => !savingStatus && setIsRejectReturnModalOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-neutral-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-neutral-200 overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between">
+            <div className="px-5 py-3 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
                   <XCircle className="w-5 h-5 text-rose-600" />
@@ -5581,13 +5688,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4 text-xs font-admin">
+            <div className="px-5 py-4 space-y-3 text-xs font-admin overflow-y-auto">
               {(() => {
                 const retGst = getReturnGstBreakdown(order);
                 return (
                   <>
                     {/* Customer & Order Metadata */}
-                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-1.5">
+                    <div className="px-3 py-2 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-1">
                       <div className="flex justify-between text-neutral-600">
                         <span>Customer:</span>
                         <span className="font-semibold text-brand-dark">{order.customer_name || order.user_id || 'Customer'}</span>
@@ -5605,11 +5712,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </div>
 
                     {/* Financial Summary with GST */}
-                    <div className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-xl space-y-2">
+                    <div className="px-3 py-2 bg-rose-50/60 border border-rose-200 rounded-xl space-y-1.5">
                       <span className="text-[10px] font-bold text-rose-900 uppercase tracking-wider block">
                         Return Request Value &amp; GST Details
                       </span>
-                      <div className="space-y-1.5 text-[11px]">
+                      <div className="space-y-1 text-[11px]">
                         <div className="flex justify-between text-neutral-700">
                           <span>Item Base Value:</span>
                           <span className="font-semibold text-brand-dark">₹{retGst.baseTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -5620,9 +5727,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             ₹{retGst.gstTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
-                        <div className="pt-1.5 border-t border-rose-200 flex justify-between items-center text-xs font-bold">
+                        <div className="pt-1 border-t border-rose-200 flex justify-between items-center text-xs font-bold">
                           <span className="text-rose-950 uppercase tracking-wider">Total Value (With GST):</span>
-                          <span className="text-brand-dark font-admin text-sm sm:text-base">
+                          <span className="text-brand-dark font-admin text-sm">
                             ₹{retGst.totalRefund.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
@@ -5631,14 +5738,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
                     {/* Rejection Reason Selection */}
                     <div>
-                      <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1">
                         Reason for Rejecting Return <span className="text-rose-500">*</span>
                       </label>
                       <select
                         value={adminRejectReturnReason}
                         onChange={(e) => setAdminRejectReturnReason(e.target.value)}
                         disabled={savingStatus}
-                        className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2.5 text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer"
+                        className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer"
                       >
                         <option value="Outside return policy window / 7 days exceeded">Outside return policy window / 7 days exceeded</option>
                         <option value="Garment shows signs of wear, washing, or perfume">Garment shows signs of wear, washing, or perfume</option>
@@ -5651,7 +5758,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1">
                         Specific Notes / Remarks {adminRejectReturnReason === 'Other (Specify reason)' && <span className="text-rose-500">*</span>}
                       </label>
                       <textarea
@@ -5660,14 +5767,14 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         onChange={(e) => setAdminRejectReturnCustomNotes(e.target.value)}
                         disabled={savingStatus}
                         placeholder="Enter remarks for customer notification and atelier audit records..."
-                        className="w-full bg-white border border-neutral-300 rounded-xl p-3 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
+                        className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                       />
                     </div>
 
-                    <div className="p-3 bg-neutral-100 border border-neutral-200 rounded-xl text-[11px] text-neutral-700 leading-relaxed flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-neutral-600 shrink-0 mt-0.5" />
+                    <div className="px-3 py-2 bg-neutral-100 border border-neutral-200 rounded-xl text-[11px] text-neutral-700 leading-snug flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-neutral-600 shrink-0 mt-0.5" />
                       <div>
-                        <strong>Order Status Impact:</strong> Rejecting will maintain the order as <strong>Delivered</strong>, void reverse courier pickup, and cancel any refund of <strong>₹{retGst.totalRefund.toLocaleString('en-IN')}</strong> (including <strong>₹{retGst.gstTotal.toLocaleString('en-IN')} GST</strong>). The rejection reason will be recorded on the customer's account timeline.
+                        <strong>Impact:</strong> Order stays <strong>Delivered</strong>, reverse pickup is voided and the <strong>₹{retGst.totalRefund.toLocaleString('en-IN')}</strong> refund (incl. ₹{retGst.gstTotal.toLocaleString('en-IN')} GST) is cancelled. Reason is logged on the customer's timeline.
                       </div>
                     </div>
                   </>
@@ -5676,7 +5783,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
 
             {/* Footer Buttons */}
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2.5">
+            <div className="px-5 py-3 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 disabled={savingStatus}

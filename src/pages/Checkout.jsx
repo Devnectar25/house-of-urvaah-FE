@@ -37,6 +37,7 @@ import { useCart } from '../context/CartContext';
 import apiClient from '../lib/apiClient';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { checkItemStockStatus } from '../utils/stockValidator';
+import { buildReorderItems } from '../utils/reorder';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
@@ -1195,7 +1196,15 @@ export const Checkout = () => {
           Boolean(ord.rejection_reason && (ord.rejection_reason.toLowerCase().includes('cancel') || ord.rejection_reason.toLowerCase().includes('rejected'))) ||
           Boolean(ord.cancel_reason && ord.cancel_reason.toLowerCase().includes('rejected'));
 
-        if (!isRej && (['cancelled', 'refunded'].includes(stLower) || (ord.cancel_reason && !ord.cancel_reason.toLowerCase().includes('rejected')))) {
+        // Admin return/replacement rejections also store their reason in cancel_reason; that must not
+        // flag a delivered order as cancelled.
+        const isPostDelivery = stLower === 'delivered' || Boolean(ord.delivered_at || ord.return_type || ord.return_request_at);
+        const cancelReasonIsRejection = Boolean(ord.cancel_reason) && (
+          ord.cancel_reason.toLowerCase().includes('rejected') ||
+          ord.cancel_reason === ord.rejection_reason ||
+          ord.cancel_reason === ord.return_rejection_reason
+        );
+        if (!isRej && (['cancelled', 'refunded'].includes(stLower) || (ord.cancel_reason && !cancelReasonIsRejection && !isPostDelivery))) {
           setOrderCancelled(true);
         } else {
           setOrderCancelled(false);
@@ -2222,12 +2231,21 @@ export const Checkout = () => {
     const isReplacementInTransit = isReplacementCollected || (isReplacementIntent && (currentStatusStr === 'replacement processing' || currentStatusStr === 'replacement shipped' || currentStatusStr === 'in reverse transit'));
     const isReplacementOutForDelivery = isReplacementIntent && (currentStatusStr === 'replacement out for delivery');
     const isReplaced = isReplacementIntent && (currentStatusStr === 'replaced' || Boolean(details.replacement_order_number));
-    const isReplacementRejected = isReplacementIntent && (currentStatusStr === 'replace rejected');
-    const isInReplacementFlow = isReplacementIntent;
+    // Admin rejection restores the order to 'Delivered' and records the reason / QC flag, so detect
+    // it from those fields too — not only from a literal 'replace rejected' status.
+    const isReplacementRejected = isReplacementIntent && !isReplaced && (
+      currentStatusStr === 'replace rejected' ||
+      currentStatusStr === 'replacement rejected' ||
+      (details.return_qc_status || details.returnQcStatus || '').toLowerCase() === 'rejected' ||
+      (currentStatusStr === 'delivered' && Boolean(details.return_rejection_reason || details.rejection_reason)) ||
+      (Array.isArray(details.items) && details.items.some(it => (it.status || '').toLowerCase() === 'replace rejected'))
+    );
+    const isInReplacementFlow = isReplacementIntent && !isReplacementRejected;
 
     // 3. Pre-Delivery Cancellation States (Customer requested vs Admin approved/rejected)
     const isCancellationRequested = !isInReturnFlow && !isInReplacementFlow && (currentStatusStr === 'cancellation requested' || currentStatusStr === 'cancel_requested');
-    const isCancellationRejected = !isInReturnFlow && !isInReplacementFlow && !isCancellationRequested && (
+    // A rejected return/replacement also carries a "...rejected by Admin" reason — that is not a cancellation rejection
+    const isCancellationRejected = !isInReturnFlow && !isInReplacementFlow && !isReplacementRejected && !isReturnRejected && !isCancellationRequested && (
       currentStatusStr === 'cancellation rejected' ||
       Boolean(
         (details.rejection_reason || details.rejectionReason) && (
@@ -2277,38 +2295,35 @@ export const Checkout = () => {
 
       setIsReordering(true);
       try {
+        // Verify live stock before adding anything to the bag
+        const { available, unavailable } = await buildReorderItems(details.items);
+
+        if (available.length === 0) {
+          showToast(
+            unavailable.length > 0
+              ? `Sorry, ${unavailable.join(', ')} ${unavailable.length > 1 ? 'are' : 'is'} currently out of stock.`
+              : 'These items are no longer available to reorder.',
+            'error'
+          );
+          return;
+        }
+
         const targetKeys = [];
-
-        for (let i = 0; i < details.items.length; i++) {
-          const item = details.items[i];
-          const rawId = item.product?.id || item.id || item.productId || '1';
-          const sizeToUse = item.selectedSize || item.size || 'M';
-          const qtyToUse = Math.max(1, Number(item.quantity || 1));
-
-          const prodObj = {
-            ...(item.product || {}),
-            id: String(rawId),
-            name: item.product?.name || item.name || item.title || 'Atelier Piece',
-            title: item.product?.title || item.name || 'Atelier Piece',
-            price: Number(item.product?.price || item.price || 0),
-            image: item.product?.image || item.image || '/assets/Images/Brown01.png',
-            stockQuantity: 99,
-            stock_quantity: 99,
-            stock: 99,
-            inStock: true,
-            instock: true,
-            is_active: true
-          };
-
-          targetKeys.push(`${String(rawId).trim()}_${String(sizeToUse).trim()}`);
+        for (const { product, size, quantity } of available) {
+          targetKeys.push(`${String(product.id).trim()}_${String(size).trim()}`);
 
           if (addToCart) {
-            await addToCart(prodObj, sizeToUse, {
-              quantity: qtyToUse,
+            await addToCart(product, size, {
+              quantity,
+              setQuantity: true, // repeated reorders must not stack quantities
               selectOnlyThis: false,
               openDrawer: false
             });
           }
+        }
+
+        if (unavailable.length > 0) {
+          showToast(`Out of stock and skipped: ${unavailable.join(', ')}. Remaining items added to your bag.`, 'error');
         }
 
         if (setSelectedCartItemKeys && targetKeys.length > 0) {
@@ -2587,9 +2602,17 @@ export const Checkout = () => {
       const initialMap = {};
       const initialStocks = {};
 
-      // If 1 item: default to Return
+      // If 1 item: default to Return (or Replace when this order already had a replacement request,
+      // e.g. one the admin rejected, so a re-submission continues the replacement flow)
       // If 2 or 3 items: default to Keep, customer picks which one to return or replace!
-      const defaultAction = currentItems.length <= 1 ? 'Return' : 'Keep';
+      const src = details || placedOrderDetails || {};
+      const hadReplacementRequest = Boolean(
+        (src.return_type || '').toLowerCase().includes('replace') ||
+        (src.return_type || '').toLowerCase().includes('exchange') ||
+        src.replacement_size ||
+        currentItems.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
+      );
+      const defaultAction = currentItems.length <= 1 ? (hadReplacementRequest ? 'Replace' : 'Return') : 'Keep';
 
       currentItems.forEach((item, idx) => {
         const key = item.id || item.product_id || idx;
@@ -3215,7 +3238,7 @@ export const Checkout = () => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4 }}
               className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm ${
-                isCancellationRejected || isReturnRejected
+                isCancellationRejected || isReturnRejected || isReplacementRejected
                   ? 'bg-rose-700 text-white'
                   : isOrderCancelled
                   ? 'bg-red-600 text-white'
@@ -3228,7 +3251,7 @@ export const Checkout = () => {
                   : 'bg-brand-dark text-white'
               }`}
             >
-              {isCancellationRejected || isReturnRejected ? (
+              {isCancellationRejected || isReturnRejected || isReplacementRejected ? (
                 <XCircle className="w-8 h-8 stroke-[2.5]" />
               ) : isOrderCancelled ? (
                 <X className="w-8 h-8 stroke-[2.5]" />
@@ -3250,6 +3273,8 @@ export const Checkout = () => {
                 ? 'RETURN QC REJECTED • REFUND CANCELLED'
                 : isReturnRejected
                 ? 'RETURN REQUEST REJECTED BY ADMIN'
+                : isReplacementRejected
+                ? 'REPLACEMENT REQUEST REJECTED BY ADMIN'
                 : isOrderCancelled
                 ? (isRefundCompleted ? 'ORDER CANCELLED & 100% REFUND COMPLETED' : 'ORDER CANCELLED & SHIPROCKET SHIPMENT VOIDED')
                 : isCancellationRequested
@@ -3273,6 +3298,8 @@ export const Checkout = () => {
                 ? 'RETURN REJECTED (QC FAILED)'
                 : isReturnRejected
                 ? 'RETURN REQUEST DECLINED'
+                : isReplacementRejected
+                ? 'REPLACEMENT REQUEST DECLINED'
                 : isOrderCancelled
                 ? 'THIS ORDER HAS BEEN CANCELLED'
                 : isCancellationRequested
@@ -3296,6 +3323,8 @@ export const Checkout = () => {
                 <>Your returned parcel was inspected by our atelier QC team and <strong className="text-black font-medium">could not be accepted into inventory</strong>. As per our policy, the return has been rejected and the refund has been cancelled.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` QC Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
               ) : isReturnRejected ? (
                 <>Your return request was reviewed and <strong className="text-black font-medium">declined by our atelier team</strong>. Your order remains delivered and no reverse pickup will take place.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
+              ) : isReplacementRejected ? (
+                <>Your exchange / replacement request was reviewed and <strong className="text-black font-medium">declined by our atelier team</strong>. Your order remains delivered and no reverse pickup or replacement dispatch will take place.</>
               ) : isOrderCancelled ? (
                 isRefundCompleted ? (
                   <>Shiprocket courier pickup was voided prior to dispatch. 100% full refund of <strong className="text-black font-medium">{formatPrice(details.totalPaid)}</strong> has been disbursed to your original payment method{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
@@ -3558,6 +3587,33 @@ export const Checkout = () => {
                 </div>
                 <p className="text-rose-900/90 leading-relaxed font-sans text-xs sm:text-sm">
                   Your return request was reviewed and <strong>declined by our atelier team</strong>. Your order remains delivered and no reverse pickup will take place.
+                </p>
+                {(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) && (
+                  <p className="text-xs text-rose-800 font-sans pt-1 font-medium">
+                    <span className="font-semibold uppercase tracking-wider text-[11px]">Admin Reason:</span> "{details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Post-Delivery Replacement Request Rejected Alert Banner */}
+          {isReplacementRejected && (
+            <div className="mb-8 bg-rose-50/90 border border-rose-200/90 rounded-2xl p-5 sm:p-6 flex items-start gap-4 shadow-sm text-left">
+              <div className="p-2.5 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
+                <AlertCircle className="w-6 h-6 text-rose-700" />
+              </div>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-sm sm:text-base">
+                    Replacement Request Declined by Admin
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase">
+                    Request Declined
+                  </span>
+                </div>
+                <p className="text-rose-900/90 leading-relaxed font-sans text-xs sm:text-sm">
+                  Your exchange / replacement request was reviewed and <strong>declined by our atelier team</strong>. Your order remains delivered and no reverse pickup or replacement will be dispatched.
                 </p>
                 {(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) && (
                   <p className="text-xs text-rose-800 font-sans pt-1 font-medium">
@@ -4622,7 +4678,7 @@ export const Checkout = () => {
                   </Link>
 
                   <Link
-                    to="/"
+                    to="/collections"
                     className="w-full block border border-neutral-300 text-brand-dark text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-4 hover:border-black transition-colors text-center"
                   >
                     CONTINUE SHOPPING
@@ -4744,14 +4800,6 @@ export const Checkout = () => {
                     <div className="w-full py-3 px-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
                       <PackageCheck className="w-4 h-4 text-emerald-700" />
                       <span>Product Replacement Completed</span>
-                    </div>
-                  )}
-
-                  {/* Replacement Rejected Pill */}
-                  {isReplacementRejected && (
-                    <div className="w-full py-3 px-4 bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.15em] uppercase flex items-center justify-center gap-2 text-center">
-                      <AlertCircle className="w-4 h-4 text-rose-700" />
-                      <span>Replacement Not Approved</span>
                     </div>
                   )}
 
@@ -6875,7 +6923,7 @@ export const Checkout = () => {
                   ORDER SUMMARY ({selectedItems.reduce((a, b) => a + b.quantity, 0)})
                 </h3>
                 <Link
-                  to="/"
+                  to="/collections"
                   className="text-[11px] text-neutral-500 hover:text-black font-semibold tracking-wider uppercase"
                 >
                   CONTINUE SHOPPING

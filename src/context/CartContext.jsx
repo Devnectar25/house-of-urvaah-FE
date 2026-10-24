@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, clearAuthSession } from '../lib/apiClient';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
@@ -459,12 +459,20 @@ export const CartProvider = ({ children }) => {
       let hasChanges = false;
       const verifiedCart = await Promise.all(
         cartToCheck.map(async (item) => {
-          const rawId = item.product?.id || item.productId || item.id;
-          const cleanId = String(rawId).replace(/\D/g, '');
-          if (!cleanId) return item;
+          const rawId = String(item.product?.id || item.productId || item.id || '').trim();
+          if (!rawId) return item;
+          // The API resolves catalog aliases (e.g. 'bs-104', '104'); only fall back to the
+          // digits-only form if the raw id isn't found.
+          const numericId = rawId.replace(/\D/g, '');
 
           try {
-            const res = await apiClient(`/api/products/${cleanId}`);
+            let res = await apiClient(`/api/products/${encodeURIComponent(rawId)}`).catch(() => null);
+            if ((!res || !res.success || !res.data) && numericId && numericId !== rawId) {
+              res = await apiClient(`/api/products/${numericId}`).catch(() => null);
+            }
+            if (!res || !res.success || !res.data) {
+              console.warn(`[CartContext] Live stock check failed for cart item "${rawId}"`);
+            }
             if (res && res.success && res.data) {
               const prod = res.data;
               const liveStock = Number(
@@ -540,6 +548,20 @@ export const CartProvider = ({ children }) => {
       syncLiveStock();
     }
   }, [isCartOpen, syncLiveStock]);
+
+  // Also re-validate a cached bag on page load and when the tab regains focus, so items that
+  // went out of stock while the bag sat in localStorage are flagged even before the drawer opens.
+  const syncLiveStockRef = useRef(syncLiveStock);
+  syncLiveStockRef.current = syncLiveStock;
+  const cartItemIdsKey = cart.map((it) => `${it.product?.id}:${it.selectedSize}`).join('|');
+  useEffect(() => {
+    if (cartItemIdsKey) syncLiveStockRef.current();
+  }, [cartItemIdsKey]);
+  useEffect(() => {
+    const handleFocus = () => syncLiveStockRef.current();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -724,12 +746,15 @@ export const CartProvider = ({ children }) => {
       let updated;
       if (existingIndex > -1) {
         const existing = prevCart[existingIndex];
-        if (existing.quantity >= availableStock) {
+        const qtyToAdd = options.quantity || 1;
+        // options.setQuantity: set the line to exactly this quantity (idempotent, e.g. Reorder)
+        // instead of adding on top of what's already in the bag
+        const newQty = options.setQuantity
+          ? Math.min(qtyToAdd, availableStock)
+          : Math.min(existing.quantity + qtyToAdd, availableStock);
+        if (newQty === existing.quantity) {
           return prevCart;
         }
-
-        const qtyToAdd = options.quantity || 1;
-        const newQty = Math.min(existing.quantity + qtyToAdd, availableStock);
 
         updated = [...prevCart];
         updated[existingIndex] = {
@@ -777,7 +802,7 @@ export const CartProvider = ({ children }) => {
         try {
           await apiClient('/api/cart/add', {
             method: 'POST',
-            body: JSON.stringify({ userId, productId: numericId, quantity: options.quantity || 1, size: sizeToUse })
+            body: JSON.stringify({ userId, productId: numericId, quantity: options.quantity || 1, size: sizeToUse, setMode: Boolean(options.setQuantity) })
           });
         } catch (err) {
           console.warn('Cart add API sync warning:', err.message);

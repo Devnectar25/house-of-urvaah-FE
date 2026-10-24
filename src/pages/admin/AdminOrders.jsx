@@ -1477,11 +1477,26 @@ export const AdminOrders = () => {
                               />
                             )}
                           </div>
-                          {Boolean(ord.return_rejection_reason) && (
-                            <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase font-sans leading-none tracking-tight">
-                              Return Rejected
-                            </span>
-                          )}
+                          {Boolean(ord.return_rejection_reason) && (() => {
+                            // Return and replacement rejections both store return_rejection_reason; label by request type
+                            const returnType = (ord.return_type || '').toLowerCase();
+                            const items = Array.isArray(ord.items) ? ord.items : [];
+                            const hasReplace = returnType.includes('replace') || returnType.includes('exchange') ||
+                              Boolean(ord.replacement_size) ||
+                              items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'));
+                            const hasReturn = returnType === 'return' ||
+                              items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return'));
+                            const label = hasReplace && hasReturn
+                              ? 'Return & Replacement Rejected'
+                              : hasReplace
+                              ? 'Replacement Rejected'
+                              : 'Return Rejected';
+                            return (
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase font-sans leading-none tracking-tight">
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
 

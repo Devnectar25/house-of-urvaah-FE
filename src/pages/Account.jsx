@@ -14,6 +14,7 @@ import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModa
 import { ProductCard } from '../components/common/ProductCard';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
+import { buildReorderItems } from '../utils/reorder';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
 import Swal from 'sweetalert2';
 
@@ -54,7 +55,8 @@ const normalizeTabName = (raw) => {
   return VALID_TABS.find((t) => t.toUpperCase() === cleaned) || null;
 };
 
-export { getOrderGstInfo, getItemGstBreakdown, getReturnGstBreakdown } from '../utils/gstHelper';
+import { getOrderGstInfo, getItemGstBreakdown, getReturnGstBreakdown } from '../utils/gstHelper';
+export { getOrderGstInfo, getItemGstBreakdown, getReturnGstBreakdown };
 
 export const Account = () => {
   const navigate = useNavigate();
@@ -69,36 +71,38 @@ export const Account = () => {
     }
 
     try {
+      // Verify live stock before adding anything to the bag
+      const { available, unavailable } = await buildReorderItems(ord.items);
+
+      if (available.length === 0) {
+        setToastMsg({
+          text: unavailable.length > 0
+            ? `Sorry, ${unavailable.join(', ')} ${unavailable.length > 1 ? 'are' : 'is'} currently out of stock.`
+            : 'These items are no longer available to reorder.',
+          type: 'error'
+        });
+        return;
+      }
+
       const targetKeys = [];
-      for (const item of ord.items) {
-        const rawId = item.product?.id || item.id || item.productId || '1';
-        const sizeToUse = item.selectedSize || item.size || 'M';
-        const qtyToUse = Math.max(1, Number(item.quantity || 1));
-
-        const prodObj = {
-          ...(item.product || {}),
-          id: String(rawId),
-          name: item.name || item.title || item.product?.name || 'Product',
-          title: item.name || item.title || item.product?.title || 'Product',
-          price: Number(item.price || item.product?.price || 0),
-          image: item.image || item.product?.image || '/assets/Images/Brown01.png',
-          stockQuantity: 99,
-          stock_quantity: 99,
-          stock: 99,
-          inStock: true,
-          instock: true,
-          is_active: true
-        };
-
-        targetKeys.push(`${String(rawId).trim()}_${String(sizeToUse).trim()}`);
+      for (const { product, size, quantity } of available) {
+        targetKeys.push(`${String(product.id).trim()}_${String(size).trim()}`);
 
         if (addToCart) {
-          await addToCart(prodObj, sizeToUse, {
-            quantity: qtyToUse,
+          await addToCart(product, size, {
+            quantity,
+            setQuantity: true, // repeated reorders must not stack quantities
             selectOnlyThis: false,
             openDrawer: false
           });
         }
+      }
+
+      if (unavailable.length > 0) {
+        setToastMsg({
+          text: `Out of stock and skipped: ${unavailable.join(', ')}. Remaining items added to your bag.`,
+          type: 'error'
+        });
       }
 
       if (setSelectedCartItemKeys && targetKeys.length > 0) {
@@ -519,7 +523,15 @@ export const Account = () => {
       }
     ];
 
-    const defaultAction = items.length <= 1 ? 'Return' : 'Keep';
+    // If this order already had a replacement request (e.g. one the admin rejected), default to
+    // Replace so a re-submitted request continues the replacement flow instead of silently becoming a return.
+    const hadReplacementRequest = Boolean(
+      (ord.return_type || '').toLowerCase().includes('replace') ||
+      (ord.return_type || '').toLowerCase().includes('exchange') ||
+      ord.replacement_size ||
+      (Array.isArray(ord.items) && ord.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace')))
+    );
+    const defaultAction = items.length <= 1 ? (hadReplacementRequest ? 'Replace' : 'Return') : 'Keep';
     const initialMap = {};
     const initialStocks = {};
 
@@ -4010,7 +4022,9 @@ export const Account = () => {
                   const statusLower = orderStatus.toLowerCase();
                   const isCancellationRequested = statusLower === 'cancellation requested' || statusLower === 'cancel_requested';
 
-                  const isCancellationRejected = !isCancellationRequested && (
+                  // A rejected return/replacement also carries a "...rejected by Admin" reason — not a cancellation rejection
+                  const hasPostDeliveryRequest = Boolean(ord.return_type || ord.return_request_at || ord.return_rejection_reason);
+                  const isCancellationRejected = !isCancellationRequested && !hasPostDeliveryRequest && (
                     statusLower === 'cancellation rejected' ||
                     Boolean(
                       ord.rejection_reason && (
@@ -4027,15 +4041,27 @@ export const Account = () => {
                     )
                   );
 
-                  const isProductEverDelivered = Boolean(ord.delivered_at) || 
-                    (ord.original_status || '').toLowerCase() === 'delivered' || 
-                    Boolean(ord.is_product_received);
+                  const isProductEverDelivered = Boolean(ord.delivered_at) ||
+                    (ord.original_status || '').toLowerCase() === 'delivered' ||
+                    Boolean(ord.is_product_received) ||
+                    statusLower === 'delivered' ||
+                    Boolean(ord.return_type) ||
+                    Boolean(ord.return_request_at);
+
+                  // Admin return/replacement rejections also write their reason into cancel_reason,
+                  // so a cancel_reason that is really a rejection reason must not mark the order cancelled.
+                  const cancelReasonLower = (ord.cancel_reason || '').toLowerCase();
+                  const cancelReasonIsRejection = Boolean(ord.cancel_reason) && (
+                    cancelReasonLower.includes('rejected') ||
+                    ord.cancel_reason === ord.rejection_reason ||
+                    ord.cancel_reason === ord.return_rejection_reason
+                  );
 
                   const isPreDeliveryCancelled = !isProductEverDelivered && !isCancellationRejected && (
-                    statusLower === 'cancelled' || 
-                    statusLower === 'canceled' || 
-                    (statusLower.includes('cancel') && statusLower !== 'cancellation rejected') || 
-                    (Boolean(ord.cancel_reason) && !ord.cancel_reason.toLowerCase().includes('rejected')) || 
+                    statusLower === 'cancelled' ||
+                    statusLower === 'canceled' ||
+                    (statusLower.includes('cancel') && statusLower !== 'cancellation rejected') ||
+                    (Boolean(ord.cancel_reason) && !cancelReasonIsRejection) ||
                     (statusLower === 'refunded' && !statusLower.includes('return'))
                   );
 
@@ -5840,7 +5866,7 @@ export const Account = () => {
               {resolvedWishlist.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/collections')}
                   className="inline-flex items-center gap-2 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-500 hover:text-black transition-colors cursor-pointer self-start sm:self-auto"
                 >
                   <span>CONTINUE SHOPPING</span>
