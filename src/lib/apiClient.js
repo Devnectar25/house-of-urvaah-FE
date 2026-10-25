@@ -211,7 +211,14 @@ export async function apiClient(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.message || data.error || `Request failed with status ${response.status}`;
+      let errorMsg = data.message || data.error || `Request failed with status ${response.status}`;
+      // Generic auth failures from the API are not meaningful to shoppers; say what to do instead
+      if (response.status === 401 && !endpoint.includes('/login') &&
+          ['Not authorized to access this route', 'Valid token required'].includes(errorMsg)) {
+        errorMsg = token
+          ? 'Your session has expired. Please sign in again to continue.'
+          : 'Please sign in to your account to continue.';
+      }
       const err = new Error(errorMsg);
       err.status = response.status;
       err.data = data;

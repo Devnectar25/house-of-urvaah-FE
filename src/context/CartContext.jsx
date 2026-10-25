@@ -38,11 +38,17 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(() => getStoredUser()); // formatted user object
+  // A stored profile only counts as signed in together with its API token; without the token every
+  // protected request (orders, returns, profile) would fail with "Not authorized".
+  const [user, setUser] = useState(() => {
+    if (getAuthToken()) return getStoredUser();
+    try { localStorage.removeItem('urvaah_user'); } catch (e) {}
+    return null;
+  }); // formatted user object
   const [token, setTokenState] = useState(() => getAuthToken());
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(() => {
-    return !getAuthToken() && !getStoredUser();
+    return !getAuthToken();
   });
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
@@ -133,7 +139,7 @@ export const CartProvider = ({ children }) => {
           ...res.user,
           addresses: res.addresses || []
         });
-        if (formatted) {
+        if (formatted && getAuthToken()) {
           setUser(formatted);
           setStoredUser(formatted);
           if (formatted.bankDetails?.accountNumber) {
@@ -161,7 +167,7 @@ export const CartProvider = ({ children }) => {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
-      if (res.success && res.user) {
+      if (res.success && res.user && getAuthToken()) {
         const formatted = formatUserData({
           ...res.user,
           addresses: user?.addresses || []
@@ -199,11 +205,8 @@ export const CartProvider = ({ children }) => {
     } else {
       // Fallback: check Supabase session
       supabase.auth.getSession().then(({ data: { session } }) => {
+        // A Supabase session has no API token, so it cannot place orders or requests: stay signed out
         setSession(session);
-        if (session?.user) {
-          const formatted = formatUserData(session.user);
-          setUser(formatted);
-        }
         setAuthLoading(false);
       }).catch(() => {
         setAuthLoading(false);
@@ -213,10 +216,6 @@ export const CartProvider = ({ children }) => {
     // Listen for Supabase Auth changes as fallback
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user && !getAuthToken()) {
-        const formatted = formatUserData(session.user);
-        setUser(formatted);
-      }
       if (!getAuthToken()) {
         setAuthLoading(false);
       }
