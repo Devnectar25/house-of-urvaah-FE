@@ -34,7 +34,7 @@ import {
   Banknote
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import apiClient from '../lib/apiClient';
+import apiClient, { getAuthToken } from '../lib/apiClient';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { checkItemStockStatus } from '../utils/stockValidator';
 import { buildReorderItems } from '../utils/reorder';
@@ -1694,6 +1694,13 @@ export const Checkout = () => {
   // Execute Actual Order Placement (Called when customer clicks "Confirm & Place Order" in modal)
   const executeOrderPlacement = async () => {
     if (placingOrderRef.current) return;
+    // Orders are created under the customer's login; without its token the API refuses the request
+    if (!getAuthToken()) {
+      setIsConfirmOrderModalOpen(false);
+      setPaymentErrorMessage('Please sign in to your account to place this order. Your bag is saved.');
+      openAuthModal('login');
+      return;
+    }
     placingOrderRef.current = true;
     setIsPlacingOrder(true);
     setPaymentErrorMessage('');
@@ -2802,6 +2809,13 @@ export const Checkout = () => {
             }
           }
         }
+      }
+
+      // The order page can be opened from a link without a session; the request itself needs the customer login
+      if (!getAuthToken()) {
+        setItemReturnError('Please sign in to your account to submit this request. Your selections are kept.');
+        openAuthModal('login');
+        return;
       }
 
       setIsSubmittingItemReturn(true);
