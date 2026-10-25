@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 export const Hero = () => {
   const fallbackVideoSrc = getSupabaseMediaUrl('HOU_desktop');
@@ -44,12 +45,12 @@ export const Hero = () => {
     const handleUpdate = () => fetchHeroSlides();
     window.addEventListener('urvaah_hero_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchHeroSlides, 3000);
+    const stopLivePolling = startVisiblePolling(fetchHeroSlides);
 
     return () => {
       window.removeEventListener('urvaah_hero_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

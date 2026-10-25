@@ -47,7 +47,10 @@ export const getItemGstBreakdown = (item, orderGstInfo, isSingleItem = false) =>
   const baseTotal = unitPrice * qty;
 
   let taxAmount = 0;
-  if (isSingleItem && orderGstInfo.totalTax > 0) {
+  // Give the item the whole order's tax only when it really is the whole order. Callers sometimes pass
+  // "one item being returned" as single, which overstated GST on partial / mixed returns.
+  const coversWholeOrder = !orderGstInfo.subtotal || Math.abs(baseTotal - orderGstInfo.subtotal) < 1;
+  if (isSingleItem && orderGstInfo.totalTax > 0 && coversWholeOrder) {
     taxAmount = orderGstInfo.totalTax;
   } else if (orderGstInfo.totalTax > 0 && orderGstInfo.subtotal > 0) {
     taxAmount = Math.round((baseTotal / orderGstInfo.subtotal) * orderGstInfo.totalTax);

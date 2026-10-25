@@ -1,4 +1,14 @@
 import { apiFetch } from './api';
+import { getAdminAuthToken } from '../lib/apiClient';
+
+// Admin-desk shipping operations are admin-only on the API, so send the admin session token
+const adminFetch = (endpoint, options = {}) => {
+  const token = getAdminAuthToken();
+  return apiFetch(endpoint, {
+    ...options,
+    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+  });
+};
 
 /**
  * Shiprocket Logistics Frontend Client for House of Urvaah
@@ -36,7 +46,7 @@ export const shippingApi = {
 
   // 5. Assign AWB (Admin)
   async assignAwb(shipmentId, courierId = null, orderId = null, orderNumber = null) {
-    return apiFetch('/api/shipping/courier/assign-awb', {
+    return adminFetch('/api/shipping/courier/assign-awb', {
       method: 'POST',
       body: JSON.stringify({
         shipment_id: shipmentId,
@@ -49,7 +59,7 @@ export const shippingApi = {
 
   // 6. Schedule Pickup (Admin)
   async schedulePickup(shipmentIds) {
-    return apiFetch('/api/shipping/courier/pickup', {
+    return adminFetch('/api/shipping/courier/pickup', {
       method: 'POST',
       body: JSON.stringify({ shipment_ids: Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds] })
     });
@@ -57,7 +67,7 @@ export const shippingApi = {
 
   // 7. Generate Label (Admin)
   async generateLabel(shipmentIds) {
-    return apiFetch('/api/shipping/label', {
+    return adminFetch('/api/shipping/label', {
       method: 'POST',
       body: JSON.stringify({ shipment_ids: Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds] })
     });
@@ -65,7 +75,7 @@ export const shippingApi = {
 
   // 8. Generate Manifest (Admin)
   async generateManifest(shipmentIds) {
-    return apiFetch('/api/shipping/manifest', {
+    return adminFetch('/api/shipping/manifest', {
       method: 'POST',
       body: JSON.stringify({ shipment_ids: Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds] })
     });
@@ -73,7 +83,7 @@ export const shippingApi = {
 
   // 9. Cancel Shipment (Admin)
   async cancelShipment(orderIds) {
-    return apiFetch('/api/shipping/order/cancel', {
+    return adminFetch('/api/shipping/order/cancel', {
       method: 'POST',
       body: JSON.stringify({ order_ids: Array.isArray(orderIds) ? orderIds : [orderIds] })
     });
@@ -92,7 +102,7 @@ export const shippingApi = {
 
   // 11. Reverse Logistics (Return Order Creation)
   async createReturnOrder(order, itemsToReturn = [], reason = 'Customer requested return') {
-    return apiFetch('/api/shipping/return/create', {
+    return adminFetch('/api/shipping/return/create', {
       method: 'POST',
       body: JSON.stringify({
         order,
@@ -104,7 +114,7 @@ export const shippingApi = {
 
   // 12. Assign Return AWB
   async assignReturnAwb(shipmentId) {
-    return apiFetch('/api/shipping/return/assign-awb', {
+    return adminFetch('/api/shipping/return/assign-awb', {
       method: 'POST',
       body: JSON.stringify({ shipment_id: shipmentId })
     });
@@ -112,7 +122,7 @@ export const shippingApi = {
 
   // 13. Schedule Reverse Pickup
   async scheduleReversePickup(shipmentIds) {
-    return apiFetch('/api/shipping/return/pickup', {
+    return adminFetch('/api/shipping/return/pickup', {
       method: 'POST',
       body: JSON.stringify({ shipment_ids: Array.isArray(shipmentIds) ? shipmentIds : [shipmentIds] })
     });
@@ -120,7 +130,7 @@ export const shippingApi = {
 
   // 14. Customer Notification (SMS / WhatsApp)
   async notifyCustomer(order, status, trackingInfo = {}) {
-    return apiFetch('/api/shipping/notify', {
+    return adminFetch('/api/shipping/notify', {
       method: 'POST',
       body: JSON.stringify({ order, status, tracking_info: trackingInfo })
     });
@@ -128,7 +138,7 @@ export const shippingApi = {
 
   // 15. Simulate Out for Delivery
   async simulateOutForDelivery(awb) {
-    return apiFetch('/api/shipping/simulate/out-for-delivery', {
+    return adminFetch('/api/shipping/simulate/out-for-delivery', {
       method: 'POST',
       body: JSON.stringify({ awb })
     });
@@ -136,7 +146,7 @@ export const shippingApi = {
 
   // 16. Simulate Delivered
   async simulateDelivered(awb, recipientName = null) {
-    return apiFetch('/api/shipping/simulate/delivered', {
+    return adminFetch('/api/shipping/simulate/delivered', {
       method: 'POST',
       body: JSON.stringify({ awb, recipient_name: recipientName })
     });
@@ -144,7 +154,7 @@ export const shippingApi = {
 
   // 17. Dispatch Replacement Item
   async dispatchReplacement(originalOrder, replacementItems = [], options = {}) {
-    return apiFetch('/api/shipping/replacement/dispatch', {
+    return adminFetch('/api/shipping/replacement/dispatch', {
       method: 'POST',
       body: JSON.stringify({
         original_order: originalOrder,

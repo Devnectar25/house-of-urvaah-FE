@@ -526,6 +526,8 @@ export const AdminOrders = () => {
   // Auto periodic background poll (every 8s) to ensure live real-time sync for counts & orders
   useEffect(() => {
     const interval = setInterval(() => {
+      // Skip while the tab is hidden; the focus listener above refreshes on return
+      if (document.visibilityState !== 'visible') return;
       fetchOrders(true);
       fetchStats(true);
     }, 8000);

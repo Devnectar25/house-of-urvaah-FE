@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../services/productApi';
 import { getProductUrl } from '../../utils/productUrl';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
@@ -62,13 +63,13 @@ export const CategoryGrid = () => {
     window.addEventListener('storage', handleProductUpdate);
 
     // Sync periodically with Admin panel updates
-    const pollingInterval = setInterval(loadRecommendedProducts, 10000);
+    const stopLivePolling = startVisiblePolling(loadRecommendedProducts);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_products_updated', handleProductUpdate);
       window.removeEventListener('storage', handleProductUpdate);
-      clearInterval(pollingInterval);
+      stopLivePolling();
     };
   }, []);
 
