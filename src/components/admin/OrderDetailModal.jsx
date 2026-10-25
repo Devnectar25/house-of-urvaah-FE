@@ -330,6 +330,9 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
+  // Item-level admin decisions on a pending return / replacement request: { [orderItemId]: 'approve' | 'reject' }
+  const [itemDecisions, setItemDecisions] = useState({});
+  const [itemDecisionReason, setItemDecisionReason] = useState('');
   const [saveError, setSaveError] = useState(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
@@ -992,6 +995,59 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
+  // Submit an approve / reject decision for every pending item; the API derives the resulting order status
+  const handleSubmitItemDecisions = async (pendingItems) => {
+    if (!order || !Array.isArray(pendingItems) || pendingItems.length === 0) return;
+    const decisions = {};
+    for (const it of pendingItems) {
+      const d = itemDecisions[it.id];
+      if (d !== 'approve' && d !== 'reject') {
+        setSaveError('Choose Approve or Reject for every requested item.');
+        return;
+      }
+      decisions[it.id] = d;
+    }
+    const hasReject = Object.values(decisions).includes('reject');
+    if (hasReject && !itemDecisionReason.trim()) {
+      setSaveError('Please give the customer a reason for the rejected item(s).');
+      return;
+    }
+    setSavingStatus(true);
+    setSaveError(null);
+    setSaveSuccessMsg(null);
+    try {
+      const response = await apiClient(`/api/orders/${order.id}/request-decision`, {
+        method: 'POST',
+        body: JSON.stringify({ decisions, reason: itemDecisionReason.trim() || null })
+      });
+      const updatedData = response?.data || response || order;
+      const newStatus = updatedData.status || order.status;
+
+      setOrder(updatedData);
+      setConfirmedStatus(newStatus);
+      setSelectedStatus(newStatus);
+      confirmedRef.current.status = newStatus;
+      setItemDecisions({});
+      setItemDecisionReason('');
+      const approvedN = Object.values(decisions).filter(d => d === 'approve').length;
+      setSaveSuccessMsg(`Decision saved: ${approvedN} approved, ${pendingItems.length - approvedN} rejected.`);
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+      const notifyPreview = onOptimisticPreview || onStatusPreview;
+      if (notifyPreview) {
+        notifyPreview({ id: order.id, status: newStatus, payment_status: updatedData.payment_status || order.payment_status, isPreview: false });
+      }
+      const notifyParent = onStatusUpdated || onOrderUpdated;
+      if (notifyParent) notifyParent({ ...updatedData, status: newStatus, isPreview: false });
+      broadcastOrderUpdate({ ...updatedData, status: newStatus });
+    } catch (err) {
+      console.error('Failed to save item decisions:', err);
+      setSaveError(err.message || 'Failed to save the decision.');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handleApproveMixedReturnReplace = async () => {
     if (!order) return;
     setSavingStatus(true);
@@ -1366,11 +1422,17 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setSavingStatus(true);
     setSaveError(null);
     try {
+      // Mixed return + exchange: QC acceptance releases the returned item's refund to the Refund Desk
+      // (refund amount = return items only, stored at request time) and restocks the returned pieces.
+      const items = Array.isArray(order.items) ? order.items : [];
+      const isMixedOrder = items.some(it => (it.return_action || '').toLowerCase() === 'return') &&
+        items.some(it => (it.return_action || '').toLowerCase() === 'replace');
       const response = await apiClient(`/api/orders/${order.id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: 'Received at House of Urvaah',
-          logisticsStatus: 'Delivered to House of Urvaah'
+          logisticsStatus: 'Delivered to House of Urvaah',
+          ...(isMixedOrder ? { return_qc_status: 'Accepted' } : {})
         })
       });
 
@@ -2049,9 +2111,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </span>
                 );
               }
-              // Never render Cancel Order button once an order has been delivered or is post-delivery or replacement is shipped.
+              // Once the parcel has shipped (in transit / out for delivery) it can no longer be cancelled.
+              // Uses the saved status, not an unsaved dropdown preview.
+              const logisticsLower = `${order.logistics_status || ''} ${order.shipment_status || ''}`.toLowerCase();
+              const isShippedOrLater =
+                ['shipped', 'in transit', 'out for delivery', 'delivered'].includes(curSt) ||
+                ['in transit', 'picked up', 'shipped', 'out for delivery'].some(s => logisticsLower.includes(s));
+              // Never render Cancel Order button once an order has shipped, been delivered, is post-delivery or replacement is shipped.
               // Cancellation is not offered from the Shiprocket Forward Desk (managed in Admin Orders).
-              if (!isShiprocketDesk && !isPostDelivery && !(isInReplacementFlow && isReplacementShipped)) {
+              if (!isShiprocketDesk && !isShippedOrLater && !isPostDelivery && !(isInReplacementFlow && isReplacementShipped)) {
                 return (
                   <button
                     type="button"
@@ -2336,6 +2404,89 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   </div>
                 </div>
               )}
+
+              {/* Item-level decision panel: approve or reject each requested piece independently */}
+              {!isShiprocketDesk && (() => {
+                const PENDING = ['return requested', 'return request processing', 'replace requested', 'replacement request processing'];
+                const pendingItems = (Array.isArray(order?.items) ? order.items : []).filter(it =>
+                  ['return', 'replace'].includes((it.return_action || '').toLowerCase()) &&
+                  PENDING.includes((it.status || '').toLowerCase())
+                );
+                if (pendingItems.length === 0) return null;
+                const anyReject = pendingItems.some(it => itemDecisions[it.id] === 'reject');
+                const allDecided = pendingItems.every(it => ['approve', 'reject'].includes(itemDecisions[it.id]));
+                return (
+                  <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-xl p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <h4 className="text-xs sm:text-sm font-admin font-bold text-neutral-900 uppercase tracking-wide">
+                        Decide each requested item
+                      </h4>
+                      <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                        {pendingItems.length} item{pendingItems.length > 1 ? 's' : ''} awaiting review
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {pendingItems.map(it => {
+                        const isReturn = (it.return_action || '').toLowerCase() === 'return';
+                        const d = itemDecisions[it.id];
+                        return (
+                          <div key={it.id} className="flex items-center justify-between gap-3 p-2.5 bg-white border border-[#E7E2D8] rounded-lg flex-wrap">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-neutral-900 truncate">{it.name || `Product #${it.product_id}`}</p>
+                              <p className="text-[11px] text-neutral-500">
+                                {isReturn ? 'Return & refund' : `Replace${it.replacement_size ? ` with size ${it.replacement_size}` : ''}`}
+                                {' • '}Qty {it.quantity || 1}{it.size ? ` • Size ${it.size}` : ''}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setItemDecisions(prev => ({ ...prev, [it.id]: 'reject' }))}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase border transition-colors cursor-pointer disabled:opacity-50 ${d === 'reject' ? 'bg-neutral-200 border-neutral-500 text-neutral-900' : 'bg-white border-neutral-300 text-neutral-700 hover:border-neutral-500'}`}
+                              >
+                                Reject
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingStatus}
+                                onClick={() => setItemDecisions(prev => ({ ...prev, [it.id]: 'approve' }))}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase border transition-colors cursor-pointer disabled:opacity-50 ${d === 'approve' ? 'bg-neutral-950 border-neutral-950 text-white' : 'bg-white border-neutral-300 text-neutral-700 hover:border-black'}`}
+                              >
+                                Approve
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {anyReject && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">Reason shown to the customer for rejected item(s)</label>
+                        <textarea
+                          value={itemDecisionReason}
+                          onChange={(e) => setItemDecisionReason(e.target.value)}
+                          rows={2}
+                          maxLength={300}
+                          placeholder="e.g. Item shows signs of use / outside the return window"
+                          className="w-full p-2 text-xs border border-[#E7E2D8] rounded-lg bg-white focus:outline-none focus:border-neutral-500"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={savingStatus || !allDecided || (anyReject && !itemDecisionReason.trim())}
+                        onClick={() => handleSubmitItemDecisions(pendingItems)}
+                        className="px-5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      >
+                        {savingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                        <span>{savingStatus ? 'Saving...' : 'Save item decisions'}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Post-Delivery Return Request Review Banner */}
               {((['return requested', 'return request processing', 'return processing'].includes(
@@ -2747,7 +2898,12 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   order.items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return')) &&
                   order.items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'))
                 )
-              ) && (['return & replacement processing', 'return and replacement processing', 'return & replacement requested'].includes(
+              ) && ([
+                'return & replacement processing', 'return and replacement processing', 'return & replacement requested',
+                // A mixed customer request is saved with the regular pending statuses, so accept those too
+                'return request processing', 'return requested', 'replacement request processing', 'replace requested',
+                'replacement requested', 'return/replace pending'
+              ].includes(
                 (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase()
               )) && (
                 <div className="bg-gradient-to-r from-purple-50 via-sky-50 to-indigo-50 border-2 border-indigo-300 rounded-xl p-4 sm:p-5 space-y-3.5 shadow-xs">
@@ -4724,8 +4880,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       >
                         {ORDER_STATUS_OPTIONS.filter((opt) => {
                           const isPostDelivery = isPostDeliveryOrder(order, confirmedStatus);
-                          // For any order after delivery, cancellation options are strictly disallowed
-                          if (isPostDelivery && ['Cancelled', 'Cancellation Requested', 'Cancellation Rejected'].includes(opt.value)) {
+                          const savedSt = (confirmedStatus || order?.status || '').toLowerCase();
+                          const savedLogistics = `${order?.logistics_status || ''} ${order?.shipment_status || ''}`.toLowerCase();
+                          const isShippedOrLater =
+                            ['shipped', 'in transit', 'out for delivery', 'delivered'].includes(savedSt) ||
+                            ['in transit', 'picked up', 'shipped', 'out for delivery'].some(s => savedLogistics.includes(s));
+                          // Once shipped or delivered, cancellation options are strictly disallowed
+                          if ((isPostDelivery || isShippedOrLater) && ['Cancelled', 'Cancellation Requested', 'Cancellation Rejected'].includes(opt.value)) {
                             return opt.value === (confirmedStatus || order?.status);
                           }
 
@@ -4940,6 +5101,27 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     );
                   }
 
+                  // Forward shipping controls (label, manifest, pickup, transit milestones) only apply until the
+                  // forward parcel is delivered. Returns / replacements run their own reverse-pickup steps above.
+                  if (isPostDelivery) {
+                    const isReverseCycle = curSt !== 'delivered';
+                    return (
+                      <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-700 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>
+                            {isReverseCycle
+                              ? 'Forward shipment was delivered. Reverse pickup, QC and replacement / refund steps are handled in the journey above.'
+                              : 'Forward shipment delivered. No further shipping label, manifest or pickup actions are needed.'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full shrink-0">
+                          {isReverseCycle ? 'Reverse Cycle' : 'Delivered'}
+                        </span>
+                      </div>
+                    );
+                  }
+
                   return (
                     <>
                       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -5055,50 +5237,56 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             Testing Suite: Simulate Shiprocket Webhook Milestones
                           </span>
                           <div className={`grid grid-cols-2 gap-2 ${isShiprocketDesk ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
-                            <button
-                              type="button"
-                              disabled={logisticsLoading || !hasAwb}
-                              onClick={() => handleSimulateMilestone('IN TRANSIT')}
-                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
-                                !hasAwb
-                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
-                                  : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer hover:border-black'
-                              }`}
-                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates package reaching transit hub"}
-                            >
-                              <Package className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
-                              <span>In Transit (Shipped)</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={logisticsLoading || !hasAwb}
-                              onClick={() => handleSimulateMilestone('OUT FOR DELIVERY')}
-                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
-                                !hasAwb
-                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
-                                  : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer hover:border-black'
-                              }`}
-                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates local rider out for delivery"}
-                            >
-                              <Truck className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-neutral-600'}`} />
-                              <span>Out for Delivery</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={logisticsLoading || !hasAwb}
-                              onClick={() => handleSimulateMilestone('DELIVERED')}
-                              className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
-                                !hasAwb
-                                  ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
-                                  : 'bg-white hover:bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer hover:border-emerald-600'
-                              }`}
-                              title={!hasAwb ? "Generate AWB first before simulating milestones" : "Simulates customer doorstep handover"}
-                            >
-                              <CheckCircle2 className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : 'text-emerald-600'}`} />
-                              <span>Mark Delivered</span>
-                            </button>
+                            {(() => {
+                              // Highlight the order's current courier milestone; earlier ones show as completed.
+                              const msSt = (confirmedStatus || order.status || '').toLowerCase();
+                              const msLog = `${order.logistics_status || ''} ${order.shipment_status || ''}`.toLowerCase();
+                              const reachedStep =
+                                msSt === 'delivered' || (msLog.includes('delivered') && !msLog.includes('house of urvaah')) ? 3
+                                : msSt === 'out for delivery' || msLog.includes('out for delivery') ? 2
+                                : ['shipped', 'in transit'].includes(msSt) || msLog.includes('in transit') ? 1
+                                : 0;
+                              const milestones = [
+                                { step: 1, code: 'IN TRANSIT', label: 'In Transit (Shipped)', Icon: Package, hint: 'Simulates package reaching transit hub' },
+                                { step: 2, code: 'OUT FOR DELIVERY', label: 'Out for Delivery', Icon: Truck, hint: 'Simulates local rider out for delivery' },
+                                { step: 3, code: 'DELIVERED', label: 'Mark Delivered', Icon: CheckCircle2, hint: 'Simulates customer doorstep handover', isFinal: true }
+                              ];
+                              return milestones.map(({ step, code, label, Icon, hint, isFinal }) => {
+                                const isCurrent = step === reachedStep;
+                                const isDone = step < reachedStep;
+                                return (
+                                  <button
+                                    key={code}
+                                    type="button"
+                                    disabled={logisticsLoading || !hasAwb || isCurrent || isDone}
+                                    onClick={() => handleSimulateMilestone(code)}
+                                    aria-current={isCurrent ? 'step' : undefined}
+                                    className={`px-2.5 py-2 border text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-2xs ${
+                                      !hasAwb
+                                        ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-40 select-none'
+                                        : isCurrent
+                                        ? `${isFinal ? 'bg-emerald-600 border-emerald-600' : 'bg-neutral-950 border-neutral-950'} text-white ring-2 ring-offset-1 ${isFinal ? 'ring-emerald-500/40' : 'ring-neutral-900/20'} cursor-default`
+                                        : isDone
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 cursor-default'
+                                        : isFinal
+                                        ? 'bg-white hover:bg-emerald-50 border-emerald-300 text-emerald-800 cursor-pointer hover:border-emerald-600'
+                                        : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300 cursor-pointer hover:border-black'
+                                    }`}
+                                    title={!hasAwb ? 'Generate AWB first before simulating milestones' : isCurrent ? 'Current milestone' : isDone ? 'Milestone completed' : hint}
+                                  >
+                                    {isDone ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    ) : (
+                                      <Icon className={`w-3.5 h-3.5 ${!hasAwb ? 'text-neutral-400' : isCurrent ? 'text-white' : isFinal ? 'text-emerald-600' : 'text-neutral-600'}`} />
+                                    )}
+                                    <span>{label}</span>
+                                    {isCurrent && (
+                                      <span className="ml-0.5 px-1.5 py-px rounded bg-white/20 text-[9px] uppercase tracking-wider">Current</span>
+                                    )}
+                                  </button>
+                                );
+                              });
+                            })()}
 
                             {!isShiprocketDesk && (
                             <button
@@ -5486,11 +5674,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
           onClick={() => !savingStatus && setIsApproveReturnModalOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-neutral-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-neutral-200 overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between">
+            <div className="px-5 py-3 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -5515,13 +5703,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4 text-xs font-admin">
+            <div className="px-5 py-4 space-y-3 text-xs font-admin overflow-y-auto">
               {(() => {
                 const retGst = getReturnGstBreakdown(order);
                 return (
                   <>
                     {/* Customer & Order Metadata */}
-                    <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-1.5">
+                    <div className="px-3 py-2 bg-neutral-50 rounded-xl border border-neutral-200/80 space-y-1">
                       <div className="flex justify-between text-neutral-600">
                         <span>Customer:</span>
                         <span className="font-semibold text-brand-dark">{order.customer_name || order.user_id || 'Customer'}</span>
@@ -5570,7 +5758,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     )}
 
                     {/* Financial Breakdown with GST prominently displayed */}
-                    <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                    <div className="px-3 py-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1.5">
                       <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider block">
                         Refund Settlement Breakdown
                       </span>
@@ -5608,7 +5796,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
                     )}
 
-                    <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+                    <div className="px-3 py-2 bg-amber-50/80 border border-amber-200/90 rounded-xl text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
                       <Truck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div>
                         <strong>Doorstep Pickup:</strong> Approving will immediately schedule Delhivery reverse courier pickup via Shiprocket. Full refund of <strong>₹{retGst.totalRefund.toLocaleString('en-IN')}</strong> (including <strong>₹{retGst.gstTotal.toLocaleString('en-IN')} GST</strong>) will be settled upon arrival at the Maison.
@@ -5620,7 +5808,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
             </div>
 
             {/* Footer Buttons */}
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2.5">
+            <div className="px-5 py-3 bg-neutral-50 border-t border-neutral-200 flex items-center justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 disabled={savingStatus}

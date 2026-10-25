@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -1064,12 +1065,12 @@ export const TrendingOnGram = () => {
     const handleUpdate = () => fetchTrendingGram();
     window.addEventListener('urvaah_trending_gram_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchTrendingGram, 3000);
+    const stopLivePolling = startVisiblePolling(fetchTrendingGram);
 
     return () => {
       window.removeEventListener('urvaah_trending_gram_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

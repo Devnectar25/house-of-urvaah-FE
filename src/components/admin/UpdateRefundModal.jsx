@@ -380,13 +380,16 @@ export const UpdateRefundModal = ({
   // Determine items list
   const hasSpecificRefundItems =
     Array.isArray(refundOrder.refund_items) && refundOrder.refund_items.length > 0;
-  const itemsList = hasSpecificRefundItems
+  const allOrderItems = hasSpecificRefundItems
     ? refundOrder.refund_items
     : fetchedItems && fetchedItems.length > 0
     ? fetchedItems
     : Array.isArray(refundOrder.items) && refundOrder.items.length > 0
     ? refundOrder.items
     : [];
+  // Partial return: list only the items the customer sent back for refund, not the ones they kept
+  const returnFlaggedItems = allOrderItems.filter(it => (it.return_action || '').toLowerCase() === 'return');
+  const itemsList = returnFlaggedItems.length > 0 ? returnFlaggedItems : allOrderItems;
 
   const gstBreakdown = getReturnGstBreakdown(refundOrder, itemsList);
   const currentRefundNum = parseFloat(refundAmountInput) || 0;

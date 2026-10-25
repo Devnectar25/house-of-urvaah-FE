@@ -119,7 +119,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
           }
         }
       } catch (err) {
-        if (err.message && err.message.toLowerCase().includes('delivered')) {
+        // The API decides invoice eligibility: a refusal must never be bypassed by the local fallback
+        if (err.status === 401 || err.status === 403 || (err.message && err.message.toLowerCase().includes('delivered'))) {
           if (isMounted) {
             setError(err.message);
             setLoading(false);

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const DEFAULT_CATEGORIES = [
   {
@@ -162,12 +163,12 @@ export const WhatsHot = () => {
     window.addEventListener('storage', handleUpdate);
 
     // Continuous polling interval for seamless multi-tab / session synchronization
-    const interval = setInterval(fetchCategories, 3000);
+    const stopLivePolling = startVisiblePolling(fetchCategories);
 
     return () => {
       window.removeEventListener('urvaah_categories_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

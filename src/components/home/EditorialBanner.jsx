@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../common/Button';
 import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const EDITORIAL_VIDEOS = [
   {
@@ -140,13 +141,13 @@ export const EditorialBanner = () => {
     const handleUpdate = () => fetchFabricConfig();
     window.addEventListener('urvaah_fabric_video_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchFabricConfig, 3000);
+    const stopLivePolling = startVisiblePolling(fetchFabricConfig);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_fabric_video_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { getSupabaseMediaUrl, CDN_BASE_URL } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const SUPABASE_CDN = CDN_BASE_URL || 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media';
 
@@ -79,13 +80,13 @@ export const DualCampaignBanner = () => {
     const handleUpdate = () => fetchBanners();
     window.addEventListener('urvaah_dual_campaign_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchBanners, 3000);
+    const stopLivePolling = startVisiblePolling(fetchBanners);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_dual_campaign_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

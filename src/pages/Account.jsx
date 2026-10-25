@@ -10,6 +10,7 @@ import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { InvoiceModal } from '../components/common/InvoiceModal';
+import { isCustomerInvoiceEligible } from '../utils/invoiceEligibility';
 import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModal';
 import { ProductCard } from '../components/common/ProductCard';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
@@ -33,6 +34,28 @@ const findLocalProduct = (id) => {
     if (numId && pNumId && numId === pNumId) return true;
     return false;
   });
+};
+
+// Item-level label for a line item once it has its own state (cancelled, returned, exchanged, declined).
+// Returns null for forward states, where the order-level status is shown instead.
+const getItemStatusLabel = (item) => {
+  const st = String(item?.status || '').trim().toLowerCase();
+  const act = String(item?.return_action || '').trim().toLowerCase();
+  if (!st) return null;
+  if (st === 'cancellation requested' || st === 'cancel_requested') return 'CANCEL REQUESTED';
+  if (st === 'cancelled' || st === 'canceled' || st === 'cancel_approved') return 'CANCELLED';
+  if (st === 'return requested' || st === 'return request processing') return 'RETURN REQUESTED';
+  if (st === 'replace requested' || st === 'replacement request processing' || st === 'replacement requested') return 'REPLACEMENT REQUESTED';
+  if (st === 'return approved') return 'RETURN APPROVED';
+  if (st === 'replace approved' || st === 'replacement approved') return 'REPLACEMENT APPROVED';
+  if (st === 'return collected' || st.startsWith('in transit to')) return act === 'replace' ? 'EXCHANGE IN TRANSIT' : 'RETURN IN TRANSIT';
+  if (st.startsWith('received at')) return 'AT ATELIER';
+  if (st === 'refunded') return act === 'replace' ? 'REPLACED' : 'RETURNED • REFUNDED';
+  if (st === 'returned') return 'RETURNED';
+  if (st === 'replaced') return 'REPLACED';
+  if (st === 'return qc rejected') return 'RETURN NOT ACCEPTED';
+  if (st === 'delivered' && /^request declined:/i.test(item?.cancel_reason || '')) return 'REQUEST DECLINED';
+  return null;
 };
 
 const VALID_TABS = ['VIEW ORDERS', 'VIEW WISHLIST', /* 'MY COUPONS', */ 'ACCOUNT DETAILS'];
@@ -262,6 +285,7 @@ export const Account = () => {
     setIsEditingCancelBank(false);
   };
 
+  // Item-level cancellation: the customer can untick pieces they want to keep
   const handleToggleCancelItem = (itemId) => {
     setSelectedCancelItems((prev) =>
       prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
@@ -1303,10 +1327,10 @@ export const Account = () => {
   const firstName = user?.firstName || user?.name?.split(' ')[0] || 'ATELIER MEMBER';
 
   const tabConfig = [
-    { name: 'VIEW ORDERS', icon: Package, badge: orders.length > 0 ? orders.length : null },
-    { name: 'VIEW WISHLIST', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
+    { name: 'VIEW ORDERS', shortLabel: 'Orders', icon: Package, badge: orders.length > 0 ? orders.length : null },
+    { name: 'VIEW WISHLIST', shortLabel: 'Wishlist', icon: Heart, badge: wishlist.length > 0 ? wishlist.length : null },
     // { name: 'MY COUPONS', icon: Ticket },
-    { name: 'ACCOUNT DETAILS', icon: User }
+    { name: 'ACCOUNT DETAILS', shortLabel: 'Account', icon: User }
   ];
 
   const tabs = tabConfig.map(t => t.name);
@@ -3443,8 +3467,9 @@ export const Account = () => {
         </div>
 
         {/* 1. Premium Luxury Atelier Navigation Bar */}
-        <div className="mb-10 p-1.5 sm:p-2 bg-[#FAF8F3] border border-neutral-200/80 rounded-2xl shadow-xs overflow-x-auto scrollbar-none">
-          <div className="flex items-center min-w-max md:min-w-full w-full justify-between gap-1 sm:gap-2">
+        <div className="mb-8 sm:mb-10 p-1.5 sm:p-2 bg-[#FAF8F3] border border-neutral-200/80 rounded-2xl shadow-xs">
+          {/* Phones: equal 3-column bar with icon above a short label. sm+: one row with full labels */}
+          <div className="grid grid-cols-3 sm:flex sm:items-center w-full sm:justify-between gap-1 sm:gap-2" role="tablist">
             {tabConfig.map((item) => {
               const isActive = activeTab === item.name;
               const Icon = item.icon;
@@ -3452,8 +3477,10 @@ export const Account = () => {
                 <button
                   key={item.name}
                   type="button"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => handleTabClick(item.name)}
-                  className={`relative flex-1 flex items-center justify-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 py-3 rounded-xl text-xs tracking-[0.18em] font-sans uppercase transition-all duration-200 cursor-pointer whitespace-nowrap select-none ${
+                  className={`relative sm:flex-1 flex items-center justify-center px-2 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs tracking-[0.12em] sm:tracking-[0.18em] font-sans uppercase transition-all duration-200 cursor-pointer whitespace-nowrap select-none min-w-0 ${
                     isActive
                       ? 'text-white font-semibold'
                       : item.isDanger
@@ -3468,13 +3495,24 @@ export const Account = () => {
                       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
                   )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    <Icon className={`w-3.5 h-3.5 stroke-[1.6] shrink-0 transition-colors ${
-                      isActive ? 'text-white' : item.isDanger ? 'text-neutral-400 group-hover:text-red-600' : 'text-neutral-500'
-                    }`} />
-                    <span>{item.name}</span>
+                  <span className="relative z-10 flex flex-col sm:flex-row items-center gap-1 sm:gap-2 min-w-0">
+                    <span className="relative">
+                      <Icon className={`w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[1.6] shrink-0 transition-colors ${
+                        isActive ? 'text-white' : item.isDanger ? 'text-neutral-400 group-hover:text-red-600' : 'text-neutral-500'
+                      }`} />
+                      {/* Phone: count badge sits on the icon corner */}
+                      {typeof item.badge === 'number' && item.badge > 0 && (
+                        <span className={`sm:hidden absolute -top-1.5 -right-3 min-w-[16px] px-1 py-px rounded-full text-[9px] font-semibold leading-none tabular-nums text-center ${
+                          isActive ? 'bg-white text-brand-dark' : 'bg-brand-dark text-white'
+                        }`}>
+                          {item.badge > 99 ? '99+' : item.badge}
+                        </span>
+                      )}
+                    </span>
+                    <span className="sm:hidden truncate">{item.shortLabel || item.name}</span>
+                    <span className="hidden sm:inline">{item.name}</span>
                     {typeof item.badge === 'number' && item.badge > 0 && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-sans font-semibold leading-none tabular-nums ${
+                      <span className={`hidden sm:inline px-1.5 py-0.5 rounded-full text-[10px] font-sans font-semibold leading-none tabular-nums ${
                         isActive ? 'bg-white/20 text-white' : 'bg-neutral-200/80 text-neutral-800'
                       }`}>
                         {item.badge}
@@ -4173,9 +4211,23 @@ export const Account = () => {
                   );
                   const isInReplacementFlow = isReplacementIntent && !isReplacementRejected;
 
+                  // Mixed request (some pieces returned, others exchanged): the return-only and replacement-only
+                  // states above exclude each other, so this order needs its own phase
+                  const isMixedRequest = hasReturnIntent && isReplacementIntent && !isCancelled && !isCancellationRequested &&
+                    Array.isArray(ord.items) &&
+                    ord.items.some(it => (it.return_action || '').toLowerCase() === 'return') &&
+                    ord.items.some(it => (it.return_action || '').toLowerCase() === 'replace');
+                  const mixedPhase = !isMixedRequest ? null
+                    : ['return request processing', 'return requested', 'replacement request processing', 'replace requested', 'replacement requested', 'return & replacement requested', 'return & replacement processing'].includes(statusLower) ? 'requested'
+                    : (statusLower === 'returned & replaced' || (isRefundCompleted && Boolean(ord.replacement_order_number || ord.replacement_order_id))) ? 'done'
+                    : ['return & replacement approved', 'return approved', 'replace approved'].includes(statusLower) ? 'approved'
+                    : (statusLower.includes('in transit to') || statusLower.includes('collected')) ? 'transit'
+                    : statusLower.startsWith('received at') ? 'received'
+                    : null;
+
                   const isDelivered = !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed')) && !isInReturnFlow && !isInReplacementFlow;
                   const isReplacementDelivered = isReplacementForwardOrder && !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed') || Boolean(ord.delivered_at));
-                  const isInvoiceEligible = isDelivered || isReplacementDelivered;
+                  const isInvoiceEligible = isDelivered || isReplacementDelivered || isCustomerInvoiceEligible(ord); // kept items stay invoiceable on partial returns
                   const isOutForDelivery = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isDelivered || statusLower.includes('out') || statusLower.includes('delivery'));
                   const isShipped = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched'));
                   const isDeliveredOrderEver = isProductEverDelivered || isDelivered;
@@ -4235,17 +4287,18 @@ export const Account = () => {
                   return (
                     <div key={ord.id || idx} className="bg-white border border-[#E7E2D8] rounded-2xl p-4 sm:p-7 shadow-[0_4px_25px_rgba(0,0,0,0.03)] font-sans text-left space-y-5 sm:space-y-6 hover:border-neutral-300 transition-all duration-300">
                       {/* Header Row */}
-                      <div className="flex flex-wrap items-start justify-between gap-4 pb-2 border-b border-neutral-100">
-                        <div>
+                      {/* Phones: status pill on its own line above the order info so long labels never squeeze it */}
+                      <div className="flex flex-col-reverse items-start gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 pb-2 border-b border-neutral-100">
+                        <div className="min-w-0 w-full sm:w-auto">
                           <span className="text-[10px] font-sans font-bold tracking-[0.25em] uppercase text-neutral-400 block mb-0.5">
                             ORDER REFERENCE
                           </span>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-base sm:text-lg font-serif tracking-[0.06em] text-black font-semibold">
+                            <h3 className="text-base sm:text-lg font-serif tracking-[0.06em] text-black font-semibold whitespace-nowrap">
                               #{orderNum}
                             </h3>
                             {isReplacementForwardOrder && (
-                              <span className="px-2.5 py-0.5 text-[10px] font-sans font-bold tracking-wider uppercase rounded-full bg-purple-100 text-purple-900 border border-purple-200 shadow-2xs">
+                              <span className="px-2.5 py-0.5 text-[10px] font-sans font-bold tracking-wider uppercase rounded-full bg-[#FAF8F3] text-neutral-900 border border-[#E7E2D8] shadow-2xs">
                                 Replacement Piece {ord.original_order_number ? `(For #${ord.original_order_number})` : ''}
                               </span>
                             )}
@@ -4255,73 +4308,78 @@ export const Account = () => {
 
                         <div className="flex items-center gap-2.5 flex-wrap">
                           {/* Status Badge */}
-                          <span className={`px-3.5 py-1 text-[11px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 ${
+                          <span className={`px-2.5 sm:px-3.5 py-1 text-[10px] sm:text-[11px] font-sans font-semibold tracking-[0.1em] sm:tracking-[0.16em] uppercase rounded-full border shadow-2xs flex items-center gap-1.5 whitespace-nowrap ${
                             isCancellationRejected
-                              ? 'bg-rose-50 text-rose-900 border-rose-300 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isCancellationRequested
-                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isCancelled
-                              ? (isRefundCompleted ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold' : 'bg-red-50 text-red-800 border-red-200 font-bold')
+                              ? (isRefundCompleted ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold' : 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold')
                               : isReplacementForwardOrder
-                              ? (isDelivered ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold' : isShipped ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold' : 'bg-purple-100 text-purple-900 border-purple-300 font-bold')
+                              ? (isDelivered ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold' : isShipped ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold' : 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold')
                               : isReplacementRequested
-                              ? 'bg-purple-100 text-purple-900 border-purple-300 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReplacementApproved
-                              ? 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReplacementCollected
-                              ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReplacementQCReceived
-                              ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReplaced
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReplacementRejected
-                              ? 'bg-rose-50 text-rose-900 border-rose-200'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                               : isReturnRejected
-                              ? 'bg-rose-50 text-rose-900 border-rose-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReturnRequested
-                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReturnApproved
-                              ? 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReceivedAtUrvaah
-                              ? 'bg-blue-50 text-blue-900 border-blue-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isReturned
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-bold'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8] font-bold'
                               : isDelivered
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                               : isOutForDelivery
-                              ? 'bg-blue-50 text-blue-900 border-blue-200'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                               : isShipped
-                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                               : 'bg-[#FAF8F3] text-neutral-800 border-[#E5E0D8]'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               isCancellationRejected
-                                ? 'bg-rose-600'
+                                ? 'bg-neutral-900'
                                 : isCancellationRequested || isReturnRequested || isReplacementRequested
-                                ? 'bg-amber-600 animate-pulse'
+                                ? 'bg-neutral-900 animate-pulse'
                                 : isCancelled
-                                ? (isRefundCompleted ? 'bg-emerald-600' : 'bg-red-600')
+                                ? (isRefundCompleted ? 'bg-neutral-900' : 'bg-neutral-900')
                                 : isReturnRejected || isReplacementRejected
-                                ? 'bg-red-600'
+                                ? 'bg-neutral-900'
                                 : isReturnApproved || isReplacementApproved
-                                ? 'bg-indigo-600 animate-pulse'
+                                ? 'bg-neutral-900 animate-pulse'
                                 : isReceivedAtUrvaah || isReplacementCollected
-                                ? 'bg-blue-600 animate-pulse'
+                                ? 'bg-neutral-900 animate-pulse'
                                 : isReplacementQCReceived
-                                ? 'bg-amber-600 animate-pulse'
+                                ? 'bg-neutral-900 animate-pulse'
                                 : isReturned || isDelivered || isReplaced
-                                ? 'bg-emerald-600'
+                                ? 'bg-neutral-900'
                                 : isOutForDelivery
-                                ? 'bg-blue-600'
+                                ? 'bg-neutral-900'
                                 : isShipped
-                                ? 'bg-amber-600'
-                                : 'bg-amber-500 animate-pulse'
+                                ? 'bg-neutral-900'
+                                : 'bg-neutral-900 animate-pulse'
                             }`} />
                             <span>{
                               isCancellationRejected ? 'CANCELLATION REJECTED' :
                               isCancellationRequested ? 'CANCELLATION REQUESTED' :
                               isCancelled ? (isRefundCompleted ? 'CANCELLED & REFUNDED' : 'CANCELLED') :
                               isReplacementForwardOrder ? (isDelivered ? 'REPLACEMENT DELIVERED' : isShipped ? 'REPLACEMENT DISPATCHED' : 'REPLACEMENT IN TAILORING') :
+                              mixedPhase === 'requested' ? 'RETURN & EXCHANGE REQUESTED' :
+                              mixedPhase === 'approved' ? 'RETURN & EXCHANGE APPROVED' :
+                              mixedPhase === 'transit' ? 'PIECES IN TRANSIT' :
+                              mixedPhase === 'received' ? 'RECEIVED AT ATELIER' :
+                              mixedPhase === 'done' ? 'RETURNED & REPLACED' :
                               isReplacementRequested ? 'REPLACEMENT REQUESTED' :
                               isReplacementApproved ? 'REPLACEMENT APPROVED' :
                               isReplacementCollected ? 'PARCEL COLLECTED (REVERSE)' :
@@ -4338,1056 +4396,165 @@ export const Account = () => {
                             }</span>
                           </span>
 
-                          {/* Shiprocket Logistics Badge for Cancelled Orders */}
-                          {isCancelled && (
-                            <span className="px-3 py-1 text-[10px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border bg-neutral-900 text-white border-neutral-900 flex items-center gap-1.5 shadow-2xs">
-                              <Package className="w-3 h-3 text-neutral-300" />
-                              <span>SHIPROCKET VOIDED</span>
-                            </span>
-                          )}
-
-                          {/* Payment / Refund Status Badge */}
-                          <span className={`px-3 py-1 text-[10px] font-sans font-semibold tracking-[0.16em] uppercase rounded-full border ${
-                            isReturnQcRejected || (isReturnRejected && (ord.refund_status || '').toLowerCase() === 'cancelled')
-                              ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold'
-                              : isCancelled
-                              ? (isPaid || isOnlinePayment)
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-neutral-100 text-neutral-700 border-neutral-200'
-                              : isPaid
-                              ? 'bg-neutral-900 text-white border-neutral-900'
-                              : 'bg-neutral-100 text-neutral-700 border-neutral-200'
-                          }`}>
-                            {isReturnQcRejected || (isReturnRejected && (ord.refund_status || '').toLowerCase() === 'cancelled')
-                              ? 'REFUND CANCELLED'
-                              : isCancelled
-                              ? ((isPaid || isOnlinePayment)
-                                  ? (['refunded', 'completed'].includes((ord.refund_status || '').toLowerCase()) ? 'REFUND SETTLED' : 'REFUND INITIATED')
-                                  : 'COD • ZERO DUE')
-                              : (isPaid ? 'PAID' : 'PENDING')}
-                          </span>
                         </div>
                       </div>
 
-                      {/* Horizontal ORDER PROGRESS JOURNEY Card */}
-                      {isCancelled ? (
-                        <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs space-y-5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                              <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-800 uppercase font-semibold">
-                                CANCELLATION & SHIPROCKET REFUND JOURNEY
-                              </h4>
-                            </div>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-neutral-500 font-medium">
-                              STEP 4 OF 4 • SHIPROCKET SYNCED
-                            </span>
-                          </div>
-
-                          {/* Cancellation Journey Steps */}
-                          <div className="grid grid-cols-4 gap-2 relative">
-                            {/* Background Line connecting all steps */}
-                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-neutral-900 via-red-600 to-emerald-700 w-full transition-all duration-500" />
-                            </div>
-
-                            {/* Step 1: ORDER PLACED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-neutral-900 text-white ring-4 ring-neutral-200">
-                                <Check className="w-4 h-4 stroke-[2.5]" />
+                      {/* Compact status summary (the full journey lives on View Details) */}
+                      {(() => {
+                        const refundAmt = Number(ord.refund_eligible_amount || 0) > 0 ? Number(ord.refund_eligible_amount) : Number(ord.total || 0);
+                        const money = `₹${refundAmt.toLocaleString('en-IN')}`;
+                        const reason = ord.return_rejection_reason || ord.rejection_reason || '';
+                        let tone = 'neutral';
+                        let title = isReplacementForwardOrder ? 'Replacement being prepared' : 'Order confirmed';
+                        let detail = isReplacementForwardOrder
+                          ? 'Your replacement piece is being prepared for dispatch.'
+                          : 'We are preparing your order for dispatch.';
+                        if (isCancelled) {
+                          tone = 'rose'; title = 'Order cancelled';
+                          detail = !(isPaid || isOnlinePayment)
+                            ? 'Cancelled before dispatch. Nothing was charged (Cash on Delivery).'
+                            : isRefundCompleted ? `Refund of ${money} completed.` : `Refund of ${money} is being processed (3–5 business days).`;
+                        } else if (isCancellationRequested) {
+                          tone = 'amber'; title = 'Cancellation requested'; detail = 'Our team is reviewing your request.';
+                        } else if (isCancellationRejected) {
+                          tone = 'amber'; title = 'Cancellation declined'; detail = 'Your order will continue as planned.';
+                        } else if (isReturnQcRejected) {
+                          tone = 'rose'; title = 'Return not accepted'; detail = 'The returned piece did not pass inspection, so no refund was issued.';
+                        } else if (isReturnRejected) {
+                          tone = 'rose'; title = 'Return request declined'; detail = reason ? `Reason: ${reason}` : 'Your order remains delivered.';
+                        } else if (isReplacementRejected) {
+                          tone = 'rose'; title = 'Replacement request declined'; detail = reason ? `Reason: ${reason}` : 'Your order remains delivered.';
+                        } else if (mixedPhase === 'requested') {
+                          tone = 'amber'; title = 'Return & exchange requested'; detail = 'Our team is reviewing each piece in your request.';
+                        } else if (mixedPhase === 'approved') {
+                          tone = 'indigo'; title = 'Request approved'; detail = 'A courier will pick up the pieces within 24–48 hours.';
+                        } else if (mixedPhase === 'transit') {
+                          tone = 'indigo'; title = 'Pieces picked up'; detail = 'Your pieces are on their way back to us.';
+                        } else if (mixedPhase === 'received') {
+                          tone = 'indigo'; title = 'Pieces received';
+                          detail = ord.replacement_order_number ? `Replacement ${ord.replacement_order_number} is on its way; your refund of ${money} follows.` : `We are inspecting the pieces. Your refund of ${money} follows.`;
+                        } else if (mixedPhase === 'done') {
+                          tone = 'emerald'; title = 'Returned & replaced';
+                          detail = ord.replacement_order_number ? `Refund of ${money} completed. Replacement ${ord.replacement_order_number} sent.` : `Refund of ${money} completed.`;
+                        } else if (isReturned) {
+                          tone = 'emerald'; title = 'Returned & refunded'; detail = `Refund of ${money} completed.`;
+                        } else if (isReceivedAtUrvaah) {
+                          tone = 'indigo'; title = 'Return received'; detail = `We are inspecting the piece. Your refund of ${money} follows.`;
+                        } else if (isReturnCollected) {
+                          tone = 'indigo'; title = 'Return picked up'; detail = 'The piece is on its way back to us.';
+                        } else if (isReturnApproved) {
+                          tone = 'indigo'; title = 'Return approved'; detail = 'A courier will pick up the piece within 24–48 hours.';
+                        } else if (isReturnRequested) {
+                          tone = 'amber'; title = 'Return requested'; detail = 'Our team is reviewing your request.';
+                        } else if (isReplaced) {
+                          tone = 'emerald'; title = 'Replacement dispatched';
+                          detail = ord.replacement_order_number ? `New order ${ord.replacement_order_number} is on its way.` : 'Your replacement is on its way.';
+                        } else if (isReplacementInTransit || isReplacementQCReceived || isReplacementCollected) {
+                          tone = 'purple'; title = 'Replacement in progress'; detail = 'We have your original piece and are preparing the replacement.';
+                        } else if (isReplacementApproved) {
+                          tone = 'purple'; title = 'Replacement approved'; detail = 'A courier will pick up the original piece within 24–48 hours.';
+                        } else if (isReplacementRequested) {
+                          tone = 'amber'; title = 'Replacement requested'; detail = 'Our team is reviewing your request.';
+                        } else if (isDelivered) {
+                          tone = 'emerald'; title = 'Delivered';
+                          detail = ord.delivered_at
+                            ? `Delivered on ${new Date(ord.delivered_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+                            : 'Your order has been delivered.';
+                        } else if (isOutForDelivery) {
+                          tone = 'indigo'; title = 'Out for delivery'; detail = 'Arriving today.';
+                        } else if (isShipped) {
+                          tone = 'indigo'; title = 'Shipped'; detail = ord.tracking_number ? `Tracking number ${ord.tracking_number}` : 'Your order is on its way.';
+                        }
+                        // One brand surface for every state; the icon badge carries the meaning
+                        const toneClasses = 'bg-[#FAF8F3] border-[#E7E2D8] text-neutral-900';
+                        const badgeClasses = tone === 'emerald'
+                          ? 'bg-neutral-900 text-white'                               // finished
+                          : tone === 'rose'
+                          ? 'bg-white text-neutral-400 border border-[#E7E2D8]'        // cancelled / declined
+                          : 'bg-white text-neutral-900 border border-neutral-900';    // in progress / awaiting
+                        const StatusIcon = isCancelled || isReturnQcRejected ? XCircle
+                          : isReturnRejected || isReplacementRejected || isCancellationRejected ? AlertCircle
+                          : isCancellationRequested || isReturnRequested || isReplacementRequested || mixedPhase === 'requested' ? Clock
+                          : mixedPhase === 'done' ? CheckCircle2
+                          : isReturned ? CheckCircle2
+                          : isInReturnFlow ? RotateCcw
+                          : isInReplacementFlow || isReplaced ? RefreshCw
+                          : isDelivered ? PackageCheck
+                          : isShipped || isOutForDelivery ? Truck
+                          : Package;
+                        // Stepper only for normal forward orders
+                        const isForwardFlow = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow &&
+                          !isReturnRejected && !isReturnQcRejected && !isReplacementRejected;
+                        const forwardStep = isDelivered ? 4 : isOutForDelivery ? 3 : isShipped ? 2 : 1;
+                        const isComplete = forwardStep === 4;
+                        const steps = [
+                          { label: 'Placed', Icon: ShoppingBag },
+                          { label: 'Shipped', Icon: Package },
+                          { label: 'Out for delivery', Icon: Truck },
+                          { label: 'Delivered', Icon: PackageCheck }
+                        ];
+                        const fillClass = 'bg-neutral-900';
+                        const deliveredOn = isDelivered && ord.delivered_at
+                          ? new Date(ord.delivered_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                          : null;
+                        return (
+                          <div className={`relative overflow-hidden rounded-xl border px-3 sm:px-4 py-2.5 ${toneClasses}`}>
+                            {/* Header: status icon, message, step / date (compact) */}
+                            <div className="flex items-center gap-2.5">
+                              <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${badgeClasses}`}>
+                                <StatusIcon className="w-3.5 h-3.5 stroke-[2]" />
+                              </span>
+                              <div className="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-2">
+                                <p className="text-[13px] font-semibold font-sans leading-tight shrink-0">{title}</p>
+                                {detail && <p className="text-[11px] sm:text-xs text-neutral-500 font-sans leading-snug sm:truncate">{detail}</p>}
                               </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-neutral-900">
-                                ORDER PLACED
-                              </span>
-                              <span className="text-[9px] text-neutral-400 font-sans tracking-tight mt-0.5 hidden sm:block">
-                                Payment Received
-                              </span>
-                            </div>
-
-                            {/* Step 2: CANCELLED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-red-600 text-white ring-4 ring-red-100">
-                                <X className="w-4 h-4 stroke-[2.5]" />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-red-700">
-                                CANCELLED
-                              </span>
-                              <span className="text-[9px] text-red-500/80 font-sans tracking-tight mt-0.5 hidden sm:block">
-                                Pre-Dispatch Request
-                              </span>
-                            </div>
-
-                            {/* Step 3: SHIPROCKET VOIDED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-neutral-900 text-white ring-4 ring-neutral-200">
-                                <Package className="w-4 h-4 stroke-[2]" />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-neutral-900">
-                                SHIPROCKET VOIDED
-                              </span>
-                              <span className="text-[9px] text-neutral-500 font-sans tracking-tight mt-0.5 hidden sm:block">
-                                Pickup Cancelled
-                              </span>
-                            </div>
-
-                            {/* Step 4: REFUND COMPLETED / COD SETTLED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-emerald-700 text-white ring-4 ring-emerald-100">
-                                <CheckCircle2 className="w-4 h-4 stroke-[2.2]" />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-emerald-800">
-                                {(isPaid || isOnlinePayment) ? (isRefundCompleted ? 'REFUND COMPLETED' : 'REFUND ISSUED') : 'COD SETTLED'}
-                              </span>
-                              <span className="text-[9px] text-emerald-600/80 font-sans tracking-tight mt-0.5 hidden sm:block">
-                                {(isPaid || isOnlinePayment) ? (isRefundCompleted ? '100% Refund Disbursed' : '100% Settled') : 'Zero Due'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Shiprocket Logistics & Refund Intelligence Box */}
-                          <div className="pt-3 border-t border-[#E7E2D8] grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-sans">
-                            {/* Shiprocket Logistics Details */}
-                            <div className="bg-white/80 border border-[#E7E2D8] rounded-xl p-3.5 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-800 flex items-center gap-1.5">
-                                  <Package className="w-3.5 h-3.5 text-neutral-700" />
-                                  Shiprocket Logistics Sync
-                                </span>
-                                <span className="text-[9px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 uppercase">
-                                  Pickup Voided
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-neutral-600 leading-relaxed">
-                                Shipment and courier pickup request were cancelled in Shiprocket prior to dispatch. Zero freight fee billed to order account.
-                              </p>
-                              <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-500">
-                                <span>Logistics Partner: <strong className="text-neutral-700">Shiprocket Express</strong></span>
-                                <span>AWB: <strong className="text-neutral-700">Voided (Cancelled)</strong></span>
-                              </div>
-                            </div>
-
-                            {/* Financial Refund Details */}
-                            <div className="bg-white/80 border border-[#E7E2D8] rounded-xl p-3.5 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-800 flex items-center gap-1.5">
-                                  <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
-                                  Financial Settlement
-                                </span>
-                                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
-                                  (isPaid || isOnlinePayment)
-                                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                                    : 'text-neutral-700 bg-neutral-100 border-neutral-200'
-                                }`}>
-                                  {(isPaid || isOnlinePayment) ? (isRefundCompleted ? '100% Refund Disbursed' : '100% Refunded') : 'Zero Payment'}
-                                </span>
-                              </div>
-                              {(isPaid || isOnlinePayment) ? (
-                                <>
-                                  <p className="text-[11px] text-neutral-600 leading-relaxed">
-                                    Full 100% refund of <strong className="text-neutral-900 font-semibold">₹{Number(orderTotal).toLocaleString('en-IN')}</strong> {isRefundCompleted ? 'disbursed' : 'initiated'} to original payment source ({ord.payment_type || ord.payment_method || 'Online / UPI'}).
-                                  </p>
-                                  <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-500">
-                                    <span>Settlement: <strong className="text-neutral-700">{isRefundCompleted ? 'Completed' : '3-5 Business Days'}</strong></span>
-                                    <span>UTR Ref: <strong className="text-neutral-700">{ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr || `REF-${orderNum}`}</strong></span>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-[11px] text-neutral-600 leading-relaxed">
-                                    This was a Cash on Delivery (COD) order. Because no advance payment was collected, no monetary refund is required.
-                                  </p>
-                                  <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-500">
-                                    <span>Payment Mode: <strong className="text-neutral-700">Cash on Delivery</strong></span>
-                                    <span>Balance Due: <strong className="text-neutral-700">₹0.00</strong></span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ) : isReplacementRejected ? (
-                        <div className="bg-[#FAF8F3] border border-rose-300 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-rose-950 uppercase font-semibold flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-                              <span>REPLACEMENT REQUEST REJECTED • QC FAILED</span>
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-rose-700 font-semibold px-2.5 py-0.5 bg-rose-100 rounded-full border border-rose-200">
-                              INSPECTION FAILED
-                            </span>
-                          </div>
-
-                          <div className="p-3.5 bg-white border border-rose-200 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between text-rose-950">
-                              <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                                <span>Atelier Inspection Reason:</span>
-                              </span>
-                              <span className="text-[10px] text-neutral-500">
-                                {ord.updated_at ? new Date(ord.updated_at).toLocaleDateString('en-IN') : 'Recent'}
-                              </span>
-                            </div>
-                            <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded-lg border border-rose-200">
-                              "{ord.rejection_reason || ord.cancel_reason || 'Returned piece failed atelier quality check / incorrect item received'}"
-                            </p>
-                            <p className="text-[11px] text-neutral-600 leading-relaxed pt-1">
-                              Because the returned garment did not pass atelier quality verification, the replacement request has been declined and no forward exchange parcel will be dispatched.
-                            </p>
-                          </div>
-                        </div>
-                      ) : isReturnQcRejected ? (
-                        <div className="bg-[#FAF8F3] border border-rose-300 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-rose-950 uppercase font-semibold flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-                              <span>RETURN REJECTED • QC FAILED • REFUND CANCELLED</span>
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-rose-800 font-bold px-2.5 py-0.5 bg-rose-100 rounded-full border border-rose-300">
-                              QC REJECTED
-                            </span>
-                          </div>
-
-                          {/* 4-Step Journey showing where the process was stopped */}
-                          <div className="grid grid-cols-4 gap-2 relative py-1">
-                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-neutral-900 via-indigo-600 to-rose-600 w-full" />
-                            </div>
-
-                            {/* Step 1: Return Requested */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-neutral-900 text-white ring-4 ring-neutral-200 text-xs shadow-xs">
-                                ✓
-                              </div>
-                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-neutral-900">
-                                REQUESTED
-                              </span>
-                            </div>
-
-                            {/* Step 2: Parcel Collected */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-indigo-700 text-white ring-4 ring-indigo-100 text-xs shadow-xs">
-                                ✓
-                              </div>
-                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-indigo-900">
-                                PICKED UP
-                              </span>
-                            </div>
-
-                            {/* Step 3: Atelier QC Failed */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-rose-600 text-white ring-4 ring-rose-100 text-xs shadow-xs">
-                                ✕
-                              </div>
-                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-rose-700 font-bold">
-                                QC REJECTED
-                              </span>
-                            </div>
-
-                            {/* Step 4: Refund Cancelled */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-neutral-800 text-white ring-4 ring-neutral-200 text-xs shadow-xs">
-                                ✕
-                              </div>
-                              <span className="text-[9px] font-bold tracking-wider uppercase mt-2 font-sans text-rose-900 font-bold">
-                                REFUND CANCELLED
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Inspection Reason & Financial Cancelled Details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                            <div className="bg-white border border-rose-200 rounded-xl p-3.5 space-y-2">
-                              <div className="flex items-center justify-between text-rose-950">
-                                <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span>QC Inspection Findings:</span>
-                                </span>
-                                <span className="text-[10px] text-neutral-500">
-                                  {ord.updated_at ? new Date(ord.updated_at).toLocaleDateString('en-IN') : 'Recent'}
-                                </span>
-                              </div>
-                              <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded-lg border border-rose-200 leading-relaxed">
-                                "{ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason || 'Wrong or damaged product received during QC inspection'}"
-                              </p>
-                              <p className="text-[11px] text-neutral-600 leading-relaxed">
-                                The returned parcel arrived at the House of Urvaah atelier but failed quality inspection. The product was not accepted into inventory.
-                              </p>
-                            </div>
-
-                            <div className="bg-white border border-rose-200 rounded-xl p-3.5 space-y-2">
-                              <div className="flex items-center justify-between text-rose-950">
-                                <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                  <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span>Financial Settlement:</span>
-                                </span>
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 uppercase">
-                                  Refund Cancelled
-                                </span>
-                              </div>
-                              <div className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200 space-y-1 text-[11px]">
-                                <div className="flex justify-between text-neutral-600">
-                                  <span>Refund Amount:</span>
-                                  <span className="font-semibold text-neutral-400 line-through">₹{Number(ord.total || orderTotal).toLocaleString('en-IN')}</span>
-                                </div>
-                                <div className="flex justify-between text-rose-900 font-bold">
-                                  <span>Payable Refund:</span>
-                                  <span className="font-mono">₹0.00 (Cancelled)</span>
-                                </div>
-                              </div>
-                              <p className="text-[11px] text-neutral-600 leading-relaxed">
-                                Because the returned garment did not pass quality check, the refund for this return has been cancelled. For further queries, please contact concierge care.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : isReturnRejected ? (
-                        <div className="bg-[#FAF8F3] border border-rose-300 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-rose-950 uppercase font-semibold flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-                              <span>RETURN REQUEST DECLINED • ATELIER AUDIT</span>
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-rose-700 font-semibold px-2.5 py-0.5 bg-rose-100 rounded-full border border-rose-200">
-                              RETURN REJECTED
-                            </span>
-                          </div>
-
-                          <div className="p-3.5 bg-white border border-rose-200 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between text-rose-950">
-                              <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                                <span>Return Request Status:</span>
-                              </span>
-                              <span className="text-[10px] text-neutral-500">
-                                {ord.updated_at ? new Date(ord.updated_at).toLocaleDateString('en-IN') : 'Recent'}
-                              </span>
-                            </div>
-                            <p className="font-semibold text-rose-900 text-xs bg-rose-50/70 p-2.5 rounded-lg border border-rose-200">
-                              "{ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason || 'Return request rejected by Admin / Not eligible for return'}"
-                            </p>
-                            <p className="text-[11px] text-neutral-600 leading-relaxed pt-1">
-                              Your return request for this order was reviewed and declined by the Maison admin team. This order remains marked as delivered and no reverse pickup will be scheduled.
-                            </p>
-                          </div>
-                        </div>
-                      ) : isInReplacementFlow ? (
-                        <div className="bg-[#FAF8F3] border border-purple-200/80 rounded-2xl p-5 sm:p-6 shadow-2xs">
-                          <div className="flex items-center justify-between mb-5">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-purple-950 uppercase font-semibold flex items-center gap-2">
-                              <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
-                              <span>REPLACEMENT & EXCHANGE JOURNEY</span>
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-purple-700 font-medium">
-                              STEP {isReplaced ? '4 OF 4' : (isReplacementOutForDelivery || isReplacementInTransit) ? '3 OF 4' : isReplacementApproved ? '2 OF 4' : '1 OF 4'}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-4 gap-2 relative">
-                            {/* Background Line */}
-                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-purple-700 transition-all duration-500"
-                                style={{
-                                  width: isReplaced
-                                    ? '100%'
-                                    : (isReplacementOutForDelivery || isReplacementInTransit)
-                                    ? '66%'
-                                    : isReplacementApproved
-                                    ? '33%'
-                                    : '0%'
-                                }}
-                              />
-                            </div>
-
-                            {/* Step 1: REPLACEMENT REQUESTED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-purple-700 text-white ring-4 ring-purple-100">
-                                <Check className="w-4 h-4 stroke-[2.5]" />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-black">
-                                REQUESTED
-                              </span>
-                            </div>
-
-                            {/* Step 2: ATELIER APPROVED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced
-                                  ? 'bg-purple-700 text-white ring-4 ring-purple-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isReplacementApproved || isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                              }`}>
-                                APPROVED
-                              </span>
-                            </div>
-
-                            {/* Step 3: DISPATCH / IN TRANSIT */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReplacementInTransit || isReplacementOutForDelivery || isReplaced
-                                  ? 'bg-purple-700 text-white ring-4 ring-purple-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <Truck className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isReplacementInTransit || isReplacementOutForDelivery || isReplaced ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                              }`}>
-                                IN TRANSIT
-                              </span>
-                            </div>
-
-                            {/* Step 4: REPLACED & DELIVERED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReplaced
-                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <PackageCheck className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isReplaced ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
-                              }`}>
-                                REPLACED
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : isInReturnFlow ? (
-                        <div className="bg-[#FAF8F3] border border-indigo-200/60 rounded-2xl p-5 sm:p-6 shadow-2xs">
-                          <div className="flex items-center justify-between mb-5">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-indigo-900 uppercase font-semibold flex items-center gap-2">
-                              <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>RETURN & REVERSE PICKUP JOURNEY</span>
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-indigo-700 font-medium">
-                              STEP {isReceivedAtUrvaah || isReturned ? '5 OF 5' : isReturnCollected ? '4 OF 5' : isReturnApproved ? '3 OF 5' : '1 OF 5'}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-5 gap-1.5 sm:gap-2 relative">
-                            {/* Background Line */}
-                            <div className="absolute top-4 left-[10%] right-[10%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-indigo-700 transition-all duration-500"
-                                style={{
-                                  width: isReceivedAtUrvaah || isReturned
-                                    ? '100%'
-                                    : isReturnCollected
-                                    ? '75%'
-                                    : isReturnApproved
-                                    ? '50%'
-                                    : '15%'
-                                }}
-                              />
-                            </div>
-
-                            {/* Step 1: RETURN REQUESTED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center font-bold shadow-xs bg-indigo-700 text-white ring-4 ring-indigo-100">
-                                <Check className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[2.5]" />
-                              </div>
-                              <span className="text-[8px] sm:text-[9px] font-bold tracking-[0.14em] uppercase mt-2 font-sans text-black">
-                                REQUESTED
-                              </span>
-                            </div>
-
-                            {/* Step 2: ATELIER APPROVED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned
-                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <CheckCircle2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[8px] sm:text-[9px] tracking-[0.14em] uppercase mt-2 font-sans ${
-                                isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                              }`}>
-                                APPROVED
-                              </span>
-                            </div>
-
-                            {/* Step 3: DOORSTEP COURIER PICKUP */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReturnCollected || isReceivedAtUrvaah || isReturned
-                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
-                                  : isReturnApproved
-                                  ? 'bg-amber-500 text-white ring-4 ring-amber-100 shadow-xs animate-pulse'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <Truck className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[8px] sm:text-[9px] tracking-[0.14em] uppercase mt-2 font-sans ${
-                                isReturnCollected || isReceivedAtUrvaah || isReturned
-                                  ? 'font-bold text-black'
-                                  : isReturnApproved
-                                  ? 'font-bold text-amber-700'
-                                  : 'font-medium text-neutral-400'
-                              }`}>
-                                {isReturnCollected || isReceivedAtUrvaah || isReturned ? 'PICKED UP' : 'PICKUP'}
-                              </span>
-                            </div>
-
-                            {/* Step 4: IN TRANSIT TO URVAAH */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReceivedAtUrvaah || isReturned
-                                  ? 'bg-indigo-700 text-white ring-4 ring-indigo-100 shadow-xs'
-                                  : isReturnCollected
-                                  ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 shadow-xs animate-pulse'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <RotateCcw className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[8px] sm:text-[9px] tracking-[0.14em] uppercase mt-2 font-sans ${
-                                isReceivedAtUrvaah || isReturned ? 'font-bold text-black' : isReturnCollected ? 'font-bold text-indigo-700' : 'font-medium text-neutral-400'
-                              }`}>
-                                IN TRANSIT
-                              </span>
-                            </div>
-
-                            {/* Step 5: ATELIER RECEIVED & REFUND */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isReceivedAtUrvaah || isReturned
-                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <PackageCheck className="w-3.5 sm:w-4 h-3.5 sm:h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[8px] sm:text-[9px] tracking-[0.14em] uppercase mt-2 font-sans ${
-                                isReceivedAtUrvaah || isReturned ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
-                              }`}>
-                                {isReturned ? 'REFUNDED' : 'ATELIER'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : !isCancelled && !isCancellationRequested ? (
-                        <div className="bg-[#FAF8F3] border border-[#E7E2D8] rounded-2xl p-5 sm:p-6 shadow-2xs">
-                          <div className="flex items-center justify-between mb-5">
-                            <h4 className="text-[10px] font-serif tracking-[0.25em] text-neutral-500 uppercase font-semibold">
-                              ORDER PROGRESS JOURNEY
-                            </h4>
-                            <span className="text-[10px] font-sans tracking-[0.15em] uppercase text-neutral-400 font-medium">
-                              STEP {isDelivered ? '4 OF 4' : isOutForDelivery ? '3 OF 4' : isShipped ? '2 OF 4' : '1 OF 4'}
-                            </span>
-                          </div>
-
-                          {/* Progress Journey Steps */}
-                          <div className="grid grid-cols-4 gap-2 relative">
-                            {/* Background Line with Dynamic Fill */}
-                            <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-neutral-200/90 z-0 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-brand-dark transition-all duration-500"
-                                style={{
-                                  width: isDelivered
-                                    ? '100%'
-                                    : isOutForDelivery
-                                    ? '66%'
-                                    : isShipped
-                                    ? '33%'
-                                    : '0%'
-                                }}
-                              />
-                            </div>
-
-                            {/* Step 1: ORDER PLACED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-xs transition-all bg-brand-dark text-white ring-4 ring-[#E8E2D8]">
-                                <Check className="w-4 h-4 stroke-[2.5]" />
-                              </div>
-                              <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.16em] uppercase mt-2.5 font-sans text-black">
-                                ORDER PLACED
-                              </span>
-                            </div>
-
-                            {/* Step 2: SHIPPED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isShipped
-                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <Package className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isShipped ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                              }`}>
-                                SHIPPED
-                              </span>
-                            </div>
-
-                            {/* Step 3: OUT FOR DELIVERY */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isOutForDelivery
-                                  ? 'bg-brand-dark text-white ring-4 ring-[#E8E2D8] shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <Truck className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isOutForDelivery ? 'font-bold text-black' : 'font-medium text-neutral-400'
-                              }`}>
-                                OUT FOR DELIVERY
-                              </span>
-                            </div>
-
-                            {/* Step 4: DELIVERED */}
-                            <div className="flex flex-col items-center text-center z-10">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                                isDelivered
-                                  ? 'bg-emerald-700 text-white ring-4 ring-emerald-100 shadow-xs'
-                                  : 'bg-white border-2 border-neutral-300 text-neutral-400'
-                              }`}>
-                                <CheckCircle2 className="w-4 h-4 stroke-[1.8]" />
-                              </div>
-                              <span className={`text-[9px] sm:text-[10px] tracking-[0.16em] uppercase mt-2.5 font-sans ${
-                                isDelivered ? 'font-bold text-emerald-800' : 'font-medium text-neutral-400'
-                              }`}>
-                                DELIVERED
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {/* Replacement Flow Informational Banners */}
-                      {isReplacementRequested && (
-                        <div className="bg-purple-50/90 border border-purple-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-purple-100 rounded-xl text-purple-800 shrink-0 mt-0.5">
-                            <Clock className="w-5 h-5 text-purple-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-purple-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Replacement Request Pending Atelier Review
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/80 text-purple-900 border border-purple-300 uppercase">
-                                Under Review
-                              </span>
-                            </div>
-                            <p className="text-purple-900/90 leading-relaxed font-normal">
-                              Your product exchange request for this delivered order has been submitted to the House of Urvaah atelier concierge. Our team is verifying stock availability for your replacement size and will coordinate reverse pickup of the delivered item.
-                            </p>
-                            {(ord.cancel_reason || ord.return_reason) && (
-                              <p className="text-[11px] text-purple-800 pt-1">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">Exchange Details:</span> {ord.cancel_reason || ord.return_reason}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {isReplacementApproved && !isReplacementCollected && !isReplacementQCReceived && !isReplaced && (
-                        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-800 shrink-0 mt-0.5">
-                            <CheckCircle2 className="w-5 h-5 text-indigo-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-indigo-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Replacement Approved — Reverse Pickup Scheduled
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 uppercase">
-                                Pickup Scheduled
-                              </span>
-                            </div>
-                            <p className="text-indigo-900/90 leading-relaxed font-normal">
-                              Your replacement has been authorized by our atelier team. Courier partner is assigned for doorstep collection of the original piece. Please ensure tags and original packaging remain intact.
-                            </p>
-                            {ord.replacement_size && (
-                              <p className="text-[11px] text-indigo-950 pt-1 font-semibold">
-                                <span className="uppercase tracking-wider text-[10px] text-indigo-700">Requested Replacement Size:</span> {ord.replacement_size}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {isReplacementCollected && !isReplacementQCReceived && !isReplaced && (
-                        <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-blue-100 rounded-xl text-blue-800 shrink-0 mt-0.5">
-                            <Truck className="w-5 h-5 text-blue-700 animate-pulse" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-blue-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Original Parcel Collected — In Reverse Transit
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200/80 text-blue-900 border border-blue-300 uppercase">
-                                Parcel Collected
-                              </span>
-                            </div>
-                            <p className="text-blue-900/90 leading-relaxed font-normal">
-                              Courier rider has collected the original piece from your doorstep. It is currently in reverse transit to House of Urvaah atelier for swift verification.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {isReplacementQCReceived && !isReplaced && (
-                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
-                            <PackageCheck className="w-5 h-5 text-amber-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Parcel Received at Atelier — QC Verified
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
-                                QC Passed
-                              </span>
-                            </div>
-                            <p className="text-amber-900/90 leading-relaxed font-normal">
-                              Your returned garment has arrived at the Maison and passed quality inspection. Your replacement forward order is being prepared and dispatched.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {(isReplaced || Boolean(ord.replacement_order_number)) && (
-                        <div className="bg-purple-50/90 border border-purple-200/90 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-2xs">
-                          <div className="flex items-start gap-3.5">
-                            <div className="p-2 bg-purple-100 rounded-xl text-purple-800 shrink-0 mt-0.5">
-                              <PackageCheck className="w-5 h-5 text-purple-700" />
-                            </div>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-serif font-bold text-purple-950 uppercase tracking-wide text-xs sm:text-sm">
-                                  Replacement Order Placed & In Motion
-                                </h4>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/80 text-purple-900 border border-purple-300 uppercase">
-                                  Order #{ord.replacement_order_number || `${orderNum}-REP`}
-                                </span>
-                              </div>
-                              <p className="text-purple-900/90 leading-relaxed font-normal">
-                                Your replacement order has been placed in the Maison dispatch queue with 100% exchange credit. You can track its live forward journey below.
-                              </p>
-                              {ord.replacement_size && (
-                                <p className="text-[11px] text-purple-950 pt-0.5 font-medium">
-                                  <span className="uppercase tracking-wider text-[10px] text-purple-700 font-bold">Exchange Size:</span> {ord.replacement_size}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Link
-                            to={`/checkout?orderNumber=${ord.replacement_order_number || `${orderNum}-REP`}`}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
-                          >
-                            <span>Track Replacement</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      )}
-
-                      {isReplacementRejected && (
-                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
-                            <AlertCircle className="w-5 h-5 text-rose-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
-                              Replacement Request Not Approved
-                            </h4>
-                            <p className="text-rose-900/90 leading-relaxed font-normal">
-                              Your replacement request could not be approved by the Maison team. For further assistance or alternate sizing options, please contact our concierge care.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Post-Delivery Return Rejected / QC Rejected Banner */}
-                      {isReturnQcRejected ? (
-                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
-                            <AlertCircle className="w-5 h-5 text-rose-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Return QC Failed — Refund Cancelled
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
-                                QC Rejected
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 uppercase">
-                                Refund Cancelled
-                              </span>
-                            </div>
-                            <p className="text-rose-900/90 leading-relaxed font-normal">
-                              The returned parcel was inspected by our atelier QC team and could not be accepted into inventory. As per our store policy, the return has been rejected and the refund has been cancelled.
-                            </p>
-                            {(ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason) && (
-                              <p className="text-[11px] text-rose-800 pt-1 font-medium">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">QC Findings / Reason:</span> {ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ) : isReturnRejected ? (
-                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
-                            <AlertCircle className="w-5 h-5 text-rose-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Return Request Declined by Admin
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
-                                Request Declined
-                              </span>
-                            </div>
-                            <p className="text-rose-900/90 leading-relaxed font-normal">
-                              Your return request for this order was reviewed and declined by the Maison admin team. This order remains delivered and no return pickup will be dispatched.
-                            </p>
-                            {(ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason) && (
-                              <p className="text-[11px] text-rose-800 pt-1 font-medium">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">Reason:</span> {ord.return_rejection_reason || ord.rejection_reason || ord.cancel_reason}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {/* Post-Delivery Return Requested Review Banner */}
-                      {isReturnRequested && (
-                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
-                            <Clock className="w-5 h-5 text-amber-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Return Request Pending Admin Review
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
-                                Under Review
-                              </span>
-                            </div>
-                            <p className="text-amber-900/90 leading-relaxed font-normal">
-                              Your return request for this delivered order has been submitted to the House of Urvaah atelier team. Once approved by admin, reverse pickup will be initiated.
-                            </p>
-                            {ord.cancel_reason && (
-                              <p className="text-[11px] text-amber-800 pt-1">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">Return Reason:</span> {ord.cancel_reason}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Return Approved Banner */}
-                      {isReturnApproved && (
-                        <div className="bg-indigo-50/90 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-indigo-100 rounded-xl text-indigo-800 shrink-0 mt-0.5">
-                            <Truck className="w-5 h-5 text-indigo-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-indigo-950 uppercase tracking-wide text-xs sm:text-sm">
-                                {isReturnCollected
-                                  ? 'Package Collected — In Transit to House of Urvaah'
-                                  : 'Return Approved — Reverse Courier Pickup Scheduled'}
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 uppercase">
-                                {isReturnCollected ? 'In Reverse Transit' : 'Pickup Scheduled'}
-                              </span>
-                            </div>
-                            <p className="text-indigo-900/90 leading-relaxed font-normal">
-                              {isReturnCollected
-                                ? 'Courier executive has collected the package from your doorstep. It is in transit back to the House of Urvaah Central Atelier. Once delivered, our Refund Desk will disburse your refund.'
-                                : 'Your return request has been approved by admin! Reverse pickup is scheduled from your delivery address within 24–48 hours. Please keep the item packed in original condition with tags intact for rider collection.'}
-                            </p>
-                            <div className="pt-1 flex items-center gap-2 text-[11px] font-sans font-semibold text-indigo-800">
-                              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
-                              <span>Destination: House of Urvaah Central Atelier</span>
-                            </div>
-
-                            {(ord.reverse_tracking_number || ord.tracking_number || ord.awb_code) && (
-                              <div className="pt-2 flex flex-wrap items-center gap-2">
-                                <div className="px-2.5 py-1 bg-white border border-indigo-200 rounded-lg text-[11px] font-medium text-neutral-800 flex items-center gap-1.5 shadow-2xs">
-                                  <Truck className="w-3.5 h-3.5 text-indigo-700" />
-                                  <span>Courier: <strong>{ord.courier_name || 'Delhivery Reverse Logistics'}</strong></span>
-                                  <span className="text-neutral-300">|</span>
-                                  <span className="font-mono font-bold text-indigo-950">
-                                    AWB: {ord.reverse_tracking_number || ord.tracking_number || ord.awb_code}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveTrackingModal({
-                                    awb: ord.reverse_tracking_number || ord.tracking_number || ord.awb_code,
-                                    orderNumber: ord.order_number,
-                                    isReturn: true,
-                                    fallbackStatus: ord.logistics_status || 'Return Pickup Scheduled'
-                                  })}
-                                  className="px-3 py-1 bg-indigo-900 hover:bg-black text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                                >
-                                  <RotateCcw className="w-3 h-3 text-indigo-200" />
-                                  <span>Track Return Parcel</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Received at House of Urvaah Banner */}
-                      {isReceivedAtUrvaah && (
-                        <div className="bg-blue-50/90 border border-blue-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-blue-100 rounded-xl text-blue-800 shrink-0 mt-0.5">
-                            <PackageCheck className="w-5 h-5 text-blue-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-blue-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Package Delivered to House of Urvaah — Refund Desk Initiated
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-200/80 text-blue-900 border border-blue-300 uppercase">
-                                Received at Atelier
-                              </span>
-                            </div>
-                            <p className="text-blue-900/90 leading-relaxed font-normal">
-                              Your returned items have safely arrived at House of Urvaah! Inventory has been restocked and this order is now active at our Refund Desk for customer disbursement.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Returned & Refund Disbursed Banner */}
-                      {isReturned && (
-                        <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-emerald-100 rounded-xl text-emerald-800 shrink-0 mt-0.5">
-                            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-emerald-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Return Completed & Full Refund Disbursed
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300 uppercase">
-                                Refund Completed
-                              </span>
-                            </div>
-                            <p className="text-emerald-900/90 leading-relaxed font-normal">
-                              Full refund of ₹{Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed{ord.refund_method ? ` via ${ord.refund_method}` : ''}.
-                              {ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Transaction Reference / UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Pre-Delivery Cancellation Rejected Alert Banner */}
-                      {isCancellationRejected && (
-                        <div className="bg-rose-50/90 border border-rose-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-rose-100 rounded-xl text-rose-800 shrink-0 mt-0.5">
-                            <XCircle className="w-5 h-5 text-rose-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-rose-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Cancellation Request Rejected by Admin
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-900 border border-rose-300 uppercase">
-                                Request Declined
-                              </span>
-                            </div>
-                            <p className="text-rose-900/90 leading-relaxed font-normal">
-                              Your cancellation request for this order was reviewed and <strong>rejected by our atelier admin team</strong>. Your order is confirmed and will be processed and dispatched for delivery as scheduled.
-                            </p>
-                            {(ord.rejection_reason || ord.cancel_reason) && (
-                              <p className="text-[11px] text-rose-800 pt-1">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">Admin Reason:</span> "{ord.rejection_reason || ord.cancel_reason}"
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Pre-Delivery Cancellation Requested Review Banner */}
-                      {isCancellationRequested && (
-                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
-                          <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
-                            <Clock className="w-5 h-5 text-amber-700" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold text-amber-950 uppercase tracking-wide text-xs sm:text-sm">
-                                Cancellation Request Pending Admin Approval
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 text-amber-900 border border-amber-300 uppercase">
-                                Review In Progress
-                              </span>
-                            </div>
-                            <p className="text-amber-900/90 leading-relaxed font-normal">
-                              Your cancellation request has been submitted to our atelier admin team for verification prior to delivery.
-                              {isOnlinePayment
-                                ? ' Once approved, the full amount will automatically be routed to the Refund Desk for customer disbursement.'
-                                : ' As this is a Cash on Delivery order, no payment was collected.'}
-                            </p>
-                            {ord.cancel_reason && (
-                              <p className="text-[11px] text-amber-800 pt-1">
-                                <span className="font-semibold uppercase tracking-wider text-[10px]">Reason:</span> {ord.cancel_reason}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Pre-Delivery Cancelled & Refund Status Banner */}
-                      {isCancelled && (
-                        <div className={`rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 border shadow-2xs ${
-                          !isOnlinePayment
-                            ? 'bg-neutral-50 border-neutral-200 text-neutral-800'
-                            : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
-                            : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-950'
-                            : 'bg-amber-50 border-amber-200 text-amber-950'
-                        }`}>
-                          <div className="p-2 rounded-xl bg-white/90 border border-current shrink-0 mt-0.5">
-                            <AlertCircle className="w-5 h-5" />
-                          </div>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-serif font-bold uppercase tracking-wide text-xs sm:text-sm">
-                                {!isOnlinePayment
-                                  ? 'Order Cancelled (Cash on Delivery)'
-                                  : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
-                                  ? 'Refund Completed'
-                                  : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
-                                  ? 'Refund In Processing'
-                                  : 'Order Cancelled — Sent to Refund Desk'}
-                              </h4>
-                              {isOnlinePayment && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-white/80">
-                                  {ord.refund_status || 'Pending'}
+                              {isForwardFlow && (
+                                <span className="hidden sm:inline-flex shrink-0 px-2.5 py-1 rounded-full bg-white/80 border border-black/5 text-[10px] font-sans font-semibold uppercase tracking-wider text-neutral-600">
+                                  {deliveredOn ? deliveredOn : `Step ${forwardStep} of 4`}
                                 </span>
                               )}
                             </div>
-                            <p className="leading-relaxed font-normal">
-                              {!isOnlinePayment
-                                ? 'This order was cancelled prior to delivery. No payment was charged for Cash on Delivery.'
-                                : (ord.refund_status === 'Completed' || ord.refund_status === 'Refunded' || ord.payment_status === 'Refunded')
-                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been disbursed${ord.refund_method ? ` via ${ord.refund_method}` : ''}.${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr ? ` Reference/UTR: ${ord.refund_txn_id || ord.refund_transaction_id || ord.refund_utr}` : ''}`
-                                : (ord.refund_status === 'Processing' || ord.refund_status === 'In-Review')
-                                ? `Full refund of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} is being processed by the Refund Desk.`
-                                : `Full amount of ₹${Number(ord.refund_eligible_amount || orderTotal).toLocaleString('en-IN')} has been approved and queued at the Refund Desk for customer disbursement.`}
-                            </p>
+
+                            {/* Stepper: nodes joined by a progress line */}
+                            {isForwardFlow && (
+                              <div className="relative mt-3 grid grid-cols-4" aria-label={`Step ${forwardStep} of 4`}>
+                                <div className="absolute top-3.5 left-[12.5%] right-[12.5%] h-[2px] rounded-full bg-neutral-200" />
+                                <div
+                                  className={`absolute top-3.5 left-[12.5%] h-[2px] rounded-full transition-all duration-500 ${fillClass}`}
+                                  style={{ width: `${((forwardStep - 1) / 3) * 75}%` }}
+                                />
+                                {steps.map(({ label, Icon }, i) => {
+                                  const isDone = i < forwardStep - 1 || isComplete;
+                                  const isCurrent = !isComplete && i === forwardStep - 1;
+                                  return (
+                                    <div key={label} className="relative flex flex-col items-center text-center">
+                                      <span
+                                        className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                          isDone
+                                            ? `${fillClass} text-white shadow-xs`
+                                            : isCurrent
+                                            ? 'bg-white text-neutral-900 ring-2 ring-neutral-900 ring-offset-2 ring-offset-transparent shadow-xs'
+                                            : 'bg-white text-neutral-300 border border-neutral-200'
+                                        }`}
+                                      >
+                                        {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Icon className="w-3.5 h-3.5" />}
+                                        {isCurrent && <span className="absolute inset-0 rounded-full ring-2 ring-neutral-900/20 animate-ping" />}
+                                      </span>
+                                      <span
+                                        className={`mt-2 text-[10px] sm:text-[11px] font-sans uppercase tracking-wider leading-tight ${
+                                          isDone || isCurrent ? 'text-neutral-900 font-semibold' : 'text-neutral-400'
+                                        }`}
+                                      >
+                                        {label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Sub-card Products List */}
                       <div className="bg-white border border-neutral-200/80 rounded-2xl p-3.5 sm:p-5 divide-y divide-neutral-100 space-y-3.5 sm:space-y-4 shadow-2xs">
@@ -5433,46 +4600,30 @@ export const Account = () => {
                               <div className="flex items-center gap-2 shrink-0 flex-wrap sm:justify-end self-start sm:self-center pl-[68px] sm:pl-0">
                                 <span className={`px-2.5 sm:px-3 py-1 rounded-full text-[10px] font-sans font-bold tracking-[0.14em] uppercase border shrink-0 ${
                                   isCancellationRejected
-                                    ? 'bg-rose-50 text-rose-900 border-rose-300'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isCancellationRequested
-                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isCancelled
-                                    ? 'bg-red-50 text-red-800 border-red-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isReturnRequested
-                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isReturnApproved
-                                    ? 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isReceivedAtUrvaah
-                                    ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isReturned
-                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isDelivered
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isOutForDelivery
-                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : isShipped
-                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : 'bg-neutral-100 text-neutral-800 border-neutral-200'
                                 }`}>
-                                  {isCancellationRejected ? 'CANCELLATION REJECTED' : isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT ATELIER' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING'}
+                                  {getItemStatusLabel(item) || (isMixedRequest && !String(item.return_action || '') && isProductEverDelivered ? 'KEPT • DELIVERED' : null) || (isCancellationRejected ? 'CANCELLATION REJECTED' : isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT ATELIER' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING')}
                                 </span>
 
-                                {isDelivered && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const prodId = item.product_id || item.productId || (item.product && (item.product.id || item.product.product_id)) || item.id;
-                                      if (prodId) {
-                                        navigate(`/product/${prodId}?openReview=true#customer-reviews`);
-                                      }
-                                    }}
-                                    className="px-3.5 py-1.5 rounded-lg border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-bold tracking-[0.14em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0"
-                                    title="Rate and give feedback for this delivered product"
-                                  >
-                                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                                    <span>Give Feedback</span>
-                                  </button>
-                                )}
                               </div>
                             </div>
                           );
@@ -5487,17 +4638,22 @@ export const Account = () => {
                           </span>
                           <span className="text-xl sm:text-2xl font-serif tracking-[0.04em] text-black font-semibold mt-0.5 block">
                             ₹{Number(orderTotal).toLocaleString('en-IN')}
+                            {Number(orderTotal) === 0 && isReplacementForwardOrder && (
+                              <span className="ml-2 align-middle text-[10px] font-sans font-semibold tracking-[0.12em] uppercase text-neutral-900 bg-[#FAF8F3] border border-[#E7E2D8] px-2 py-0.5 rounded-full">
+                                Exchange • No charge
+                              </span>
+                            )}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2.5 flex-wrap">
+                        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-2.5 sm:flex-wrap">
                           <button
                             type="button"
                             onClick={() => {
                               const targetOrderNum = ord.order_number || ord.orderNumber || ord.id;
                               navigate(`/checkout?orderNumber=${encodeURIComponent(targetOrderNum)}`, { state: { viewOrder: ord } });
                             }}
-                            className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer"
+                            className="px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer"
                           >
                             View Details
                           </button>
@@ -5510,10 +4666,10 @@ export const Account = () => {
                                 const targetOrderNum = ord.order_number || ord.orderNumber || ord.id;
                                 navigate(`/checkout?orderNumber=${encodeURIComponent(targetOrderNum)}`, { state: { viewOrder: ord, openAddressEdit: true } });
                               }}
-                              className="px-5 py-2.5 rounded-xl border border-amber-300 hover:border-black bg-amber-50 hover:bg-amber-100/80 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-amber-950 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              className="px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-[#E7E2D8] hover:border-black bg-[#FAF8F3] hover:bg-neutral-50 text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title={`Edit shipping address within 24 hours (${hoursRemaining}h remaining)`}
                             >
-                              <Pencil className="w-3.5 h-3.5 text-amber-700" />
+                              <Pencil className="w-3.5 h-3.5 text-neutral-900" />
                               <span>Edit Address ({hoursRemaining}h)</span>
                             </button>
                           )}
@@ -5523,7 +4679,7 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedOrderForInvoice(ord)}
-                              className="px-5 py-2.5 rounded-xl border border-[#c5a880] hover:border-black bg-white hover:bg-[#faf8f5] text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              className="px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-[#c5a880] hover:border-black bg-white hover:bg-[#faf8f5] text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase text-neutral-900 transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title="View or download official tax invoice"
                             >
                               <FileText className="w-3.5 h-3.5 text-[#8c734b]" />
@@ -5564,7 +4720,7 @@ export const Account = () => {
                                               <p class="text-xs font-bold text-black truncate uppercase tracking-wider">${pName}</p>
                                               <p class="text-[10px] text-neutral-500 uppercase tracking-widest mt-0.5">Click to write feedback</p>
                                             </div>
-                                            <span class="text-xs font-bold text-amber-500 flex items-center gap-1 shrink-0">★ REVIEW</span>
+                                            <span class="text-xs font-bold text-neutral-500 flex items-center gap-1 shrink-0">★ REVIEW</span>
                                           </button>
                                         `;
                                       }).join('')}
@@ -5586,7 +4742,7 @@ export const Account = () => {
                                   }
                                 });
                               }}
-                              className="px-5 py-2.5 rounded-xl border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              className="px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-neutral-900 bg-neutral-900 hover:bg-black text-white text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title="Give feedback for your delivered pieces"
                             >
                               <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
@@ -5597,7 +4753,7 @@ export const Account = () => {
                           <button
                             type="button"
                             onClick={() => handleReorderOrder(ord)}
-                            className="px-5 py-2.5 rounded-xl border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-xs font-sans font-semibold tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                            className="px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-neutral-300 hover:border-black bg-white hover:bg-neutral-50 text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase text-neutral-800 hover:text-black transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             <span>Reorder</span>
@@ -5608,7 +4764,7 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => handleCancelOrderInAccount(ord)}
-                              className="px-5 py-2.5 rounded-xl border border-red-200 hover:border-red-500 bg-white hover:bg-red-50 text-red-600 hover:text-red-700 text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                              className="col-span-2 sm:col-span-1 px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-[#E7E2D8] hover:border-black bg-white hover:bg-neutral-50 text-neutral-500 hover:text-black text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Cancel Order</span>
@@ -5620,7 +4776,7 @@ export const Account = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenReturnReplaceModal(ord)}
-                              className="px-5 py-2.5 rounded-xl border border-neutral-900 bg-white hover:bg-neutral-900 text-neutral-900 hover:text-white text-xs font-sans font-semibold tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 group"
+                              className="col-span-2 sm:col-span-1 px-3 sm:px-5 py-2.5 rounded-xl justify-center text-center min-w-0 border border-neutral-900 bg-white hover:bg-neutral-900 text-neutral-900 hover:text-white text-[11px] sm:text-xs font-sans font-semibold tracking-[0.08em] sm:tracking-[0.16em] uppercase transition-all shadow-2xs cursor-pointer flex items-center gap-1.5 group"
                               title="Request Return (Refund) or Replacement Piece"
                             >
                               <RotateCcw className="w-3.5 h-3.5 text-neutral-600 group-hover:text-white transition-colors" />
@@ -5628,100 +4784,6 @@ export const Account = () => {
                             </button>
                           )}
 
-                          {/* Post-Delivery Replacement Flow Status Badges */}
-                          {isReplacementRequested && (
-                            <span className="px-4 py-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <Clock className="w-3.5 h-3.5 text-purple-600" />
-                              <span>Replacement Pending Review</span>
-                            </span>
-                          )}
-
-                          {isReplacementApproved && (
-                            <span className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>Replacement Approved</span>
-                            </span>
-                          )}
-
-                          {(isReplacementInTransit || isReplacementOutForDelivery) && (
-                            <span className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <Truck className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                              <span>Replacement In Transit</span>
-                            </span>
-                          )}
-
-                          {isReplaced && (
-                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <PackageCheck className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Product Replaced</span>
-                            </span>
-                          )}
-
-                          {/* Pre-Delivery Cancellation Pending Review */}
-                          {isCancellationRequested && (
-                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <Clock className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Cancellation Pending Review</span>
-                            </span>
-                          )}
-
-                          {/* Pre-Delivery Cancellation Rejected Status Pill */}
-                          {isCancellationRejected && (
-                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Cancellation Request Rejected by Admin</span>
-                            </span>
-                          )}
-
-                          {/* Post-Delivery Return Flow Status Badges */}
-                          {isReturnRequested && (
-                            <span className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <Clock className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Return Pending Review</span>
-                            </span>
-                          )}
-
-                          {isReturnApproved && (
-                            <span className="px-4 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <Truck className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>Return In Transit</span>
-                            </span>
-                          )}
-
-                          {isReceivedAtUrvaah && (
-                            <span className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <PackageCheck className="w-3.5 h-3.5 text-blue-600" />
-                              <span>At Urvaah House • Refund Desk</span>
-                            </span>
-                          )}
-
-                          {isReturned && (
-                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Refund Completed</span>
-                            </span>
-                          )}
-
-                          {isReturnRejected && (
-                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Return Request Declined by Admin</span>
-                            </span>
-                          )}
-
-                          {isReplacementRejected && (
-                            <span className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                              <span>Replacement Rejected</span>
-                            </span>
-                          )}
-
-                          {isCancelled && (
-                            <span className="px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-sans font-bold tracking-[0.12em] uppercase flex items-center gap-1.5 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>{isRefundCompleted ? 'Refund Completed' : 'Order Cancelled'}</span>
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -6432,6 +5494,15 @@ export const Account = () => {
                           {(() => {
                             const act = (item.return_action || '').toLowerCase();
                             const stat = (item.status || selectedOrderModal.status || '').toLowerCase();
+                            // Item-level admin decision: this piece's return / replacement request was declined
+                            if (!act && /^request declined:/i.test(item.cancel_reason || '')) {
+                              const note = item.cancel_reason.replace(/^request declined:\s*/i, '');
+                              return (
+                                <span className="text-[9px] font-bold text-neutral-800 uppercase bg-[#FAF8F3] border border-[#E7E2D8] px-1.5 py-0.5 rounded mt-0.5 inline-block" title={note || undefined}>
+                                  Request declined{note ? ` • ${note}` : ''}
+                                </span>
+                              );
+                            }
                             if (act === 'keep') {
                               return (
                                 <span className="text-[9px] font-bold text-emerald-700 uppercase bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
