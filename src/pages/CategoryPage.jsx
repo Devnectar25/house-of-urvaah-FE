@@ -15,11 +15,6 @@ import { ProductCard } from '../components/common/ProductCard';
 import { productApi } from '../services/productApi';
 import { apiClient } from '../lib/apiClient';
 import { OCCASION_OPTIONS, FABRIC_OPTIONS, productHasOccasion, productHasFabric, productIsWearTwoWays } from '../constants/productFilters';
-import { getColorName, getSwatchCss, compareColorNames, POPULAR_FASHION_COLORS } from '../utils/colorValidator';
-
-// Shopper-facing color names of a product (from the colors the admin set on it)
-const productColorNames = (product) =>
-  (Array.isArray(product?.colors) ? product.colors : []).map(getColorName).filter(Boolean);
 
 // Canonical collection definitions
 const CANONICAL_COLLECTIONS = [
@@ -48,6 +43,17 @@ const productMatchesCategory = (product, slug) => {
 
   const pTitle = (product.name || product.title || '').toLowerCase();
   const pCatName = (product.category || '').toLowerCase().trim();
+
+  // Products the admin has categorised are matched on their categories only; guessing from the
+  // name ("Ivory Heart Corset Kurti" contains "corset") would put them in the wrong collection
+  const hasCategories = normalizedCats.length > 0 || Boolean(pCatName);
+  const catText = [pCatName, ...normalizedCats].join(' ');
+  if (hasCategories) {
+    if (norm === 'co-ord-sets' || norm === 'co-ord-set') return /co-?ord/.test(catText);
+    if (norm === 'festive-wear' || norm === 'ethnic-wear') return /festive|ethnic/.test(catText);
+    if (norm === 'kurtis-and-dresses' || norm === 'kurti' || norm === 'dresses') return /kurti|dress/.test(catText);
+    if (norm === 'corset-tops' || norm === 'corset') return /corset/.test(catText);
+  }
 
   if (norm === 'co-ord-sets' || norm === 'co-ord-set') {
     if (normalizedCats.some((c) => c.includes('co-ord'))) return true;
@@ -100,7 +106,6 @@ export const CategoryPage = ({ defaultCategory }) => {
   const [isWearItTwoWays, setIsWearItTwoWays] = useState(false);
   const [selectedFabrics, setSelectedFabrics] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
-  const [selectedColors, setSelectedColors] = useState([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // Reset filters when the collection/slug changes
@@ -109,7 +114,6 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
-    setSelectedColors([]);
   }, [currentSlug]);
 
   // Fetch all live categories and active products
@@ -237,23 +241,6 @@ export const CategoryPage = ({ defaultCategory }) => {
     });
   }, [collectionProducts]);
 
-  // Color options: every color the admin set on products in this collection, with a swatch
-  const availableColors = useMemo(() => {
-    const byName = new Map();
-    collectionProducts.forEach((p) => {
-      (Array.isArray(p.colors) ? p.colors : []).forEach((raw) => {
-        const name = getColorName(raw);
-        if (name && !byName.has(name)) {
-          const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
-          byName.set(name, preset ? preset.hex : getSwatchCss(raw));
-        }
-      });
-    });
-    return [...byName.entries()]
-      .map(([name, swatch]) => ({ name, swatch }))
-      .sort((a, b) => compareColorNames(a.name, b.name));
-  }, [collectionProducts]);
-
   // Multi-facet filtering logic (AND combination across facets; OR within multi-select facets)
   const filteredProducts = useMemo(() => {
     return collectionProducts.filter((p) => {
@@ -283,12 +270,6 @@ export const CategoryPage = ({ defaultCategory }) => {
         if (!matchesSize) return false;
       }
 
-      // 5. Color Filter
-      if (selectedColors.length > 0) {
-        const names = productColorNames(p);
-        if (!selectedColors.some((c) => names.includes(c))) return false;
-      }
-
       return true;
     });
   }, [
@@ -296,8 +277,7 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedOccasions,
     isWearItTwoWays,
     selectedFabrics,
-    selectedSizes,
-    selectedColors
+    selectedSizes
   ]);
 
   const sortedProducts = filteredProducts;
@@ -308,39 +288,32 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
-    setSelectedColors([]);
   };
 
   const hasActiveFilters =
     selectedOccasions.length > 0 ||
     isWearItTwoWays ||
     selectedFabrics.length > 0 ||
-    selectedSizes.length > 0 ||
-    selectedColors.length > 0;
+    selectedSizes.length > 0;
 
-  const toggleOccasion = (occ) => {
-    setSelectedOccasions((prev) =>
-      prev.includes(occ) ? prev.filter((o) => o !== occ) : [...prev, occ]
-    );
+  // Single-choice filtering: selecting any option replaces whatever filter was active before;
+  // clicking the active option again clears it
+  const selectOnly = (kind, value) => {
+    const isActive =
+      (kind === 'occasion' && selectedOccasions.includes(value)) ||
+      (kind === 'fabric' && selectedFabrics.includes(value)) ||
+      (kind === 'size' && selectedSizes.includes(value)) ||
+      (kind === 'twoWays' && isWearItTwoWays);
+    setSelectedOccasions(!isActive && kind === 'occasion' ? [value] : []);
+    setSelectedFabrics(!isActive && kind === 'fabric' ? [value] : []);
+    setSelectedSizes(!isActive && kind === 'size' ? [value] : []);
+    setIsWearItTwoWays(!isActive && kind === 'twoWays');
   };
 
-  const toggleFabric = (fab) => {
-    setSelectedFabrics((prev) =>
-      prev.includes(fab) ? prev.filter((f) => f !== fab) : [...prev, fab]
-    );
-  };
-
-  const toggleColor = (name) => {
-    setSelectedColors((prev) =>
-      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
-    );
-  };
-
-  const toggleSize = (sz) => {
-    setSelectedSizes((prev) =>
-      prev.includes(sz) ? prev.filter((s) => s !== sz) : [...prev, sz]
-    );
-  };
+  const toggleOccasion = (occ) => selectOnly('occasion', occ);
+  const toggleFabric = (fab) => selectOnly('fabric', fab);
+  const toggleSize = (sz) => selectOnly('size', sz);
+  const toggleWearItTwoWays = () => selectOnly('twoWays', true);
 
   return (
     <main className="w-full min-h-screen bg-white font-serif select-none pt-24 sm:pt-28 md:pt-32 pb-20">
@@ -395,45 +368,43 @@ export const CategoryPage = ({ defaultCategory }) => {
         </div>
 
         {/* Unified Filter Toolbar & Facet Panel Container */}
-        <div className="border border-neutral-200 bg-white mb-4">
+        <div className="mb-5 rounded-2xl border border-[#E7E2D8] bg-[#FAF8F3] font-sans overflow-hidden">
           {/* Top Row Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-neutral-50/80">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               {/* Filter Toggle Button */}
               <button
                 type="button"
                 onClick={() => setIsFilterPanelOpen((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] tracking-wider uppercase transition-all border cursor-pointer select-none ${
-                  isFilterPanelOpen || hasActiveFilters
-                    ? 'bg-black text-white border-black font-semibold'
-                    : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
+                aria-expanded={isFilterPanelOpen}
+                className={`inline-flex items-center gap-2 h-9 px-4 rounded-full text-[11px] font-semibold tracking-[0.14em] uppercase transition-all border cursor-pointer select-none ${
+                  isFilterPanelOpen
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-neutral-900 border-[#E7E2D8] hover:border-black'
                 }`}
               >
-                <SlidersHorizontal className="w-3 h-3 stroke-[1.75]" />
+                <SlidersHorizontal className="w-3.5 h-3.5 stroke-[1.75]" />
                 <span>Filters</span>
                 {hasActiveFilters && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] leading-[18px] text-center ${isFilterPanelOpen ? 'bg-white text-black' : 'bg-black text-white'}`}>1</span>
                 )}
-                <ChevronDown
-                  className={`w-3 h-3 transition-transform duration-200 ${
-                    isFilterPanelOpen ? 'rotate-180' : ''
-                  }`}
-                />
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Quick Wear It Two Ways Toggle Pill */}
               <button
                 type="button"
-                onClick={() => setIsWearItTwoWays((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] tracking-wider uppercase transition-all border cursor-pointer select-none ${
+                onClick={toggleWearItTwoWays}
+                aria-pressed={isWearItTwoWays}
+                className={`inline-flex items-center gap-2 h-9 px-4 rounded-full text-[11px] font-semibold tracking-[0.14em] uppercase transition-all border cursor-pointer select-none ${
                   isWearItTwoWays
-                    ? 'bg-black text-white border-black font-semibold shadow-2xs'
-                    : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-neutral-900 border-[#E7E2D8] hover:border-black'
                 }`}
               >
-                <Sparkles className="w-3 h-3 text-amber-400" />
+                <Sparkles className={`w-3.5 h-3.5 ${isWearItTwoWays ? 'text-[#c5a880]' : 'text-[#8c734b]'}`} />
                 <span>Wear it 2 ways</span>
-                {isWearItTwoWays && <Check className="w-2.5 h-2.5 text-white stroke-[2.5]" />}
+                {isWearItTwoWays && <Check className="w-3 h-3 stroke-[2.5]" />}
               </button>
             </div>
 
@@ -442,9 +413,9 @@ export const CategoryPage = ({ defaultCategory }) => {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 h-7 px-2 text-[11px] text-neutral-500 hover:text-black uppercase tracking-wider transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-[11px] font-semibold text-neutral-500 hover:text-black uppercase tracking-[0.14em] transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-2.5 h-2.5" />
+                <RotateCcw className="w-3 h-3" />
                 <span>Reset All</span>
               </button>
             )}
@@ -458,167 +429,50 @@ export const CategoryPage = ({ defaultCategory }) => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="overflow-hidden border-t border-neutral-200 bg-white px-3 sm:px-4 py-2.5 font-sans"
+                className="overflow-hidden border-t border-[#E7E2D8] bg-white"
               >
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-6 max-w-5xl">
-                  {/* 1. Occasion Filter (Shown in Two Parts) */}
-                  <div className="md:col-span-5">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Occasion
-                    </h4>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                      {/* Part 1 */}
-                      <div className="space-y-1">
-                        {OCCASION_OPTIONS.slice(0, 2).map((occ) => {
-                          const isSelected = selectedOccasions.includes(occ);
-                          return (
-                            <label
-                              key={occ}
-                              onClick={() => toggleOccasion(occ)}
-                              className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
-                            >
-                              <div
-                                className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
+                <div className="divide-y divide-[#F0ECE4]">
+                  {[
+                    { key: 'occasion', label: 'Occasion', options: OCCASION_OPTIONS, isSelected: (o) => selectedOccasions.includes(o), onPick: toggleOccasion },
+                    { key: 'fabric', label: 'Fabric', options: FABRIC_OPTIONS, isSelected: (o) => selectedFabrics.includes(o), onPick: toggleFabric },
+                    { key: 'size', label: 'Size', options: availableSizes, isSelected: (o) => selectedSizes.includes(o), onPick: toggleSize }
+                  ].map((group) => (
+                    <div key={group.key} className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-6 px-3 sm:px-4 py-3.5">
+                      <h4 className="sm:w-28 flex-shrink-0 text-[10px] font-semibold tracking-[0.22em] uppercase text-neutral-500">
+                        {group.label}
+                      </h4>
+                      {group.options.length === 0 ? (
+                        <p className="text-xs text-neutral-400 italic">No size variants</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {group.options.map((opt) => {
+                            const isSelected = group.isSelected(opt);
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => group.onPick(opt)}
+                                aria-pressed={isSelected}
+                                className={`inline-flex items-center justify-center gap-1.5 h-8 rounded-full border text-xs transition-all cursor-pointer select-none ${
+                                  group.key === 'size' ? 'min-w-[44px] px-3 font-semibold tracking-wider' : 'px-4'
+                                } ${
                                   isSelected
-                                    ? 'bg-black border-black text-white'
-                                    : 'bg-white border-neutral-400 hover:border-black'
+                                    ? 'bg-black text-white border-black font-semibold'
+                                    : 'bg-white text-neutral-700 border-[#E7E2D8] hover:border-black hover:text-black'
                                 }`}
                               >
-                                {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                              </div>
-                              <span className={isSelected ? 'font-semibold text-black' : ''}>
-                                {occ}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      {/* Part 2 */}
-                      <div className="space-y-1">
-                        {OCCASION_OPTIONS.slice(2).map((occ) => {
-                          const isSelected = selectedOccasions.includes(occ);
-                          return (
-                            <label
-                              key={occ}
-                              onClick={() => toggleOccasion(occ)}
-                              className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
-                            >
-                              <div
-                                className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
-                                  isSelected
-                                    ? 'bg-black border-black text-white'
-                                    : 'bg-white border-neutral-400 hover:border-black'
-                                }`}
-                              >
-                                {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                              </div>
-                              <span className={isSelected ? 'font-semibold text-black' : ''}>
-                                {occ}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
+                                {isSelected && group.key !== 'size' && <Check className="w-3 h-3 stroke-[2.5]" />}
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-
-                  {/* 2. Fabric Filter */}
-                  <div className="md:col-span-2">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Fabric
-                    </h4>
-                    <div className="space-y-1">
-                      {FABRIC_OPTIONS.map((fab) => {
-                        const isSelected = selectedFabrics.includes(fab);
-                        return (
-                          <label
-                            key={fab}
-                            onClick={() => toggleFabric(fab)}
-                            className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
-                          >
-                            <div
-                              className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
-                                isSelected
-                                  ? 'bg-black border-black text-white'
-                                  : 'bg-white border-neutral-400 hover:border-black'
-                              }`}
-                            >
-                              {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                            </div>
-                            <span className={isSelected ? 'font-semibold text-black' : ''}>
-                              {fab}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 3. Color Filter (colors the admin added to products in this collection) */}
-                  <div className="md:col-span-3">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Color
-                    </h4>
-                    {availableColors.length === 0 ? (
-                      <p className="text-[11px] text-neutral-400 italic">No colors listed</p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {availableColors.map(({ name, swatch }) => {
-                          const isSelected = selectedColors.includes(name);
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              onClick={() => toggleColor(name)}
-                              aria-pressed={isSelected}
-                              className={`flex items-center gap-1.5 h-7 px-2 text-[11px] text-left border transition-all cursor-pointer min-w-0 ${
-                                isSelected
-                                  ? 'bg-black text-white border-black font-semibold'
-                                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
-                              }`}
-                            >
-                              <span
-                                className="w-3 h-3 rounded-full border border-neutral-300 flex-shrink-0"
-                                style={{ background: swatch }}
-                              />
-                              <span className="truncate">{name}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 4. Available Sizes */}
-                  <div className="md:col-span-2">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Available Sizes
-                    </h4>
-                    {availableSizes.length === 0 ? (
-                      <p className="text-[11px] text-neutral-400 italic">No size variants</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {availableSizes.map((sz) => {
-                          const isSelected = selectedSizes.includes(sz);
-                          return (
-                            <button
-                              key={sz}
-                              type="button"
-                              onClick={() => toggleSize(sz)}
-                              className={`min-w-[28px] h-6 px-1.5 text-[11px] font-mono font-medium tracking-wider uppercase border transition-all cursor-pointer flex items-center justify-center ${
-                                isSelected
-                                  ? 'bg-black text-white border-black font-bold'
-                                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
-                              }`}
-                            >
-                              {sz}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  ))}
+                  <p className="px-3 sm:px-4 py-2 text-[10px] tracking-wider text-neutral-400 bg-[#FAF8F3]">
+                    Choose one filter at a time. Tap it again to clear.
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -677,24 +531,6 @@ export const CategoryPage = ({ defaultCategory }) => {
                   onClick={() => toggleFabric(fab)}
                   className="hover:text-black cursor-pointer"
                   aria-label={`Remove ${fab} filter`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-
-            {/* Color Chips */}
-            {selectedColors.map((c) => (
-              <span
-                key={c}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 text-neutral-900 border border-neutral-300 text-xs font-medium uppercase tracking-wider rounded-full"
-              >
-                <span>{c}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleColor(c)}
-                  className="hover:text-black cursor-pointer"
-                  aria-label={`Remove ${c} filter`}
                 >
                   <X className="w-3 h-3" />
                 </button>

@@ -38,6 +38,8 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  // Email already entered elsewhere (e.g. home page sign-in form): the modal starts the OTP step with it
+  const [authPrefillEmail, setAuthPrefillEmail] = useState('');
   // A stored profile only counts as signed in together with its API token; without the token every
   // protected request (orders, returns, profile) would fail with "Not authorized".
   const [user, setUser] = useState(() => {
@@ -690,7 +692,8 @@ export const CartProvider = ({ children }) => {
     } catch (err) {}
   };
 
-  const openAuthModal = (mode = 'login') => {
+  const openAuthModal = (mode = 'login', options = {}) => {
+    setAuthPrefillEmail(typeof options?.email === 'string' ? options.email.trim() : '');
     setAuthMode(mode);
     setIsAuthModalOpen(true);
   };
@@ -1022,6 +1025,7 @@ export const CartProvider = ({ children }) => {
         setIsAuthModalOpen,
         authMode,
         setAuthMode,
+        authPrefillEmail,
         openAuthModal,
         setPendingAction,
         user,

@@ -4423,8 +4423,8 @@ export const Checkout = () => {
 
                     {/* Step 1: ORDER PLACED */}
                     <div className="relative flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs ${isShipped ? 'bg-brand-dark text-white' : 'bg-neutral-900 text-black shadow-xs'}`}>
-                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-neutral-900 text-white shadow-xs">
+                        <Check className="w-4 h-4 stroke-[2.5] text-white" />
                       </div>
                       <div className="font-sans pt-0.5">
                         <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">

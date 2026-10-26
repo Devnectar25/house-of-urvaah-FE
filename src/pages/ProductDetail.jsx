@@ -41,6 +41,7 @@ import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWi
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import RichTextRenderer from '../components/common/RichTextRenderer';
+import { getColorName, getSwatchCss, compareColorNames, POPULAR_FASHION_COLORS } from '../utils/colorValidator';
 import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
 import { getLegacyDetailRows, productDetailsToRichText, hasVisibleRichText } from '../utils/productDetailsContent';
 
@@ -1363,6 +1364,34 @@ export const ProductDetail = () => {
                 </button>
               </div>
             </div>
+
+            {/* Colours the admin set on this product (each colour once, in the admin preset order) */}
+            {(() => {
+              const byName = new Map();
+              (Array.isArray(product.colors) ? product.colors : []).forEach((raw) => {
+                const name = getColorName(raw);
+                if (!name || byName.has(name)) return;
+                const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
+                byName.set(name, preset ? preset.hex : getSwatchCss(raw));
+              });
+              const colours = [...byName.entries()].sort((a, b) => compareColorNames(a[0], b[0]));
+              if (colours.length === 0) return null;
+              return (
+                <div className="pt-4 font-sans">
+                  <span className="block text-xs sm:text-sm font-semibold tracking-wider uppercase text-brand-dark mb-2.5">
+                    {colours.length === 1 ? 'Colour' : 'Colours'}: <span className="font-normal normal-case tracking-normal text-neutral-600">{colours.map(([n]) => n).join(', ')}</span>
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {colours.map(([name, swatch]) => (
+                      <span key={name} className="inline-flex items-center gap-2 h-8 pl-1.5 pr-3 border border-neutral-200 rounded-full text-xs text-neutral-800">
+                        <span className="w-5 h-5 rounded-full border border-neutral-300 flex-shrink-0" style={{ background: swatch }} />
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
             {(() => {
