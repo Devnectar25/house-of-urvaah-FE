@@ -7,6 +7,7 @@ import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
 import { startVisiblePolling } from '../../lib/livePolling';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -478,22 +479,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onPrev, onNext, isPlaying, isVideo]);
 
-  // Lock background body scroll while modal is open
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    const originalPaddingRight = document.body.style.paddingRight;
-    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = 'hidden';
-    if (scrollBarWidth > 0) {
-      document.body.style.paddingRight = `${scrollBarWidth}px`;
-    }
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.paddingRight = originalPaddingRight;
-    };
-  }, []);
+  // Lock the page behind the modal (shared lock: pins the body so it cannot scroll, also on iOS)
+  useModalScrollLock(true, onClose);
 
   const handleTogglePlay = (e) => {
     if (e) e.stopPropagation();
@@ -572,7 +559,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 select-none overflow-hidden font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 select-none overflow-hidden overscroll-none font-sans">
       {/* Darkened Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -756,18 +743,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
 
           {/* Top Right: Video Controls (Sound Toggle & Full Video Mode Toggle) */}
           <div className="absolute top-3.5 right-3.5 z-30 flex items-center gap-2">
-            {isVideo && (
-              <button
-                type="button"
-                onClick={handleToggleMute}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md transition-all shadow-lg cursor-pointer border border-white/15"
-                title={isMuted ? 'Unmute video audio' : 'Mute audio'}
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
-              >
-                {isMuted ? <VolumeX className="w-4 h-4 text-white/90" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-              </button>
-            )}
-
+            {/* Storefront videos always play muted, so there is no sound toggle */}
             {/* Desktop Mode Toggle (Expand to Full Video Mode vs Split View) */}
             <button
               type="button"
@@ -786,65 +762,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               )}
             </button>
           </div>
-
-          {/* Floating Shoppable Card (Shown in Full Video Mode OR on Mobile in 'video' tab) */}
-          {(isFullVideoMode || mobileTab === 'video') && (
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-4 z-30 bg-black/75 backdrop-blur-md border border-white/15 rounded-xl p-2.5 sm:p-3.5 text-white flex items-center justify-between gap-3 shadow-2xl"
-            >
-              <div
-                onClick={() => {
-                  if (isFullVideoMode) setIsFullVideoMode(false);
-                  setMobileTab('product');
-                }}
-                className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
-                title="Tap to view outfit gallery & details"
-              >
-                <img
-                  src={getSupabaseMediaUrl(look.product.image)}
-                  alt={look.product.name}
-                  className="w-11 h-13 sm:w-13 sm:h-15 rounded-lg object-cover bg-white/10 shrink-0 border border-white/20"
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="text-[9px] uppercase tracking-widest text-white/60 block font-sans">Featured Look</span>
-                  <h4 className="text-xs sm:text-sm font-serif font-normal uppercase truncate text-white">{look.product.name}</h4>
-                  <p className="text-xs sm:text-sm font-semibold text-white/95 mt-0.5 font-sans">{look.product.formattedPrice}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="px-3 py-2 sm:px-4 sm:py-2.5 bg-white text-black hover:bg-neutral-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  {isAdded ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Added</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Add</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isFullVideoMode) setIsFullVideoMode(false);
-                    setMobileTab('product');
-                  }}
-                  className="px-2.5 py-2 border border-white/30 hover:border-white text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-                >
-                  Details
-                </button>
-              </div>
-            </motion.div>
-          )}
         </div>
 
         {/* Right Side: Product Details & Shoppable Panel (Visible on Desktop always, or on Mobile when mobileTab === 'product') */}
@@ -856,7 +773,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
           >
             {/* Scrollable Content Area */}
             <div
-              className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-5 sm:p-6 md:p-7 space-y-4"
+              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar scrollbar-none p-5 sm:p-6 md:p-7 space-y-4"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {/* Main Product Image Viewer with Carousel Controls */}

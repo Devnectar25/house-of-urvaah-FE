@@ -142,18 +142,6 @@ const formatAdditionalInfoRows = (product) => {
     if (valid.length > 0) return valid;
   }
 
-  // 2. Check if productDetails or product_details array exists (legacy label/value rows only)
-  const prodDetails = getLegacyDetailRows(product.productDetails || product.product_details);
-  if (Array.isArray(prodDetails) && prodDetails.length > 0) {
-    const valid = prodDetails
-      .filter((s) => s && ((s.label && s.label.trim()) || (s.value && s.value.trim()) || (s.title && s.title.trim())))
-      .map((s) => ({
-        title: (s.label || s.title || '').trim(),
-        value: (s.value || '').trim()
-      }));
-    if (valid.length > 0) return valid;
-  }
-
   // 3. Check if specifications object exists
   if (product.specifications && typeof product.specifications === 'object') {
     const entries = Object.entries(product.specifications)
@@ -189,14 +177,8 @@ const formatAdditionalInfoRows = (product) => {
     }
   }
 
-  // 5. Default fallback specification table items
-  return [
-    { title: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
-    { title: 'Skirt hem', value: 'Hand-finished potli trim' },
-    { title: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
-    { title: 'Lining', value: 'Fully lined (top and skirt)' },
-    { title: 'Top', value: 'Lightly Padded' }
-  ];
+  // Nothing entered by the admin: no rows, so the table stays hidden
+  return [];
 };
 
 export const ProductDetail = () => {
@@ -930,8 +912,9 @@ export const ProductDetail = () => {
     return '₹ ' + Number(val).toLocaleString('en-IN');
   };
 
-  // Structured key-value rows for the Additional Information table
+  // Structured key-value rows shown as a table inside Product Details (hidden when empty)
   const additionalInfoList = formatAdditionalInfoRows(product);
+  const hasSpecRows = additionalInfoList.length > 0;
 
   // Rich Product Details content from the admin panel (section hidden when empty)
   const productDetailsHtml = productDetailsToRichText(
@@ -1034,9 +1017,12 @@ export const ProductDetail = () => {
                   >
                     <video
                       src={productVideo}
-                      controls
+                      ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
                       muted
+                      autoPlay
+                      loop
                       playsInline
+                      disablePictureInPicture
                       className="w-full h-full object-contain bg-white"
                     />
                     <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 flex items-center gap-1">
@@ -1153,11 +1139,12 @@ export const ProductDetail = () => {
                 >
                   <video
                     src={productVideo}
-                    controls
+                    ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
                     muted
                     autoPlay
                     loop
                     playsInline
+                    disablePictureInPicture
                     className="w-full h-full object-contain bg-white"
                   />
                   <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase rounded flex items-center gap-1.5 border border-black/10 pointer-events-none">
@@ -1564,53 +1551,8 @@ export const ProductDetail = () => {
                 )}
               </div>
 
-              {/* Additional Information Accordion */}
-              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => toggleAccordion('info')}
-                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                  aria-expanded={Boolean(openAccordions['info'])}
-                >
-                  <span>ADDITIONAL INFORMATION</span>
-                  {openAccordions['info'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                </button>
-                {openAccordions['info'] && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-2xs">
-                    <table className="w-full text-xs sm:text-sm font-sans text-left border-collapse">
-                      <tbody className="divide-y divide-neutral-200/70">
-                        {additionalInfoList.map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className={`transition-colors hover:bg-neutral-50/80 ${
-                              idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'
-                            }`}
-                          >
-                            {row.title ? (
-                              <>
-                                <td className="py-2 px-3 sm:px-3.5 font-semibold text-neutral-900 w-28 sm:w-36 align-top border-r border-neutral-200/60 shrink-0 whitespace-nowrap">
-                                  {row.title}
-                                </td>
-                                <td className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
-                                  {row.value}
-                                </td>
-                              </>
-                            ) : (
-                              <td colSpan={2} className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
-                                {row.value}
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-
-              {/* Product Details (Dynamic Bullet Points) - only shown when admin has added content */}
-              {hasProductDetails && (
+              {/* Product Details: rich text and/or the specification table - only shown when admin has added content */}
+              {(hasProductDetails || hasSpecRows) && (
                   <div className="border-b border-neutral-200 pb-2.5 pt-1">
                     <button
                       type="button"
@@ -1621,11 +1563,42 @@ export const ProductDetail = () => {
                       <span>PRODUCT DETAILS</span>
                       {openAccordions['pdetails'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                     </button>
-                    {openAccordions['pdetails'] && (
+                    {openAccordions['pdetails'] && hasProductDetails && (
                       <RichTextRenderer
                         content={productDetailsHtml}
                         className="mt-2 text-xs sm:text-sm pr-2"
                       />
+                    )}
+                    {openAccordions['pdetails'] && hasSpecRows && (
+                      <div className={`mt-3 overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-2xs`}>
+                        <table className="w-full text-xs sm:text-sm font-sans text-left border-collapse">
+                          <tbody className="divide-y divide-neutral-200/70">
+                            {additionalInfoList.map((row, idx) => (
+                              <tr
+                                key={idx}
+                                className={`transition-colors hover:bg-neutral-50/80 ${
+                                  idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'
+                                }`}
+                              >
+                                {row.title ? (
+                                  <>
+                                    <td className="py-2 px-3 sm:px-3.5 font-semibold text-neutral-900 w-28 sm:w-36 align-top border-r border-neutral-200/60 shrink-0 whitespace-nowrap">
+                                      {row.title}
+                                    </td>
+                                    <td className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                      {row.value}
+                                    </td>
+                                  </>
+                                ) : (
+                                  <td colSpan={2} className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                    {row.value}
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
@@ -1950,10 +1923,12 @@ export const ProductDetail = () => {
               {lightboxSelectedMedia === 'video' && productVideo ? (
                 <video
                   src={productVideo}
-                  controls
+                  ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
                   muted
                   autoPlay
+                  loop
                   playsInline
+                  disablePictureInPicture
                   className="max-w-[85vw] max-h-[75vh] object-contain drop-shadow-2xl"
                 />
               ) : (

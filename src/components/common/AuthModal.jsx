@@ -693,7 +693,7 @@ export const AuthModal = () => {
           {/* Footer Security Notice */}
           <div className="bg-[#FAF8F3] px-6 py-3 border-t border-neutral-200/80 flex items-center justify-center gap-2 text-[10px] text-neutral-500 tracking-widest uppercase">
             <Shield className="w-3.5 h-3.5 text-neutral-400 stroke-[1.5]" />
-            256-BIT ENCRYPTED ATELIER CONCIERGE
+            256-BIT ENCRYPTED
           </div>
         </motion.div>
       </div>
