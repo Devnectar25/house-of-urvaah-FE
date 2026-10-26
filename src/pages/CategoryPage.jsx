@@ -14,6 +14,12 @@ import { SEOHead } from '../components/common/SEOHead';
 import { ProductCard } from '../components/common/ProductCard';
 import { productApi } from '../services/productApi';
 import { apiClient } from '../lib/apiClient';
+import { OCCASION_OPTIONS, FABRIC_OPTIONS, productHasOccasion, productHasFabric, productIsWearTwoWays } from '../constants/productFilters';
+import { getColorName, getSwatchCss, compareColorNames, POPULAR_FASHION_COLORS } from '../utils/colorValidator';
+
+// Shopper-facing color names of a product (from the colors the admin set on it)
+const productColorNames = (product) =>
+  (Array.isArray(product?.colors) ? product.colors : []).map(getColorName).filter(Boolean);
 
 // Canonical collection definitions
 const CANONICAL_COLLECTIONS = [
@@ -23,20 +29,6 @@ const CANONICAL_COLLECTIONS = [
   { slug: 'festive-wear', path: '/festive-wear', label: 'FESTIVE WEAR' },
   { slug: 'kurtis-and-dresses', path: '/kurtis-and-dresses', label: 'KURTIS AND DRESSES' },
   { slug: 'corset-tops', path: '/corset-tops', label: 'CORSET TOPS', minProducts: 2 }
-];
-
-// Occasion filter options specified in task requirements
-const OCCASION_OPTIONS = [
-  'Beach and Vacation',
-  'Night Out',
-  'College and Office',
-  'Festive and Wedding'
-];
-
-// Fabric filter options specified in task requirements
-const FABRIC_OPTIONS = [
-  'Cora Cotton',
-  'Tissue Silk'
 ];
 
 // Match product against collection slug
@@ -108,6 +100,7 @@ export const CategoryPage = ({ defaultCategory }) => {
   const [isWearItTwoWays, setIsWearItTwoWays] = useState(false);
   const [selectedFabrics, setSelectedFabrics] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // Reset filters when the collection/slug changes
@@ -116,6 +109,7 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
+    setSelectedColors([]);
   }, [currentSlug]);
 
   // Fetch all live categories and active products
@@ -243,42 +237,40 @@ export const CategoryPage = ({ defaultCategory }) => {
     });
   }, [collectionProducts]);
 
+  // Color options: every color the admin set on products in this collection, with a swatch
+  const availableColors = useMemo(() => {
+    const byName = new Map();
+    collectionProducts.forEach((p) => {
+      (Array.isArray(p.colors) ? p.colors : []).forEach((raw) => {
+        const name = getColorName(raw);
+        if (name && !byName.has(name)) {
+          const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
+          byName.set(name, preset ? preset.hex : getSwatchCss(raw));
+        }
+      });
+    });
+    return [...byName.entries()]
+      .map(([name, swatch]) => ({ name, swatch }))
+      .sort((a, b) => compareColorNames(a.name, b.name));
+  }, [collectionProducts]);
+
   // Multi-facet filtering logic (AND combination across facets; OR within multi-select facets)
   const filteredProducts = useMemo(() => {
     return collectionProducts.filter((p) => {
       // 1. Occasion Filter
       if (selectedOccasions.length > 0) {
-        const pOccasion = (p.occasion || '').toLowerCase().trim();
-        const matchesOccasion = selectedOccasions.some((occ) => {
-          const occLower = occ.toLowerCase();
-          return pOccasion.includes(occLower) || occLower.includes(pOccasion);
-        });
+        const matchesOccasion = selectedOccasions.some((occ) => productHasOccasion(p, occ));
         if (!matchesOccasion) return false;
       }
 
       // 2. Wear It Two Ways Tag Filter
       if (isWearItTwoWays) {
-        const pTags = Array.isArray(p.tags) ? p.tags : [];
-        const hasTag =
-          pTags.some((t) => t.toLowerCase().includes('two ways')) ||
-          (typeof p.tag === 'string' && p.tag.toLowerCase().includes('two ways')) ||
-          (p.description && p.description.toLowerCase().includes('wear it two ways'));
-        if (!hasTag) return false;
+        if (!productIsWearTwoWays(p)) return false;
       }
 
       // 3. Fabric Filter
       if (selectedFabrics.length > 0) {
-        const pFabric = (p.fabric || '').toLowerCase();
-        const pDesc = (p.description || '').toLowerCase();
-        const pAddInfo = (p.additional_info || p.additionalInfo || '').toLowerCase();
-        const matchesFabric = selectedFabrics.some((fab) => {
-          const fabLower = fab.toLowerCase();
-          return (
-            pFabric.includes(fabLower) ||
-            pDesc.includes(fabLower) ||
-            pAddInfo.includes(fabLower)
-          );
-        });
+        const matchesFabric = selectedFabrics.some((fab) => productHasFabric(p, fab));
         if (!matchesFabric) return false;
       }
 
@@ -291,6 +283,12 @@ export const CategoryPage = ({ defaultCategory }) => {
         if (!matchesSize) return false;
       }
 
+      // 5. Color Filter
+      if (selectedColors.length > 0) {
+        const names = productColorNames(p);
+        if (!selectedColors.some((c) => names.includes(c))) return false;
+      }
+
       return true;
     });
   }, [
@@ -298,7 +296,8 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedOccasions,
     isWearItTwoWays,
     selectedFabrics,
-    selectedSizes
+    selectedSizes,
+    selectedColors
   ]);
 
   const sortedProducts = filteredProducts;
@@ -309,13 +308,15 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
+    setSelectedColors([]);
   };
 
   const hasActiveFilters =
     selectedOccasions.length > 0 ||
     isWearItTwoWays ||
     selectedFabrics.length > 0 ||
-    selectedSizes.length > 0;
+    selectedSizes.length > 0 ||
+    selectedColors.length > 0;
 
   const toggleOccasion = (occ) => {
     setSelectedOccasions((prev) =>
@@ -326,6 +327,12 @@ export const CategoryPage = ({ defaultCategory }) => {
   const toggleFabric = (fab) => {
     setSelectedFabrics((prev) =>
       prev.includes(fab) ? prev.filter((f) => f !== fab) : [...prev, fab]
+    );
+  };
+
+  const toggleColor = (name) => {
+    setSelectedColors((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
     );
   };
 
@@ -453,9 +460,9 @@ export const CategoryPage = ({ defaultCategory }) => {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden border-t border-neutral-200 bg-white px-3 sm:px-4 py-2.5 font-sans"
               >
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-6 max-w-4xl">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-6 max-w-5xl">
                   {/* 1. Occasion Filter (Shown in Two Parts) */}
-                  <div className="md:col-span-6">
+                  <div className="md:col-span-5">
                     <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
                       Occasion
                     </h4>
@@ -517,7 +524,7 @@ export const CategoryPage = ({ defaultCategory }) => {
                   </div>
 
                   {/* 2. Fabric Filter */}
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-2">
                     <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
                       Fabric
                     </h4>
@@ -548,8 +555,43 @@ export const CategoryPage = ({ defaultCategory }) => {
                     </div>
                   </div>
 
-                  {/* 3. Available Sizes */}
+                  {/* 3. Color Filter (colors the admin added to products in this collection) */}
                   <div className="md:col-span-3">
+                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
+                      Color
+                    </h4>
+                    {availableColors.length === 0 ? (
+                      <p className="text-[11px] text-neutral-400 italic">No colors listed</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {availableColors.map(({ name, swatch }) => {
+                          const isSelected = selectedColors.includes(name);
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => toggleColor(name)}
+                              aria-pressed={isSelected}
+                              className={`flex items-center gap-1.5 h-7 px-2 text-[11px] text-left border transition-all cursor-pointer min-w-0 ${
+                                isSelected
+                                  ? 'bg-black text-white border-black font-semibold'
+                                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
+                              }`}
+                            >
+                              <span
+                                className="w-3 h-3 rounded-full border border-neutral-300 flex-shrink-0"
+                                style={{ background: swatch }}
+                              />
+                              <span className="truncate">{name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Available Sizes */}
+                  <div className="md:col-span-2">
                     <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
                       Available Sizes
                     </h4>
@@ -635,6 +677,24 @@ export const CategoryPage = ({ defaultCategory }) => {
                   onClick={() => toggleFabric(fab)}
                   className="hover:text-black cursor-pointer"
                   aria-label={`Remove ${fab} filter`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+
+            {/* Color Chips */}
+            {selectedColors.map((c) => (
+              <span
+                key={c}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 text-neutral-900 border border-neutral-300 text-xs font-medium uppercase tracking-wider rounded-full"
+              >
+                <span>{c}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleColor(c)}
+                  className="hover:text-black cursor-pointer"
+                  aria-label={`Remove ${c} filter`}
                 >
                   <X className="w-3 h-3" />
                 </button>

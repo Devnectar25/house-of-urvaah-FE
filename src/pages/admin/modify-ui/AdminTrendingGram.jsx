@@ -32,6 +32,7 @@ import { apiClient, getAdminAuthToken } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { getSupabaseMediaUrl } from '../../../lib/supabase';
 import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
+import { uploadVideoDirect } from '../../../lib/directVideoUpload';
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -302,27 +303,32 @@ export const AdminTrendingGram = () => {
 
     setUploadingFile(true);
     try {
-      const uploadData = new FormData();
-      uploadData.append(isVideo ? 'video' : 'file', file);
-      if (!isVideo) uploadData.append('folder', 'trending');
+      let uploadedUrl;
+      if (isVideo) {
+        uploadedUrl = await uploadVideoDirect(file, 'trending/videos');
+      } else {
+        const uploadData = new FormData();
+        uploadData.append(isVideo ? 'video' : 'file', file);
+        if (!isVideo) uploadData.append('folder', 'trending');
 
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
-      const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
+        const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+        const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
+        const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: uploadData
+        });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Upload failed');
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Upload failed');
+        }
+
+        uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
+        if (!uploadedUrl) throw new Error('No media URL returned by server');
       }
-
-      const uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
-      if (!uploadedUrl) throw new Error('No media URL returned by server');
 
       setFormData((prev) => ({
         ...prev,

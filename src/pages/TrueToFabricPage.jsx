@@ -282,6 +282,19 @@ export const TrueToFabricPage = () => {
 
     if (!activeFabric) return [];
 
+    // Products the admin linked to this fabric (product form or Fabric Video "Related Products")
+    const isLinked = (p) => {
+      const pFabricSlug = normalizeKey(p.fabric_slug || p.fabricSlug || '');
+      return Boolean(pFabricSlug) && (
+        pFabricSlug === activeFabric.slug ||
+        pFabricSlug === activeFabric.id ||
+        (Array.isArray(activeFabric.aliases) && activeFabric.aliases.includes(pFabricSlug))
+      );
+    };
+    const linked = products.filter(isLinked);
+    if (linked.length > 0) return linked;
+
+    // Nothing linked yet: fall back to name / fabric matching
     return products.filter((p) => {
       // 1. Direct fabric_slug or fabricSlug match (authoritative)
       const pFabricSlug = normalizeKey(p.fabric_slug || p.fabricSlug || '');
