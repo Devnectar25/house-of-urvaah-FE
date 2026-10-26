@@ -79,8 +79,9 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
         const currentKey = getProductKey(currentProduct);
         normalizedList = dedupeProducts(normalizedList, currentKey);
 
-        // Backfill up to target pool size from catalog for rich multi-batch rotation
-        if (normalizedList.length < TARGET_POOL_SIZE) {
+        // Backfill from the bundled sample catalogue only when the live API returned nothing;
+        // otherwise deleted products would reappear among related pieces
+        if (normalizedList.length === 0) {
           const existingKeys = new Set([currentKey, ...normalizedList.map(getProductKey)]);
 
           // Priority 1: same category in catalog

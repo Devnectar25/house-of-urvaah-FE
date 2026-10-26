@@ -102,8 +102,9 @@ export const SearchOverlay = () => {
   // Combined catalog: DB live products take priority over mock catalog products
   const allCatalog = useMemo(() => {
     const map = new Map();
-    // 1. Initial mock products
-    for (const p of [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS]) {
+    // 1. Bundled sample products only while the live catalogue is unavailable, so deleted
+    //    products never come back through search
+    for (const p of liveProducts.length > 0 ? [] : [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS]) {
       if (!p) continue;
       map.set(getDedupeKey(p), p);
     }
