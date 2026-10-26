@@ -7,6 +7,18 @@ import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../services/productApi';
 import { getProductUrl } from '../../utils/productUrl';
 import { startVisiblePolling } from '../../lib/livePolling';
+import { MIN_RECOMMENDED_PRODUCTS } from '../../constants/recommendations';
+
+// Recommended cards normally show the product's main photo; some products read better with
+// another gallery shot as the first view. Gallery index per product id (the API serves the
+// Mocha Brown set, product 105, as id 101).
+const RECOMMENDED_COVER_INDEX = { '101': 2, '105': 2 };
+
+const getRecommendedCover = (product) => {
+  const gallery = Array.isArray(product?.images) && product.images.length ? product.images : (product?.gallery || []);
+  const idx = RECOMMENDED_COVER_INDEX[String(product?.id)];
+  return (idx !== undefined && gallery[idx]) || product?.image;
+};
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
@@ -191,8 +203,8 @@ export const CategoryGrid = () => {
     };
   }, [isHovered]);
 
-  // Validation: Require a minimum of 3 products to display the "Recommended for you" section
-  if (!productsList || productsList.length < 3) {
+  // Validation: the "Recommended for you" section needs a minimum number of products (admin is told in the product form)
+  if (!productsList || productsList.length < MIN_RECOMMENDED_PRODUCTS) {
     return null;
   }
 
@@ -265,7 +277,7 @@ export const CategoryGrid = () => {
                 className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100/90 cursor-pointer"
               >
                 <img
-                  src={product.image}
+                  src={getRecommendedCover(product)}
                   alt={product.name}
                   className="w-full h-full object-cover object-top filter brightness-[0.98] transition-transform duration-500 group-hover/card:scale-105"
                   loading="lazy"

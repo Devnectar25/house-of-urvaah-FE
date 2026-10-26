@@ -279,6 +279,33 @@ const RAW_BEST_SELLERS_PRODUCTS = [
     colors: ['#F5F5F0', '#111111', '#8B0000'],
     sizes: ['XS', 'S', 'M', 'L'],
     description: 'A versatile festive ensemble featuring an intricately embroidered short kurti with a hook-on peplum and flared gharara trousers. Wear it with the peplum for full celebratory volume, or detach for a sleek, contemporary silhouette.\nWear it two ways for wedding soirees and festive celebrations.'
+  },
+  {
+    id: '81',
+    name: 'Firoza Aqua Gold Hand-Embroidered Gharara Set',
+    price: 5000,
+    originalPrice: 7990,
+    category: 'FESTIVE WEAR',
+    categories: ['New Arrivals', 'Festive Wear', 'new-arrivals', 'festive-wear'],
+    occasion: 'Festive and Wedding',
+    tags: ['Wear it two ways'],
+    fabric: 'Aqua Gold Threadwork',
+    fabric_slug: 'aqua-gold-threadwork',
+    subcategory: 'Gharara Sets',
+    tag: 'EDITORIAL',
+    isNew: true,
+    isBestSeller: true,
+    image: 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002059980-2.png',
+    hoverImage: 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002071268-1.png',
+    gallery: [
+      'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002059980-2.png',
+      'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002071268-1.png',
+      'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002081811-3.png',
+      'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/products/1793002091054-4.png'
+    ],
+    colors: ['Default'],
+    sizes: ['S', 'M', 'L'],
+    description: 'Step into festive season in Firoza, an aqua-blue crop top and gharara set with a soft gold shimmer. The dual-toned fabric catches the light as you move. Golden hand embroidery of vines, leaves and florals covers the top and the gharara, so every angle looks finished.'
   }
 ];
 

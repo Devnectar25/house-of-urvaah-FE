@@ -116,6 +116,27 @@ export const CANONICAL_FABRICS = [
     ],
     videoPath: '',
     defaultVideoUrl: ''
+  },
+  {
+    id: 'aqua-gold-threadwork',
+    slug: 'aqua-gold-threadwork',
+    aliases: ['aqua-gold-threadwork', 'aqua-gold', 'firoza', 'firoza-aqua-gold', 'aqua', 'threadwork', 'video-1792746455828-4'],
+    tag: 'AQUA GOLD THREADWORK',
+    fabricName: 'Aqua Gold Threadwork',
+    videoTitle: 'Firoza Aqua Gold Hand-Embroidered Gharara Set',
+    name: 'Firoza Aqua Gold Hand-Embroidered Gharara Set',
+    subtitle: 'Dual-Toned Luminous Shimmer & Golden Vine Hand-Embroidery',
+    description:
+      'Luminous dual-toned aqua and gold shimmer fabric adorned with rich golden hand embroidery of vines, florals, and delicate micro-sequins, tailored for majestic festive occasions.',
+    sensoryProfile: [
+      { label: 'Texture', value: 'Shimmer & Hand-Embroidered' },
+      { label: 'Sheen', value: 'Dual-Toned Gold Glow' },
+      { label: 'Drape', value: 'Flowing & Flared' },
+      { label: 'Occasion', value: 'Festive, Weddings & Sangeet' }
+    ],
+    videoPath: 'videos/VID_20261022_044316_193_bsl.mp4',
+    defaultVideoUrl:
+      'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media/videos/VID_20261022_044316_193_bsl.mp4'
   }
 ];
 
@@ -264,25 +285,44 @@ export const TrueToFabricPage = () => {
     return products.filter((p) => {
       // 1. Direct fabric_slug or fabricSlug match (authoritative)
       const pFabricSlug = normalizeKey(p.fabric_slug || p.fabricSlug || '');
-      if (pFabricSlug) {
-        return (
-          pFabricSlug === activeFabric.slug ||
+      if (
+        pFabricSlug &&
+        (pFabricSlug === activeFabric.slug ||
           pFabricSlug === activeFabric.id ||
-          activeFabric.aliases.includes(pFabricSlug)
-        );
+          (Array.isArray(activeFabric.aliases) && activeFabric.aliases.includes(pFabricSlug)))
+      ) {
+        return true;
       }
 
-      // 2. Title matching fallback only if fabric_slug is not explicitly defined
+      // 2. Exact or fuzzy Title/Name match with the section title (Show product added with same name as section)
       const pTitle = normalizeKey(p.title || p.name || '');
+      const activeTitle = normalizeKey(activeFabric.videoTitle || activeFabric.name || activeFabric.title || '');
+      if (pTitle && activeTitle) {
+        if (pTitle === activeTitle || pTitle.includes(activeTitle) || activeTitle.includes(pTitle)) {
+          return true;
+        }
+      }
+
+      // 3. Section specific keywords fallback
+      if (
+        (activeFabric.slug === 'aqua-gold-threadwork' || activeFabric.slug.includes('aqua-gold') || activeFabric.slug.includes('firoza')) &&
+        (pTitle.includes('firoza') || pTitle.includes('aqua-gold') || pTitle.includes('gharara'))
+      ) return true;
       if (activeFabric.slug === 'petal-threadwork' && pTitle.includes('blush-pink')) return true;
       if (activeFabric.slug === 'heritage-weave' && pTitle.includes('mocha-brown')) return true;
       if (activeFabric.slug === 'ocean-bloom' && pTitle.includes('teal')) return true;
       if (activeFabric.slug === 'cora-cotton' && pTitle.includes('ivory-heart')) return true;
       if (activeFabric.slug === 'raw-tissue-silk' && (pTitle.includes('sage-bloom') || pTitle.includes('tissue-silk'))) return true;
 
-      // 3. Fabric name matching
+      // 4. Fabric name matching
       const pFabric = normalizeKey(p.fabric || '');
-      if (pFabric && (pFabric.includes(activeFabric.slug) || activeFabric.slug.includes(pFabric))) {
+      const activeFabricName = normalizeKey(activeFabric.fabricName || activeFabric.tag || '');
+      if (
+        pFabric &&
+        (pFabric.includes(activeFabric.slug) ||
+          activeFabric.slug.includes(pFabric) ||
+          (activeFabricName && (pFabric.includes(activeFabricName) || activeFabricName.includes(pFabric))))
+      ) {
         return true;
       }
 

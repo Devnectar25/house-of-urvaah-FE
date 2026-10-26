@@ -40,6 +40,17 @@ const EDITORIAL_VIDEOS = [
       const lower = fileName.toLowerCase();
       return lower.includes('teal') && lower.includes('h264');
     }
+  },
+  {
+    id: 'aqua-gold',
+    name: 'Firoza Aqua Gold Hand-Embroidered Gharara Set',
+    tag: 'AQUA GOLD THREADWORK',
+    slug: 'aqua-gold-threadwork',
+    defaultPath: 'videos/VID_20261022_044316_193_bsl.mp4',
+    matcher: (fileName) => {
+      const lower = fileName.toLowerCase();
+      return lower.includes('vid_20261022') || (lower.includes('firoza') && lower.includes('aqua'));
+    }
   }
 ];
 

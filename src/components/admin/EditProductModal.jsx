@@ -31,6 +31,7 @@ import {
   POPULAR_FASHION_COLORS
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
+import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { getLegacyDetailRows, productDetailsToRichText, richTextToProductDetails } from '../../utils/productDetailsContent';
 
 
@@ -60,6 +61,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const imagesRef = useRef(null);
 
   // Form State initialized from product prop
+  // Live status of the home page "Recommended for you" section (minimum product count)
+  const [recommendationStatus, setRecommendationStatus] = useState(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchRecommendationStatus().then((st) => { if (active) setRecommendationStatus(st); }).catch(() => {});
+    return () => { active = false; };
+  }, [isOpen]);
   const [formData, setFormData] = useState({
     name: '',
     category_id: '',
@@ -1128,6 +1137,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                         ? "Featured in 'Recommended For You' collections."
                         : 'Not featured in recommendation lists.'}
                     </p>
+                    {recommendationStatus && (
+                    <p className={`text-[11px] mt-1 leading-snug ${recommendationStatus.missing > 0 ? 'text-amber-700 font-semibold' : 'text-neutral-500'}`}>
+                      {recommendationStatus.text}
+                    </p>
+                  )}
                   </div>
                   <button
                     type="button"

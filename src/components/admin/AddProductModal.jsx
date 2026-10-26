@@ -28,6 +28,7 @@ import {
   POPULAR_FASHION_COLORS
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
+import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { richTextToProductDetails } from '../../utils/productDetailsContent';
 
 
@@ -45,6 +46,14 @@ export const AddProductModal = ({ isOpen, onClose, onProductCreated }) => {
   const imagesRef = useRef(null);
 
   // Form State initialized empty/default
+  // Live status of the home page "Recommended for you" section (minimum product count)
+  const [recommendationStatus, setRecommendationStatus] = useState(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchRecommendationStatus().then((st) => { if (active) setRecommendationStatus(st); }).catch(() => {});
+    return () => { active = false; };
+  }, [isOpen]);
   const [formData, setFormData] = useState({
     name: '',
     category_id: '',
@@ -1040,6 +1049,11 @@ const DEFAULT_CATEGORIES = [
                 />
                 <span className="text-xs font-medium text-brand-dark">Recommended for You</span>
               </label>
+              {recommendationStatus && (
+                    <p className={`text-[11px] mt-1 basis-full leading-snug ${recommendationStatus.missing > 0 ? 'text-amber-700 font-semibold' : 'text-neutral-500'}`}>
+                      {recommendationStatus.text}
+                    </p>
+                  )}
             </div>
 
             {/* 7. Available Sizes (Tag/Chip Input with Presets & Strict Validation) */}
