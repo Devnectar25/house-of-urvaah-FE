@@ -738,7 +738,7 @@ export const ReturnOrderDetailModal = ({
                           <p className="text-[10px] text-sky-800 mt-1 pl-6">Reason registered</p>
                         </div>
 
-                        {/* Step 2: Atelier Approved */}
+                        {/* Step 2: Store Approved */}
                         <div className={`p-2.5 rounded-lg border ${
                           isS2 ? 'bg-sky-50/60 border-sky-300' : 'bg-neutral-50 border-neutral-200 opacity-60'
                         }`}>
@@ -778,7 +778,7 @@ export const ReturnOrderDetailModal = ({
                           </p>
                         </div>
 
-                        {/* Step 4: In Transit to Atelier */}
+                        {/* Step 4: In Transit to House of Urvaah */}
                         <div className={`p-2.5 rounded-lg border ${
                           isS4
                             ? 'bg-sky-50/60 border-sky-300'
@@ -982,10 +982,10 @@ export const ReturnOrderDetailModal = ({
                       disabled={logisticsLoading}
                       onClick={() => handleSimulateReturnMilestone('RECEIVED_ATELIER')}
                       className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
-                      title="Package arrives at Atelier, restocks inventory & routes to refund desk"
+                      title="Package arrives at House of Urvaah, restocks inventory & routes to refund desk"
                     >
                       <Building className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Received at Atelier (Restocked)</span>
+                      <span>Received at House of Urvaah (Restocked)</span>
                     </button>
 
                     <button
@@ -1090,7 +1090,7 @@ export const ReturnOrderDetailModal = ({
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="font-semibold text-neutral-900">{item.name || item.title || 'Store Item'}</p>
                             <p className="text-[11px] text-neutral-500">
                               Qty: {item.quantity || 1} • Size: {item.size || 'M'}
                             </p>

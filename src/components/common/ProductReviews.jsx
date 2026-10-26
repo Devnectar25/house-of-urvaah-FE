@@ -153,7 +153,7 @@ export const ProductReviews = ({ productId, productName, autoOpenReview = false,
     2: 'Fair',
     3: 'Good Quality',
     4: 'Very Satisfied',
-    5: 'Exceptional Atelier Piece'
+    5: 'Exceptional Store Piece'
   };
 
   const avgNum = parseFloat(summary.average) || 0;
@@ -256,7 +256,7 @@ export const ProductReviews = ({ productId, productName, autoOpenReview = false,
             <p className="text-xs font-sans text-neutral-500 tracking-wide mt-1">
               {summary.total > 0
                 ? `Based on ${summary.total} verified patron review${summary.total > 1 ? 's' : ''}`
-                : 'Inaugural atelier piece. Patron ratings welcomed.'}
+                : 'Inaugural store piece. Patron ratings welcomed.'}
             </p>
           </div>
 

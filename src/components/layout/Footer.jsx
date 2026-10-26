@@ -109,7 +109,7 @@ export const Footer = () => {
       <div className="max-w-[1320px] mx-auto">
         {/* 4-Column Balanced Grid Layout: Logo Block (Left) + 3 Link Columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-8 lg:gap-8 xl:gap-12 mb-5 sm:mb-6">
-          {/* Column 1: LOGO & ATELIER ADDRESS */}
+          {/* Column 1: LOGO & STORE ADDRESS */}
           <div className="flex flex-col items-center sm:items-start pb-4 sm:pb-0 border-b sm:border-b-0 border-neutral-200" data-allow-guest="true">
             <div className="inline-flex flex-col items-center text-center">
               <Link to="/" data-allow-guest="true" className="inline-flex justify-center -mt-4 sm:-mt-6 lg:-mt-8">
@@ -243,7 +243,7 @@ export const Footer = () => {
                   NEWSLETTER
                 </h5>
                 <p className="text-xs text-neutral-600 leading-relaxed font-normal mb-3.5">
-                  Subscribe for atelier updates, private sales & runway invitations.
+                  Subscribe for store updates, private sales & runway invitations.
                 </p>
                 <form onSubmit={handleNewsletterSubmit} className="space-y-2">
                   <div className="flex items-stretch bg-white border border-neutral-300 hover:border-neutral-400 focus-within:border-black transition-colors rounded-xs overflow-hidden shadow-2xs">

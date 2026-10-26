@@ -27,14 +27,14 @@ const INITIAL_FAQS = [
     id: 8,
     question: "What materials and craftsmanship techniques are used in your collections?",
     answer: "Our pieces are handcrafted using premium mulberry silks, French laces, fine satins, and artisanal hand-embroidery created in collaboration with master Indian artisans.",
-    category: "Atelier & Craftsmanship",
+    category: "Design & Craftsmanship",
     display_order: 1
   },
   {
     id: 9,
     question: "How should I care for my House of Urvaah luxury garments?",
     answer: "Given the delicate fabrics and intricate handwork, we strongly advise professional dry cleaning only. Store corsets and evening wear in our breathable cotton garment bags away from direct sunlight.",
-    category: "Atelier & Craftsmanship",
+    category: "Design & Craftsmanship",
     display_order: 2
   },
   {
@@ -47,7 +47,7 @@ const INITIAL_FAQS = [
   {
     id: 2,
     question: "How can I track my shipment?",
-    answer: "Once your order leaves our atelier, you will receive an SMS and email notification with an exclusive courier tracking link. You can also view live tracking updates via your Account page or by querying Urvaah Bot.",
+    answer: "Once your order leaves our store, you will receive an SMS and email notification with an exclusive courier tracking link. You can also view live tracking updates via your Account page or by querying Urvaah Bot.",
     category: "Orders & Shipping",
     display_order: 2
   },
@@ -75,7 +75,7 @@ const INITIAL_FAQS = [
   {
     id: 7,
     question: "How do I initiate a return or exchange?",
-    answer: "You can initiate an exchange or return directly through your Account under \"My Orders\", or contact our Concierge team. Our courier partner will arrange a doorstep inspection and reverse pickup.",
+    answer: "You can initiate an exchange or return directly through your Account under \"My Orders\", or contact our Customer Care team. Our courier partner will arrange a doorstep inspection and reverse pickup.",
     category: "Returns & Exchanges",
     display_order: 2
   }
@@ -83,7 +83,7 @@ const INITIAL_FAQS = [
 
 const INITIAL_CATEGORIES = [
   'All',
-  'Atelier & Craftsmanship',
+  'Design & Craftsmanship',
   'Orders & Shipping',
   'Payments & Security',
   'Returns & Exchanges'
@@ -174,14 +174,14 @@ export const ContactUs = () => {
   const [contactInfo, setContactInfo] = useState(() => cachedContactInfo || {
     concierge: {
       section_badge: 'CLIENT SERVICES',
-      section_title: 'ATELIER CONCIERGE',
+      section_title: 'CUSTOMER CARE',
       email: 'houseofurvaah@gmail.com',
       phone: '+91 98333 25657',
       hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
     },
     boutiques: {
       section_badge: 'FLAGSHIP BOUTIQUES',
-      section_title: 'ATELIER LOCATIONS',
+      section_title: 'STORE LOCATIONS',
       locations: [
         {
           id: 1,
@@ -192,7 +192,7 @@ export const ContactUs = () => {
         },
         {
           id: 2,
-          name: 'NEW DELHI CONCIERGE & SHOWROOM',
+          name: 'NEW DELHI CUSTOMER CARE & SHOWROOM',
           address: 'Mehrauli Heritage District,\nStyle Mile, New Delhi 110030',
           phone: '+91 98333 25657',
           is_active: true
@@ -346,9 +346,9 @@ export const ContactUs = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-8 md:pt-32 md:pb-10 overflow-x-hidden select-none">
       <SEOHead
-        title="Contact Us & FAQs | House of Urvaah — Concierge & Client Support"
-        description="Connect with House of Urvaah customer care and atelier concierge. Browse frequently asked questions regarding sizing, deliveries, and returns."
-        keywords="House of Urvaah contact, customer care, FAQs, fashion concierge, order inquiries, bespoke sizing"
+        title="Contact Us & FAQs | House of Urvaah — Customer Care & Client Support"
+        description="Connect with House of Urvaah customer care. Browse frequently asked questions regarding sizing, deliveries, and returns."
+        keywords="House of Urvaah contact, customer care, FAQs, customer care, order inquiries, bespoke sizing"
       />
 
       {/* 1. HERO HEADER SECTION */}
@@ -360,7 +360,7 @@ export const ContactUs = () => {
           className="text-center flex flex-col items-center"
         >
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 font-semibold mb-3 block">
-            CLIENT SERVICES & ATELIER CARE
+            CLIENT SERVICES & CUSTOMER CARE
           </span>
           <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-6">
             CONTACT HOUSE OF URVAAH
@@ -369,7 +369,7 @@ export const ContactUs = () => {
           <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
 
           <p className="max-w-2xl text-base sm:text-lg md:text-xl font-serif leading-relaxed text-neutral-700 tracking-wide font-light text-center">
-            Our Atelier Concierge is available to assist you with bespoke styling, order inquiries, boutique appointments, and press relations.
+            Our Customer Care is available to assist you with bespoke styling, order inquiries, boutique appointments, and press relations.
           </p>
         </motion.div>
       </section>
@@ -404,7 +404,7 @@ export const ContactUs = () => {
                 </h3>
                 <p className="text-xs sm:text-sm font-serif text-neutral-800 max-w-md font-normal">
                   Thank you for reaching out to House of Urvaah.
-                  Our Atelier Concierge will respond to your enquiry within 24 hours.
+                  Our Customer Care will respond to your enquiry within 24 hours.
                 </p>
               </motion.div>
             ) : (
@@ -471,7 +471,6 @@ export const ContactUs = () => {
                         onChange={handlePhoneChange}
                         onBlur={handlePhoneBlur}
                         maxLength={11}
-                        placeholder="98765 43210"
                         className={`w-full bg-white border ${
                           phoneError
                             ? 'border-rose-500 focus:border-rose-600'
@@ -506,7 +505,7 @@ export const ContactUs = () => {
                       className="w-full bg-white border border-neutral-300 px-4 py-3 text-xs text-neutral-900 font-medium focus:outline-none focus:border-black transition-colors"
                     >
                       <option value="Order Inquiry">Order & Delivery Inquiry</option>
-                      <option value="Private Concierge">Private Concierge & Styling</option>
+                      <option value="Private Customer Care">Private Customer Care & Styling</option>
                       <option value="Boutique Appointment">Boutique Appointment</option>
                       <option value="Press & Media">Press, PR & Wholesale</option>
                     </select>
@@ -524,7 +523,7 @@ export const ContactUs = () => {
                     rows="5"
                     value={formData.message}
                     onChange={handleChange}
-                    placeholder="How may our Atelier Concierge assist you?"
+                    placeholder="How may our Customer Care assist you?"
                     className="w-full bg-white border border-neutral-300 px-4 py-3 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none focus:border-black transition-colors resize-none"
                   />
                 </div>
@@ -559,7 +558,7 @@ export const ContactUs = () => {
             )}
           </motion.div>
 
-          {/* Right Column: Atelier Flagships & Contacts */}
+          {/* Right Column: Store Flagships & Contacts */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -567,20 +566,20 @@ export const ContactUs = () => {
             transition={{ duration: 0.9, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="lg:col-span-5 flex flex-col space-y-10"
           >
-            {/* Atelier Concierge Channels */}
+            {/* Customer Care Channels */}
             <div className="bg-neutral-50 p-8 border border-neutral-200/80 rounded-xs space-y-6">
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-800 font-semibold block">
                 {contactInfo.concierge?.section_badge || 'CLIENT SERVICES'}
               </span>
               <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                {contactInfo.concierge?.section_title || 'ATELIER CONCIERGE'}
+                {contactInfo.concierge?.section_title || 'CUSTOMER CARE'}
               </h3>
 
               <div className="space-y-4 text-xs font-serif text-neutral-800 font-normal">
                 <div className="flex items-start gap-3">
                   <Mail className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
-                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CONCIERGE</span>
+                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CUSTOMER CARE</span>
                     <a href={`mailto:${contactInfo.concierge?.email || 'houseofurvaah@gmail.com'}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
                       {contactInfo.concierge?.email || 'houseofurvaah@gmail.com'}
                     </a>
@@ -600,7 +599,7 @@ export const ContactUs = () => {
                 <div className="flex items-start gap-3">
                   <Clock className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
-                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">CONCIERGE HOURS</span>
+                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">CUSTOMER CARE HOURS</span>
                     <span className="block text-neutral-800 font-medium mt-0.5">
                       {contactInfo.concierge?.hours || 'Monday – Saturday: 10:00 AM – 8:00 PM IST'}
                     </span>
@@ -609,13 +608,13 @@ export const ContactUs = () => {
               </div>
             </div>
 
-            {/* Atelier Flagship Boutiques */}
+            {/* Store Flagship Boutiques */}
             <div className="space-y-6">
               <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-800 font-semibold block">
                 {contactInfo.boutiques?.section_badge || 'FLAGSHIP BOUTIQUES'}
               </span>
               <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                {contactInfo.boutiques?.section_title || 'ATELIER LOCATIONS'}
+                {contactInfo.boutiques?.section_title || 'STORE LOCATIONS'}
               </h3>
 
               <div className="space-y-6 text-xs font-serif font-normal text-neutral-800 border-l-2 border-neutral-400 pl-4">
@@ -654,7 +653,7 @@ export const ContactUs = () => {
         >
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 font-semibold mb-3 block flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-neutral-700" />
-            CLIENT ASSISTANCE & CONCIERGE
+            CLIENT ASSISTANCE & CUSTOMER CARE
           </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-4">
             FREQUENTLY ASKED QUESTIONS
@@ -806,7 +805,7 @@ export const ContactUs = () => {
           )}
         </div>
 
-        {/* 4. CONCIERGE HELP CALLOUT (Urvaah Bot & Direct Enquiry CTA) */}
+        {/* 4. CUSTOMER CARE HELP CALLOUT (Urvaah Bot & Direct Enquiry CTA) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -819,7 +818,7 @@ export const ContactUs = () => {
               CANNOT FIND YOUR ANSWER?
             </span>
             <h3 className="text-lg sm:text-xl font-serif uppercase tracking-wider text-neutral-900 font-normal">
-              OUR ATELIER CONCIERGE IS AT YOUR SERVICE
+              OUR CUSTOMER CARE IS AT YOUR SERVICE
             </h3>
             <p className="text-xs font-serif text-neutral-600 max-w-lg font-light">
               Chat in real time with our AI fashion stylist <strong className="font-semibold text-neutral-900">Urvaah Bot</strong>, or dispatch a direct inquiry to our styling salon.

@@ -141,7 +141,7 @@ export const Wishlist = () => {
       <SEOHead
         title={`My Wishlist (${resolvedProducts.length}) | House of Urvaah`}
         description="View and manage your saved House of Urvaah runway pieces and curated items."
-        keywords="House of Urvaah wishlist, saved items, luxury fashion atelier"
+        keywords="House of Urvaah wishlist, saved items, luxury fashion house"
       />
 
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 md:px-12">

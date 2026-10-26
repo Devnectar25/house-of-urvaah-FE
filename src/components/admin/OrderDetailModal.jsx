@@ -57,7 +57,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'Return Request Processing', label: 'Return Request Processing' },
   { value: 'Return Approved', label: 'Return Approved (Pickup Scheduled)' },
   { value: 'In Transit to House of Urvaah', label: 'In Transit to House of Urvaah (Return In Transit)' },
-  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah (Atelier Restocked)' },
+  { value: 'Received at House of Urvaah', label: 'Received at House of Urvaah (Store Restocked)' },
   { value: 'Return QC Rejected', label: 'Return QC Rejected (Damaged/Wrong Item)' },
   { value: 'Returned', label: 'Returned (Refund Completed)' },
   { value: 'Return Rejected', label: 'Return Rejected' },
@@ -1372,7 +1372,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setConfirmedStatus('In Transit to House of Urvaah');
       setSelectedStatus('In Transit to House of Urvaah');
       confirmedRef.current.status = 'In Transit to House of Urvaah';
-      setSaveSuccessMsg('Parcel collected from customer! Piece is now in reverse transit to House of Urvaah atelier.');
+      setSaveSuccessMsg('Parcel collected from customer! Piece is now in reverse transit to House of Urvaah.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyParent = onStatusUpdated || onOrderUpdated;
@@ -1386,7 +1386,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     }
   };
 
-  // Return reverse-pickup cycle: advance the parcel (collected -> in transit -> received at atelier)
+  // Return reverse-pickup cycle: advance the parcel (collected -> in transit -> received at House of Urvaah)
   const handleAdvanceReturnStage = async (nextStatus, successMsg) => {
     if (!order) return;
     setSavingStatus(true);
@@ -1447,15 +1447,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setConfirmedStatus('Received at House of Urvaah');
       setSelectedStatus('Received at House of Urvaah');
       confirmedRef.current.status = 'Received at House of Urvaah';
-      setSaveSuccessMsg('Original piece received & verified at atelier (QC Passed)! Ready to generate replacement dispatch order.');
+      setSaveSuccessMsg('Original piece received & verified at House of Urvaah (QC Passed)! Ready to generate replacement dispatch order.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyParent = onStatusUpdated || onOrderUpdated;
       if (notifyParent) notifyParent(updatedData);
       broadcastOrderUpdate(updatedData);
     } catch (err) {
-      console.error('Failed to confirm replacement arrival at atelier:', err);
-      setSaveError(err.message || 'Failed to confirm arrival at atelier.');
+      console.error('Failed to confirm replacement arrival at House of Urvaah:', err);
+      setSaveError(err.message || 'Failed to confirm arrival at House of Urvaah.');
     } finally {
       setSavingStatus(false);
     }
@@ -1591,7 +1591,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setConfirmedStatus('Received at House of Urvaah');
       setSelectedStatus('Received at House of Urvaah');
       confirmedRef.current.status = 'Received at House of Urvaah';
-      setSaveSuccessMsg('Package arrived at Atelier! Awaiting physical QC inspection to confirm acceptable or reject.');
+      setSaveSuccessMsg('Package arrived at House of Urvaah! Awaiting physical QC inspection to confirm acceptable or reject.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyPreview = onOptimisticPreview || onStatusPreview;
@@ -1628,7 +1628,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
     const targetStatus = isAccepted ? 'Received at House of Urvaah' : 'Return QC Rejected';
     const finalReason = isAccepted
-      ? 'Parcel verified in acceptable condition by Atelier QC'
+      ? 'Parcel verified in acceptable condition by Quality Check'
       : (rejectionReason || 'Wrong or damaged product received during QC inspection');
 
     try {
@@ -1718,7 +1718,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
       setConfirmedStatus('In Transit to House of Urvaah');
       setSelectedStatus('In Transit to House of Urvaah');
       confirmedRef.current.status = 'In Transit to House of Urvaah';
-      setSaveSuccessMsg('Doorstep pickup verified! Parcel collected by courier and in transit back to Urvaah atelier.');
+      setSaveSuccessMsg('Doorstep pickup verified! Parcel collected by courier and in transit back to Urvaah.');
       setTimeout(() => setSaveSuccessMsg(null), 3500);
 
       const notifyParent = onStatusUpdated || onOrderUpdated;
@@ -1917,7 +1917,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
     setIsManifestModalOpen(true);
   };
 
-  // Logistics Action 5b: Schedule Atelier Warehouse Courier Pickup
+  // Logistics Action 5b: Schedule Store Warehouse Courier Pickup
   const handleSchedulePickup = async () => {
     if (!order) return;
     setLogisticsLoading(true);
@@ -1939,7 +1939,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
 
       setLogisticsMsg({
         type: 'success',
-        text: `Courier Pickup Scheduled! Token: ${token} (${pickupDate}). Courier driver dispatched to House of Urvaah atelier.`
+        text: `Courier Pickup Scheduled! Token: ${token} (${pickupDate}). Courier driver dispatched to House of Urvaah.`
       });
 
       if (onOrderUpdated || onStatusUpdated) {
@@ -2508,7 +2508,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
                       <p className="text-xs text-amber-900/90 leading-relaxed">
                         {!isShiprocketDesk
-                          ? 'The customer has requested to return this delivered order. Approving will initiate the courier reverse pickup back to the House of Urvaah atelier.'
+                          ? 'The customer has requested to return this delivered order. Approving will initiate the courier reverse pickup back to the House of Urvaah.'
                           : 'The customer has requested to return this delivered order. Return request review and approval are managed directly in the Admin Orders panel.'}
                       </p>
 
@@ -2669,7 +2669,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           {[
                             'Out of replacement / exchange policy window',
-                            'Requested size / product unavailable in atelier inventory',
+                            'Requested size / product unavailable in House of Urvaah inventory',
                             'Item was marked as Final Sale / Non-exchangeable',
                             'Exchange limit exceeded for this order',
                             'Replacement request rejected by Admin',
@@ -3038,7 +3038,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             </span>
                           </h4>
                           <p className="text-xs text-indigo-900/90 leading-relaxed">
-                            Reverse courier collection, atelier QC, and replacement dispatch are managed via the <strong>Shiprocket Order Desk</strong>.
+                            Reverse courier collection, quality check, and replacement dispatch are managed via the <strong>Shiprocket Order Desk</strong>.
                           </p>
                         </div>
                       </div>
@@ -3118,11 +3118,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS3 ? 'Collected & In Transit' : isS3Active ? 'Rider Assigned' : 'Doorstep Pickup'}</p>
                         </div>
 
-                        {/* Step 4: Atelier QC */}
+                        {/* Step 4: Quality Check */}
                         <div className={`p-2.5 rounded-lg border ${isS4 ? 'bg-indigo-50/60 border-indigo-300' : isS4Active ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'bg-neutral-50 border-neutral-200 opacity-60'}`}>
                           <div className="flex items-center gap-1.5">
                             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isS4 ? 'bg-indigo-700 text-white' : isS4Active ? 'bg-blue-600 text-white animate-pulse' : 'bg-neutral-300 text-neutral-600'}`}>{isS4 ? '✓' : '4'}</div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Atelier QC</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Quality Check</span>
                           </div>
                           <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS4 ? 'Both Pieces Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}</p>
                         </div>
@@ -3188,7 +3188,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         <div className="space-y-1">
                           <h5 className="text-xs font-bold font-admin text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
                             <Building className="w-4 h-4 text-blue-700" />
-                            <span>Parcel In Reverse Transit to House of Urvaah Atelier</span>
+                            <span>Parcel In Reverse Transit to House of Urvaah</span>
                           </h5>
                           <p className="text-xs text-neutral-600 leading-relaxed">
                             Courier collected both pieces from customer. Once the parcel physically arrives at the Maison and passes quality inspection (QC), confirm receipt below:
@@ -3203,13 +3203,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                           >
                             <CheckCircle2 className="w-4 h-4 text-white" />
-                            <span>Confirm Both Pieces Received at Atelier & Restocked (QC Passed)</span>
+                            <span>Confirm Both Pieces Received at House of Urvaah & Restocked (QC Passed)</span>
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {/* 3. If Received at Atelier (Step 5 Active) - Dual Settlement Panel */}
+                    {/* 3. If Received at House of Urvaah (Step 5 Active) - Dual Settlement Panel */}
                     {(curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active || isS5) && (
                       <div className="space-y-3">
                         {/* Dual Fulfillment Grid */}
@@ -3384,7 +3384,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             </span>
                           </h4>
                           <p className="text-xs text-purple-900/90 leading-relaxed">
-                            Exchange for size <strong className="font-bold text-purple-950">{reqSize}</strong> is active. Reverse courier pickup, atelier QC, and replacement order fulfillment are managed from the <strong>Shiprocket Order Desk</strong>.
+                            Exchange for size <strong className="font-bold text-purple-950">{reqSize}</strong> is active. Reverse courier pickup, quality check, and replacement order fulfillment are managed from the <strong>Shiprocket Order Desk</strong>.
                             {repOrderNum && (
                               <span className="block mt-1 text-emerald-800 font-semibold">
                                 ✓ Replacement Forward Order: #{repOrderNum}
@@ -3489,7 +3489,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <p className="text-[10px] text-neutral-600 mt-1 pl-6">{isS3 ? 'Collected & In Transit' : isS3Active ? 'Awaiting Rider' : 'Doorstep Pickup'}</p>
                         </div>
 
-                        {/* Step 4: Atelier QC */}
+                        {/* Step 4: Quality Check */}
                         <div className={`p-2.5 rounded-lg border ${
                           isRejected
                             ? 'bg-rose-50 border-rose-300 ring-1 ring-rose-400'
@@ -3511,7 +3511,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             }`}>
                               {isRejected ? '✕' : isS4 ? '✓' : '4'}
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Atelier QC</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-900">4. Quality Check</span>
                           </div>
                           <p className="text-[10px] text-neutral-600 mt-1 pl-6">
                             {isRejected ? 'QC Rejected' : isS4 ? 'Piece Verified' : isS4Active ? 'In Transit' : 'Arrival & QC'}
@@ -3561,7 +3561,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <h4 className="text-xs sm:text-sm font-admin font-bold text-rose-950 uppercase tracking-wide">
-                                  Replacement Request Rejected • Atelier QC Failed
+                                  Replacement Request Rejected • Quality Check Failed
                                 </h4>
                                 <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-200 text-rose-900 border border-rose-300 uppercase">
                                   REJECTED
@@ -3687,13 +3687,13 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                       </div>
                     )}
 
-                    {/* C. If Parcel in Transit to Atelier (Step 4 Active) */}
+                    {/* C. If Parcel in Transit to House of Urvaah (Step 4 Active) */}
                     {(curSt === 'in transit to house of urvaah' || isS4Active) && !isS4 && !repOrderNum && !isRejected && (
                       <div className="bg-white border border-blue-200 rounded-xl p-4 space-y-3">
                         <div className="space-y-1">
                           <h5 className="text-xs font-bold font-admin text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
                             <Building className="w-4 h-4 text-blue-700" />
-                            <span>Parcel In Reverse Transit to Urvaah Atelier</span>
+                            <span>Parcel In Reverse Transit to Urvaah</span>
                           </h5>
                           <p className="text-xs text-neutral-600 leading-relaxed">
                             Courier has collected the original piece from the customer doorstep. Once the parcel physically arrives at the Maison, inspect and verify the garment below:
@@ -3717,24 +3717,24 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                           >
                             <CheckCircle2 className="w-4 h-4 text-white" />
-                            <span>Confirm Piece Received at Atelier (Begin QC)</span>
+                            <span>Confirm Piece Received at House of Urvaah (Begin QC)</span>
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {/* D. If Piece Received at Atelier & Ready for QC Decision (Step 4/5 Active) */}
+                    {/* D. If Piece Received at House of Urvaah & Ready for QC Decision (Step 4/5 Active) */}
                     {((curSt === 'received at house of urvaah' || curSt === 'received at homved' || isS5Active) && !repOrderNum && !isRejected) && (
                       <div className="bg-white border-2 border-purple-300 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-200 uppercase">
-                              ATELIER PHYSICAL INSPECTION (QC)
+                              STORE PHYSICAL INSPECTION (QC)
                             </span>
                           </div>
                           <h5 className="text-sm font-bold font-admin text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
                             <PackageCheck className="w-4 h-4 text-purple-700" />
-                            <span>Returned Piece Received at Atelier — Approve or Reject Replacement</span>
+                            <span>Returned Piece Received at House of Urvaah — Approve or Reject Replacement</span>
                           </h5>
                           <p className="text-xs text-neutral-600 leading-relaxed">
                             The original garment has arrived at the Maison. Perform physical quality check (QC). If correct piece arrived in good condition, approve replacement below. If wrong product or damaged item was returned, reject replacement with reason:
@@ -4107,10 +4107,10 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             </span>
                           </h4>
                           <p className="text-xs text-sky-900/90 leading-relaxed">
-                            Return request has been approved. Doorstep reverse pickup, in-transit tracking, and atelier parcel receiving are managed from the <strong>Shiprocket Order Desk</strong>.
+                            Return request has been approved. Doorstep reverse pickup, in-transit tracking, and store parcel receiving are managed from the <strong>Shiprocket Order Desk</strong>.
                             {(order.refund_eligible_amount || order.total) && (
                               <span className="block mt-1 text-emerald-800 font-semibold">
-                                ✓ Refund Amount: ₹{Number(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN')} (Routed to Refund Desk upon atelier QC)
+                                ✓ Refund Amount: ₹{Number(order.refund_eligible_amount || totalAmount).toLocaleString('en-IN')} (Routed to Refund Desk upon quality check)
                               </span>
                             )}
                           </p>
@@ -4185,7 +4185,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             <p className="text-[10px] text-sky-800 mt-1 pl-6">Customer initiated</p>
                           </div>
 
-                          {/* Step 2: Atelier Approved */}
+                          {/* Step 2: Store Approved */}
                           <div className={`p-2.5 rounded-lg border ${
                             isS2 ? 'bg-sky-50/60 border-sky-300' : 'bg-neutral-50 border-neutral-200 opacity-60'
                           }`}>
@@ -4225,7 +4225,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             </p>
                           </div>
 
-                          {/* Step 4: In Transit to Atelier */}
+                          {/* Step 4: In Transit to House of Urvaah */}
                           <div className={`p-2.5 rounded-lg border ${
                             isS4
                               ? 'bg-sky-50/60 border-sky-300'
@@ -4385,12 +4385,12 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           : 'bg-sky-50 text-sky-900 border-sky-200/70'
                       }`}>
                         {(() => {
-                          if (isQCRejected) return `❌ Return QC Rejected: ${order.return_rejection_reason || order.cancel_reason || 'Product wrong or damaged received'}. Parcel was NOT accepted into atelier inventory, and refund disbursement has been cancelled.`;
+                          if (isQCRejected) return `❌ Return QC Rejected: ${order.return_rejection_reason || order.cancel_reason || 'Product wrong or damaged received'}. Parcel was NOT accepted into store inventory, and refund disbursement has been cancelled.`;
                           const s = (confirmedRef.current.status || confirmedStatus || order?.status || '').toLowerCase();
                           if (s === 'returned') return '100% full refund has been settled to the customer. Return and reverse courier journey complete.';
-                          if (isQCPassed) return 'Package arrived at House of Urvaah atelier, verified by QC team as acceptable, and auto-restocked. Amount refund is active and started in Refund Desk.';
-                          if (s.includes('received')) return 'Package has arrived at House of Urvaah atelier. Please perform QC check below: confirm parcel is acceptable to restock & start refund, or reject if wrong/damaged.';
-                          if (s.includes('transit') || s.includes('collected')) return 'Courier rider has collected the parcel from customer doorstep! Parcel is currently in transit to House of Urvaah atelier.';
+                          if (isQCPassed) return 'Package arrived at House of Urvaah, verified by QC team as acceptable, and auto-restocked. Amount refund is active and started in Refund Desk.';
+                          if (s.includes('received')) return 'Package has arrived at House of Urvaah. Please perform QC check below: confirm parcel is acceptable to restock & start refund, or reject if wrong/damaged.';
+                          if (s.includes('transit') || s.includes('collected')) return 'Courier rider has collected the parcel from customer doorstep! Parcel is currently in transit to House of Urvaah.';
                           if (s === 'return approved') return 'Return request approved and reverse AWB allocated! Delhivery courier is dispatched to customer doorstep for collection within 24-48 hours.';
                           return 'Customer has requested a return. Review and approve the request to dispatch reverse courier pickup.';
                         })()}
@@ -4405,7 +4405,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <button
                             type="button"
                             disabled={savingStatus}
-                            onClick={() => handleAdvanceReturnStage('In Transit to House of Urvaah', 'Parcel collected from customer! Return is now in reverse transit to House of Urvaah atelier.')}
+                            onClick={() => handleAdvanceReturnStage('In Transit to House of Urvaah', 'Parcel collected from customer! Return is now in reverse transit to House of Urvaah.')}
                             className="px-4 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                           >
                             {savingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackageCheck className="w-4 h-4 text-emerald-400" />}
@@ -4414,7 +4414,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         </div>
                       )}
 
-                      {/* Step 4: In reverse transit -> mark received at atelier (unlocks Step 5 QC below) */}
+                      {/* Step 4: In reverse transit -> mark received at House of Urvaah (unlocks Step 5 QC below) */}
                       {isS4Active && !isQCRejected && (
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-100">
                           <span className="text-[11px] text-neutral-600">
@@ -4423,11 +4423,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           <button
                             type="button"
                             disabled={savingStatus}
-                            onClick={() => handleAdvanceReturnStage('Received at House of Urvaah', 'Return parcel received at House of Urvaah atelier. Please complete the QC inspection.')}
+                            onClick={() => handleAdvanceReturnStage('Received at House of Urvaah', 'Return parcel received at House of Urvaah. Please complete the QC inspection.')}
                             className="px-4 py-2 bg-blue-900 hover:bg-black text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                           >
                             {savingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building className="w-4 h-4 text-blue-200" />}
-                            <span>Mark Parcel Received at Atelier</span>
+                            <span>Mark Parcel Received at House of Urvaah</span>
                           </button>
                         </div>
                       )}
@@ -4451,7 +4451,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                                 <PackageCheck className="w-4 h-4 text-amber-700 shrink-0" />
                               )}
                               <span className="font-bold uppercase tracking-wider text-[11px]">
-                                Step 5: Atelier Parcel Arrival &amp; Quality Inspection (QC)
+                                Step 5: Store Parcel Arrival &amp; Quality Inspection (QC)
                               </span>
                             </div>
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
@@ -4471,11 +4471,11 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                               <>
                                 <strong>Return Rejected by Admin:</strong> The received parcel failed QC inspection (
                                 <span className="font-semibold text-rose-800">{order.return_rejection_reason || order.cancel_reason || 'Product is wrong or damaged received'}</span>
-                                ). The product was <strong>NOT accepted</strong> into atelier inventory and stock was not restored. <strong>Amount refund has been cancelled and stopped.</strong>
+                                ). The product was <strong>NOT accepted</strong> into store inventory and stock was not restored. <strong>Amount refund has been cancelled and stopped.</strong>
                               </>
                             ) : isQCPassed ? (
                               <>
-                                <strong>Parcel Received &amp; Acceptable:</strong> The Maison admin physically inspected the parcel contents. Correct product verified in good condition, tags intact, and auto-restocked into atelier inventory. <strong>Amount refund has been unlocked and started.</strong>
+                                <strong>Parcel Received &amp; Acceptable:</strong> The Maison admin physically inspected the parcel contents. Correct product verified in good condition, tags intact, and auto-restocked into store inventory. <strong>Amount refund has been unlocked and started.</strong>
                               </>
                             ) : (
                               <>
@@ -4712,7 +4712,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             disabled={savingStatus}
                             onClick={handleMarkReceivedAtUrvaah}
                             className="px-5 py-2.5 bg-neutral-950 hover:bg-black text-white text-xs font-bold uppercase rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-                            title="Advance to Step 5: Item delivered back to atelier for QC inspection"
+                            title="Advance to Step 5: Item delivered back to House of Urvaah for QC inspection"
                           >
                             {savingStatus ? (
                               <>
@@ -5056,7 +5056,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                           {order.pickup_token || 'PKP-CONFIRMED'}
                         </span>
                         <span className="text-emerald-700 ml-1.5 text-[11px]">
-                          {order.pickup_scheduled_date ? `• Scheduled: ${order.pickup_scheduled_date}` : '• Courier driver dispatched to House of Urvaah atelier'}
+                          {order.pickup_scheduled_date ? `• Scheduled: ${order.pickup_scheduled_date}` : '• Courier driver dispatched to House of Urvaah'}
                         </span>
                       </div>
                     </div>
@@ -5954,7 +5954,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         value={adminRejectReturnCustomNotes}
                         onChange={(e) => setAdminRejectReturnCustomNotes(e.target.value)}
                         disabled={savingStatus}
-                        placeholder="Enter remarks for customer notification and atelier audit records..."
+                        placeholder="Enter remarks for customer notification and store audit records..."
                         className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                       />
                     </div>

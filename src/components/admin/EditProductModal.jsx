@@ -1289,6 +1289,109 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   badgeText="RICH EDITOR"
                   rows={5}
                 />
+
+                {/* Product Details table (storefront) - shown under the rich details, hidden when empty */}
+                <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                          Product Details Table
+                        </label>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
+                          Shown in Product Details
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">
+                        Rows shown as a table inside the "PRODUCT DETAILS" section on the product page. Leave empty to hide the table.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={handleLoadAdditionalInfoTemplate}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                        title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
+                      >
+                        Load Preset
+                      </button>
+                      {(formData.specifications || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearAdditionalInfo}
+                          className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
+                          title="Clear all rows"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleAddSpecification}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
+                      </button>
+                    </div>
+                  </div>
+
+                  {!formData.specifications || formData.specifications.length === 0 ? (
+                    <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
+                      <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleLoadAdditionalInfoTemplate}
+                          className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                        >
+                          Load Standard Preset Rows
+                        </button>
+                        <span className="text-neutral-300">•</span>
+                        <button
+                          type="button"
+                          onClick={handleAddSpecification}
+                          className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                        >
+                          + Add Custom Row
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                        <div className="col-span-4">Attribute / Title</div>
+                        <div className="col-span-7">Value / Specification Detail</div>
+                        <div className="col-span-1 text-center">Action</div>
+                      </div>
+                      {formData.specifications.map((spec, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
+                          <input
+                            type="text"
+                            value={spec.label}
+                            onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
+                            placeholder="e.g. Fabric, Closure, Lining, Care"
+                            className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
+                          />
+                          <input
+                            type="text"
+                            value={spec.value}
+                            onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
+                            placeholder="e.g. Embroidered fabric with sequin detailing"
+                            className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSpecification(idx)}
+                            className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 5. Pricing & Stock Row */}
@@ -1735,109 +1838,6 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5 animate-in fade-in">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{colorError}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 9. Additional Information (Storefront Accordion) */}
-              <div className="space-y-3 pt-3 border-t border-neutral-200/80">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
-                        Additional Information
-                      </label>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
-                        Storefront Accordion
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      Dynamically customize rows displayed under the "ADDITIONAL INFORMATION" accordion on the product page.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={handleLoadAdditionalInfoTemplate}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
-                      title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
-                    >
-                      Load Preset
-                    </button>
-                    {(formData.specifications || []).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAdditionalInfo}
-                        className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
-                        title="Clear all rows"
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleAddSpecification}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
-                    </button>
-                  </div>
-                </div>
-
-                {!formData.specifications || formData.specifications.length === 0 ? (
-                  <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
-                    <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
-                    <div className="flex items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleLoadAdditionalInfoTemplate}
-                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
-                      >
-                        Load Standard Preset Rows
-                      </button>
-                      <span className="text-neutral-300">•</span>
-                      <button
-                        type="button"
-                        onClick={handleAddSpecification}
-                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
-                      >
-                        + Add Custom Row
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                      <div className="col-span-4">Attribute / Title</div>
-                      <div className="col-span-7">Value / Specification Detail</div>
-                      <div className="col-span-1 text-center">Action</div>
-                    </div>
-                    {formData.specifications.map((spec, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
-                        <input
-                          type="text"
-                          value={spec.label}
-                          onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
-                          placeholder="e.g. Fabric, Closure, Lining, Care"
-                          className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
-                        />
-                        <input
-                          type="text"
-                          value={spec.value}
-                          onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                          placeholder="e.g. Embroidered fabric with sequin detailing"
-                          className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSpecification(idx)}
-                          className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
-                          title="Remove row"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>

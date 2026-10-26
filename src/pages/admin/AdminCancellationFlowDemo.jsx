@@ -56,7 +56,7 @@ export const AdminCancellationFlowDemo = () => {
       title: 'Shiprocket Pickup Voided',
       desc: 'Urvaah backend contacts Shiprocket API to immediately void the courier pickup request.',
       customerView: 'Cancellation confirmed instantly on screen.',
-      backendAction: 'Shiprocket voids AWB. Courier driver is notified NOT to visit Urvaah Atelier. Zero freight fees incurred.',
+      backendAction: 'Shiprocket voids AWB. Courier driver is notified NOT to visit Urvaah. Zero freight fees incurred.',
       apiEndpoint: 'POST /v1/external/orders/cancel'
     },
     {
@@ -97,22 +97,22 @@ export const AdminCancellationFlowDemo = () => {
       title: 'Shiprocket RTO (Return to Origin) Triggered',
       desc: 'Shiprocket signals the destination hub to halt delivery and initiate Return-to-Origin (RTO).',
       customerView: 'Tracking scan changes to: "RTO Initiated - Returning to Sender".',
-      backendAction: 'Courier rider is instructed not to attempt delivery. Parcel is routed back to Mumbai Atelier.',
+      backendAction: 'Courier rider is instructed not to attempt delivery. Parcel is routed back to Mumbai Store.',
       apiEndpoint: 'Shiprocket Webhook: EVENT_RTO_INITIATED'
     },
     {
       stepNum: 3,
-      title: 'Package Received at Homved Atelier',
-      desc: 'The physical parcel arrives back at House of Urvaah atelier facility.',
-      customerView: 'Tracking updates to: "Package Received at Atelier Facility".',
-      backendAction: 'Atelier QA team inspects box seals and updates status to "Received at Homved".',
+      title: 'Package Received at Homved Store',
+      desc: 'The physical parcel arrives back at House of Urvaah facility.',
+      customerView: 'Tracking updates to: "Package Received at House of Urvaah Facility".',
+      backendAction: 'Store QA team inspects box seals and updates status to "Received at Homved".',
       apiEndpoint: 'PATCH /api/orders/:id/status (Received at Homved)'
     },
     {
       stepNum: 4,
       title: 'Stock Restocking at Homved (URVAAH-014)',
       desc: 'Condition is verified as unworn and undamaged. Garments are returned to active boutique inventory.',
-      customerView: 'Items restocked in atelier collection.',
+      customerView: 'Items restocked in House of Urvaah collection.',
       backendAction: 'Automated inventory script restores product stock only after physical arrival at Homved.',
       apiEndpoint: 'DB Automation (URVAAH-014 Restock)'
     },

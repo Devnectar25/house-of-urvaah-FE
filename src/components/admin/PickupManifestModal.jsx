@@ -196,7 +196,7 @@ export const PickupManifestModal = ({ isOpen, onClose, order }) => {
                   Official Courier Dispatch Handover Manifest
                 </p>
                 <p className="text-[10px] text-neutral-500 mt-0.5">
-                  Atelier Warehouse: Kurla East Hub, Mumbai 400024
+                  Store Warehouse: Kurla East Hub, Mumbai 400024
                 </p>
               </div>
 

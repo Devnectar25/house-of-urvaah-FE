@@ -169,7 +169,7 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8 border-b border-neutral-200/80 pb-4 text-left">
         <div>
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.25em] uppercase text-neutral-400 font-semibold block mb-1.5">
-            CURATED ATELIER SELECTIONS
+            CURATED STORE SELECTIONS
           </span>
           <h2 className="text-2xl sm:text-3xl font-serif tracking-[0.1em] uppercase text-brand-dark font-semibold">
             RELATED PIECES

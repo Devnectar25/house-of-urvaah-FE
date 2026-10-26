@@ -390,7 +390,7 @@ export const AuthModal = () => {
 
                 <div>
                   <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 block mb-1">
-                    ATELIER MEMBER
+                    STORE MEMBER
                   </span>
                   <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
                     {user.name}
@@ -588,7 +588,7 @@ export const AuthModal = () => {
                         HEY, WE NEED A FEW DETAILS
                       </h3>
                       <p className="text-xs text-neutral-500 font-light mt-1.5 leading-relaxed">
-                        Complete your profile to customize your Atelier experience.
+                        Complete your profile to customize your Store experience.
                       </p>
                     </div>
 
@@ -693,7 +693,7 @@ export const AuthModal = () => {
           {/* Footer Security Notice */}
           <div className="bg-[#FAF8F3] px-6 py-3 border-t border-neutral-200/80 flex items-center justify-center gap-2 text-[10px] text-neutral-500 tracking-widest uppercase">
             <Shield className="w-3.5 h-3.5 text-neutral-400 stroke-[1.5]" />
-            256-BIT ENCRYPTED ATELIER CONCIERGE
+            256-BIT ENCRYPTED
           </div>
         </motion.div>
       </div>

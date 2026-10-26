@@ -172,7 +172,7 @@ export const CategoryPage = ({ defaultCategory }) => {
   // Format collection title
   const categoryTitle = useMemo(() => {
     const norm = currentSlug.replace(/[^a-z0-9]+/g, '-');
-    if (norm === 'all') return 'ALL ATELIER PIECES';
+    if (norm === 'all') return 'ALL STORE PIECES';
     if (norm === 'new-arrivals') return 'NEW ARRIVALS';
     if (norm === 'co-ord-sets') return 'CO-ORD SETS';
     if (norm === 'festive-wear' || norm === 'ethnic-wear') return 'FESTIVE WEAR';
@@ -338,7 +338,7 @@ export const CategoryPage = ({ defaultCategory }) => {
   return (
     <main className="w-full min-h-screen bg-white font-serif select-none pt-24 sm:pt-28 md:pt-32 pb-20">
       <SEOHead
-        title={`${categoryTitle} Collection | House of Urvaah Atelier`}
+        title={`${categoryTitle} Collection | House of Urvaah`}
         description={`Explore the ${categoryTitle} collection at House of Urvaah. Handcrafted festive ensembles, minimalist co-ord sets, and contemporary women's designer apparel.`}
         keywords={`House of Urvaah, ${categoryTitle}, luxury clothing, designer fashion`}
       />
@@ -348,7 +348,7 @@ export const CategoryPage = ({ defaultCategory }) => {
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-sans">
-              ATELIER EDIT
+              STORE EDIT
             </span>
             <span className="text-neutral-300">•</span>
             <span className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase font-sans">

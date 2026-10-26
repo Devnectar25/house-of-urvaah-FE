@@ -371,7 +371,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
 }
 
 /* ==========================================================================
-   Rich Description & Product Story Typography (Atelier Luxe System)
+   Rich Description & Product Story Typography (Store Luxe System)
    ========================================================================== */
 .rich-description-content {
   color: #4b5563;
@@ -391,7 +391,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   line-height: 1.4;
 }
 
-.rich-description-content h2:first-child {
+.rich-description-content > h2:first-child {
   margin-top: 0;
 }
 
@@ -407,7 +407,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   line-height: 1.4;
 }
 
-.rich-description-content h3:first-child {
+.rich-description-content > h3:first-child {
   margin-top: 0;
 }
 

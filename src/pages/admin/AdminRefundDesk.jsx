@@ -670,7 +670,7 @@ export const AdminRefundDesk = () => {
         title={activeViewTab === 'shiprocket' ? 'Return Logistics & Shiprocket Reverse Desk' : 'Refund Desk'}
         subtitle={
           activeViewTab === 'shiprocket'
-            ? 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements.'
+            ? 'Manage Doorstep QC pickups, reverse AWBs, store restock verification, and size replacements.'
             : 'Track and process customer refunds, cancellations, and return payouts.'
         }
         className="py-2.5 px-4 sm:py-3 sm:px-5 rounded-xl"
@@ -757,7 +757,7 @@ export const AdminRefundDesk = () => {
         <div className="text-[11px] text-neutral-500 font-medium">
           {activeViewTab === 'payouts'
             ? 'Manage customer bank refunds, payment gateway reversal UTRs, and payout approvals'
-            : 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements'}
+            : 'Manage Doorstep QC pickups, reverse AWBs, store restock verification, and size replacements'}
         </div>
       </div>
 

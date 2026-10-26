@@ -12,7 +12,7 @@ export const ProtectedRoute = ({ children }) => {
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto" />
           <span className="text-xs tracking-[0.25em] uppercase font-semibold text-neutral-600 block">
-            VERIFYING ATELIER SESSION...
+            VERIFYING STORE SESSION...
           </span>
         </div>
       </div>

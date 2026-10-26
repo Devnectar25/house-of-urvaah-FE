@@ -21,9 +21,9 @@ export const Home = () => {
   return (
     <main className="w-full min-h-screen bg-white">
       <SEOHead 
-        title="House of Urvaah | Official Online Store & Luxury Atelier"
+        title="House of Urvaah | Official Online Store & Luxury House"
         description="Explore House of Urvaah: high-fashion runway tailoring, luxury silk dresses, minimalist co-ord sets, and timeless women's designer apparel."
-        keywords="House of Urvaah, luxury clothing, architectural tailoring, silk dresses, co-ord sets, women fashion atelier"
+        keywords="House of Urvaah, luxury clothing, architectural tailoring, silk dresses, co-ord sets, women fashion house"
         ogImage="/assets/Images/Brown01.png"
       />
       {/* Hero Video + Dual Campaign Banner Parallax Block with Pinned Logo Overlay */}
@@ -60,7 +60,7 @@ export const Home = () => {
       {/* 4.8 Sustainability / Brand Story Strip */}
       <BrandStory />
 
-      {/* Login & Sign Up Atelier Section */}
+      {/* Login & Sign Up Store Section */}
       <AuthSection />
     </main>
   );
