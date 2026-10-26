@@ -53,13 +53,11 @@ export const Wishlist = () => {
 
       const items = await Promise.all(
         wishlist.map(async (id) => {
-          // 1. Try local catalog match (fast & immediate)
+          // Live catalogue first: deleted or deactivated products must not reappear from sample data
           const local = findLocalProduct(id);
-          if (local) return local;
-
-          // 2. Fetch from backend API if not in static catalog
           try {
             const apiProd = await productApi.getProductById(id);
+            if (apiProd && (apiProd.is_active === false || apiProd.active === false)) return null;
             if (apiProd && (apiProd.name || apiProd.title)) {
               return {
                 ...apiProd,
@@ -78,7 +76,10 @@ export const Wishlist = () => {
               };
             }
           } catch (e) {
+            // Product removed from the catalogue: drop it from the wishlist view
+            if (/not found|404/i.test(String(e?.message || ''))) return null;
             console.warn('API lookup failed for wishlist product ID:', id, e);
+            return local; // server unreachable: fall back to the bundled catalogue
           }
 
           return null;

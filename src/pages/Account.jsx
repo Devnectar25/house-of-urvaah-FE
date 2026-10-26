@@ -1355,11 +1355,11 @@ export const Account = () => {
 
       const items = await Promise.all(
         wishlist.map(async (id) => {
+          // Live catalogue first: deleted or deactivated products must not reappear from sample data
           const local = findLocalProduct(id);
-          if (local) return local;
-
           try {
             const apiProd = await productApi.getProductById(id);
+            if (apiProd && (apiProd.is_active === false || apiProd.active === false)) return null;
             if (apiProd && (apiProd.name || apiProd.title)) {
               return {
                 ...apiProd,
@@ -1378,7 +1378,10 @@ export const Account = () => {
               };
             }
           } catch (e) {
+            // Product removed from the catalogue: drop it from the wishlist view
+            if (/not found|404/i.test(String(e?.message || ''))) return null;
             console.warn('API lookup failed for wishlist product ID:', id, e);
+            return local; // server unreachable: fall back to the bundled catalogue
           }
 
           return null;
