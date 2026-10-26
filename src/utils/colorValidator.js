@@ -300,3 +300,27 @@ export function filterValidColors(colorList) {
   }
   return result;
 }
+
+/**
+ * Shopper-facing name for a color the admin picked: a preset (stored as its name or its HEX) or a
+ * typed color name. Returns null for the "Default" placeholder and for HEX codes that are not one
+ * of the admin presets (old seeded values the admin never chose), so filters only offer real picks.
+ */
+export function getColorName(colorStr) {
+  if (!colorStr || typeof colorStr !== 'string') return null;
+  const clean = colorStr.trim();
+  if (!clean || clean.toLowerCase() === 'default') return null;
+  if (!isHexColor(clean) && !isBareHex(clean)) return normalizeColor(clean);
+  const hex = normalizeColor(clean);
+  const preset = POPULAR_FASHION_COLORS.find((c) => c.hex.toUpperCase() === hex);
+  return preset ? preset.name : null;
+}
+
+/** Sort color names in the admin preset order (Black, White, Wine Red...), then A-Z */
+export function compareColorNames(a, b) {
+  const rank = (n) => {
+    const i = POPULAR_FASHION_COLORS.findIndex((c) => c.name.toLowerCase() === String(n).toLowerCase());
+    return i === -1 ? POPULAR_FASHION_COLORS.length : i;
+  };
+  return rank(a) - rank(b) || String(a).localeCompare(String(b));
+}

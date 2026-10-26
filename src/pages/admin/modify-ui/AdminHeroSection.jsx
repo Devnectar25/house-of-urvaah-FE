@@ -24,6 +24,7 @@ import { apiClient } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
 import { getSupabaseMediaUrl } from '../../../lib/supabase';
+import { uploadVideoDirect } from '../../../lib/directVideoUpload';
 
 // Storefront plays this on phones when a slide has no mobile video (see components/home/Hero.jsx)
 const DEFAULT_MOBILE_HERO_VIDEO = getSupabaseMediaUrl('HOU_mobile');
@@ -132,6 +133,7 @@ export const AdminHeroSection = () => {
   // Upload a media file to the CDN and return its URL
   const uploadMediaFile = async (file) => {
     const isVideo = file.type.startsWith('video/');
+    if (isVideo) return uploadVideoDirect(file, 'hero/videos');
     const uploadData = new FormData();
     uploadData.append(isVideo ? 'video' : 'file', file);
     if (!isVideo) uploadData.append('folder', 'hero');

@@ -29,6 +29,8 @@ import {
 import { apiClient, getAdminAuthToken } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import Swal from 'sweetalert2';
+import { uploadVideoDirect } from '../../../lib/directVideoUpload';
+import { FabricProductPicker } from '../../../components/admin/FabricProductPicker';
 
 // Helper to safely inspect video duration client-side before upload without hanging
 const getVideoDuration = (file) => {
@@ -275,25 +277,7 @@ export const AdminFabricVideo = () => {
 
     setUploadingIndex(index);
     try {
-      const uploadData = new FormData();
-      uploadData.append('video', file);
-
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
-
-      const res = await fetch(`${API_BASE}/api/upload/upload-video`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Video upload failed');
-      }
-
-      const uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
-      if (!uploadedUrl) throw new Error('No video URL returned by server');
+      const uploadedUrl = await uploadVideoDirect(file, 'fabric/videos');
 
       // Update state with permanent remote URL
       const updatedVideos = videos.slice(0, 10).map((v, idx) => {
@@ -710,7 +694,7 @@ export const AdminFabricVideo = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
               {videos.map((vid, idx) => {
                 const isUploading = uploadingIndex === idx;
 
@@ -935,6 +919,13 @@ export const AdminFabricVideo = () => {
                               <span className="text-neutral-400">Max 250MB</span>
                             </div>
                           </div>
+
+                          {/* Related products: products made in this fabric (shown on its fabric page) */}
+                          <FabricProductPicker
+                            fabricSlug={vid.slug || vid.fabric_slug || (vid.tag ? vid.tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '')}
+                            fabricLabel={vid.tag || vid.title}
+                            onNotify={showToast}
+                          />
                         </div>
                       </div>
                     </div>

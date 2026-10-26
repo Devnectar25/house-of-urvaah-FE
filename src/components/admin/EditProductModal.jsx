@@ -31,7 +31,11 @@ import {
   POPULAR_FASHION_COLORS
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
+import ProductFilterPicker from './ProductFilterPicker';
+import { readProductFilters, buildFilterPayload } from '../../constants/productFilters';
+import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { getLegacyDetailRows, productDetailsToRichText, richTextToProductDetails } from '../../utils/productDetailsContent';
+import { uploadVideoDirect } from '../../lib/directVideoUpload';
 
 
 const DEFAULT_CATEGORIES = [
@@ -60,7 +64,16 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const imagesRef = useRef(null);
 
   // Form State initialized from product prop
+  // Live status of the home page "Recommended for you" section (minimum product count)
+  const [recommendationStatus, setRecommendationStatus] = useState(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchRecommendationStatus().then((st) => { if (active) setRecommendationStatus(st); }).catch(() => {});
+    return () => { active = false; };
+  }, [isOpen]);
   const [formData, setFormData] = useState({
+    shopFilters: readProductFilters(null),
     name: '',
     category_id: '',
     subCategory: '',
@@ -211,6 +224,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         setFormData({
           name: data.name || data.title || '',
+          shopFilters: readProductFilters(data),
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
@@ -281,6 +295,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         setFormData({
           name: product.name || '',
+          shopFilters: readProductFilters(product),
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
@@ -648,31 +663,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     setSubmitError(null);
 
     try {
-      const uploadData = new FormData();
-      uploadData.append('video', file);
-      uploadData.append('folderName', 'products/videos');
-
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
-
-      const res = await fetch(`${API_BASE}/api/upload/upload-video`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Video upload failed');
-      }
-
-      const uploadedUrl = data.url || data.data?.url || data.filePath;
-      if (uploadedUrl) {
-        setFormData(prev => ({ ...prev, video_url: uploadedUrl }));
-        setSubmitError(null);
-      } else {
-        throw new Error('No video URL returned from server.');
-      }
+      const uploadedUrl = await uploadVideoDirect(file, 'products/videos');
+      setFormData(prev => ({ ...prev, video_url: uploadedUrl }));
+      setSubmitError(null);
     } catch (err) {
       console.error('Video upload failed:', err);
       setSubmitError(err.message || 'Video upload failed. Please try again or provide a direct video URL.');
@@ -767,6 +760,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
       const payload = {
         title: formData.name.trim(),
+        ...(formData.shopFilters ? buildFilterPayload(formData.shopFilters) : {}),
         productname: formData.name.trim(),
         category_id: formData.category_id,
         subcategory_name: formData.subCategory,
@@ -1128,6 +1122,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                         ? "Featured in 'Recommended For You' collections."
                         : 'Not featured in recommendation lists.'}
                     </p>
+                    {recommendationStatus && (
+                    <p className={`text-[11px] mt-1 leading-snug ${recommendationStatus.missing > 0 ? 'text-amber-700 font-semibold' : 'text-neutral-500'}`}>
+                      {recommendationStatus.text}
+                    </p>
+                  )}
                   </div>
                   <button
                     type="button"
@@ -1206,6 +1205,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   />
                 </div>
               </div>
+
+              {/* Shop Filters: storefront collection filters this product appears under */}
+              <ProductFilterPicker
+                value={formData.shopFilters}
+                onChange={(shopFilters) => setFormData(prev => ({ ...prev, shopFilters }))}
+              />
 
               {/* 3. Short Description */}
               <div className="space-y-1.5">
@@ -1773,7 +1778,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                         }`}
                       >
                         <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          className={`w-2.5 h-2.5 rounded-full border shrink-0 ${isSelected ? 'border-white/80' : 'border-black/20'}`}
                           style={{ background: hex }}
                         />
                         <span>{isSelected ? `✓ ${name}` : `+ ${name}`}</span>
@@ -1789,7 +1794,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       : 'border-neutral-200 focus-within:border-neutral-400'
                   }`}
                 >
-                  {formData.colors.map((col) => (
+                  {/* Presets are toggled above; only custom colors are listed here */}
+                  {formData.colors.filter((col) => !POPULAR_FASHION_COLORS.some(({ name, hex }) => col.toLowerCase() === name.toLowerCase() || col.toLowerCase() === hex.toLowerCase())).map((col) => (
                     <span
                       key={col}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-neutral-200 text-brand-dark text-xs font-semibold rounded-md shadow-2xs"
