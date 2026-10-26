@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * WomanAiIcon - Luxury Woman AI Stylist Concierge Icon
+ * WomanAiIcon - Luxury Woman AI Stylist Customer Care Icon
  * Depicts an elegant feminine silhouette with chic hair, neckline, and AI sparkles.
  */
 export const WomanAiIcon = ({ className = "w-4 h-4", width = 18, height = 18, ...props }) => {

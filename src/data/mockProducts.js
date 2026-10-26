@@ -7,12 +7,12 @@ export const CATEGORIES = [
     image: '/assets/Images/Brown01.png',
     itemCount: '6 Items',
     subcategories: [
-      { name: 'Latest Atelier Drops', featured: true },
+      { name: 'Latest Store Drops', featured: true },
       { name: 'Co-Ord Sets', featured: true },
       { name: 'Festive Silhouettes', featured: true }
     ],
     promo: {
-      title: 'CONTEMPORARY ATELIER',
+      title: 'CONTEMPORARY STORE',
       subtitle: 'NEW ARRIVALS',
       image: '/assets/Images/Brown01.png'
     }

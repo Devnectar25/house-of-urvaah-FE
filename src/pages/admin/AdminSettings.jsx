@@ -509,7 +509,7 @@ export const AdminSettings = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
-                    Concierge &amp; Customer Support Email
+                    Customer Care &amp; Customer Support Email
                   </label>
                   <input
                     type="email"

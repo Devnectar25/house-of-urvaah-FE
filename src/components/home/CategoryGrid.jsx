@@ -191,6 +191,11 @@ export const CategoryGrid = () => {
     };
   }, [isHovered]);
 
+  // Validation: Require a minimum of 3 products to display the "Recommended for you" section
+  if (!productsList || productsList.length < 3) {
+    return null;
+  }
+
   return (
     <section id="recommended-for-you" className="pt-16 md:pt-20 pb-0 px-4 md:px-8 max-w-[1800px] mx-auto bg-white font-serif">
       {/* Section Heading matching Trending on the gram typography */}

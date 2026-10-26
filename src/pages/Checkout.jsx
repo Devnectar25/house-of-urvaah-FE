@@ -1281,7 +1281,7 @@ export const Checkout = () => {
       setAppliedCoupon({ code, discountPercent: 10, label: '10% Welcome Discount' });
       setCouponMessage({ type: 'success', text: 'Coupon WELCOME10 applied! (10% OFF)' });
     } else if (code === 'ATELIER20') {
-      setAppliedCoupon({ code, discountPercent: 20, label: '20% VIP Atelier Discount' });
+      setAppliedCoupon({ code, discountPercent: 20, label: '20% VIP Store Discount' });
       setCouponMessage({ type: 'success', text: 'Coupon ATELIER20 applied! (20% OFF)' });
     } else {
       setCouponMessage({
@@ -1333,7 +1333,7 @@ export const Checkout = () => {
       order_number: String(orderNumber || orderId),
       id: orderId || orderNumber,
       order_date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      pickup_location: 'Primary Atelier',
+      pickup_location: 'Primary Store',
       billing_customer_name: firstName,
       billing_last_name: lastName,
       billing_address: streetAddress,
@@ -2090,7 +2090,7 @@ export const Checkout = () => {
     );
   }
 
-  // Order Success Screen View (Matching House of Urvaah Atelier Brand Theme)
+  // Order Success Screen View (Matching House of Urvaah Brand Theme)
   if (orderPlaced) {
     const details = placedOrderDetails || {
       orderNumber: placedOrderNumber || `HOU-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -2398,7 +2398,7 @@ export const Checkout = () => {
         },
         html: `
           <div class="text-left font-sans space-y-3">
-            <p class="text-xs text-neutral-600">Select a reason for returning your delivered atelier piece:</p>
+            <p class="text-xs text-neutral-600">Select a reason for returning your delivered store piece:</p>
             <select id="swal-return-reason" class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 focus:outline-none">
               <option value="Size or fit issue">Size or fit issue</option>
               <option value="Defective or damaged piece received">Defective or damaged piece received</option>
@@ -2540,7 +2540,7 @@ export const Checkout = () => {
                 <option value="XXL">XXL</option>
               </select>
             </div>
-            <textarea id="swal-replace-comment" placeholder="Optional notes for atelier concierge..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 resize-none h-16 focus:outline-none"></textarea>
+            <textarea id="swal-replace-comment" placeholder="Optional notes for customer care..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-sans text-neutral-800 resize-none h-16 focus:outline-none"></textarea>
             <div class="p-3 bg-purple-50 border border-purple-100 rounded-lg text-[11px] text-purple-900 leading-relaxed">
               Complimentary reverse pickup will be scheduled from your delivery address. Once reviewed, your replacement piece will be dispatched with priority delivery.
             </div>
@@ -2601,7 +2601,7 @@ export const Checkout = () => {
 
             await Swal.fire({
               title: 'Replacement Request Submitted',
-              text: 'Your exchange request has been submitted to House of Urvaah atelier team for verification.',
+              text: 'Your exchange request has been submitted to House of Urvaah team for verification.',
               icon: 'success',
               confirmButtonColor: '#171717',
               confirmButtonText: 'OK',
@@ -3077,7 +3077,7 @@ export const Checkout = () => {
             title: 'Cancellation Submitted',
             message: requiresBankDetails
               ? 'Your cancellation request has been submitted with your refund bank details.'
-              : 'Your cancellation request has been submitted to our atelier team.'
+              : 'Your cancellation request has been submitted to House of Urvaah team.'
           });
         } catch (err) {
           console.warn('Cancel order API fallback:', err.message);
@@ -3313,13 +3313,13 @@ export const Checkout = () => {
                 : isCancellationRequested
                 ? 'CANCELLATION REQUEST UNDER REVIEW'
                 : isMixedReturnReplace
-                ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED & REFUND PROCESSED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT ATELIER • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'EXCHANGE & RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'SIMULTANEOUS RETURN & REPLACEMENT UNDER REVIEW')
+                ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED & REFUND PROCESSED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT HOUSE OF URVAAH • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'EXCHANGE & RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'SIMULTANEOUS RETURN & REPLACEMENT UNDER REVIEW')
                 : isReplacementForwardOrder
                 ? (isDelivered ? 'REPLACEMENT ORDER DELIVERED' : isShipped ? 'REPLACEMENT ORDER DISPATCHED' : 'REPLACEMENT IN TAILORING')
                 : isInReturnFlow
-                ? (isReturned ? (isPartialReturnOrder ? 'RETURN COMPLETED & REFUND SETTLED' : 'RETURN COMPLETED & 100% REFUND SETTLED') : isReceivedAtUrvaah ? 'RETURN RECEIVED AT ATELIER • QC IN PROGRESS' : isReturnApproved ? 'RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'RETURN REQUEST UNDER ATELIER REVIEW')
+                ? (isReturned ? (isPartialReturnOrder ? 'RETURN COMPLETED & REFUND SETTLED' : 'RETURN COMPLETED & 100% REFUND SETTLED') : isReceivedAtUrvaah ? 'RETURN RECEIVED AT HOUSE OF URVAAH • QC IN PROGRESS' : isReturnApproved ? 'RETURN APPROVED • REVERSE PICKUP SCHEDULED' : 'RETURN REQUEST UNDER STORE REVIEW')
                 : isInReplacementFlow
-                ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT ATELIER • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'REPLACEMENT APPROVED • REVERSE PICKUP SCHEDULED' : 'REPLACEMENT REQUEST UNDER REVIEW')
+                ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER DISPATCHED' : isReplacementQCReceived ? 'PARCEL RECEIVED AT HOUSE OF URVAAH • QC PASSED' : isReplacementCollected ? 'PARCEL COLLECTED • IN REVERSE TRANSIT' : isReplacementApproved ? 'REPLACEMENT APPROVED • REVERSE PICKUP SCHEDULED' : 'REPLACEMENT REQUEST UNDER REVIEW')
                 : isDelivered
                 ? 'ORDER DELIVERED & COMPLETED'
                 : 'ORDER CONFIRMED & PROCESSING'}
@@ -3342,7 +3342,7 @@ export const Checkout = () => {
                 : isReplacementForwardOrder
                 ? `REPLACEMENT PIECE #${details.orderNumber}`
                 : isInReturnFlow
-                ? (isReturned ? 'RETURN & REFUND COMPLETED' : isReceivedAtUrvaah ? 'PIECE RECEIVED AT HOUSE OF URVAAH' : isReturnApproved ? 'RETURN APPROVED BY ATELIER' : 'RETURN REQUEST SUBMITTED')
+                ? (isReturned ? 'RETURN & REFUND COMPLETED' : isReceivedAtUrvaah ? 'PIECE RECEIVED AT HOUSE OF URVAAH' : isReturnApproved ? 'RETURN APPROVED BY STORE' : 'RETURN REQUEST SUBMITTED')
                 : isInReplacementFlow
                 ? (isReplaced || Boolean(details.replacement_order_number) ? 'REPLACEMENT ORDER PLACED & DISPATCHED' : 'EXCHANGE / REPLACEMENT IN MOTION')
                 : isDelivered
@@ -3351,13 +3351,13 @@ export const Checkout = () => {
             </h1>
             <p className="text-xs font-sans text-neutral-500 tracking-wider uppercase">
               {isCancellationRejected ? (
-                <>Your cancellation request was reviewed and <strong className="text-black font-medium">rejected by our atelier admin team</strong>. Your order remains confirmed and will be processed for delivery.{(details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.rejection_reason || details.cancel_reason}"` : ''}</>
+                <>Your cancellation request was reviewed and <strong className="text-black font-medium">rejected by our store admin team</strong>. Your order remains confirmed and will be processed for delivery.{(details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.rejection_reason || details.cancel_reason}"` : ''}</>
               ) : isReturnQcRejected ? (
-                <>Your returned parcel was inspected by our atelier QC team and <strong className="text-black font-medium">could not be accepted into inventory</strong>. As per our policy, the return has been rejected and the refund has been cancelled.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` QC Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
+                <>Your returned parcel was inspected by our quality check team and <strong className="text-black font-medium">could not be accepted into inventory</strong>. As per our policy, the return has been rejected and the refund has been cancelled.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` QC Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
               ) : isReturnRejected ? (
-                <>Your return request was reviewed and <strong className="text-black font-medium">declined by our atelier team</strong>. Your order remains delivered and no reverse pickup will take place.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
+                <>Your return request was reviewed and <strong className="text-black font-medium">declined by our store team</strong>. Your order remains delivered and no reverse pickup will take place.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
               ) : isReplacementRejected ? (
-                <>Your exchange / replacement request was reviewed and <strong className="text-black font-medium">declined by our atelier team</strong>. Your order remains delivered and no reverse pickup or replacement dispatch will take place.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
+                <>Your exchange / replacement request was reviewed and <strong className="text-black font-medium">declined by our store team</strong>. Your order remains delivered and no reverse pickup or replacement dispatch will take place.{(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) ? ` Reason: "${details.return_rejection_reason || details.rejection_reason || details.cancel_reason}"` : ''}</>
               ) : isOrderCancelled ? (
                 isRefundCompleted ? (
                   <>Shiprocket courier pickup was voided prior to dispatch. 100% full refund of <strong className="text-black font-medium">{formatPrice(details.totalPaid)}</strong> has been disbursed to your original payment method{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
@@ -3365,42 +3365,42 @@ export const Checkout = () => {
                   <>Shiprocket courier pickup was voided prior to dispatch. 100% full refund has been initiated to your original payment method.</>
                 )
               ) : isCancellationRequested ? (
-                <>Your cancellation request has been recorded and is currently being reviewed by our atelier management team. Once approved, freight will be voided and your refund will be processed.</>
+                <>Your cancellation request has been recorded and is currently being reviewed by our store management team. Once approved, freight will be voided and your refund will be processed.</>
               ) : isMixedReturnReplace ? (
                 isReplaced || Boolean(details.replacement_order_number) ? (
                   <>Your replacement order #{details.replacement_order_number || `${details.orderNumber}-REP`} has been generated and dispatched with 100% exchange credit, and ₹{mixedRefundAmount.toLocaleString('en-IN')} refund for your returned item has been processed.</>
                 ) : isReplacementQCReceived ? (
-                  <>Reverse parcel containing both exchange and return items has arrived at House of Urvaah atelier and verified in pristine condition. Replacement order is queued and refund of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong> is in settlement.</>
+                  <>Reverse parcel containing both exchange and return items has arrived at House of Urvaah and verified in pristine condition. Replacement order is queued and refund of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong> is in settlement.</>
                 ) : isReplacementCollected ? (
-                  <>Courier rider has collected both exchange and return pieces from your doorstep and they are in transit to our atelier.</>
+                  <>Courier rider has collected both exchange and return pieces from your doorstep and they are in transit to House of Urvaah.</>
                 ) : isReplacementApproved ? (
                   <>Both exchange and return requests have been authorized. Delhivery reverse courier pickup has been scheduled for your doorstep. Please keep pieces ready.</>
                 ) : (
-                  <>Your simultaneous exchange and return request is active. Our concierge is coordinating doorstep collection for both items, replacement dispatch, and refund settlement of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong>.</>
+                  <>Your simultaneous exchange and return request is active. Our customer care is coordinating doorstep collection for both items, replacement dispatch, and refund settlement of <strong className="text-black font-medium">{formatPrice(mixedRefundAmount)}</strong>.</>
                 )
               ) : isReplacementForwardOrder ? (
-                <>Our atelier is crafting your replacement piece{details.replacement_size ? ` in size ${details.replacement_size}` : ''} for delivered Order #{details.original_order_number || 'original'}. 100% exchange credit applied (₹0 balance).</>
+                <>Our store is crafting your replacement piece{details.replacement_size ? ` in size ${details.replacement_size}` : ''} for delivered Order #{details.original_order_number || 'original'}. 100% exchange credit applied (₹0 balance).</>
               ) : isInReturnFlow ? (
                 isReturned ? (
                   <>Your {isPartialReturnOrder ? 'returned piece' : 'delivered piece'} was received back at House of Urvaah and passed inspection. {isPartialReturnOrder ? 'A refund' : '100% full refund'} of <strong className="text-black font-medium">{formatPrice(returnRefundAmount)}</strong> has been settled to your account{details.refund_txn_id ? ` (UTR: ${details.refund_txn_id})` : ''}.</>
                 ) : isReceivedAtUrvaah ? (
-                  <>Your return parcel has arrived at our atelier. Our quality team is verifying the piece. Upon verification, your refund will be disbursed immediately.</>
+                  <>Your return parcel has arrived at House of Urvaah. Our quality team is verifying the piece. Upon verification, your refund will be disbursed immediately.</>
                 ) : isReturnApproved ? (
                   <>Your return request has been approved by admin. Delhivery reverse courier pickup has been scheduled for your delivery address within 24–48 hours.</>
                 ) : (
-                  <>Your return request has been received and is pending admin verification. Upon approval, reverse doorstep pickup will be scheduled. Refund will be processed upon QC inspection at our atelier.</>
+                  <>Your return request has been received and is pending admin verification. Upon approval, reverse doorstep pickup will be scheduled. Refund will be processed upon QC inspection at House of Urvaah.</>
                 )
               ) : isInReplacementFlow ? (
                 isReplaced || Boolean(details.replacement_order_number) ? (
                   <>Your replacement order #{details.replacement_order_number || `${details.orderNumber}-REP`} has been generated and placed in the Maison dispatch queue with 100% exchange credit.</>
                 ) : isReplacementQCReceived ? (
-                  <>Original parcel was received at House of Urvaah atelier and verified in pristine condition. Replacement order is queued for placement.</>
+                  <>Original parcel was received at House of Urvaah and verified in pristine condition. Replacement order is queued for placement.</>
                 ) : isReplacementCollected ? (
-                  <>Courier rider has collected the parcel from customer doorstep and is delivering it to our atelier.</>
+                  <>Courier rider has collected the parcel from customer doorstep and is delivering it to House of Urvaah.</>
                 ) : isReplacementApproved ? (
                   <>Replacement authorized. Courier partner has been assigned for doorstep parcel collection. Please keep tags and packaging ready.</>
                 ) : (
-                  <>Your exchange request is active. Our concierge is coordinating doorstep collection and replacement dispatch.</>
+                  <>Your exchange request is active. Our customer care is coordinating doorstep collection and replacement dispatch.</>
                 )
               ) : (
                 <>We'll send you an order confirmation email shortly to <strong className="text-black font-medium">{details.customerEmail || user?.email}</strong>.</>
@@ -3645,7 +3645,7 @@ export const Checkout = () => {
                                 const isRefundDone = itemStat === 'refunded' || isRefundCompleted;
                                 const label = isRefundDone ? 'Returned • Refunded'
                                   : itemStat === 'returned' ? 'Returned'
-                                  : itemStat.includes('received') ? 'Received at Atelier'
+                                  : itemStat.includes('received') ? 'Received at House of Urvaah'
                                   : itemStat.includes('transit') || itemStat.includes('collected') ? 'In Return Transit'
                                   : itemStat.includes('approved') ? 'Return Approved'
                                   : 'Return Requested';
@@ -3866,7 +3866,7 @@ export const Checkout = () => {
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-900/90 leading-relaxed">
-                      The returned parcel was received at House of Urvaah atelier and underwent quality inspection. The piece could not be verified into inventory. As per store policy, the return has been rejected and the refund has been cancelled.
+                      The returned parcel was received at House of Urvaah and underwent quality inspection. The piece could not be verified into inventory. As per store policy, the return has been rejected and the refund has been cancelled.
                     </p>
                     {(details.return_rejection_reason || details.rejection_reason || details.cancel_reason) && (
                       <p className="text-[11px] text-neutral-900 font-semibold pt-1">
@@ -3901,18 +3901,18 @@ export const Checkout = () => {
                       <div className="font-sans pt-0.5">
                         <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">2. DOORSTEP PICKUP & ARRIVAL</h4>
                         <span className="text-[9px] font-sans font-semibold tracking-[0.16em] uppercase block mt-0.5 text-neutral-900">
-                          PARCEL DELIVERED TO ATELIER
+                          PARCEL DELIVERED TO HOUSE OF URVAAH
                         </span>
                       </div>
                     </div>
 
-                    {/* Step 3: Atelier QC Inspection */}
+                    {/* Step 3: Quality Check Inspection */}
                     <div className="relative flex items-start gap-4">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 font-bold text-xs bg-neutral-900 text-white shadow-xs ring-4 ring-neutral-900/20">
                         <X className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-900 uppercase">3. ATELIER QUALITY CHECK</h4>
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-neutral-900 uppercase">3. STORE QUALITY CHECK</h4>
                         <span className="text-[9px] font-sans font-bold tracking-[0.16em] uppercase block mt-0.5 text-neutral-900">
                           INSPECTION FAILED • RETURN REJECTED
                         </span>
@@ -3944,7 +3944,7 @@ export const Checkout = () => {
                       <span className="font-mono font-bold text-neutral-900">₹0.00 (Cancelled)</span>
                     </div>
                     <p className="text-[11px] text-neutral-500 leading-relaxed pt-1">
-                      Due to quality inspection failure, the refund cannot be disbursed. If you have questions regarding this assessment, please contact our concierge team.
+                      Due to quality inspection failure, the refund cannot be disbursed. If you have questions regarding this assessment, please contact our customer care team.
                     </p>
                   </div>
                 </div>
@@ -3981,13 +3981,13 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Step 2: ATELIER APPROVED */}
+                    {/* Step 2: STORE APPROVED */}
                     <div className="relative flex items-start gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? 'bg-neutral-900 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                         {isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Clock className="w-4 h-4" />}
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>2. ATELIER APPROVED</h4>
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>2. STORE APPROVED</h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? 'text-neutral-900 font-bold' : 'text-neutral-400'}`}>
                           {isReplacementApproved || isReplacementCollected || isReplacementQCReceived || isReplaced ? 'REVERSE PICKUP SCHEDULED' : 'PENDING APPROVAL'}
                         </span>
@@ -4007,15 +4007,15 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Step 4: ATELIER QC PASSED */}
+                    {/* Step 4: QUALITY CHECK PASSED */}
                     <div className="relative flex items-start gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${isReplacementQCReceived || isReplaced ? 'bg-neutral-900 text-white shadow-xs font-bold' : 'bg-white border-2 border-neutral-300 text-neutral-400'}`}>
                         {isReplacementQCReceived || isReplaced ? <Check className="w-4 h-4 stroke-[2.5]" /> : <ShieldCheck className="w-4 h-4" />}
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementQCReceived || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>4. ATELIER QC PASSED</h4>
+                        <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${isReplacementQCReceived || isReplaced ? 'text-black font-bold' : 'text-neutral-400'}`}>4. QUALITY CHECK PASSED</h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 ${isReplacementQCReceived || isReplaced ? 'text-neutral-900 font-bold' : 'text-neutral-400'}`}>
-                          {isReplacementQCReceived || isReplaced ? 'ORIGINAL PIECE VERIFIED' : 'PENDING ATELIER INSPECTION'}
+                          {isReplacementQCReceived || isReplaced ? 'ORIGINAL PIECE VERIFIED' : 'PENDING STORE INSPECTION'}
                         </span>
                       </div>
                     </div>
@@ -4084,14 +4084,14 @@ export const Checkout = () => {
                     </div>
                     <p className="text-[11px] text-neutral-900/90 leading-relaxed">
                       {isReturned
-                        ? `Piece received back at House of Urvaah atelier. ${isPartialReturnOrder ? `Refund of ${formatPrice(returnRefundAmount)}` : '100% full refund'} has been settled to your account.`
+                        ? `Piece received back at House of Urvaah. ${isPartialReturnOrder ? `Refund of ${formatPrice(returnRefundAmount)}` : '100% full refund'} has been settled to your account.`
                         : isReceivedAtUrvaah
-                        ? 'Package arrived at Urvaah atelier. Quality check passed; refund queued for settlement.'
+                        ? 'Package arrived at Urvaah. Quality check passed; refund queued for settlement.'
                         : isReturnCollected
                         ? 'Courier rider collected the parcel from customer doorstep! In transit back to House of Urvaah.'
                         : isReturnApproved
                         ? 'Return approved! Courier partner is scheduled to collect package from your delivery address within 24–48 hours.'
-                        : 'Return request submitted. Our atelier team is reviewing your request for reverse courier dispatch.'}
+                        : 'Return request submitted. Our store team is reviewing your request for reverse courier dispatch.'}
                     </p>
 
                     {/* Pickup Details Grid */}
@@ -4146,7 +4146,7 @@ export const Checkout = () => {
                             ? 'text-black'
                             : 'text-neutral-400'
                         }`}>
-                          2. ATELIER APPROVED & COURIER ASSIGNED
+                          2. STORE APPROVED & COURIER ASSIGNED
                         </h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-0.5 ${
                           isReturnApproved || isReturnCollected || isReceivedAtUrvaah || isReturned
@@ -4199,7 +4199,7 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Step 4: In Transit to Urvaah Atelier */}
+                    {/* Step 4: In Transit to Urvaah */}
                     <div className="relative flex items-start gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
                         isReceivedAtUrvaah || isReturned
@@ -4220,7 +4220,7 @@ export const Checkout = () => {
                             ? 'text-black'
                             : 'text-neutral-400'
                         }`}>
-                          4. IN TRANSIT TO URVAAH ATELIER
+                          4. IN TRANSIT TO URVAAH
                         </h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-0.5 ${
                           isReceivedAtUrvaah || isReturned
@@ -4230,7 +4230,7 @@ export const Checkout = () => {
                             : 'text-neutral-400'
                         }`}>
                           {isReceivedAtUrvaah || isReturned
-                            ? 'ARRIVED AT ATELIER'
+                            ? 'ARRIVED AT HOUSE OF URVAAH'
                             : isReturnCollected
                             ? 'IN TRANSIT'
                             : 'PENDING PICKUP'}
@@ -4253,7 +4253,7 @@ export const Checkout = () => {
                         <h4 className={`text-xs font-bold tracking-[0.15em] uppercase ${
                           isReturned ? 'text-neutral-900 font-bold' : isReceivedAtUrvaah ? 'text-neutral-900 font-bold' : 'text-neutral-400'
                         }`}>
-                          5. ATELIER VERIFICATION & REFUND
+                          5. STORE VERIFICATION & REFUND
                         </h4>
                         <span className={`text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-0.5 ${
                           isReturned ? 'text-neutral-900 font-bold' : isReceivedAtUrvaah ? 'text-neutral-900 font-bold' : 'text-neutral-400'
@@ -4283,10 +4283,10 @@ export const Checkout = () => {
                   <div className="mb-6 p-4 bg-[#FAF8F3] border border-[#E7E2D8] rounded-xl space-y-2 text-xs font-sans">
                     <span className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
                       <AlertCircle className="w-3.5 h-3.5 text-neutral-900" />
-                      <span>Cancellation Under Atelier Review</span>
+                      <span>Cancellation Under Store Review</span>
                     </span>
                     <p className="text-[11px] text-neutral-900/90 leading-relaxed">
-                      Your cancellation request has been received by our atelier concierge. Once reviewed and verified, the Shiprocket courier pickup will be voided and your refund will be queued.
+                      Your cancellation request has been received by our customer care. Once reviewed and verified, the Shiprocket courier pickup will be voided and your refund will be queued.
                     </p>
                   </div>
 
@@ -4319,13 +4319,13 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Step 3: ATELIER REVIEW & FREIGHT VOID */}
+                    {/* Step 3: STORE REVIEW & FREIGHT VOID */}
                     <div className="relative flex items-start gap-4">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 bg-neutral-900 text-white shadow-xs font-bold ring-4 ring-neutral-900/20 animate-pulse">
                         <Clock className="w-4 h-4" />
                       </div>
                       <div className="font-sans pt-0.5">
-                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">3. ATELIER REVIEW & DISPATCH VOID</h4>
+                        <h4 className="text-xs font-bold tracking-[0.15em] text-black uppercase">3. STORE REVIEW & DISPATCH VOID</h4>
                         <span className="text-[9px] font-sans font-medium tracking-[0.16em] uppercase block mt-1 text-neutral-900 font-bold">
                           UNDER REVIEW BY ADMIN
                         </span>
@@ -4591,7 +4591,7 @@ export const Checkout = () => {
                   })()}
                 </div>
 
-                {/* Action Buttons Stack (Luxury Atelier Button Theme) */}
+                {/* Action Buttons Stack (Luxury House Button Theme) */}
                 <div className="space-y-3">
                   <Link
                     to="/account?tab=VIEW ORDERS"
@@ -4709,7 +4709,7 @@ export const Checkout = () => {
           orderId={details.orderNumber}
         />
 
-        {/* Atelier Cancel Order Modal with Reason Selection */}
+        {/* Store Cancel Order Modal with Reason Selection */}
         <AnimatePresence>
           {isCancelOrderModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-red-500 font-sans">
@@ -5088,7 +5088,7 @@ export const Checkout = () => {
           )}
         </AnimatePresence>
 
-        {/* Atelier Granular Multi-Item Return & Exchange Modal */}
+        {/* Store Granular Multi-Item Return & Exchange Modal */}
         <AnimatePresence>
           {isItemReturnModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 font-sans text-left">
@@ -5114,7 +5114,7 @@ export const Checkout = () => {
                 <div className="flex items-center justify-between pb-4 border-b border-neutral-200 shrink-0">
                   <div>
                     <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
-                      HOUSE OF URVAAH ATELIER • RETURNS & EXCHANGES
+                      HOUSE OF URVAAH • RETURNS & EXCHANGES
                     </span>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full bg-neutral-900 text-white flex items-center justify-center shrink-0">
@@ -5196,7 +5196,7 @@ export const Checkout = () => {
                                     }}
                                   />
                                   <div className="min-w-0">
-                                    <p className="font-bold text-neutral-900 truncate">{item.name || item.title || 'Atelier Item'}</p>
+                                    <p className="font-bold text-neutral-900 truncate">{item.name || item.title || 'Store Item'}</p>
                                     <p className="text-[11px] text-neutral-500">
                                       Size: <strong className="text-neutral-800">{item.size || 'M'}</strong> • Qty: {breakdown.qty}
                                     </p>
@@ -5315,7 +5315,7 @@ export const Checkout = () => {
                                         </div>
                                       )}
                                       <p className="text-[10px] text-amber-700 pt-0.5">
-                                        Refund of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (including ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST)` : ''} will be credited upon doorstep collection & atelier QC.
+                                        Refund of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (including ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST)` : ''} will be credited upon doorstep collection & quality check.
                                       </p>
                                     </div>
                                   </div>
@@ -5852,7 +5852,7 @@ export const Checkout = () => {
                   {/* General Comments */}
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                      Additional Notes for Atelier Concierge (Optional)
+                      Additional Notes for Customer Care (Optional)
                     </label>
                     <textarea
                       value={returnComments}
@@ -5894,7 +5894,7 @@ export const Checkout = () => {
           )}
         </AnimatePresence>
 
-        {/* Atelier Edit Shipping Address Modal (24-Hour Edit Window) */}
+        {/* Store Edit Shipping Address Modal (24-Hour Edit Window) */}
         <AnimatePresence>
           {isEditAddressModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 selection:bg-neutral-800 selection:text-white font-sans">
@@ -5930,7 +5930,7 @@ export const Checkout = () => {
                 {/* Header */}
                 <div className="mb-5">
                   <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
-                    HOUSE OF URVAAH ATELIER
+                    HOUSE OF URVAAH
                   </span>
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full border border-neutral-300 bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
@@ -6061,7 +6061,7 @@ export const Checkout = () => {
 
                   {/* Policy Info Note */}
                   <div className="p-3 bg-[#FAF8F3] border border-neutral-200 text-[11px] text-neutral-600 leading-relaxed font-sans">
-                    Address updates are permitted for up to 24 hours from when the order was placed. Once dispatched by our atelier logistics team, routing changes cannot be applied.
+                    Address updates are permitted for up to 24 hours from when the order was placed. Once dispatched by our store logistics team, routing changes cannot be applied.
                   </div>
 
                   {/* Actions */}
@@ -7286,7 +7286,7 @@ export const Checkout = () => {
                   </div>
                   <div>
                     <span className="text-[10px] font-sans font-bold tracking-[0.25em] text-neutral-400 uppercase block">
-                      HOUSE OF URVAAH • ATELIER
+                      HOUSE OF URVAAH • STORE
                     </span>
                     <h3 className="text-base sm:text-lg font-serif font-semibold tracking-wide text-black">
                       Confirm Your Order

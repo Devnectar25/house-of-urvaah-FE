@@ -946,7 +946,7 @@ export const ProductDetail = () => {
       title: 'CHECK AVAILABILITY',
       content:
         product.availability ||
-        'Available in select House of Urvaah flagships across Mumbai, New Delhi, and Bengaluru. Contact boutique concierge for private styling appointments.'
+        'Available in select House of Urvaah flagships across Mumbai, New Delhi, and Bengaluru. Contact customer care for private styling appointments.'
     }
   ];
 

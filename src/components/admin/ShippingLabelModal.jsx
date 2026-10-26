@@ -158,7 +158,7 @@ export const ShippingLabelModal = ({ isOpen, onClose, order }) => {
                   HOUSE OF URVAAH
                 </h1>
                 <span className="text-[9px] uppercase tracking-widest text-neutral-600 font-bold block">
-                  Haute Couture & Atelier Express
+                  Haute Couture & Store Express
                 </span>
               </div>
               <div className="text-right">
@@ -256,7 +256,7 @@ export const ShippingLabelModal = ({ isOpen, onClose, order }) => {
               <span className="text-[8.5px] uppercase tracking-wider font-bold text-neutral-500 block">
                 IF UNDELIVERED, RETURN TO:
               </span>
-              <p className="font-bold text-black mt-0.5">HOUSE OF URVAAH ATELIER CENTRAL WAREHOUSE</p>
+              <p className="font-bold text-black mt-0.5">HOUSE OF URVAAH CENTRAL WAREHOUSE</p>
               <p>Plot 402, Signature Industrial Estate, Kurla East, Mumbai, MH - 400024</p>
               <p className="font-mono text-[9px] mt-0.5">GSTIN: 27AABCH8821F1ZX • Support: concierge@urvaah.com</p>
             </div>

@@ -30,7 +30,7 @@ const QUICK_SUGGESTIONS = [
 const INITIAL_MESSAGE = {
   id: 'welcome',
   sender: 'bot',
-  text: "Hello! I am **Urvaah bot**, your personal luxury fashion concierge. 🌿\n\nHow may I curate your style journey today? You can ask me about our corsets, bespoke fabrics, sizing guidance, or order tracking.",
+  text: "Hello! I am **Urvaah bot**, your personal luxury customer care. 🌿\n\nHow may I curate your style journey today? You can ask me about our corsets, bespoke fabrics, sizing guidance, or order tracking.",
   products: [],
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 };
@@ -289,7 +289,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
       const fallbackMessage = {
         id: 'bot_' + Date.now(),
         sender: 'bot',
-        text: "I'm having a momentary connection delay, but our atelier specialists are always at your service. Please try asking again or explore our curated collections.",
+        text: "I'm having a momentary connection delay, but our store specialists are always at your service. Please try asking again or explore our curated collections.",
         products: [],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
@@ -476,7 +476,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
                       {isBot && msg.products && msg.products.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
                           <p className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">
-                            Recommended Atelier Pieces ({msg.products.length})
+                            Recommended Store Pieces ({msg.products.length})
                           </p>
                           <div
                             style={{

@@ -36,7 +36,7 @@ export const AuthCallback = () => {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center pt-28 pb-16 bg-white font-serif">
       <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4" />
-      <p className="text-xs uppercase tracking-widest text-neutral-500">Authenticating Atelier Session...</p>
+      <p className="text-xs uppercase tracking-widest text-neutral-500">Authenticating Store Session...</p>
     </div>
   );
 };

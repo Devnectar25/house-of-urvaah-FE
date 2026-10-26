@@ -248,8 +248,8 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
             scenario: 'Scenario 2: Doorstep QC Passed & In Transit',
             success: true,
             status: 'Return Collected',
-            details: 'Courier rider confirmed brand tags, luxury box, and unworn garment condition. Parcel collected and traveling to Urvaah Atelier.',
-            next_step: 'Transit to Regional Distribution Center ➔ Arrival at Homved Atelier.'
+            details: 'Courier rider confirmed brand tags, luxury box, and unworn garment condition. Parcel collected and traveling to Urvaah.',
+            next_step: 'Transit to Regional Distribution Center ➔ Arrival at Homved Store.'
           };
           break;
         }
@@ -264,7 +264,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
             scenario: 'Scenario 3: Received at Homved (Automated Restocking URVAAH-014)',
             success: true,
             status: 'Received at Homved',
-            details: 'Package safely delivered back to atelier. Database auto-restocked items back to inventory stock. Order ready for financial payout or size exchange.',
+            details: 'Package safely delivered back to House of Urvaah. Database auto-restocked items back to inventory stock. Order ready for financial payout or size exchange.',
             next_step: 'Refund Desk Payout ➔ Release bank funds or execute replacement dispatch.'
           };
           break;
@@ -346,7 +346,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
             method: 'PATCH',
             body: JSON.stringify({ 
               status: 'Cancelled', 
-              cancelReason: 'Customer requested cancellation prior to atelier dispatch' 
+              cancelReason: 'Customer requested cancellation prior to House of Urvaah dispatch' 
             })
           });
 
@@ -420,7 +420,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
             <Truck className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-2xl font-bold text-amber-700">{stats.inTransitReverse}</div>
-          <span className="text-[10px] text-neutral-400">En-route to Atelier</span>
+          <span className="text-[10px] text-neutral-400">En-route to House of Urvaah</span>
         </div>
 
         <div className="bg-white border border-neutral-200/80 rounded-2xl p-4 shadow-2xs">
@@ -493,7 +493,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
               className="w-full bg-neutral-800 border border-neutral-700 text-white text-xs rounded-xl px-3 py-2.5 focus:outline-hidden focus:border-amber-400 font-medium"
             >
               <option value="approve_return">Scenario 1: Approve Return & Schedule Doorstep QC Pickup</option>
-              <option value="qc_passed_transit">Scenario 2: Doorstep QC Passed & In-Transit to Atelier</option>
+              <option value="qc_passed_transit">Scenario 2: Doorstep QC Passed & In-Transit to House of Urvaah</option>
               <option value="received_homved">Scenario 3: "Received at Homved" & Auto Restock (URVAAH-014)</option>
               <option value="qc_failed">Scenario 4: Doorstep QC Failed (Customer Handover Denied)</option>
               <option value="settle_refund">Scenario 5: Settle Financial Refund (Prepaid/COD Receipt)</option>
@@ -574,7 +574,7 @@ export const ShiprocketRefundDeskView = ({ onSelectOrder = null, showHeader = fa
               <option value="all">All Claims</option>
               <option value="return_requested">Return Requested</option>
               <option value="pickup_scheduled">Pickup Scheduled</option>
-              <option value="in_transit">In Transit to Atelier</option>
+              <option value="in_transit">In Transit to House of Urvaah</option>
               <option value="at_homved">Received at Homved</option>
               <option value="refunded">Refund Settled</option>
               <option value="exchanged">Exchanged / Replaced</option>

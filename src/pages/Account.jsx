@@ -49,7 +49,7 @@ const getItemStatusLabel = (item) => {
   if (st === 'return approved') return 'RETURN APPROVED';
   if (st === 'replace approved' || st === 'replacement approved') return 'REPLACEMENT APPROVED';
   if (st === 'return collected' || st.startsWith('in transit to')) return act === 'replace' ? 'EXCHANGE IN TRANSIT' : 'RETURN IN TRANSIT';
-  if (st.startsWith('received at')) return 'AT ATELIER';
+  if (st.startsWith('received at')) return 'AT HOUSE OF URVAAH';
   if (st === 'refunded') return act === 'replace' ? 'REPLACED' : 'RETURNED • REFUNDED';
   if (st === 'returned') return 'RETURNED';
   if (st === 'replaced') return 'REPLACED';
@@ -499,7 +499,7 @@ export const Account = () => {
       });
 
       setToastMsg({
-        text: isDeliveredModalOrder ? 'Return request submitted for atelier review.' : 'Cancellation request submitted for admin review.',
+        text: isDeliveredModalOrder ? 'Return request submitted for store review.' : 'Cancellation request submitted for admin review.',
         type: 'success'
       });
     } catch (e) {
@@ -536,7 +536,7 @@ export const Account = () => {
     const items = ord.items && Array.isArray(ord.items) && ord.items.length > 0 ? ord.items : [
       {
         id: ord.product_id || ord.id || 'item-1',
-        name: ord.product_name || ord.name || 'Atelier Product',
+        name: ord.product_name || ord.name || 'Store Product',
         price: ord.price || ord.total || 0,
         quantity: ord.quantity || 1,
         image: ord.image || ord.image_url || '/assets/Images/Brown01.png',
@@ -791,7 +791,7 @@ export const Account = () => {
     const items = ord.items && Array.isArray(ord.items) && ord.items.length > 0 ? ord.items : [
       {
         id: ord.product_id || ord.id || 'item-1',
-        name: ord.product_name || ord.name || 'Atelier Product',
+        name: ord.product_name || ord.name || 'Store Product',
         price: ord.price || ord.total || 0,
         quantity: ord.quantity || 1,
         image: ord.image || ord.image_url || '/assets/Images/Brown01.png',
@@ -965,8 +965,8 @@ export const Account = () => {
         type: 'success',
         title: 'Request Submitted',
         text: reqType === 'Replacement'
-          ? 'Replacement request submitted for atelier review.'
-          : 'Return / exchange request submitted for atelier review.'
+          ? 'Replacement request submitted for store review.'
+          : 'Return / exchange request submitted for store review.'
       });
 
       setReturnReplaceModalOrder(null);
@@ -1015,7 +1015,7 @@ export const Account = () => {
       : [
           {
             id: replaceModalOrder.product_id || replaceModalOrder.id || 'item-1',
-            name: replaceModalOrder.product_name || replaceModalOrder.name || 'Atelier Product',
+            name: replaceModalOrder.product_name || replaceModalOrder.name || 'Store Product',
             price: replaceModalOrder.price || replaceModalOrder.total || 0,
             quantity: replaceModalOrder.quantity || 1,
             image: replaceModalOrder.image || replaceModalOrder.image_url || '/assets/Images/Brown01.png',
@@ -1060,7 +1060,7 @@ export const Account = () => {
       });
 
       setToastMsg({
-        text: 'Replacement request submitted for atelier review.',
+        text: 'Replacement request submitted for store review.',
         type: 'success'
       });
     } catch (e) {
@@ -1324,7 +1324,7 @@ export const Account = () => {
     }
   }, [user, authLoading, openAuthModal]);
 
-  const firstName = user?.firstName || user?.name?.split(' ')[0] || 'ATELIER MEMBER';
+  const firstName = user?.firstName || user?.name?.split(' ')[0] || 'STORE MEMBER';
 
   const tabConfig = [
     { name: 'VIEW ORDERS', shortLabel: 'Orders', icon: Package, badge: orders.length > 0 ? orders.length : null },
@@ -1835,7 +1835,7 @@ export const Account = () => {
       <div className="min-h-[70vh] flex items-center justify-center pt-28 pb-16 bg-white">
         <div className="text-center font-serif">
           <div className="w-8 h-8 border-2 border-brand-dark border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-xs uppercase tracking-widest text-neutral-400">Loading your Atelier profile...</p>
+          <p className="text-xs uppercase tracking-widest text-neutral-400">Loading your Store profile...</p>
         </div>
       </div>
     );
@@ -1917,7 +1917,7 @@ export const Account = () => {
               </div>
               <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
                 {isDeliveredModalOrder
-                  ? 'Request a return for your delivered piece(s). Our concierge team will coordinate reverse pickup and process your 100% full refund.'
+                  ? 'Request a return for your delivered piece(s). Our customer care team will coordinate reverse pickup and process your 100% full refund.'
                   : "We're sorry to see you cancel. Please tell us why you're cancelling your order."}
               </p>
 
@@ -1988,7 +1988,7 @@ export const Account = () => {
                             {/* Product Info */}
                             <div className="min-w-0">
                               <p className="text-xs font-semibold text-neutral-800 truncate">
-                                {item.name || item.title || 'Atelier Item'}
+                                {item.name || item.title || 'Store Item'}
                               </p>
                               <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
                                 Purchased: {itemQty} • ₹{itemPrice.toLocaleString('en-IN')}
@@ -2378,7 +2378,7 @@ export const Account = () => {
               <div className="flex items-center justify-between pb-4 border-b border-neutral-200 shrink-0">
                 <div>
                   <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
-                    HOUSE OF URVAAH ATELIER • RETURNS & EXCHANGES
+                    HOUSE OF URVAAH • RETURNS & EXCHANGES
                   </span>
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-neutral-900 text-white flex items-center justify-center shrink-0">
@@ -2420,7 +2420,7 @@ export const Account = () => {
                     : [
                         {
                           id: returnReplaceModalOrder.product_id || returnReplaceModalOrder.id || 'item-1',
-                          name: returnReplaceModalOrder.product_name || returnReplaceModalOrder.name || 'Atelier Product',
+                          name: returnReplaceModalOrder.product_name || returnReplaceModalOrder.name || 'Store Product',
                           price: returnReplaceModalOrder.price || returnReplaceModalOrder.total || 0,
                           quantity: returnReplaceModalOrder.quantity || 1,
                           image: returnReplaceModalOrder.image || returnReplaceModalOrder.image_url || '/assets/Images/Brown01.png',
@@ -2472,7 +2472,7 @@ export const Account = () => {
                                   }}
                                 />
                                 <div className="min-w-0">
-                                  <p className="font-bold text-neutral-900 truncate">{item.name || item.title || item.product_name || 'Atelier Item'}</p>
+                                  <p className="font-bold text-neutral-900 truncate">{item.name || item.title || item.product_name || 'Store Item'}</p>
                                   <p className="text-[11px] text-neutral-500">
                                     Size: <strong className="text-neutral-800">{item.size || item.selectedSize || 'M'}</strong> • Qty: {breakdown.qty}
                                   </p>
@@ -2591,7 +2591,7 @@ export const Account = () => {
                                       </div>
                                     )}
                                     <p className="text-[10px] text-amber-700 pt-0.5">
-                                      Refund of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (including ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST)` : ''} will be credited upon doorstep collection & atelier QC.
+                                      Refund of ₹{breakdown.totalWithTax.toLocaleString('en-IN')}{breakdown.taxAmount > 0 ? ` (including ₹${breakdown.taxAmount.toLocaleString('en-IN')} GST)` : ''} will be credited upon doorstep collection & quality check.
                                     </p>
                                   </div>
                                 </div>
@@ -3138,7 +3138,7 @@ export const Account = () => {
                 {/* General Comments */}
                 <div>
                   <label className="block text-[10px] font-bold text-neutral-700 uppercase mb-1">
-                    Additional Notes for Atelier Concierge (Optional)
+                    Additional Notes for Customer Care (Optional)
                   </label>
                   <textarea
                     value={returnComments}
@@ -3222,7 +3222,7 @@ export const Account = () => {
                 </h3>
               </div>
               <p className="text-xs text-neutral-500 font-sans tracking-wide leading-relaxed mb-5">
-                Delivered pieces can be exchanged for a different size or replacement piece. Select the item, choose your preferred size, and our atelier concierge will coordinate reverse pickup and replacement delivery.
+                Delivered pieces can be exchanged for a different size or replacement piece. Select the item, choose your preferred size, and our customer care will coordinate reverse pickup and replacement delivery.
               </p>
 
               <div className="space-y-4">
@@ -3280,7 +3280,7 @@ export const Account = () => {
 
                             <div className="min-w-0">
                               <p className="text-xs font-semibold text-neutral-800 truncate">
-                                {item.name || item.title || 'Atelier Item'}
+                                {item.name || item.title || 'Store Item'}
                               </p>
                               <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
                                 Current Size: {item.size || item.selectedSize || 'Standard'} • ₹{itemPrice.toLocaleString('en-IN')}
@@ -3347,7 +3347,7 @@ export const Account = () => {
                 {/* Additional Comments */}
                 <div>
                   <label className="block text-xs font-bold text-neutral-800 mb-1.5">
-                    Notes for Atelier Concierge (Optional)
+                    Notes for Customer Care (Optional)
                   </label>
                   <textarea
                     rows={2}
@@ -3366,7 +3366,7 @@ export const Account = () => {
                       COMPLIMENTARY REVERSE PICKUP & EXCHANGE
                     </span>
                     <p className="text-[11px] sm:text-xs leading-relaxed font-normal text-purple-950">
-                      Our courier will collect the piece from your delivery address with zero return fee. Upon verification by our atelier, your requested size ({replacementSize}) will be dispatched immediately.
+                      Our courier will collect the piece from your delivery address with zero return fee. Upon verification by our store, your requested size ({replacementSize}) will be dispatched immediately.
                     </p>
                   </div>
                 </div>
@@ -3447,7 +3447,7 @@ export const Account = () => {
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-serif tracking-[0.12em] uppercase text-black font-semibold">
-                {user?.name || 'ATELIER MEMBER'}
+                {user?.name || 'STORE MEMBER'}
               </h1>
               <p className="text-xs sm:text-sm text-neutral-600 font-sans font-light">
                 {user?.email || 'member@houseofurvaah.com'}
@@ -3466,7 +3466,7 @@ export const Account = () => {
           </div>
         </div>
 
-        {/* 1. Premium Luxury Atelier Navigation Bar */}
+        {/* 1. Premium Luxury House Navigation Bar */}
         <div className="mb-8 sm:mb-10 p-1.5 sm:p-2 bg-[#FAF8F3] border border-neutral-200/80 rounded-2xl shadow-xs">
           {/* Phones: equal 3-column bar with icon above a short label. sm+: one row with full labels */}
           <div className="grid grid-cols-3 sm:flex sm:items-center w-full sm:justify-between gap-1 sm:gap-2" role="tablist">
@@ -4378,19 +4378,19 @@ export const Account = () => {
                               mixedPhase === 'requested' ? 'RETURN & EXCHANGE REQUESTED' :
                               mixedPhase === 'approved' ? 'RETURN & EXCHANGE APPROVED' :
                               mixedPhase === 'transit' ? 'PIECES IN TRANSIT' :
-                              mixedPhase === 'received' ? 'RECEIVED AT ATELIER' :
+                              mixedPhase === 'received' ? 'RECEIVED AT HOUSE OF URVAAH' :
                               mixedPhase === 'done' ? 'RETURNED & REPLACED' :
                               isReplacementRequested ? 'REPLACEMENT REQUESTED' :
                               isReplacementApproved ? 'REPLACEMENT APPROVED' :
                               isReplacementCollected ? 'PARCEL COLLECTED (REVERSE)' :
-                              isReplacementQCReceived ? 'ATELIER QC VERIFIED' :
+                              isReplacementQCReceived ? 'QUALITY CHECK VERIFIED' :
                               isReplaced ? 'REPLACEMENT DISPATCHED' :
                               isReplacementRejected ? 'REPLACEMENT REJECTED' :
                               isReturnRejected ? (isReturnQcRejected ? 'RETURN REJECTED (QC FAILED)' : 'RETURN REJECTED') :
                               isReturnRequested ? 'RETURN REQUESTED' :
                               isReturnCollected ? 'RETURN IN TRANSIT' :
                               isReturnApproved ? 'RETURN PICKUP SCHEDULED' :
-                              isReceivedAtUrvaah ? 'RECEIVED AT ATELIER' :
+                              isReceivedAtUrvaah ? 'RECEIVED AT HOUSE OF URVAAH' :
                               isReturned ? 'RETURNED & REFUNDED' :
                               orderStatus
                             }</span>
@@ -4577,7 +4577,7 @@ export const Account = () => {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <h5 className="text-xs sm:text-sm font-serif tracking-[0.04em] uppercase text-black font-semibold truncate leading-snug" title={item.name || item.title}>
-                                    {item.name || item.title || 'Atelier Item'}
+                                    {item.name || item.title || 'Store Item'}
                                   </h5>
                                   <div className="flex items-center gap-2 text-xs text-neutral-500 font-sans tracking-wide mt-1 flex-wrap">
                                     <span>Qty: {item.quantity || 1}</span>
@@ -4621,7 +4621,7 @@ export const Account = () => {
                                     ? 'bg-[#FAF8F3] text-neutral-900 border-[#E7E2D8]'
                                     : 'bg-neutral-100 text-neutral-800 border-neutral-200'
                                 }`}>
-                                  {getItemStatusLabel(item) || (isMixedRequest && !String(item.return_action || '') && isProductEverDelivered ? 'KEPT • DELIVERED' : null) || (isCancellationRejected ? 'CANCELLATION REJECTED' : isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT ATELIER' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING')}
+                                  {getItemStatusLabel(item) || (isMixedRequest && !String(item.return_action || '') && isProductEverDelivered ? 'KEPT • DELIVERED' : null) || (isCancellationRejected ? 'CANCELLATION REJECTED' : isCancellationRequested ? 'CANCEL REQUESTED' : isCancelled ? 'CANCELLED' : isReturnRequested ? 'RETURN REQUESTED' : isReturnCollected ? 'RETURN IN TRANSIT' : isReturnApproved ? 'PICKUP SCHEDULED' : isReceivedAtUrvaah ? 'AT HOUSE OF URVAAH' : isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isOutForDelivery ? 'OUT FOR DELIVERY' : isShipped ? 'SHIPPED' : 'PROCESSING')}
                                 </span>
 
                               </div>
@@ -4915,7 +4915,7 @@ export const Account = () => {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-neutral-200">
               <div>
                 <span className="text-[10px] tracking-[0.25em] uppercase text-neutral-400 font-serif block mb-1">
-                  CURATED ATELIER SELECTION
+                  CURATED STORE SELECTION
                 </span>
                 <h2 className="text-xl sm:text-2xl font-serif tracking-[0.12em] uppercase text-black font-semibold">
                   SAVED WISHLIST PIECES ({resolvedWishlist.length})
@@ -4983,7 +4983,7 @@ export const Account = () => {
           <div className="w-full bg-[#FAF8F3] p-8 sm:p-12 md:p-16 border border-[#E7E2D8] rounded-2xl text-center font-sans shadow-xs">
             <Ticket className="w-10 h-10 text-neutral-300 mx-auto mb-4" />
             <h3 className="text-lg font-serif tracking-[0.15em] uppercase text-black mb-2 font-semibold">
-              ATELIER VOUCHERS & COUPONS
+              STORE VOUCHERS & COUPONS
             </h3>
             <div className="max-w-md mx-auto p-4 bg-white border border-dashed border-neutral-300 text-left my-4 rounded-xl">
               <div className="flex items-center justify-between">
@@ -5371,7 +5371,7 @@ export const Account = () => {
                             Reverse Logistics & Return Desk
                           </span>
                           <span className="text-[9px] font-bold text-indigo-800 bg-white px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase">
-                            {statusLower === 'returned' ? 'Return Completed' : 'Pending Atelier QC'}
+                            {statusLower === 'returned' ? 'Return Completed' : 'Pending Quality Check'}
                           </span>
                         </div>
 
@@ -5380,7 +5380,7 @@ export const Account = () => {
                             <span className="text-[10px] font-bold uppercase text-indigo-950 block mb-1">Doorstep Reverse Pickup</span>
                             <p className="text-[11px] text-neutral-600 leading-relaxed">
                               {statusLower === 'returned'
-                                ? 'Piece returned to House of Urvaah atelier and verified.'
+                                ? 'Piece returned to House of Urvaah and verified.'
                                 : 'Return request recorded. Upon admin approval, reverse courier partner will collect parcel from delivery address.'}
                             </p>
                           </div>
@@ -5390,7 +5390,7 @@ export const Account = () => {
                             <p className="text-[11px] text-neutral-600 leading-relaxed">
                               {statusLower === 'returned'
                                 ? `100% full refund of ₹${modalTotal.toLocaleString('en-IN')} has been disbursed.`
-                                : `Full refund of ₹${modalTotal.toLocaleString('en-IN')} will be processed after piece is inspected at our atelier.`}
+                                : `Full refund of ₹${modalTotal.toLocaleString('en-IN')} will be processed after piece is inspected at House of Urvaah.`}
                             </p>
                           </div>
                         </div>
@@ -5410,7 +5410,7 @@ export const Account = () => {
                           </span>
                         </div>
                         <p className="text-[11px] text-amber-900 leading-relaxed">
-                          Your cancellation request is being reviewed by our atelier team. Once approved, the shipment will be voided and your refund of ₹{modalTotal.toLocaleString('en-IN')} will be queued.
+                          Your cancellation request is being reviewed by our store team. Once approved, the shipment will be voided and your refund of ₹{modalTotal.toLocaleString('en-IN')} will be queued.
                         </p>
                       </div>
                     )}
@@ -5485,7 +5485,7 @@ export const Account = () => {
                             }}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-neutral-900 truncate leading-snug">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="font-bold text-neutral-900 truncate leading-snug">{item.name || item.title || 'Store Item'}</p>
                             <p className="text-neutral-500 font-medium text-[11px] mt-0.5">Quantity: {item.quantity || 1}</p>
                           </div>
                         </div>

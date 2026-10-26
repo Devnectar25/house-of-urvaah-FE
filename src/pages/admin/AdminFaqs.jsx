@@ -23,7 +23,7 @@ const DEFAULT_CATEGORIES = [
   'Orders & Shipping',
   'Sizing & Fit',
   'Returns & Exchanges',
-  'Atelier & Craftsmanship',
+  'Design & Craftsmanship',
   'Payments & Security',
   'General'
 ];
@@ -336,7 +336,7 @@ export const AdminFaqs = () => {
       {/* Admin Header */}
       <AdminPageHeader
         title="FAQ Management"
-        subtitle="Manage frequently asked questions displayed on the storefront Contact Us concierge page and referenced by the Urvaah Bot."
+        subtitle="Manage frequently asked questions displayed on the storefront Contact Us customer care page and referenced by the Urvaah Bot."
         icon={HelpCircle}
         badge={
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-900 text-white uppercase tracking-wider">
@@ -733,7 +733,7 @@ export const AdminFaqs = () => {
             <div className="px-6 py-4.5 bg-[#FAF8F3] border-b border-[#E5E0D5] flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-serif tracking-[0.2em] uppercase text-neutral-500 font-semibold block">
-                  {editingFaq ? 'UPDATE ENTRY' : 'NEW CONCIERGE FAQ'}
+                  {editingFaq ? 'UPDATE ENTRY' : 'NEW CUSTOMER CARE FAQ'}
                 </span>
                 <h3 className="text-base sm:text-lg font-serif font-bold text-neutral-950">
                   {editingFaq ? 'Edit FAQ Item' : 'Add Storefront FAQ'}
@@ -782,7 +782,7 @@ export const AdminFaqs = () => {
                     onChange={(e) =>
                       setModalFormData(prev => ({ ...prev, customCategory: e.target.value }))
                     }
-                    placeholder="Enter new category name (e.g. VIP Concierge)..."
+                    placeholder="Enter new category name (e.g. VIP Customer Care)..."
                     className="w-full mt-2 bg-white border border-neutral-300 rounded-xl px-3.5 py-2 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 transition-colors"
                   />
                 )}

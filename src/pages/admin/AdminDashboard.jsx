@@ -257,7 +257,7 @@ export const AdminDashboard = () => {
     },
     {
       title: 'Newsletter Subscribers',
-      description: 'Monitor atelier audience signups and marketing email lists',
+      description: 'Monitor store audience signups and marketing email lists',
       link: '/admin/newsletter',
       icon: MailCheck,
     },

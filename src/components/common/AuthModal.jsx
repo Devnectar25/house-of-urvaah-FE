@@ -390,7 +390,7 @@ export const AuthModal = () => {
 
                 <div>
                   <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 block mb-1">
-                    ATELIER MEMBER
+                    STORE MEMBER
                   </span>
                   <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
                     {user.name}
@@ -588,7 +588,7 @@ export const AuthModal = () => {
                         HEY, WE NEED A FEW DETAILS
                       </h3>
                       <p className="text-xs text-neutral-500 font-light mt-1.5 leading-relaxed">
-                        Complete your profile to customize your Atelier experience.
+                        Complete your profile to customize your Store experience.
                       </p>
                     </div>
 

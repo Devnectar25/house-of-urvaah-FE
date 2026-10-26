@@ -97,7 +97,7 @@ export const CartProvider = ({ children }) => {
     if (userData.id === '1' || userData.username === '1' || String(userData.email || userData.emailid || '').includes('@urvaah.local')) {
       return null;
     }
-    const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Atelier Member';
+    const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Store Member';
     const firstName = fullName.trim().split(' ')[0] || fullName;
     return {
       id: userData.id || userData.userid || userData.username || 'user',

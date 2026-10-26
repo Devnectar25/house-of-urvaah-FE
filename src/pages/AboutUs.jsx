@@ -48,7 +48,7 @@ export const AboutUs = () => {
       <SEOHead
         title="About Us | House of Urvaah — Contemporary Women's Fashion"
         description="Learn about House of Urvaah: our passion for refined editorial fashion, timeless craftsmanship, and our mission to empower women with elevated wardrobes."
-        keywords="About House of Urvaah, luxury fashion brand, contemporary tailoring, sustainable fashion atelier, brand story"
+        keywords="About House of Urvaah, luxury fashion brand, contemporary tailoring, sustainable fashion house, brand story"
         ogImage="/assets/Images/Corset01.png"
       />
       {/* 1. EDITORIAL HERO SECTION */}
@@ -146,7 +146,7 @@ export const AboutUs = () => {
             <div className="absolute inset-0 bg-black/5 pointer-events-none" />
             <div className="absolute bottom-5 left-5 bg-white/90 backdrop-blur-md px-3.5 py-1.5 border border-white/80">
               <span className="text-[10px] tracking-[0.25em] font-serif uppercase text-neutral-800">
-                AUTUMN / WINTER 2026 — ATELIER NO. 01
+                AUTUMN / WINTER 2026 — STORE NO. 01
               </span>
             </div>
           </motion.div>

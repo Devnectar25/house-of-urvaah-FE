@@ -700,7 +700,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     }}
                   />
                   <p className="text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold">
-                    Haute Couture &bull; Luxury Pret Atelier &bull; New Delhi
+                    Haute Couture &bull; Luxury Pret Store &bull; New Delhi
                   </p>
                 </div>
 
@@ -758,12 +758,12 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                 </div>
               </div>
 
-              {/* Dossier: Atelier Details vs Customer Details */}
+              {/* Dossier: Store Details vs Customer Details */}
               <div className="invoice-dossier-grid grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 relative z-10">
                 <div className="border border-[#eae3d8] rounded-md p-4 sm:p-5 bg-[#fcfbfa]">
                   <div className="text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
-                    <span>Sold By &bull; Registered Atelier</span>
-                    <span>Concierge</span>
+                    <span>Sold By &bull; Registered Store</span>
+                    <span>Customer Care</span>
                   </div>
                   <div className="text-[13px] font-bold text-neutral-950 mb-1.5">
                     House of Urvaah Private Limited
@@ -867,7 +867,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                   {/* Bank Details */}
                   <div className="border border-dashed border-[#ded6cb] rounded-md p-3.5 bg-[#fcfbfa] text-[10px] text-neutral-600 leading-relaxed">
                     <span className="font-bold uppercase tracking-widest text-[#8c734b] block mb-1">
-                      Atelier Remittance &amp; Audit Reference
+                      Store Remittance &amp; Audit Reference
                     </span>
                     Beneficiary: <strong>HOUSE OF URVAAH PRIVATE LIMITED</strong> &bull; Bank: HDFC Bank Ltd<br />
                     Account: 50200088923412 &bull; IFSC: HDFC0000123 &bull; Branch: Kurla East, Mumbai
@@ -930,7 +930,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                   </div>
                   <div className="text-[10px] text-neutral-600 leading-snug">
                     <strong className="text-neutral-950 uppercase tracking-wider block text-[10.5px] font-bold">
-                      Digitally Verified Atelier Invoice
+                      Digitally Verified Store Invoice
                     </strong>
                     Issued under IT Act 2000 &amp; Central Goods and Services Tax Rules. No manual signature required.
                   </div>
@@ -941,7 +941,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     For House of Urvaah Private Limited
                   </span>
                   <div className="italic font-semibold text-lg sm:text-xl text-neutral-950 leading-tight">
-                    House of Urvaah Atelier
+                    House of Urvaah
                   </div>
                   <span className="text-[8.5px] uppercase tracking-widest text-neutral-500 font-bold border-t border-[#ded6cb] pt-1 inline-block mt-1">
                     Authorized Signatory &bull; {invoiceData?.authSignatoryDate}

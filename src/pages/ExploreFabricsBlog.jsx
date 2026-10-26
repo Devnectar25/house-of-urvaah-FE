@@ -201,7 +201,7 @@ export const ExploreFabricsBlog = () => {
               Home
             </Link>
             <span>/</span>
-            <span className="text-neutral-400">Atelier Journal</span>
+            <span className="text-neutral-400">Store Journal</span>
             <span>/</span>
             <span className="text-[#111111] font-semibold">Fabric Information</span>
           </nav>
@@ -258,14 +258,14 @@ export const ExploreFabricsBlog = () => {
         >
           <img
             src="/assets/Images/fabrics/fabric-hero.jpg"
-            alt="Atelier drape of pure ethnic couture fabrics in House of Urvaah workshop"
+            alt="Store drape of pure ethnic couture fabrics in House of Urvaah workshop"
             className="w-full h-full object-cover object-center filter brightness-[0.97]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
           <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-12 right-6 sm:right-12 text-white">
             <span className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-[#E5D3A3] font-sans font-medium block mb-2">
-              Atelier Textile Artistry
+              Store Textile Artistry
             </span>
             <p className="text-xs sm:text-base md:text-lg font-serif italic max-w-xl text-neutral-100">
               "Every thread holds a story; every weave shapes modern femininity."
@@ -431,7 +431,7 @@ export const ExploreFabricsBlog = () => {
           className="bg-white border border-neutral-200/90 shadow-md p-8 sm:p-12 md:p-16 rounded-sm text-center"
         >
           <span className="text-[11px] font-sans uppercase tracking-[0.3em] text-neutral-500 block mb-2">
-            ATELIER DECISION GUIDE
+            STORE DECISION GUIDE
           </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif uppercase tracking-wide text-[#111111] mb-4">
             How to Choose the Right Fabric for Your Outfit
@@ -490,7 +490,7 @@ export const ExploreFabricsBlog = () => {
 
           <div className="relative z-10 max-w-2xl mx-auto">
             <span className="text-[10px] sm:text-xs font-sans tracking-[0.3em] uppercase text-[#D4AF37] block mb-3 font-semibold">
-              HOUSE OF URVAAH ATELIER
+              HOUSE OF URVAAH
             </span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-serif uppercase tracking-wide text-white mb-6 leading-tight">
               Discover Your Style with House of Urvaah

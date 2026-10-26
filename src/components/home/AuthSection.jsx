@@ -35,14 +35,14 @@ export const AuthSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12">
           <span className="text-[10px] sm:text-xs font-serif tracking-[0.3em] uppercase text-neutral-500 mb-3 block">
-            ATELIER MEMBERSHIP & CONCIERGE
+            STORE MEMBERSHIP & CUSTOMER CARE
           </span>
           <h2 className="section-heading font-serif tracking-[0.1em] text-brand-dark mb-5">
             ACCESS THE MAISON
           </h2>
           <div className="w-16 h-[1px] bg-neutral-900/30 mx-auto mb-5" />
           <p className="text-xs sm:text-sm md:text-base font-serif text-neutral-700 leading-relaxed font-light">
-            Unlock bespoke concierge styling, express checkout, order tracking, and private invitations to limited-run Autumn / Winter releases with single-click OTP login.
+            Unlock bespoke customer care styling, express checkout, order tracking, and private invitations to limited-run Autumn / Winter releases with single-click OTP login.
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export const AuthSection = () => {
             </div>
             <div>
               <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 block mb-1">
-                AUTHENTICATED ATELIER MEMBER
+                AUTHENTICATED STORE MEMBER
               </span>
               <h3 className="text-2xl font-serif tracking-[0.15em] uppercase text-[#111111]">
                 WELCOME BACK, {user.name}
@@ -76,7 +76,7 @@ export const AuthSection = () => {
                 <span className="text-sm font-semibold tracking-wider text-black block mt-0.5">SAVED ITEMS</span>
               </div>
               <div className="p-4 bg-neutral-50 border border-neutral-200/60">
-                <span className="text-[9px] uppercase tracking-widest text-neutral-400 block">CONCIERGE</span>
+                <span className="text-[9px] uppercase tracking-widest text-neutral-400 block">CUSTOMER CARE</span>
                 <span className="text-sm font-semibold tracking-wider text-black block mt-0.5">ACTIVE</span>
               </div>
             </div>
@@ -98,7 +98,7 @@ export const AuthSection = () => {
                 SIGN IN / SIGN UP
               </h3>
               <p className="text-xs text-neutral-500 font-light mt-2">
-                One seamless flow for new and returning Atelier members.
+                One seamless flow for new and returning Store members.
               </p>
             </div>
 
@@ -150,12 +150,12 @@ export const AuthSection = () => {
           <div className="flex flex-col items-center">
             <Sparkles className="w-5 h-5 text-neutral-700 mb-2 stroke-[1.5]" />
             <span className="text-xs font-semibold tracking-[0.2em] uppercase text-neutral-900">PRIVATE PREVIEWS</span>
-            <p className="text-[11px] text-neutral-500 font-light mt-1">First access to limited-run atelier drops</p>
+            <p className="text-[11px] text-neutral-500 font-light mt-1">First access to limited-run store drops</p>
           </div>
 
           <div className="flex flex-col items-center">
             <User className="w-5 h-5 text-neutral-700 mb-2 stroke-[1.5]" />
-            <span className="text-xs font-semibold tracking-[0.2em] uppercase text-neutral-900">STYLING CONCIERGE</span>
+            <span className="text-xs font-semibold tracking-[0.2em] uppercase text-neutral-900">CUSTOMER CARE</span>
             <p className="text-[11px] text-neutral-500 font-light mt-1">Dedicated priority assistance & tailoring support</p>
           </div>
         </div>

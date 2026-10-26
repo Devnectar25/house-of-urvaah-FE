@@ -22,10 +22,10 @@ const WEBSITE_SECTIONS = [
   },
   {
     id: 'concierge',
-    title: 'CLIENT CONCIERGE & CARE',
+    title: 'CUSTOMER CARE',
     items: [
       { label: 'ABOUT US / OUR STORY', isRoute: true, to: '/about' },
-      { label: 'CONTACT US / CONCIERGE', isRoute: true, to: '/contact' },
+      { label: 'CONTACT US / CUSTOMER CARE', isRoute: true, to: '/contact' },
       { label: 'FREQUENTLY ASKED QUESTIONS', isRoute: true, to: '/faqs' },
       { label: 'MY WISHLIST', isRoute: true, to: '/wishlist' },
       { label: 'ACCOUNT & ORDERS', isRoute: true, to: '/account' }
@@ -339,7 +339,7 @@ export const MobileMenu = () => {
                   );
                 })}
 
-                {/* WEBSITE SECTIONS ACCORDION (DISCOVER & CONCIERGE) */}
+                {/* WEBSITE SECTIONS ACCORDION (DISCOVER & CUSTOMER CARE) */}
                 {WEBSITE_SECTIONS.map((sec) => {
                   const isExpanded = expandedSection === sec.id;
                   return (

@@ -217,7 +217,7 @@ export const TrueToFabricPage = () => {
             tag: adminV.tag || adminV.title || `FABRIC ${idx + 1}`,
             videoTitle: adminV.title || adminV.name || adminV.tag || `Fabric ${idx + 1}`,
             name: adminV.title || adminV.name || adminV.tag || `Fabric ${idx + 1}`,
-            subtitle: 'Exclusive House of Urvaah Atelier Textile',
+            subtitle: 'Exclusive House of Urvaah Textile',
             description:
               description ||
               'A distinctive artisan fabric handcrafted with bespoke detailing for contemporary silhouettes.',
@@ -321,7 +321,7 @@ export const TrueToFabricPage = () => {
         title={
           activeFabric
             ? `${displayTitle} | House of Urvaah`
-            : `True to Fabric Atelier | Luxury Textile Artistry | House of Urvaah`
+            : `True to Fabric Store | Luxury Textile Artistry | House of Urvaah`
         }
         description={
           activeFabric
@@ -387,7 +387,7 @@ export const TrueToFabricPage = () => {
                   NO PIECES CURRENTLY DISPLAYED
                 </h3>
                 <p className="text-xs text-neutral-500 tracking-wider font-sans uppercase mb-6 max-w-sm mx-auto leading-relaxed">
-                  Outfits tailored in {activeFabric?.name || 'this fabric'} are currently undergoing finishing in our atelier.
+                  Outfits tailored in {activeFabric?.name || 'this fabric'} are currently undergoing finishing in House of Urvaah.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <Link

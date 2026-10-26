@@ -74,7 +74,7 @@ const ALL_NAV_ITEMS = [
       { name: 'Dual Campaign Banner', path: '/admin/modify-ui/dual-campaign', icon: Columns },
       { name: 'Trending on the Gram', path: '/admin/modify-ui/trending-gram', icon: InstagramIcon },
       { name: 'Fabric Video', path: '/admin/modify-ui/fabric-video', icon: Video },
-      { name: 'Boutiques & Concierge', path: '/admin/modify-ui/boutiques-concierge', icon: Building2 },
+      { name: 'Boutiques & Customer Care', path: '/admin/modify-ui/boutiques-concierge', icon: Building2 },
     ]
   },
   { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },

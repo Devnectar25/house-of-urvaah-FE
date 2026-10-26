@@ -33,7 +33,7 @@ export const TermsAndConditions = () => {
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-20 pb-4 md:pt-28 md:pb-6 overflow-x-hidden">
       <SEOHead
         title="Terms & Conditions | House of Urvaah"
-        description="Review the official Terms and Conditions governing your use of the House of Urvaah website, online purchases, and official atelier services."
+        description="Review the official Terms and Conditions governing your use of the House of Urvaah website, online purchases, and official store services."
         keywords="House of Urvaah terms and conditions, terms of service, legal notice, user agreement"
       />
       {/* 1. HERO HEADER */}
