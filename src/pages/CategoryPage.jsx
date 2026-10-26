@@ -106,7 +106,6 @@ export const CategoryPage = ({ defaultCategory }) => {
   const [isWearItTwoWays, setIsWearItTwoWays] = useState(false);
   const [selectedFabrics, setSelectedFabrics] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
-  const [selectedColors, setSelectedColors] = useState([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // Reset filters when the collection/slug changes
@@ -115,7 +114,6 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
-    setSelectedColors([]);
   }, [currentSlug]);
 
   // Fetch all live categories and active products
@@ -243,22 +241,6 @@ export const CategoryPage = ({ defaultCategory }) => {
     });
   }, [collectionProducts]);
 
-  // Color options: every color the admin set on products in this collection, with a swatch
-  const availableColors = useMemo(() => {
-    const byName = new Map();
-    collectionProducts.forEach((p) => {
-      (Array.isArray(p.colors) ? p.colors : []).forEach((raw) => {
-        const name = getColorName(raw);
-        if (name && !byName.has(name)) {
-          const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
-          byName.set(name, preset ? preset.hex : getSwatchCss(raw));
-        }
-      });
-    });
-    return [...byName.entries()]
-      .map(([name, swatch]) => ({ name, swatch }))
-      .sort((a, b) => compareColorNames(a.name, b.name));
-  }, [collectionProducts]);
 
   // Multi-facet filtering logic (AND combination across facets; OR within multi-select facets)
   const filteredProducts = useMemo(() => {
@@ -289,12 +271,6 @@ export const CategoryPage = ({ defaultCategory }) => {
         if (!matchesSize) return false;
       }
 
-      // 5. Color Filter
-      if (selectedColors.length > 0) {
-        const names = productColorNames(p);
-        if (!selectedColors.some((c) => names.includes(c))) return false;
-      }
-
       return true;
     });
   }, [
@@ -302,8 +278,7 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedOccasions,
     isWearItTwoWays,
     selectedFabrics,
-    selectedSizes,
-    selectedColors
+    selectedSizes
   ]);
 
   const sortedProducts = filteredProducts;
@@ -314,15 +289,13 @@ export const CategoryPage = ({ defaultCategory }) => {
     setIsWearItTwoWays(false);
     setSelectedFabrics([]);
     setSelectedSizes([]);
-    setSelectedColors([]);
   };
 
   const hasActiveFilters =
     selectedOccasions.length > 0 ||
     isWearItTwoWays ||
     selectedFabrics.length > 0 ||
-    selectedSizes.length > 0 ||
-    selectedColors.length > 0;
+    selectedSizes.length > 0;
 
   // Single-choice filtering: selecting any option replaces whatever filter was active before;
   // clicking the active option again clears it
@@ -559,24 +532,6 @@ export const CategoryPage = ({ defaultCategory }) => {
                   onClick={() => toggleFabric(fab)}
                   className="hover:text-black cursor-pointer"
                   aria-label={`Remove ${fab} filter`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-
-            {/* Color Chips */}
-            {selectedColors.map((c) => (
-              <span
-                key={c}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 text-neutral-900 border border-neutral-300 text-xs font-medium uppercase tracking-wider rounded-full"
-              >
-                <span>{c}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleColor(c)}
-                  className="hover:text-black cursor-pointer"
-                  aria-label={`Remove ${c} filter`}
                 >
                   <X className="w-3 h-3" />
                 </button>
