@@ -36,6 +36,45 @@ if (typeof window !== 'undefined') {
   );
 }
 
+// Safety net for storefront pages: third-party overlays (Razorpay checkout, SweetAlert) save and
+// restore the page's overflow themselves and can put back a locked state after our modals have
+// already unlocked, leaving the page frozen. When nothing is actually open, clear any leftover lock.
+const isOverlayVisible = () => {
+  if (activeLocksCount > 0) return true;
+  if (document.querySelector('.swal2-container')) return true;
+  return [...document.querySelectorAll('.razorpay-container, iframe.razorpay-checkout-frame')]
+    .some((el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0);
+};
+const isPageLocked = () => {
+  const b = document.body.style;
+  const h = document.documentElement.style;
+  return b.overflow === 'hidden' || b.position === 'fixed' || h.overflow === 'hidden';
+};
+let watchdogTimer = null;
+const checkStuckScroll = () => {
+  watchdogTimer = null;
+  if (window.location.pathname.startsWith('/admin')) return; // admin layout manages its own sidebar lock
+  if (isPageLocked() && !isOverlayVisible()) {
+    lockedScrollY = 0; // keep the current position, only remove the lock
+    // eslint-disable-next-line no-use-before-define
+    forceUnlockScroll();
+  }
+};
+if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined') {
+  const schedule = () => {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(checkStuckScroll, 400);
+  };
+  const startWatchdog = () => {
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+    // one call per node: a second observe() on the same node replaces the first one's options
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'], childList: true });
+  };
+  if (document.body) startWatchdog();
+  else window.addEventListener('DOMContentLoaded', startWatchdog, { once: true });
+}
+
 export const forceUnlockScroll = (resetToTop = false) => {
   activeLocksCount = 0;
   escapeHandlersStack.length = 0;
@@ -92,13 +131,16 @@ export const useModalScrollLock = (isOpen, onClose) => {
       document.body.setAttribute('data-modal-open', 'true');
       document.documentElement.setAttribute('data-modal-open', 'true');
 
-      initialHtmlOverflow = document.documentElement.style.overflow || '';
-      initialHtmlHeight = document.documentElement.style.height || '';
-      initialBodyOverflow = document.body.style.overflow || '';
-      initialBodyHeight = document.body.style.height || '';
+      // A page that is already locked (another overlay, payment window, alert) must never be
+      // remembered as its "normal" state, or closing this modal would leave it frozen
+      const unlocked = (v) => (v === 'hidden' || v === 'fixed' ? '' : v);
+      initialHtmlOverflow = unlocked(document.documentElement.style.overflow || '');
+      initialHtmlHeight = document.documentElement.style.height === '100%' ? '' : (document.documentElement.style.height || '');
+      initialBodyOverflow = unlocked(document.body.style.overflow || '');
+      initialBodyHeight = document.body.style.height === '100%' ? '' : (document.body.style.height || '');
       initialBodyPaddingRight = document.body.style.paddingRight || '';
-      initialBodyPosition = document.body.style.position || '';
-      initialBodyTop = document.body.style.top || '';
+      initialBodyPosition = unlocked(document.body.style.position || '');
+      initialBodyTop = initialBodyPosition ? (document.body.style.top || '') : '';
       initialBodyLeft = document.body.style.left || '';
       initialBodyRight = document.body.style.right || '';
       initialBodyWidth = document.body.style.width || '';

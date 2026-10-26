@@ -25,7 +25,9 @@ import {
   normalizeColor,
   getSwatchCss,
   filterValidColors,
-  POPULAR_FASHION_COLORS
+  POPULAR_FASHION_COLORS,
+  isPresetColor,
+  normalizePresetColors
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
 import ProductFilterPicker from './ProductFilterPicker';
@@ -254,13 +256,14 @@ const DEFAULT_CATEGORIES = [
 
   // Color tag & preset handlers
   const handleTogglePresetColor = (colorName) => {
-    const isSelected = formData.colors.some(
-      c => c.toLowerCase() === colorName.toLowerCase()
-    );
+    // A preset may be stored by name or by its HEX code (#111111 = Black): match and remove both
+    const preset = POPULAR_FASHION_COLORS.find(p => p.name.toLowerCase() === colorName.toLowerCase());
+    const matches = (c) => (preset ? isPresetColor(c, preset) : c.toLowerCase() === colorName.toLowerCase());
+    const isSelected = formData.colors.some(matches);
     if (isSelected) {
       setFormData(prev => ({
         ...prev,
-        colors: prev.colors.filter(c => c.toLowerCase() !== colorName.toLowerCase())
+        colors: prev.colors.filter(c => !matches(c))
       }));
     } else {
       const result = validateColorInput(colorName, formData.colors);

@@ -777,7 +777,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {/* Main Product Image Viewer with Carousel Controls */}
-              <div className="relative w-full h-[230px] sm:h-[260px] md:h-[280px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
+              <div className="relative w-full h-[320px] sm:h-[360px] md:h-[380px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
                 <img
                   src={getSupabaseMediaUrl(selectedImage)}
                   alt={look.product.name}
@@ -785,7 +785,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = selectedImage;
                   }}
-                  className="w-full h-full object-contain object-center transition-all duration-300 p-1"
+                  className="w-full h-full object-cover object-top transition-all duration-300"
                 />
 
                 {look.product.gallery.length > 1 && (

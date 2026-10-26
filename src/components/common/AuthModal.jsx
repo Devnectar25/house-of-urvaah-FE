@@ -19,6 +19,7 @@ export const AuthModal = () => {
     user,
     loginUser,
     logoutUser,
+    authPrefillEmail,
   } = useCart();
 
   // Lock background screen scroll while Auth Modal is open and handle ESC key close
@@ -72,8 +73,13 @@ export const AuthModal = () => {
       setOtpDigits(['', '', '', '', '', '']);
       setResendCountdown(60);
       setCanResend(false);
+      // Email already entered on the page: use it and send the code straight away
+      if (authPrefillEmail) {
+        setEmail(authPrefillEmail);
+        handleSendOtp(null, authPrefillEmail);
+      }
     }
-  }, [isAuthModalOpen]);
+  }, [isAuthModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resend Countdown Timer effect
   useEffect(() => {
@@ -107,12 +113,12 @@ export const AuthModal = () => {
   }, [step]);
 
   // --- STEP 1: SEND OTP ---
-  const handleSendOtp = async (e) => {
+  const handleSendOtp = async (e, emailOverride) => {
     if (e) e.preventDefault();
     setServerError('');
     setFieldErrors({});
 
-    const cleanEmail = email.trim();
+    const cleanEmail = (typeof emailOverride === 'string' ? emailOverride : email).trim();
     const validation = validateEmailClient(cleanEmail);
     if (!validation.isValid) {
       setFieldErrors({ email: validation.message });

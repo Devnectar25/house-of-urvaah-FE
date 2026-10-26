@@ -26,7 +26,7 @@ export const AuthSection = () => {
     }
 
     // Open Auth Modal initialized with OTP flow
-    openAuthModal('email');
+    openAuthModal('email', { email: validation.cleanEmail || cleanEmail });
   };
 
   return (

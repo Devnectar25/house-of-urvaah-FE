@@ -28,7 +28,9 @@ import {
   normalizeColor,
   getSwatchCss,
   filterValidColors,
-  POPULAR_FASHION_COLORS
+  POPULAR_FASHION_COLORS,
+  isPresetColor,
+  normalizePresetColors
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
 import ProductFilterPicker from './ProductFilterPicker';
@@ -243,7 +245,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           rating: ratingVal,
           reviews: reviewsCount,
           sizes: validSizes,
-          colors: Array.isArray(data.colors) && data.colors.length > 0 ? (filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
+          colors: Array.isArray(data.colors) && data.colors.length > 0 ? normalizePresetColors(filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
           specifications: specPairs,
           careInstructions: data.careInstructions || data.care_instructions || '',
           images: Array.isArray(data.images) && data.images.length > 0
@@ -314,7 +316,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           rating: fallbackRating,
           reviews: fallbackReviews,
           sizes: validSizes,
-          colors: Array.isArray(product.colors) ? (filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
+          colors: Array.isArray(product.colors) ? normalizePresetColors(filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
           images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : []),
@@ -481,13 +483,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Color pill & preset handlers
   const handleTogglePresetColor = (colorName) => {
-    const isSelected = formData.colors.some(
-      c => c.toLowerCase() === colorName.toLowerCase()
-    );
+    // A preset may be stored by name or by its HEX code (#111111 = Black): match and remove both
+    const preset = POPULAR_FASHION_COLORS.find(p => p.name.toLowerCase() === colorName.toLowerCase());
+    const matches = (c) => (preset ? isPresetColor(c, preset) : c.toLowerCase() === colorName.toLowerCase());
+    const isSelected = formData.colors.some(matches);
     if (isSelected) {
       setFormData(prev => ({
         ...prev,
-        colors: prev.colors.filter(c => c.toLowerCase() !== colorName.toLowerCase())
+        colors: prev.colors.filter(c => !matches(c))
       }));
     } else {
       const result = validateColorInput(colorName, formData.colors);
