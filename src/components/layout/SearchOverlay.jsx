@@ -6,7 +6,18 @@ import { useCart } from '../../context/CartContext';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
+<<<<<<< HEAD
 import { getProductUrl } from '../../utils/productUrl';
+=======
+import { getProductUrl, resolveProductCanonical } from '../../utils/productUrl';
+
+// DB and mock catalog use different ids for the same piece (e.g. '105' vs 'bs-101'),
+// so dedupe on the canonical product id instead of the raw id.
+const getDedupeKey = (p) => {
+  const canonicalId = resolveProductCanonical(p)?.id;
+  return String(canonicalId || p.id || p.product_id || p.productId || p.name || '').toLowerCase();
+};
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen } = useCart();
@@ -95,16 +106,16 @@ export const SearchOverlay = () => {
   // Combined catalog: DB live products take priority over mock catalog products
   const allCatalog = useMemo(() => {
     const map = new Map();
-    // 1. Initial mock products
-    for (const p of [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS]) {
+    // 1. Bundled sample products only while the live catalogue is unavailable, so deleted
+    //    products never come back through search
+    for (const p of liveProducts.length > 0 ? [] : [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS]) {
       if (!p) continue;
-      const key = String(p.id).toLowerCase();
-      map.set(key, p);
+      map.set(getDedupeKey(p), p);
     }
     // 2. Overwrite/supplement with real active products from database
     for (const p of liveProducts) {
       if (!p) continue;
-      const key = String(p.id || p.product_id || p.productId || '').toLowerCase();
+      const key = getDedupeKey(p);
       if (key) map.set(key, p);
     }
     return Array.from(map.values());
@@ -121,8 +132,8 @@ export const SearchOverlay = () => {
     if (Array.isArray(apiSearchResults)) {
       for (const p of apiSearchResults) {
         if (!p) continue;
-        const key = String(p.id || p.product_id || p.productId || p.name);
-        map.set(key, p);
+        const key = getDedupeKey(p);
+        if (!map.has(key)) map.set(key, p);
       }
     }
 
@@ -133,7 +144,7 @@ export const SearchOverlay = () => {
 
     for (const p of allCatalog) {
       if (!p) continue;
-      const key = String(p.id || p.product_id || p.productId || p.name);
+      const key = getDedupeKey(p);
       if (map.has(key)) continue;
 
       const searchableText = [
@@ -438,7 +449,7 @@ export const SearchOverlay = () => {
                     {isSearching && (
                       <span className="flex items-center gap-1.5 text-xs text-neutral-400 tracking-wider font-sans uppercase">
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-500" />
-                        Searching atelier...
+                        Searching...
                       </span>
                     )}
                   </div>
@@ -446,7 +457,7 @@ export const SearchOverlay = () => {
                   {filteredProducts.length === 0 ? (
                     <div className="py-12 text-center">
                       <p className="text-sm text-neutral-500 tracking-wider uppercase mb-2">
-                        {isSearching ? `SEARCHING ATELIER FOR "${searchTerm}"...` : `NO PRODUCTS FOUND MATCHING "${searchTerm}"`}
+                        {isSearching ? `SEARCHING FOR "${searchTerm}"...` : `NO PRODUCTS FOUND MATCHING "${searchTerm}"`}
                       </p>
                       <p className="text-xs text-neutral-400 font-sans tracking-wide">
                         Try searching by silhouette, color, fabric (e.g., silk, corset, co-ord), or product name.

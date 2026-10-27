@@ -26,23 +26,38 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { apiClient, getAdminAuthToken } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import Swal from 'sweetalert2';
+import { uploadVideoDirect } from '../../../lib/directVideoUpload';
+import { FabricProductPicker } from '../../../components/admin/FabricProductPicker';
 
-// Helper to inspect video duration client-side before upload
+// Helper to safely inspect video duration client-side before upload without hanging
 const getVideoDuration = (file) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     try {
       const video = document.createElement('video');
       video.preload = 'metadata';
       const objectUrl = URL.createObjectURL(file);
 
+      let isCleaned = false;
       const cleanUp = () => {
-        URL.revokeObjectURL(objectUrl);
+        if (!isCleaned) {
+          isCleaned = true;
+          try {
+            URL.revokeObjectURL(objectUrl);
+          } catch (_) {}
+        }
       };
 
+      // 2-second timeout to ensure upload NEVER hangs on mobile or non-standard codecs
+      const timeoutId = setTimeout(() => {
+        cleanUp();
+        resolve(0);
+      }, 2000);
+
       video.onloadedmetadata = () => {
+        clearTimeout(timeoutId);
         const duration = video.duration;
         cleanUp();
         if (typeof duration === 'number' && !isNaN(duration) && isFinite(duration)) {
@@ -53,13 +68,14 @@ const getVideoDuration = (file) => {
       };
 
       video.onerror = () => {
+        clearTimeout(timeoutId);
         cleanUp();
-        reject(new Error('Unable to read video file metadata. Please verify that this is a supported video format.'));
+        resolve(0);
       };
 
       video.src = objectUrl;
     } catch (err) {
-      reject(err);
+      resolve(0);
     }
   });
 };
@@ -178,61 +194,107 @@ export const AdminFabricVideo = () => {
     fetchFabricVideo();
   }, []);
 
+  // Core persistence function used both on explicit save and auto-save on video upload
+  const persistFabricConfig = async (videosList, editorialConfig) => {
+    const listToSave = (videosList || videos).slice(0, 10).map((v, idx) => {
+      const tag = typeof v?.tag === 'string' ? v.tag.trim() : '';
+      const derivedSlug =
+        v?.slug ||
+        v?.fabric_slug ||
+        (tag ? tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (v?.id || `fabric-${idx + 1}`));
+      return {
+        id: v?.id || `video-${idx + 1}`,
+        tag,
+        slug: derivedSlug,
+        fabric_slug: derivedSlug,
+        title: v?.title || '',
+        video_url: v?.video_url || '',
+        description: v?.description || ''
+      };
+    });
+
+    const ed = editorialConfig || editorial;
+    const payload = {
+      subheading: ed.subheading,
+      heading: ed.heading,
+      description: ed.description,
+      button_text: ed.button_text,
+      button_link: ed.button_link,
+      secondary_button_text: ed.secondary_button_text,
+      secondary_button_link: ed.secondary_button_link,
+      is_active: ed.is_active,
+      video_url: listToSave[0]?.video_url || '',
+      videos: listToSave
+    };
+
+    const res = await apiClient('/api/ui/admin/fabric-video', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res?.success) throw new Error(res?.message || 'Update failed');
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('urvaah_fabric_video_updated'));
+      localStorage.setItem('urvaah_fabric_video_last_update', Date.now().toString());
+    }
+
+    return res;
+  };
+
   // Handle Video file upload for a specific card slot
   const handleVideoUpload = async (index, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadError(null);
-    if (!file.type.startsWith('video/')) {
-      setUploadError('Please select a valid video file (MP4, WebM, QuickTime).');
+    const isVideo = (file.type && file.type.startsWith('video/')) || 
+      Boolean(file.name && file.name.match(/\.(mp4|webm|mov|m4v|ogg|mkv|avi)$/i));
+    if (!isVideo) {
+      showToast('error', 'Please select a valid video file (MP4, WebM, QuickTime MOV, M4V).');
       return;
     }
 
     if (file.size > 250 * 1024 * 1024) {
-      setUploadError(`Video size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 250MB limit.`);
+      showToast('error', `Video size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds 250MB limit.`);
       return;
     }
 
+    // 1. Instant zero-delay local preview: user immediately sees the video playing in this card!
+    const localBlobUrl = URL.createObjectURL(file);
+    setVideos((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], video_url: localBlobUrl };
+      return next;
+    });
+
+    // 2. Non-blocking duration extraction
+    getVideoDuration(file).then((dur) => {
+      if (dur > 0) {
+        setVideoDurations((prev) => ({ ...prev, [index]: dur }));
+      }
+    });
+
     setUploadingIndex(index);
     try {
-      // Inspect video duration for informative display (no blocking validation)
-      try {
-        const duration = await getVideoDuration(file);
-        if (duration) {
-          setVideoDurations((prev) => ({ ...prev, [index]: duration }));
+      const uploadedUrl = await uploadVideoDirect(file, 'fabric/videos');
+
+      // Update state with permanent remote URL
+      const updatedVideos = videos.slice(0, 10).map((v, idx) => {
+        if (idx === index) {
+          return { ...v, video_url: uploadedUrl };
         }
-      } catch (durErr) {
-        console.warn('Could not inspect video duration:', durErr);
-      }
-
-      const uploadData = new FormData();
-      uploadData.append('video', file);
-
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
-
-      const res = await fetch(`${API_BASE}/api/upload/upload-video`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
+        return v;
       });
+      setVideos(updatedVideos);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Video upload failed');
+      // Auto-persist directly to database so it's guaranteed saved
+      try {
+        await persistFabricConfig(updatedVideos, editorial);
+        showToast('success', `Video ${index + 1} (${videos[index]?.tag || 'Card'}) uploaded & saved to live storefront!`);
+      } catch (saveErr) {
+        showToast('success', `Video ${index + 1} uploaded! Remember to click "Save All Changes".`);
       }
-
-      const uploadedUrl = data.url || data.videoUrl || data.filePath;
-      if (!uploadedUrl) throw new Error('No video URL returned by server');
-
-      setVideos((prev) => {
-        const next = [...prev];
-        next[index] = { ...next[index], video_url: uploadedUrl };
-        return next;
-      });
-
-      showToast('success', `Video ${index + 1} (${videos[index].tag || 'Card'}) uploaded successfully!`);
     } catch (err) {
       console.error('Video upload error:', err);
       setUploadError(err.message || 'Upload failed');
@@ -384,46 +446,8 @@ export const AdminFabricVideo = () => {
 
     setSaving(true);
     try {
-      const payload = {
-        subheading: editorial.subheading,
-        heading: editorial.heading,
-        description: editorial.description,
-        button_text: editorial.button_text,
-        button_link: editorial.button_link,
-        secondary_button_text: editorial.secondary_button_text,
-        secondary_button_link: editorial.secondary_button_link,
-        is_active: editorial.is_active,
-        video_url: videos[0]?.video_url || '',
-        videos: videos.slice(0, 10).map((v, idx) => {
-          const derivedSlug =
-            v.slug ||
-            v.fabric_slug ||
-            (v.tag ? v.tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (v.id || `fabric-${idx + 1}`));
-          return {
-            id: v.id || `video-${idx + 1}`,
-            tag: v.tag || '',
-            slug: derivedSlug,
-            fabric_slug: derivedSlug,
-            title: v.title || '',
-            video_url: v.video_url || '',
-            description: v.description || ''
-          };
-        })
-      };
-
-      const res = await apiClient('/api/ui/admin/fabric-video', {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
-
-      if (!res?.success) throw new Error(res?.message || 'Update failed');
-
+      await persistFabricConfig(videos, editorial);
       showToast('success', `${videos.length} Fabric Videos & Editorial settings saved successfully!`);
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('urvaah_fabric_video_updated'));
-        localStorage.setItem('urvaah_fabric_video_last_update', Date.now().toString());
-      }
     } catch (err) {
       console.error('Save fabric video error:', err);
       showToast('error', err.message || 'Failed to update fabric video');
@@ -670,7 +694,7 @@ export const AdminFabricVideo = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
               {videos.map((vid, idx) => {
                 const isUploading = uploadingIndex === idx;
 
@@ -782,6 +806,15 @@ export const AdminFabricVideo = () => {
                               {vid.tag}
                             </span>
                           )}
+
+                          {/* Uploading progress overlay */}
+                          {isUploading && (
+                            <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
+                              <Loader2 className="w-8 h-8 animate-spin text-white" />
+                              <span className="text-xs font-bold tracking-wider uppercase font-admin">Uploading Video...</span>
+                              <span className="text-[10px] text-neutral-300">Saving to cloud storage</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Video Controls & Inputs */}
@@ -821,14 +854,18 @@ export const AdminFabricVideo = () => {
                             </label>
                             <div className="flex items-center gap-2">
                               <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-neutral-200 hover:border-neutral-900 rounded-xl cursor-pointer bg-neutral-50/70 hover:bg-neutral-50 transition-all text-neutral-800">
-                                <Upload className="w-3.5 h-3.5 text-neutral-700" />
+                                {isUploading ? (
+                                  <Loader2 className="w-3.5 h-3.5 text-neutral-700 animate-spin" />
+                                ) : (
+                                  <Upload className="w-3.5 h-3.5 text-neutral-700" />
+                                )}
                                 <span className="text-xs font-semibold">
                                   {isUploading ? 'Uploading...' : 'Upload MP4'}
                                 </span>
                                 <input
                                   type="file"
                                   ref={(el) => (fileInputRefs.current[idx] = el)}
-                                  accept="video/mp4,video/webm,video/quicktime"
+                                  accept="video/mp4,video/webm,video/quicktime,video/*,.mp4,.webm,.mov,.m4v"
                                   className="hidden"
                                   disabled={isUploading}
                                   onChange={(e) => handleVideoUpload(idx, e)}
@@ -846,6 +883,24 @@ export const AdminFabricVideo = () => {
                                   <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
                               )}
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await persistFabricConfig(videos, editorial);
+                                    showToast('success', `Video Card ${idx + 1} saved to live storefront!`);
+                                  } catch (err) {
+                                    showToast('error', err.message || 'Failed to save card');
+                                  }
+                                }}
+                                disabled={saving || isUploading}
+                                className="px-3 py-2 bg-neutral-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                title="Save this card changes immediately"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>Save</span>
+                              </button>
                             </div>
 
                             <input
@@ -864,6 +919,13 @@ export const AdminFabricVideo = () => {
                               <span className="text-neutral-400">Max 250MB</span>
                             </div>
                           </div>
+
+                          {/* Related products: products made in this fabric (shown on its fabric page) */}
+                          <FabricProductPicker
+                            fabricSlug={vid.slug || vid.fabric_slug || (vid.tag ? vid.tag.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '')}
+                            fabricLabel={vid.tag || vid.title}
+                            onNotify={showToast}
+                          />
                         </div>
                       </div>
                     </div>

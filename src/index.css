@@ -73,11 +73,21 @@
   }
 
   html[data-modal-open="true"],
-  body[data-modal-open="true"] {
+  body[data-modal-open="true"],
+  html:has(.razorpay-container),
+  body:has(.razorpay-container),
+  html:has(iframe[src*="razorpay"]),
+  body:has(iframe[src*="razorpay"]),
+  html:has([class*="razorpay-backdrop"]),
+  body:has([class*="razorpay-backdrop"]) {
     overflow: hidden !important;
     height: 100% !important;
     overscroll-behavior: none !important;
     touch-action: none !important;
+  }
+
+  .razorpay-container {
+    overscroll-behavior: contain !important;
   }
 
   /* Global Luxury Selection */
@@ -158,13 +168,31 @@
 }
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar,
+  [role="dialog"]::-webkit-scrollbar,
+  [role="dialog"] *::-webkit-scrollbar,
+  .modal-box::-webkit-scrollbar,
+  .modal-box *::-webkit-scrollbar,
+  .fixed.inset-0 .overflow-y-auto::-webkit-scrollbar,
+  .fixed.inset-0 .overflow-y-auto *::-webkit-scrollbar,
+  .fixed.inset-0 [class*="max-h-"]::-webkit-scrollbar,
+  .fixed.inset-0 [class*="max-h-"] *::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
     background: transparent !important;
   }
-  .no-scrollbar {
+  .no-scrollbar,
+  .scrollbar-none,
+  [role="dialog"],
+  [role="dialog"] *,
+  .modal-box,
+  .modal-box *,
+  .fixed.inset-0 .overflow-y-auto,
+  .fixed.inset-0 .overflow-y-auto *,
+  .fixed.inset-0 [class*="max-h-"],
+  .fixed.inset-0 [class*="max-h-"] * {
     -ms-overflow-style: none !important;
     scrollbar-width: none !important;
   }
@@ -343,7 +371,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
 }
 
 /* ==========================================================================
-   Rich Description & Product Story Typography (Atelier Luxe System)
+   Rich Description & Product Story Typography (Store Luxe System)
    ========================================================================== */
 .rich-description-content {
   color: #4b5563;
@@ -363,7 +391,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   line-height: 1.4;
 }
 
-.rich-description-content h2:first-child {
+.rich-description-content > h2:first-child {
   margin-top: 0;
 }
 
@@ -379,7 +407,7 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   line-height: 1.4;
 }
 
-.rich-description-content h3:first-child {
+.rich-description-content > h3:first-child {
   margin-top: 0;
 }
 
@@ -470,6 +498,26 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
 
 .rich-description-content li::marker {
   color: #111827;
+}
+
+/* Visual WYSIWYG ContentEditable Editor Styles */
+.visual-editor {
+  min-height: 140px;
+  max-height: 380px;
+  overflow-y: auto;
+  outline: none !important;
+}
+
+.visual-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+  display: block;
+  font-style: italic;
+}
+
+.visual-editor:focus {
+  outline: none !important;
 }
 
 /* Global High-End Frosted Glass Backdrop Blur for Modals & Overlays */

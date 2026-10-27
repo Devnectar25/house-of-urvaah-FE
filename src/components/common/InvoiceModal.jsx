@@ -71,7 +71,16 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
       const isAdmin = Boolean(getAdminAuthToken());
       const orderStatusStr = String(order?.status || '').toLowerCase();
       const origStatusStr = String(order?.original_status || '').toLowerCase();
-      const isDelivered = orderStatusStr.includes('delivered') || origStatusStr.includes('delivered') || Boolean(order?.delivered_at || order?.deliveredAt);
+      const isQCRejected =
+        orderStatusStr === 'return qc rejected' ||
+        orderStatusStr === 'return rejected' ||
+        orderStatusStr === 'replace rejected' ||
+        String(order?.return_qc_status || '').toLowerCase() === 'rejected';
+      const isDelivered =
+        orderStatusStr.includes('delivered') ||
+        origStatusStr.includes('delivered') ||
+        isQCRejected ||
+        Boolean(order?.delivered_at || order?.deliveredAt);
 
       if (order && !isAdmin && !isDelivered) {
         if (isMounted) {
@@ -119,7 +128,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
           }
         }
       } catch (err) {
-        if (err.message && err.message.toLowerCase().includes('delivered')) {
+        // The API decides invoice eligibility: a refusal must never be bypassed by the local fallback
+        if (err.status === 401 || err.status === 403 || (err.message && err.message.toLowerCase().includes('delivered'))) {
           if (isMounted) {
             setError(err.message);
             setLoading(false);
@@ -434,7 +444,8 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
 
   return (
     <div
-      className="invoice-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain"
+      className="invoice-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto overscroll-contain no-scrollbar scrollbar-none"
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) {
@@ -453,6 +464,20 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         #urvaah-invoice-print-area,
         #urvaah-invoice-print-area * {
           font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif !important;
+        }
+
+        .invoice-modal-overlay,
+        .invoice-modal-scroll {
+          -ms-overflow-style: none !important;
+          scrollbar-width: none !important;
+        }
+
+        .invoice-modal-overlay::-webkit-scrollbar,
+        .invoice-modal-scroll::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          background: transparent !important;
         }
 
         @media print {
@@ -631,7 +656,10 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
         </div>
 
         {/* Scrollable Document Container */}
-        <div className="invoice-modal-scroll overflow-y-auto p-4 sm:p-8 bg-[#f5f4ef] flex justify-center">
+        <div
+          className="invoice-modal-scroll overflow-y-auto no-scrollbar scrollbar-none p-4 sm:p-8 bg-[#f5f4ef] flex justify-center"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {loading ? (
             <div className="py-24 text-center">
               <Loader2 className="w-8 h-8 animate-spin text-neutral-700 mx-auto mb-3" />
@@ -681,7 +709,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     }}
                   />
                   <p className="text-[9px] sm:text-[10px] tracking-[0.28em] text-[#8c734b] uppercase font-semibold">
-                    Haute Couture &bull; Luxury Pret Atelier &bull; New Delhi
+                    Haute Couture &bull; Luxury Pret Store &bull; New Delhi
                   </p>
                 </div>
 
@@ -739,12 +767,12 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                 </div>
               </div>
 
-              {/* Dossier: Atelier Details vs Customer Details */}
+              {/* Dossier: Store Details vs Customer Details */}
               <div className="invoice-dossier-grid grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 relative z-10">
                 <div className="border border-[#eae3d8] rounded-md p-4 sm:p-5 bg-[#fcfbfa]">
                   <div className="text-[9.5px] font-bold tracking-widest uppercase text-[#8c734b] pb-2 mb-2.5 border-b border-[#efe8df] flex justify-between">
-                    <span>Sold By &bull; Registered Atelier</span>
-                    <span>Concierge</span>
+                    <span>Sold By &bull; Registered Store</span>
+                    <span>Customer Care</span>
                   </div>
                   <div className="text-[13px] font-bold text-neutral-950 mb-1.5">
                     House of Urvaah Private Limited
@@ -848,7 +876,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                   {/* Bank Details */}
                   <div className="border border-dashed border-[#ded6cb] rounded-md p-3.5 bg-[#fcfbfa] text-[10px] text-neutral-600 leading-relaxed">
                     <span className="font-bold uppercase tracking-widest text-[#8c734b] block mb-1">
-                      Atelier Remittance &amp; Audit Reference
+                      Store Remittance &amp; Audit Reference
                     </span>
                     Beneficiary: <strong>HOUSE OF URVAAH PRIVATE LIMITED</strong> &bull; Bank: HDFC Bank Ltd<br />
                     Account: 50200088923412 &bull; IFSC: HDFC0000123 &bull; Branch: Kurla East, Mumbai
@@ -911,7 +939,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                   </div>
                   <div className="text-[10px] text-neutral-600 leading-snug">
                     <strong className="text-neutral-950 uppercase tracking-wider block text-[10.5px] font-bold">
-                      Digitally Verified Atelier Invoice
+                      Digitally Verified Store Invoice
                     </strong>
                     Issued under IT Act 2000 &amp; Central Goods and Services Tax Rules. No manual signature required.
                   </div>
@@ -922,7 +950,7 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
                     For House of Urvaah Private Limited
                   </span>
                   <div className="italic font-semibold text-lg sm:text-xl text-neutral-950 leading-tight">
-                    House of Urvaah Atelier
+                    House of Urvaah
                   </div>
                   <span className="text-[8.5px] uppercase tracking-widest text-neutral-500 font-bold border-t border-[#ded6cb] pt-1 inline-block mt-1">
                     Authorized Signatory &bull; {invoiceData?.authSignatoryDate}

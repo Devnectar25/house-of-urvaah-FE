@@ -42,3 +42,7 @@ temp/
 *.diff
 
 
+
+# Removed unused admin placeholder pages
+src/pages/admin/AdminDashboardPlaceholder.jsx
+src/pages/admin/AdminPlaceholderPage.jsx

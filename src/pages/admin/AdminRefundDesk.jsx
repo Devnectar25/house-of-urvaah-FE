@@ -108,7 +108,9 @@ function getPayoutInfo(order) {
       type: 'Bank Transfer',
       masked: `A/C: **** ${last4}${ifsc}${holder}`,
       full: `A/C: ${rawAcc}${ifsc}${holder}`,
-      hasSensitive: true
+      hasSensitive: true,
+      hasBank: true,
+      isMissingBank: false
     };
   }
 
@@ -121,63 +123,35 @@ function getPayoutInfo(order) {
       type: 'UPI / Phone',
       masked: `UPI: **** ${last4}`,
       full: `UPI: ${upiHandle}`,
-      hasSensitive: true
+      hasSensitive: true,
+      hasBank: false,
+      isMissingBank: false
     };
   }
 
-  // 3. Card payment method
-  if (method === 'card' || method.includes('card')) {
-    const digits = getDeterministicCardDigits(order);
-    const last4 = digits.slice(-4);
-    const formattedCard = digits.match(/.{1,4}/g)?.join(' ') || digits;
-    return {
-      type: 'Card',
-      masked: `Card: **** **** **** ${last4}`,
-      full: `Card: ${formattedCard}`,
-      hasSensitive: true
-    };
-  }
-
-  // 4. UPI payment method
-  if (method === 'upi' || method.includes('upi')) {
-    const phone = order.customer_phone || order.user_id || '9876543210';
-    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10) || '9876543210';
-    const last4 = cleanPhone.slice(-4);
-    return {
-      type: 'UPI',
-      masked: `UPI: **** ${last4}`,
-      full: `UPI: ${cleanPhone}@upi`,
-      hasSensitive: true
-    };
-  }
-
-  // 5. Razorpay Gateway Reference
-  if (order.razorpay_payment_id) {
-    const rawId = String(order.razorpay_payment_id).trim();
+  // 3. Completed Gateway Refund (only if already finalized with transaction reference)
+  const isAlreadyRefunded = ['completed', 'refunded'].includes((order.refund_status || '').toLowerCase());
+  if (isAlreadyRefunded && (order.refund_txn_id || order.razorpay_payment_id)) {
+    const rawId = String(order.refund_txn_id || order.razorpay_payment_id).trim();
     const last4 = rawId.slice(-4);
     return {
       type: 'Original Gateway',
       masked: `Gateway: **** ${last4}`,
       full: `Razorpay: ${rawId}`,
-      hasSensitive: true
+      hasSensitive: true,
+      hasBank: false,
+      isMissingBank: false
     };
   }
 
-  // 6. COD
-  if (method === 'cod' || method.includes('cod') || method.includes('cash')) {
-    return {
-      type: 'Cash on Delivery',
-      masked: 'Awaiting Bank/UPI',
-      full: 'Awaiting Bank/UPI Details',
-      hasSensitive: false
-    };
-  }
-
+  // 4. If Bank Details are missing, flag as Awaiting Bank Details
   return {
-    type: 'Original Method',
-    masked: 'Original Payment Source',
-    full: 'Original Payment Source',
-    hasSensitive: false
+    type: 'Awaiting Bank Details',
+    masked: 'Awaiting Bank Details',
+    full: 'Awaiting Customer Bank Details',
+    hasSensitive: false,
+    hasBank: false,
+    isMissingBank: true
   };
 }
 
@@ -696,7 +670,7 @@ export const AdminRefundDesk = () => {
         title={activeViewTab === 'shiprocket' ? 'Return Logistics & Shiprocket Reverse Desk' : 'Refund Desk'}
         subtitle={
           activeViewTab === 'shiprocket'
-            ? 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements.'
+            ? 'Manage Doorstep QC pickups, reverse AWBs, store restock verification, and size replacements.'
             : 'Track and process customer refunds, cancellations, and return payouts.'
         }
         className="py-2.5 px-4 sm:py-3 sm:px-5 rounded-xl"
@@ -783,7 +757,7 @@ export const AdminRefundDesk = () => {
         <div className="text-[11px] text-neutral-500 font-medium">
           {activeViewTab === 'payouts'
             ? 'Manage customer bank refunds, payment gateway reversal UTRs, and payout approvals'
-            : 'Manage Doorstep QC pickups, reverse AWBs, atelier restock verification, and size replacements'}
+            : 'Manage Doorstep QC pickups, reverse AWBs, store restock verification, and size replacements'}
         </div>
       </div>
 
@@ -1095,32 +1069,44 @@ export const AdminRefundDesk = () => {
 
                       {/* 5. PAYOUT DETAILS */}
                       <td className="py-1.5 px-1.5 whitespace-nowrap">
-                        <div className="inline-flex items-center justify-between gap-1 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded px-1.5 py-0.5 text-[10px] transition-colors max-w-[125px]">
+                        {payout.isMissingBank ? (
                           <button
                             type="button"
                             onClick={() => handleOpenReviewModal(row)}
-                            className="font-mono text-neutral-700 hover:text-brand-dark truncate text-left cursor-pointer focus:outline-none leading-tight no-underline hover:no-underline"
-                            style={{ textDecoration: 'none' }}
-                            title={isRevealed ? payout.full : payout.masked}
+                            className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100/90 border border-amber-300 text-amber-800 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer"
+                            title="Customer bank account details are missing. Click to enter details."
                           >
-                            <span style={{ textDecoration: 'none' }}>
-                              {isRevealed ? payout.full : payout.masked}
-                            </span>
+                            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span className="truncate max-w-[100px]">Awaiting Bank</span>
                           </button>
+                        ) : (
+                          <div className="inline-flex items-center justify-between gap-1 bg-neutral-50 hover:bg-neutral-100/70 border border-neutral-200/70 rounded px-1.5 py-0.5 text-[10px] transition-colors max-w-[125px]">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReviewModal(row)}
+                              className="font-mono text-neutral-700 hover:text-brand-dark truncate text-left cursor-pointer focus:outline-none leading-tight no-underline hover:no-underline"
+                              style={{ textDecoration: 'none' }}
+                              title={isRevealed ? payout.full : payout.masked}
+                            >
+                              <span style={{ textDecoration: 'none' }}>
+                                {isRevealed ? payout.full : payout.masked}
+                              </span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleRevealPayout(row.id, e)}
-                            className="p-0.5 text-neutral-400 hover:text-brand-dark rounded transition-colors cursor-pointer shrink-0"
-                            title={isRevealed ? 'Hide number' : 'Show number'}
-                          >
-                            {isRevealed ? (
-                              <EyeOff className="w-3 h-3 text-brand-dark" />
-                            ) : (
-                              <Eye className="w-3 h-3" />
-                            )}
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleRevealPayout(row.id, e)}
+                              className="p-0.5 text-neutral-400 hover:text-brand-dark rounded transition-colors cursor-pointer shrink-0"
+                              title={isRevealed ? 'Hide number' : 'Show number'}
+                            >
+                              {isRevealed ? (
+                                <EyeOff className="w-3 h-3 text-brand-dark" />
+                              ) : (
+                                <Eye className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* 6. AMOUNT */}

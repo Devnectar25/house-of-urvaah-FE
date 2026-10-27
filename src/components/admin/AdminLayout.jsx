@@ -27,11 +27,11 @@ import {
   Bell,
   ShieldAlert,
   Mail,
-  MailCheck,
   Building2,
   RotateCcw,
   Truck,
-  XCircle
+  XCircle,
+  ExternalLink
 } from 'lucide-react';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
@@ -54,7 +54,6 @@ const ALL_NAV_ITEMS = [
   //{ name: 'Cancellation Demo', path: '/admin/cancellation-flow', icon: XCircle, key: 'orders' },
   { name: 'Refund Desk', path: '/admin/refunds', icon: Banknote, key: 'refunds' },
   { name: 'Email Notifications', path: '/admin/email-notifications', icon: Mail, key: 'email-notifications' },
-  { name: 'Newsletter', path: '/admin/newsletter', icon: MailCheck, key: 'newsletter' },
   { name: 'Stock Alerts', path: '/admin/stock-notifications', icon: Bell, key: 'stock-notifications' },
   // { name: 'Coupons', path: '/admin/coupons', icon: Ticket, key: 'coupons' },
   { name: 'Customers', path: '/admin/customers', icon: Users, key: 'customers' },
@@ -64,7 +63,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Error Monitoring', path: '/admin/error-monitoring', icon: ShieldAlert, key: 'error-monitoring' },
   { name: 'Sub-Admins', path: '/admin/subadmins', icon: UserCheck, key: 'subadmins', superAdminOnly: true },
   {
-    name: 'Edit Home page',
+    name: 'Edit Homepage',
     path: '/admin/modify-ui',
     icon: Sliders,
     key: 'modify-ui',
@@ -73,7 +72,7 @@ const ALL_NAV_ITEMS = [
       { name: 'Dual Campaign Banner', path: '/admin/modify-ui/dual-campaign', icon: Columns },
       { name: 'Trending on the Gram', path: '/admin/modify-ui/trending-gram', icon: InstagramIcon },
       { name: 'Fabric Video', path: '/admin/modify-ui/fabric-video', icon: Video },
-      { name: 'Boutiques & Concierge', path: '/admin/modify-ui/boutiques-concierge', icon: Building2 },
+      { name: 'Boutiques & Customer Care', path: '/admin/modify-ui/boutiques-concierge', icon: Building2 },
     ]
   },
   { name: 'Settings', path: '/admin/settings', icon: Settings, key: 'settings' },
@@ -88,15 +87,19 @@ export const AdminLayout = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => getAdminStoredUser());
   const [modifyUiOpen, setModifyUiOpen] = useState(() => location.pathname.startsWith('/admin/modify-ui'));
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  const userDropdownRef = useRef(null);
 
   // Lock background scroll when logout confirmation modal is open
   useModalScrollLock(showLogoutModal, () => setShowLogoutModal(false));
 
   const contentScrollRef = useRef(null);
 
-  // Close mobile drawer on route change & ensure modify-ui is expanded if on its subroutes
+  // Close mobile drawer and dropdown on route change & ensure modify-ui is expanded if on its subroutes
   useEffect(() => {
     setMobileMenuOpen(false);
+    setUserDropdownOpen(false);
     if (location.pathname.startsWith('/admin/modify-ui')) {
       setModifyUiOpen(true);
     }
@@ -105,6 +108,21 @@ export const AdminLayout = () => {
       contentScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [location.pathname]);
+
+  // Handle click outside to close user dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    if (userDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userDropdownOpen]);
 
   // Keep user profile in sync and re-fetch fresh permissions from backend on mount/navigation
   useEffect(() => {
@@ -165,14 +183,21 @@ export const AdminLayout = () => {
   const isSuperAdmin = !currentUser?.role || currentUser?.role === 'super_admin' || currentUser?.username === 'Admin';
   const userPermissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
 
+  const adminUsername = currentUser?.username || currentUser?.name || 'Admin';
+  const adminEmail = currentUser?.email || 'admin@houseofurvaah.com';
+  const adminInitial = (adminUsername || 'A').charAt(0).toUpperCase();
+  const adminRoleLabel = isSuperAdmin
+    ? 'Super Admin'
+    : (currentUser?.role ? currentUser.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Admin');
+
   const navItems = ALL_NAV_ITEMS.filter((item) => {
     if (item.superAdminOnly) {
       return isSuperAdmin;
     }
-    if (isSuperAdmin || item.key === 'dashboard' || item.key === 'modify-ui' || item.key === 'faqs') {
+    if (isSuperAdmin || item.key === 'dashboard') {
       return true;
     }
-    return userPermissions.includes(item.key);
+    return userPermissions.includes(item.key) || (item.key === 'refunds' && userPermissions.includes('refund-desk'));
   });
 
   return (
@@ -210,20 +235,130 @@ export const AdminLayout = () => {
           </Link>
         </div>
 
-        {/* Right: Logout Button */}
-        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-          {/* Logout Button */}
-          <button
-            type="button"
-            onClick={() => setShowLogoutModal(true)}
-            className="inline-flex items-center gap-2.5 px-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:bg-neutral-950 hover:border-neutral-950 transition-all duration-200 cursor-pointer group shadow-2xs"
-            title="Sign out of Admin Panel"
-          >
-            <LogOut className="w-4 h-4 text-neutral-900 stroke-[2] group-hover:text-white transition-colors" />
-            <span className="font-admin text-xs sm:text-sm font-bold text-neutral-900 group-hover:text-white tracking-tight transition-colors">
-              Logout
-            </span>
-          </button>
+        {/* Right: User Profile Dropdown & Quick Actions */}
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setUserDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-2.5 sm:gap-3 p-1 sm:px-3 sm:py-1.5 rounded-xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 transition-all duration-200 cursor-pointer select-none group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-dark"
+              aria-expanded={userDropdownOpen}
+              aria-haspopup="true"
+              aria-label="Admin user menu"
+            >
+              {/* Avatar circle with status dot */}
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-neutral-950 text-white font-bold font-admin flex items-center justify-center text-xs shrink-0 shadow-xs uppercase">
+                  {adminInitial}
+                </div>
+                <span
+                  className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"
+                  title="Active session"
+                />
+              </div>
+
+              {/* Username + role summary (hidden on extra small screens) */}
+              <div className="hidden sm:flex flex-col text-left min-w-0 pr-0.5">
+                <span className="text-[9.5px] text-neutral-400 uppercase font-bold tracking-wider leading-none">
+                  Logged in as
+                </span>
+                <span className="font-bold text-neutral-950 text-xs sm:text-[13px] truncate leading-tight mt-0.5 max-w-[130px]">
+                  {adminUsername}
+                </span>
+              </div>
+
+              <ChevronDown
+                className={`w-4 h-4 text-neutral-400 group-hover:text-neutral-900 transition-transform duration-200 ${
+                  userDropdownOpen ? 'rotate-180 text-neutral-900' : ''
+                }`}
+              />
+            </button>
+
+            {/* Dropdown Menu Popover */}
+            {userDropdownOpen && (
+              <div
+                className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-neutral-200/90 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 font-admin origin-top-right divide-y divide-neutral-100"
+                role="menu"
+                aria-orientation="vertical"
+              >
+                {/* Account Details Header */}
+                <div className="px-4 py-3 bg-neutral-50/70">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-neutral-950 text-white font-bold text-sm flex items-center justify-center uppercase shrink-0 shadow-xs">
+                      {adminInitial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-sm text-neutral-950 truncate">{adminUsername}</p>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active now" />
+                      </div>
+                      <p className="text-[11px] text-neutral-500 truncate">{adminEmail}</p>
+                      <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-200/80 text-[10px] font-bold text-neutral-800 tracking-wide uppercase">
+                        <ShieldCheck className="w-3 h-3 text-neutral-700" />
+                        {adminRoleLabel}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick navigation actions */}
+                <div className="p-1.5 space-y-0.5">
+                  <Link
+                    to="/admin/settings"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Settings className="w-4 h-4 text-neutral-500" />
+                    <span>Store Settings</span>
+                  </Link>
+
+                  {isSuperAdmin && (
+                    <Link
+                      to="/admin/subadmins"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                      role="menuitem"
+                    >
+                      <UserCheck className="w-4 h-4 text-neutral-500" />
+                      <span>Sub-Admins</span>
+                    </Link>
+                  )}
+
+                  <a
+                    href="/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer"
+                    role="menuitem"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ExternalLink className="w-4 h-4 text-neutral-500" />
+                      <span>View Live Store</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-400 font-normal">New Tab</span>
+                  </a>
+                </div>
+
+                {/* Sign Out Action */}
+                <div className="p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      setShowLogoutModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer text-left"
+                    role="menuitem"
+                  >
+                    <LogOut className="w-4 h-4 text-red-500 stroke-[2]" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -373,23 +508,7 @@ export const AdminLayout = () => {
             </nav>
           </div>
 
-          {/* Logged in Admin Profile Card */}
-          <div className="p-4 border-t border-neutral-100 bg-neutral-50/70 shrink-0">
-            <div className="px-3.5 py-3 rounded-xl bg-white border border-neutral-200/80 text-xs font-admin text-neutral-600 flex items-center gap-3 shadow-2xs">
-              <div className="w-8 h-8 rounded-full bg-neutral-950 text-white font-bold font-admin flex items-center justify-center text-xs shrink-0 shadow-xs uppercase">
-                {(currentUser?.username || currentUser?.name || 'A').charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider block leading-tight">
-                  Logged in as
-                </span>
-                <span className="font-bold text-neutral-950 text-xs sm:text-[13px] truncate block leading-snug">
-                  {currentUser?.username || currentUser?.name || 'Admin'}
-                </span>
-              </div>
-              <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active session" />
-            </div>
-          </div>
+
         </aside>
 
         {/* ========================================================================= */}

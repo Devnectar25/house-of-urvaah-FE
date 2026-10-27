@@ -105,7 +105,7 @@ export const StockNotificationModal = ({
       }
     } catch (err) {
       setResultStatus('error');
-      setMessage(err.message || 'Something went wrong while connecting to atelier service.');
+      setMessage(err.message || 'Something went wrong while connecting to House of Urvaah service.');
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,7 @@ export const StockNotificationModal = ({
         {/* Modal Header */}
         <div className="text-center mb-6">
           <span className="text-[10px] font-serif tracking-[0.25em] text-neutral-400 uppercase block mb-1">
-            HOUSE OF URVAAH ATELIER
+            HOUSE OF URVAAH
           </span>
           <h2 id="stock-modal-title" className="text-lg sm:text-xl font-normal font-serif tracking-widest uppercase text-neutral-900">
             NOTIFY ME WHEN AVAILABLE
@@ -303,7 +303,7 @@ export const StockNotificationModal = ({
               </div>
             )}
 
-            {/* Atelier Guarantee Note */}
+            {/* Store Guarantee Note */}
             <div className="pt-1 flex items-start gap-2 text-[11px] text-neutral-500 leading-relaxed font-sans">
               <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
               <span>We only alert you when this exact silhouette and size is restocked. No spam, ever.</span>

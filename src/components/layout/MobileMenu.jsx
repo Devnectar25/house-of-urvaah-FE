@@ -5,28 +5,27 @@ import { X, User, Search, Heart, ShoppingBag, ArrowRight, ChevronDown } from 'lu
 import { useCart } from '../../context/CartContext';
 import { productApi } from '../../services/productApi';
 import { apiClient } from '../../lib/apiClient';
-import { Logo } from '../common/Logo';
 
 const TABS = ['WOMAN'];
 
 const WEBSITE_SECTIONS = [
   {
     id: 'discover',
-    title: 'DISCOVER THE ATELIER',
+    title: 'DISCOVER HOUSE OF URVAAH',
     items: [
       { label: 'BEST SELLERS', target: 'best-sellers' },
       { label: 'TRENDING ON THE GRAM', target: 'trending' },
-      { label: 'WHAT’S HOT RN', target: 'whats-hot' },
+      { label: 'THE HOT LIST', target: 'whats-hot' },
       { label: 'RECOMMENDED FOR YOU', target: 'recommended' },
-      { label: 'EDITORIAL & LOOKBOOK', target: 'editorial' }
+      { label: 'THE FABRIC EDIT', target: 'editorial' }
     ]
   },
   {
     id: 'concierge',
-    title: 'CLIENT CONCIERGE & CARE',
+    title: 'CUSTOMER CARE',
     items: [
-      { label: 'ABOUT US / ATELIER STORY', isRoute: true, to: '/about' },
-      { label: 'CONTACT US / CONCIERGE', isRoute: true, to: '/contact' },
+      { label: 'ABOUT US', isRoute: true, to: '/about' },
+      { label: 'CONTACT US', isRoute: true, to: '/contact' },
       { label: 'FREQUENTLY ASKED QUESTIONS', isRoute: true, to: '/faqs' },
       { label: 'MY WISHLIST', isRoute: true, to: '/wishlist' },
       { label: 'ACCOUNT & ORDERS', isRoute: true, to: '/account' }
@@ -186,7 +185,7 @@ export const MobileMenu = () => {
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             style={{ overscrollBehavior: 'contain' }}
-            className="fixed top-0 left-0 z-50 h-full w-full max-w-[388px] bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200 overscroll-contain"
+            className="fixed top-0 left-0 z-50 h-full w-[82vw] max-w-[320px] bg-white text-brand-dark shadow-2xl flex flex-col font-serif select-none border-r border-neutral-200 overscroll-contain"
           >
             {/* 1. TOP BAR: Close (X) on Top-Left; Account, Search, Wishlist, Cart on Top-Right */}
             <div className="p-4 px-5 flex items-center justify-between border-b border-neutral-100 bg-white">
@@ -299,13 +298,13 @@ export const MobileMenu = () => {
             {/* SCROLLABLE MENU BODY */}
             <div
               style={{ overscrollBehavior: 'contain' }}
-              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar p-5 space-y-4"
+              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar px-6 py-6 space-y-5"
             >
               {/* ACCORDION: DATABASE CATEGORIES & WEBSITE SECTIONS */}
               <div className="divide-y divide-neutral-100">
-                <div className="pb-2">
+                <div className="pb-3">
                   <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-serif block">
-                    ATELIER COLLECTIONS
+                    COLLECTIONS
                   </span>
                 </div>
 
@@ -320,17 +319,17 @@ export const MobileMenu = () => {
                   else if (catSlug.includes('corset')) targetRoute = '/corset-tops';
 
                   return (
-                    <div key={cat.id || idx} className="py-1">
+                    <div key={cat.id || idx}>
                       <Link
                         to={targetRoute}
                         onClick={() => {
                           setIsMobileMenuOpen(false);
                           window.scrollTo({ top: 0, behavior: 'instant' });
                         }}
-                        className="w-full py-3.5 flex items-center justify-between text-left group cursor-pointer"
+                        className="w-full py-[18px] flex items-center justify-between text-left group cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-black"
                       >
                         <div className="flex items-center min-w-0 pr-2">
-                          <span className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-neutral-900 group-hover:text-black transition-colors truncate">
+                          <span className="text-[13px] font-medium tracking-[0.16em] uppercase text-neutral-900 group-hover:text-black transition-colors truncate">
                             {cat.name}
                           </span>
                         </div>
@@ -340,19 +339,19 @@ export const MobileMenu = () => {
                   );
                 })}
 
-                {/* WEBSITE SECTIONS ACCORDION (DISCOVER & CONCIERGE) */}
+                {/* WEBSITE SECTIONS ACCORDION (DISCOVER & CUSTOMER CARE) */}
                 {WEBSITE_SECTIONS.map((sec) => {
                   const isExpanded = expandedSection === sec.id;
                   return (
-                    <div key={sec.id} className="py-1">
+                    <div key={sec.id}>
                       {/* Section Header */}
                       <button
                         type="button"
                         onClick={() => toggleSection(sec.id)}
-                        className="w-full py-3.5 flex items-center justify-between text-left group cursor-pointer"
+                        className="w-full py-[18px] flex items-center justify-between text-left group cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-black"
                       >
                         <div className="flex items-center">
-                          <span className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-neutral-900 group-hover:text-black transition-colors">
+                          <span className="text-[13px] font-medium tracking-[0.16em] uppercase text-neutral-900 group-hover:text-black transition-colors">
                             {sec.title}
                           </span>
                         </div>
@@ -371,11 +370,11 @@ export const MobileMenu = () => {
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.25, ease: 'easeInOut' }}
-                            className="overflow-hidden pl-3 pr-2 pb-3 space-y-2.5"
+                            className="overflow-hidden pl-3 pr-2 pb-4 space-y-2"
                           >
                             {sec.items.map((sub, sIdx) => {
                               const linkContent = (
-                                <span className="text-xs text-neutral-600 hover:text-black tracking-wider uppercase font-medium transition-colors flex items-center justify-between group/sub py-1 cursor-pointer w-full text-left">
+                                <span className="text-xs text-neutral-600 hover:text-black tracking-wider uppercase font-medium transition-colors flex items-center justify-between group/sub py-1.5 cursor-pointer w-full text-left">
                                   {sub.label}
                                   <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover/sub:opacity-100 group-hover/sub:translate-x-0 transition-all text-black" />
                                 </span>
@@ -413,20 +412,6 @@ export const MobileMenu = () => {
               </div>
             </div>
 
-            {/* BOTTOM FOOTER INFO */}
-            <div className="py-4 px-5 border-t border-neutral-100 bg-[#FAF8F3] flex items-center justify-start">
-              <Link
-                to="/"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'instant' });
-                }}
-                className="flex items-center justify-start hover:opacity-80 transition-opacity"
-                aria-label="House of Urvaah Home"
-              >
-                <Logo className="h-14 sm:h-16" />
-              </Link>
-            </div>
           </motion.div>
         </>
       )}

@@ -37,17 +37,17 @@ export const Sitemap = () => {
         { name: 'Architectural Outerwear', path: '/outerwear' },
         { name: 'Tailored Trousers', path: '/trousers' },
         { name: 'Designer Shoes', path: '/shoes' },
-        { name: 'Atelier Accessories', path: '/accessories' },
+        { name: 'Store Accessories', path: '/accessories' },
         { name: 'Curated Sale', path: '/sale' },
       ],
     },
     {
-      title: 'Client Concierge & Care',
+      title: 'Customer Care',
       icon: PhoneCall,
       links: [
-        { name: 'Contact Concierge', path: '/contact' },
+        { name: 'Contact Customer Care', path: '/contact' },
         { name: 'Order Tracking & History', path: '/account' },
-        { name: 'Size & Fit Atelier Guide', path: '/faqs' },
+        { name: 'Size & Fit Store Guide', path: '/faqs' },
         { name: 'Urvaah Bot AI Stylist', path: '/contact' },
       ],
     },
@@ -55,7 +55,7 @@ export const Sitemap = () => {
       title: 'Client Account & Bag',
       icon: User,
       links: [
-        { name: 'My Atelier Account', path: '/account' },
+        { name: 'My Store Account', path: '/account' },
         { name: 'Private Wishlist', path: '/wishlist' },
         { name: 'Shopping Bag', path: '/cart' },
         { name: 'Express Checkout', path: '/checkout' },
@@ -76,10 +76,10 @@ export const Sitemap = () => {
       title: 'Heritage & Company',
       icon: Info,
       links: [
-        { name: 'The Atelier Story', path: '/about' },
+        { name: 'The Maison Story', path: '/about' },
         { name: 'Sustainability & Artisans', path: '/about' },
         { name: 'Boutique Locations', path: '/contact' },
-        { name: 'Careers & Atelier Apprenticeships', path: '/about' },
+        { name: 'Careers & Store Apprenticeships', path: '/about' },
       ],
     },
   ];
@@ -88,8 +88,8 @@ export const Sitemap = () => {
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-24 pb-20 md:pt-32 md:pb-28 overflow-x-hidden select-none">
       <SEOHead
         title="Sitemap & Site Directory | House of Urvaah"
-        description="Comprehensive index of House of Urvaah pages, collections, concierge care, client support, and policies."
-        keywords="House of Urvaah sitemap, site directory, luxury collections, atelier care"
+        description="Comprehensive index of House of Urvaah pages, collections, customer care, client support, and policies."
+        keywords="House of Urvaah sitemap, site directory, luxury collections, customer care"
       />
 
       {/* Header Section */}
@@ -109,7 +109,7 @@ export const Sitemap = () => {
           </h1>
           <div className="w-16 h-[1px] bg-neutral-900/30 mb-5" />
           <p className="max-w-xl text-xs sm:text-sm font-serif leading-relaxed text-neutral-600 font-light text-center">
-            A comprehensive index of all ready-to-wear collections, atelier client services, bespoke tailoring inquiries, and brand policies.
+            A comprehensive index of all ready-to-wear collections, client services, bespoke tailoring inquiries, and brand policies.
           </p>
         </motion.div>
       </section>

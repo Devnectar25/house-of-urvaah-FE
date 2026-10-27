@@ -112,7 +112,7 @@ export const DeliveryReminderWidget = ({
             </h4>
           </div>
           <p className="text-[11px] text-neutral-500 font-sans mb-3 text-left leading-relaxed">
-            Enter your 6-digit postal pincode to check instant atelier delivery and courier serviceability.
+            Enter your 6-digit postal pincode to check instant store delivery and courier serviceability.
           </p>
 
           <form onSubmit={handleCheckPincode} className="flex gap-2 font-sans items-center">

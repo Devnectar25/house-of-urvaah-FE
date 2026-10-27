@@ -32,10 +32,10 @@ export const AdminBoutiquesConcierge = () => {
   const [savingLocation, setSavingLocation] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Concierge Form State
+  // Customer Care Form State
   const [conciergeData, setConciergeData] = useState({
     section_badge: 'CLIENT SERVICES',
-    section_title: 'ATELIER CONCIERGE',
+    section_title: 'CUSTOMER CARE',
     email: 'houseofurvaah@gmail.com',
     phone: '+91 98333 25657',
     hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
@@ -44,7 +44,7 @@ export const AdminBoutiquesConcierge = () => {
   // Boutiques Header State
   const [boutiquesHeader, setBoutiquesHeader] = useState({
     section_badge: 'FLAGSHIP BOUTIQUES',
-    section_title: 'ATELIER LOCATIONS'
+    section_title: 'STORE LOCATIONS'
   });
 
   // Boutique Locations List
@@ -86,7 +86,7 @@ export const AdminBoutiquesConcierge = () => {
         if (res.data.concierge) {
           setConciergeData({
             section_badge: res.data.concierge.section_badge || 'CLIENT SERVICES',
-            section_title: res.data.concierge.section_title || 'ATELIER CONCIERGE',
+            section_title: res.data.concierge.section_title || 'CUSTOMER CARE',
             email: res.data.concierge.email || '',
             phone: res.data.concierge.phone || '',
             hours: res.data.concierge.hours || ''
@@ -95,7 +95,7 @@ export const AdminBoutiquesConcierge = () => {
         if (res.data.boutiques) {
           setBoutiquesHeader({
             section_badge: res.data.boutiques.section_badge || 'FLAGSHIP BOUTIQUES',
-            section_title: res.data.boutiques.section_title || 'ATELIER LOCATIONS'
+            section_title: res.data.boutiques.section_title || 'STORE LOCATIONS'
           });
           setLocations(res.data.boutiques.locations || []);
         }
@@ -113,7 +113,7 @@ export const AdminBoutiquesConcierge = () => {
     fetchContactData();
   }, []);
 
-  // Save Concierge Details
+  // Save Customer Care Details
   const handleSaveConcierge = async (e) => {
     e.preventDefault();
     setSavingConcierge(true);
@@ -123,13 +123,13 @@ export const AdminBoutiquesConcierge = () => {
         body: JSON.stringify(conciergeData)
       });
       if (res && res.success) {
-        showToast('success', 'Atelier Concierge details updated successfully!');
+        showToast('success', 'Customer Care details updated successfully!');
       } else {
-        throw new Error(res?.message || 'Failed to save concierge details');
+        throw new Error(res?.message || 'Failed to save customer care details');
       }
     } catch (err) {
-      console.error('Error saving concierge:', err);
-      showToast('error', err.message || 'Could not save concierge details');
+      console.error('Error saving customer care:', err);
+      showToast('error', err.message || 'Could not save customer care details');
     } finally {
       setSavingConcierge(false);
     }
@@ -337,8 +337,8 @@ export const AdminBoutiquesConcierge = () => {
 
       {/* Header Banner */}
       <AdminPageHeader
-        title="Boutiques & Atelier Concierge"
-        subtitle="Manage client services contact channels and flagship atelier boutique locations dynamically."
+        title="Boutiques & Customer Care"
+        subtitle="Manage client services contact channels and flagship store boutique locations dynamically."
       >
         <div className="flex items-center gap-2.5">
           <button
@@ -374,7 +374,7 @@ export const AdminBoutiquesConcierge = () => {
           }`}
         >
           <Mail className="w-4 h-4" />
-          <span>Atelier Concierge & Support</span>
+          <span>Customer Care & Support</span>
         </button>
 
         <button
@@ -394,10 +394,10 @@ export const AdminBoutiquesConcierge = () => {
       {loading ? (
         <div className="py-24 text-center bg-white border border-neutral-200/80 rounded-2xl shadow-2xs">
           <Loader2 className="w-8 h-8 text-neutral-600 animate-spin mx-auto mb-3" />
-          <p className="text-xs uppercase tracking-widest text-neutral-500 font-semibold">Loading Boutique & Concierge Configurations...</p>
+          <p className="text-xs uppercase tracking-widest text-neutral-500 font-semibold">Loading Boutique & Customer Care Configurations...</p>
         </div>
       ) : activeTab === 'concierge' ? (
-        /* TAB 1: CONCIERGE & CLIENT SERVICES */
+        /* TAB 1: CUSTOMER CARE & CLIENT SERVICES */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Form */}
           <div className="lg:col-span-7 bg-white border border-neutral-200/90 rounded-2xl p-6 shadow-2xs space-y-6">
@@ -406,7 +406,7 @@ export const AdminBoutiquesConcierge = () => {
                 CLIENT SERVICES CONFIGURATION
               </span>
               <h3 className="text-lg font-serif font-bold tracking-wide uppercase text-brand-dark mt-1">
-                Atelier Concierge Channels
+                Customer Care Channels
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
                 Configure official email, hotline, and operating hours shown to clients on the Contact Us page.
@@ -435,7 +435,7 @@ export const AdminBoutiquesConcierge = () => {
                     type="text"
                     value={conciergeData.section_title}
                     onChange={(e) => setConciergeData({ ...conciergeData, section_title: e.target.value })}
-                    placeholder="e.g. ATELIER CONCIERGE"
+                    placeholder="e.g. CUSTOMER CARE"
                     className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                   />
                 </div>
@@ -444,7 +444,7 @@ export const AdminBoutiquesConcierge = () => {
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Email Concierge</span>
+                  <span>Email Customer Care</span>
                 </label>
                 <input
                   type="email"
@@ -474,7 +474,7 @@ export const AdminBoutiquesConcierge = () => {
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Concierge Working Hours</span>
+                  <span>Customer Care Working Hours</span>
                 </label>
                 <input
                   type="text"
@@ -500,7 +500,7 @@ export const AdminBoutiquesConcierge = () => {
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      <span>Save Concierge Details</span>
+                      <span>Save Customer Care Details</span>
                     </>
                   )}
                 </button>
@@ -524,14 +524,14 @@ export const AdminBoutiquesConcierge = () => {
                 {conciergeData.section_badge || 'CLIENT SERVICES'}
               </span>
               <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                {conciergeData.section_title || 'ATELIER CONCIERGE'}
+                {conciergeData.section_title || 'CUSTOMER CARE'}
               </h3>
 
               <div className="space-y-4 text-xs font-serif text-neutral-800 font-normal">
                 <div className="flex items-start gap-3">
                   <Mail className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
-                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CONCIERGE</span>
+                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">EMAIL CUSTOMER CARE</span>
                     <a href={`mailto:${conciergeData.email}`} className="hover:underline text-neutral-800 font-medium block mt-0.5">
                       {conciergeData.email || 'houseofurvaah@gmail.com'}
                     </a>
@@ -551,7 +551,7 @@ export const AdminBoutiquesConcierge = () => {
                 <div className="flex items-start gap-3">
                   <Clock className="w-4 h-4 text-neutral-800 mt-0.5 shrink-0 stroke-[1.75]" />
                   <div>
-                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">CONCIERGE HOURS</span>
+                    <span className="block font-semibold uppercase text-neutral-900 tracking-wider">CUSTOMER CARE HOURS</span>
                     <span className="block text-neutral-800 font-medium mt-0.5">
                       {conciergeData.hours || 'Monday – Saturday: 10:00 AM – 8:00 PM IST'}
                     </span>
@@ -566,7 +566,7 @@ export const AdminBoutiquesConcierge = () => {
           </div>
         </div>
       ) : (
-        /* TAB 2: FLAGSHIP BOUTIQUES & ATELIER LOCATIONS */
+        /* TAB 2: FLAGSHIP BOUTIQUES & STORE LOCATIONS */
         <div className="space-y-8">
           {/* Section Headers Card */}
           <div className="bg-white border border-neutral-200/90 rounded-2xl p-6 shadow-2xs">
@@ -592,7 +592,7 @@ export const AdminBoutiquesConcierge = () => {
                     type="text"
                     value={boutiquesHeader.section_title}
                     onChange={(e) => setBoutiquesHeader({ ...boutiquesHeader, section_title: e.target.value })}
-                    placeholder="e.g. ATELIER LOCATIONS"
+                    placeholder="e.g. STORE LOCATIONS"
                     className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-dark"
                   />
                 </div>
@@ -611,10 +611,10 @@ export const AdminBoutiquesConcierge = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-serif font-bold uppercase tracking-wider text-brand-dark">
-                Atelier Boutiques ({locations.length})
+                Store Boutiques ({locations.length})
               </h3>
               <p className="text-xs text-neutral-500 mt-0.5">
-                Manage each atelier address, phone number, and designate the primary flagship featured in the footer.
+                Manage each store address, phone number, and designate the primary flagship featured in the footer.
               </p>
             </div>
             <button
@@ -768,7 +768,7 @@ export const AdminBoutiquesConcierge = () => {
                   {boutiquesHeader.section_badge || 'FLAGSHIP BOUTIQUES'}
                 </span>
                 <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
-                  {boutiquesHeader.section_title || 'ATELIER LOCATIONS'}
+                  {boutiquesHeader.section_title || 'STORE LOCATIONS'}
                 </h3>
 
                 <div className="space-y-6 text-xs font-serif font-normal text-neutral-800 border-l-2 border-neutral-400 pl-4">
@@ -819,7 +819,7 @@ export const AdminBoutiquesConcierge = () => {
           >
             <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
               <h3 className="text-base font-serif font-bold uppercase tracking-wider text-brand-dark">
-                {editingLocation ? 'Edit Atelier Boutique' : 'Add New Atelier Boutique'}
+                {editingLocation ? 'Edit Store Boutique' : 'Add New Store Boutique'}
               </h3>
               <button
                 type="button"
@@ -833,7 +833,7 @@ export const AdminBoutiquesConcierge = () => {
             <form onSubmit={handleSaveLocation} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                  Boutique / Atelier Title *
+                  Boutique / Store Title *
                 </label>
                 <input
                   type="text"

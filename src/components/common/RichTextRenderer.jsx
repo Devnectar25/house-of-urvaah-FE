@@ -32,6 +32,32 @@ function hasHtmlTags(text) {
   return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
+const BLOCK_TAG = '(?:h[1-6]|p|ul|ol|li|div|blockquote|table|thead|tbody|tr|td|th|hr)';
+// Inline wrappers the editor may put around a block (e.g. <strong><h3>..</h3></strong>)
+const INLINE_TAG = '(?:strong|b|em|i|u|span)';
+const NEWLINE_BEFORE_BLOCK = new RegExp(`\\s*\\n\\s*(?=(?:<${INLINE_TAG}\\b[^>]*>\\s*)*<\\/?${BLOCK_TAG}\\b)`, 'gi');
+const NEWLINE_AFTER_BLOCK = new RegExp(`(<\\/?${BLOCK_TAG}\\b[^>]*>(?:\\s*<\\/${INLINE_TAG}>)*)\\s*\\n\\s*`, 'gi');
+// Whitespace between a block tag and an inline wrapper tag right next to it is layout only
+const SPACE_BLOCK_THEN_INLINE = new RegExp(`(<\\/?${BLOCK_TAG}\\b[^>]*>)\\s+(?=<\\/?${INLINE_TAG}\\b)`, 'gi');
+const SPACE_INLINE_THEN_BLOCK = new RegExp(`(<\\/?${INLINE_TAG}\\b[^>]*>)\\s+(?=<\\/?${BLOCK_TAG}\\b)`, 'gi');
+
+/**
+ * The description editor stores text with line breaks mixed with HTML tags. HTML collapses line
+ * breaks, so blank lines the admin typed between text (gaps between sections) disappeared. Keep
+ * them as <br />. Breaks touching a block tag (heading, list, paragraph) are only source layout,
+ * since those tags get their own spacing from CSS, so they are dropped.
+ */
+function preserveLineBreaks(html) {
+  return html
+    .replace(/\r\n?/g, '\n')
+    .replace(SPACE_BLOCK_THEN_INLINE, '$1')
+    .replace(SPACE_INLINE_THEN_BLOCK, '$1')
+    .replace(NEWLINE_BEFORE_BLOCK, '')
+    .replace(NEWLINE_AFTER_BLOCK, '$1')
+    .replace(/\n{3,}/g, '\n\n') // at most one empty line between text
+    .replace(/\n/g, '<br />');
+}
+
 /**
  * Converts simple markdown formatting (##, ###, *, -) to HTML if plain text with markdown is entered
  */
@@ -101,7 +127,7 @@ function markdownToHtml(md) {
 /**
  * RichTextRenderer:
  * Renders HTML formatted or markdown product stories and descriptions
- * with atelier luxury typography, fallback handling, and sanitization.
+ * with store luxury typography, fallback handling, and sanitization.
  */
 export default function RichTextRenderer({ content, className = '', fallback = '' }) {
   const renderedHtml = useMemo(() => {
@@ -109,7 +135,7 @@ export default function RichTextRenderer({ content, className = '', fallback = '
     if (!raw) return '';
 
     if (hasHtmlTags(raw)) {
-      return sanitizeHtml(raw);
+      return preserveLineBreaks(sanitizeHtml(raw));
     }
 
     // If it has markdown headings or bullet points, convert to structured HTML

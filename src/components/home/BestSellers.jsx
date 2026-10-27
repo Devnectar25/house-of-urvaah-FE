@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { BEST_SELLERS_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 export const BestSellers = ({ onQuickView }) => {
   const [products, setProducts] = useState(BEST_SELLERS_PRODUCTS);
@@ -49,13 +50,13 @@ export const BestSellers = ({ onQuickView }) => {
     window.addEventListener('storage', fetchBestSellers);
 
     // Auto-polling every 3s for live real-time sync with Admin panel
-    const pollingInterval = setInterval(fetchBestSellers, 3000);
+    const stopLivePolling = startVisiblePolling(fetchBestSellers);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_products_updated', fetchBestSellers);
       window.removeEventListener('storage', fetchBestSellers);
-      clearInterval(pollingInterval);
+      stopLivePolling();
     };
   }, []);
 

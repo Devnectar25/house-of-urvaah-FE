@@ -162,28 +162,8 @@ export const AdminAnalytics = () => {
     return topUsers.reduce((sum, u) => sum + (Number(u.totalRevenue) || 0), 0);
   }, [topUsers]);
 
-  // Trend indicator component (badge style)
-  const renderTrendBadge = (trend) => {
-    if (trend === null || trend === undefined) return null;
-    const isPos = trend >= 0;
-    return (
-      <span
-        className={`inline-flex items-center text-[11px] font-semibold font-admin px-2 py-0.5 rounded-md border ${
-          isPos
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : 'bg-rose-50 text-rose-700 border-rose-200'
-        }`}
-        title={`Comparison with prior ${period === 'today' ? 'day' : period === '30d' ? '30-day period' : '7-day period'}`}
-      >
-        {isPos ? (
-          <ArrowUpRight className="w-3.5 h-3.5 mr-0.5 stroke-[2.2]" />
-        ) : (
-          <ArrowDownRight className="w-3.5 h-3.5 mr-0.5 stroke-[2.2]" />
-        )}
-        {Math.abs(trend)}%
-      </span>
-    );
-  };
+  // Trend indicator component (badge style - disabled per request)
+  const renderTrendBadge = () => null;
 
   // Inline trend line helper matching Screenshot 2 design
   const renderTrendLine = (trend) => {
@@ -356,7 +336,6 @@ export const AdminAnalytics = () => {
                 <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   {formatNumber(totalUsersVal)}
                 </div>
-                {renderTrendLine(totalUsersTrend)}
               </div>
             </div>
 
@@ -377,7 +356,6 @@ export const AdminAnalytics = () => {
                 <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   {formatNumber(activeUsersVal)}
                 </div>
-                {renderTrendLine(activeUsersTrend)}
               </div>
             </div>
 
@@ -398,7 +376,6 @@ export const AdminAnalytics = () => {
                 <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   ₹{formatCurrency(totalRevenueVal)}
                 </div>
-                {renderTrendLine(totalRevenueTrend)}
               </div>
             </div>
 
@@ -442,7 +419,6 @@ export const AdminAnalytics = () => {
                 <div className="text-3xl font-admin font-bold text-neutral-950 tracking-tight">
                   ₹{formatCurrency(aovVal)}
                 </div>
-                {renderTrendLine(aovTrend)}
               </div>
             </div>
           </div>
@@ -697,7 +673,6 @@ export const AdminAnalytics = () => {
               <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
                 Total Orders
               </span>
-              {renderTrendBadge(totalOrdersTrend)}
             </div>
             <div className="my-2">
               <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">
@@ -717,7 +692,6 @@ export const AdminAnalytics = () => {
               <span className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 font-bold font-admin">
                 Conversion Rate
               </span>
-              {renderTrendBadge(conversionRateTrend)}
             </div>
             <div className="my-2">
               <span className="text-2xl sm:text-3xl font-admin font-bold text-neutral-950 tracking-tight">

@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../common/Button';
 import { supabase, BUCKET_NAME, getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const EDITORIAL_VIDEOS = [
   {
@@ -38,6 +39,17 @@ const EDITORIAL_VIDEOS = [
     matcher: (fileName) => {
       const lower = fileName.toLowerCase();
       return lower.includes('teal') && lower.includes('h264');
+    }
+  },
+  {
+    id: 'aqua-gold',
+    name: 'Firoza Aqua Gold Hand-Embroidered Gharara Set',
+    tag: 'AQUA GOLD THREADWORK',
+    slug: 'aqua-gold-threadwork',
+    defaultPath: 'videos/VID_20261022_044316_193_bsl.mp4',
+    matcher: (fileName) => {
+      const lower = fileName.toLowerCase();
+      return lower.includes('vid_20261022') || (lower.includes('firoza') && lower.includes('aqua'));
     }
   }
 ];
@@ -140,13 +152,13 @@ export const EditorialBanner = () => {
     const handleUpdate = () => fetchFabricConfig();
     window.addEventListener('urvaah_fabric_video_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchFabricConfig, 3000);
+    const stopLivePolling = startVisiblePolling(fetchFabricConfig);
 
     return () => {
       isMounted = false;
       window.removeEventListener('urvaah_fabric_video_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 
@@ -397,13 +409,6 @@ export const EditorialBanner = () => {
                 );
               })}
               </div>
-
-              {/* Slide Counter / Hint */}
-              {videos.length > 3 && (
-                <div className="absolute bottom-2.5 right-3 z-20 bg-neutral-950/75 backdrop-blur-md text-white/90 text-[8.5px] font-sans tracking-[0.2em] uppercase px-2.5 py-0.5 rounded-full pointer-events-none select-none shadow-sm">
-                  {videos.length} Fabric Videos &bull; Use Arrows
-                </div>
-              )}
             </div>
           </motion.div>
 

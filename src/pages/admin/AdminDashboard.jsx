@@ -14,8 +14,7 @@ import {
   ArrowRight,
   AlertTriangle,
   RefreshCw,
-  ExternalLink,
-  MailCheck
+  ExternalLink
 } from 'lucide-react';
 import { getStoredUser, apiClient } from '../../lib/apiClient';
 import { RegisteredUsersModal } from '../../components/admin/RegisteredUsersModal';
@@ -254,12 +253,6 @@ export const AdminDashboard = () => {
       description: 'Review client account records and shopping profiles',
       link: '/admin/customers',
       icon: Users,
-    },
-    {
-      title: 'Newsletter Subscribers',
-      description: 'Monitor atelier audience signups and marketing email lists',
-      link: '/admin/newsletter',
-      icon: MailCheck,
     },
   ];
 

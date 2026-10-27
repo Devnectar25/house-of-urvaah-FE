@@ -278,7 +278,7 @@ export const AdminNewsletter = () => {
       {/* Header */}
       <AdminPageHeader
         title="Newsletter Subscribers"
-        subtitle="Manage atelier newsletter audience, subscription sources, and mailing lists."
+        subtitle="Manage store newsletter audience, subscription sources, and mailing lists."
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <button
@@ -759,7 +759,7 @@ export const AdminNewsletter = () => {
                 >
                   <option value="admin">Admin Manual Entry</option>
                   <option value="vip_client">VIP Client List</option>
-                  <option value="in_store">In-Store Atelier Walk-in</option>
+                  <option value="in_store">In-Store Store Walk-in</option>
                   <option value="runway_event">Runway Event Guest</option>
                   <option value="marketing_import">Marketing Campaign</option>
                 </select>

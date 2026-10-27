@@ -58,13 +58,13 @@ export const ShipmentTrackingModal = ({
         setTrackingData({
           awb_code: lookupKey,
           current_status: fallbackStatus || 'IN TRANSIT',
-          origin: isReturn ? 'Customer Doorstep' : 'House of Urvaah Atelier (Mumbai)',
-          destination: isReturn ? 'House of Urvaah Central Atelier' : 'Destination Hub',
+          origin: isReturn ? 'Customer Doorstep' : 'House of Urvaah (Mumbai)',
+          destination: isReturn ? 'House of Urvaah Central Store' : 'Destination Hub',
           scans: [
             {
               date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
               activity: isReturn ? 'Reverse Pickup Assigned' : 'Shipment Registered with Courier Partner',
-              location: isReturn ? 'Customer City' : 'Mumbai Atelier'
+              location: isReturn ? 'Customer City' : 'Mumbai Store'
             }
           ]
         });
@@ -75,8 +75,8 @@ export const ShipmentTrackingModal = ({
       setTrackingData({
         awb_code: lookupKey,
         current_status: fallbackStatus || 'PROCESSING',
-        origin: isReturn ? 'Customer Doorstep' : 'House of Urvaah Atelier (Mumbai)',
-        destination: isReturn ? 'House of Urvaah Central Atelier' : 'Destination Hub',
+        origin: isReturn ? 'Customer Doorstep' : 'House of Urvaah (Mumbai)',
+        destination: isReturn ? 'House of Urvaah Central Store' : 'Destination Hub',
         scans: [
           {
             date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -132,7 +132,7 @@ export const ShipmentTrackingModal = ({
     { label: 'REQUESTED', active: true, icon: RotateCcw },
     { label: 'PICKUP SCHEDULED', active: isPickedUp, icon: Clock },
     { label: 'REVERSE TRANSIT', active: isInTransit, icon: Truck },
-    { label: 'RECEIVED AT ATELIER', active: isDelivered, icon: CheckCircle2 }
+    { label: 'RECEIVED AT HOUSE OF URVAAH', active: isDelivered, icon: CheckCircle2 }
   ];
 
   const currentSteps = isReturn ? reverseSteps : forwardSteps;
@@ -188,7 +188,10 @@ export const ShipmentTrackingModal = ({
           </div>
 
           {/* Modal Body */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+          <div
+            className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-5 sm:p-6 space-y-6"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {loading ? (
               <div className="py-16 text-center space-y-3">
                 <RefreshCw className="w-7 h-7 text-neutral-400 animate-spin mx-auto" />
@@ -295,10 +298,10 @@ export const ShipmentTrackingModal = ({
                   <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-neutral-600" />
-                      Origin Atelier
+                      Origin Store
                     </span>
                     <p className="font-semibold text-neutral-900">
-                      {trackingData?.origin || 'House of Urvaah Atelier (Mumbai)'}
+                      {trackingData?.origin || 'House of Urvaah (Mumbai)'}
                     </p>
                   </div>
                   <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
@@ -344,7 +347,7 @@ export const ShipmentTrackingModal = ({
                     </div>
                   ) : (
                     <div className="py-6 text-center text-neutral-400 text-xs italic">
-                      Package is prepared. First courier scan will appear once picked up from our atelier.
+                      Package is prepared. First courier scan will appear once picked up from House of Urvaah.
                     </div>
                   )}
                 </div>

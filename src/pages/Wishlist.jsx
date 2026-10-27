@@ -53,13 +53,11 @@ export const Wishlist = () => {
 
       const items = await Promise.all(
         wishlist.map(async (id) => {
-          // 1. Try local catalog match (fast & immediate)
+          // Live catalogue first: deleted or deactivated products must not reappear from sample data
           const local = findLocalProduct(id);
-          if (local) return local;
-
-          // 2. Fetch from backend API if not in static catalog
           try {
             const apiProd = await productApi.getProductById(id);
+            if (apiProd && (apiProd.is_active === false || apiProd.active === false)) return null;
             if (apiProd && (apiProd.name || apiProd.title)) {
               return {
                 ...apiProd,
@@ -78,7 +76,10 @@ export const Wishlist = () => {
               };
             }
           } catch (e) {
+            // Product removed from the catalogue: drop it from the wishlist view
+            if (/not found|404/i.test(String(e?.message || ''))) return null;
             console.warn('API lookup failed for wishlist product ID:', id, e);
+            return local; // server unreachable: fall back to the bundled catalogue
           }
 
           return null;
@@ -141,7 +142,7 @@ export const Wishlist = () => {
       <SEOHead
         title={`My Wishlist (${resolvedProducts.length}) | House of Urvaah`}
         description="View and manage your saved House of Urvaah runway pieces and curated items."
-        keywords="House of Urvaah wishlist, saved items, luxury fashion atelier"
+        keywords="House of Urvaah wishlist, saved items, luxury fashion house"
       />
 
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 md:px-12">
@@ -197,7 +198,19 @@ export const Wishlist = () => {
               Explore our luxury collection and click the heart icon on any piece to save it for later.
             </p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                  sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                } catch (e) {}
+                navigate('/#best-sellers');
+                setTimeout(() => {
+                  const el = document.getElementById('best-sellers');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 150);
+              }}
               className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer shadow-xs"
             >
               EXPLORE COLLECTION

@@ -308,7 +308,7 @@ export const AdminStockNotifications = () => {
         badge={
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-900 text-white tracking-widest uppercase">
             <Sparkles className="w-3 h-3 text-amber-300" />
-            BACK-IN-STOCK ATELIER ENGINE
+            BACK-IN-STOCK STORE ENGINE
           </span>
         }
         actions={

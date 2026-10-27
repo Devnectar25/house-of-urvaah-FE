@@ -56,7 +56,6 @@ import { AdminBoutiquesConcierge } from './pages/admin/modify-ui/AdminBoutiquesC
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
 import { AdminErrorMonitoring } from './pages/admin/AdminErrorMonitoring';
 import { AdminEmailNotifications } from './pages/admin/AdminEmailNotifications';
-import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StockUnsubscribe } from './pages/StockUnsubscribe';
 import { getAdminStoredUser, getStoredUser } from './lib/apiClient';
 
@@ -65,16 +64,11 @@ function PermissionGuard({ moduleKey, children }) {
   const isSuperAdmin = !user?.role || user?.role === 'super_admin' || user?.username === 'Admin';
   const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
 
+  // Sub-admins only reach modules explicitly granted to them (Sub-Admin Management permissions)
   const hasAccess =
     isSuperAdmin ||
     permissions.includes(moduleKey) ||
-    moduleKey === 'modify-ui' ||
-    moduleKey === 'faqs' ||
-    moduleKey === 'stock-notifications' ||
-    moduleKey === 'error-monitoring' ||
-    moduleKey === 'email-notifications' ||
-    moduleKey === 'newsletter' ||
-    (moduleKey === 'refunds' && (permissions.includes('refunds') || permissions.includes('refund-desk')));
+    (moduleKey === 'refunds' && permissions.includes('refund-desk'));
 
   if (hasAccess) {
     return children;
@@ -274,7 +268,6 @@ export function AppContent() {
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="shiprocket-refund-desk" element={<Navigate to="/admin/refunds?view=shiprocket" replace />} />
         <Route path="email-notifications" element={<PermissionGuard moduleKey="email-notifications"><AdminEmailNotifications /></PermissionGuard>} />
-        <Route path="newsletter" element={<PermissionGuard moduleKey="newsletter"><AdminNewsletter /></PermissionGuard>} />
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
         <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />

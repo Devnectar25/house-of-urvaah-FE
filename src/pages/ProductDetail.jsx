@@ -41,7 +41,13 @@ import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWi
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import RichTextRenderer from '../components/common/RichTextRenderer';
+<<<<<<< HEAD
 import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
+=======
+import { getColorName, getSwatchCss, compareColorNames, POPULAR_FASHION_COLORS } from '../utils/colorValidator';
+import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
+import { getLegacyDetailRows, productDetailsToRichText, hasVisibleRichText } from '../utils/productDetailsContent';
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
@@ -141,18 +147,6 @@ const formatAdditionalInfoRows = (product) => {
     if (valid.length > 0) return valid;
   }
 
-  // 2. Check if productDetails or product_details array exists
-  const prodDetails = product.productDetails || product.product_details;
-  if (Array.isArray(prodDetails) && prodDetails.length > 0) {
-    const valid = prodDetails
-      .filter((s) => s && ((s.label && s.label.trim()) || (s.value && s.value.trim()) || (s.title && s.title.trim())))
-      .map((s) => ({
-        title: (s.label || s.title || '').trim(),
-        value: (s.value || '').trim()
-      }));
-    if (valid.length > 0) return valid;
-  }
-
   // 3. Check if specifications object exists
   if (product.specifications && typeof product.specifications === 'object') {
     const entries = Object.entries(product.specifications)
@@ -188,14 +182,8 @@ const formatAdditionalInfoRows = (product) => {
     }
   }
 
-  // 5. Default fallback specification table items
-  return [
-    { title: 'Fabric', value: 'Embroidered fabric with sequin detailing' },
-    { title: 'Skirt hem', value: 'Hand-finished potli trim' },
-    { title: 'Closure', value: 'Adjustable tie-back (top), side zip on left of skirt' },
-    { title: 'Lining', value: 'Fully lined (top and skirt)' },
-    { title: 'Top', value: 'Lightly Padded' }
-  ];
+  // Nothing entered by the admin: no rows, so the table stays hidden
+  return [];
 };
 
 export const ProductDetail = () => {
@@ -206,6 +194,57 @@ export const ProductDetail = () => {
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Route id that `product` was loaded for; guards against acting on the previous product during navigation
+  const loadedIdRef = useRef(null);
+
+  // Authoritative canonical SEO URL and metadata resolution
+  const canonicalInfo = useMemo(() => {
+    return resolveProductCanonical(product || id);
+  }, [product, id]);
+
+  // Dynamic Product Structured Data (JSON-LD) for Rich Snippets & Search Engines
+  const productSchema = useMemo(() => {
+    if (!product) return null;
+    const price = product.price || 8990;
+    const canonical = canonicalInfo?.canonicalUrl || `https://houseofurvaah.com/product/${product.id}`;
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      image: [product.image].filter(Boolean),
+      description: canonicalInfo?.description || product.description,
+      sku: String(product.id),
+      brand: {
+        '@type': 'Brand',
+        name: 'House of Urvaah'
+      },
+      offers: {
+        '@type': 'Offer',
+        url: canonical,
+        priceCurrency: 'INR',
+        price: price,
+        availability: (product.inStock !== false && (product.stockQuantity ?? 1) > 0)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        seller: {
+          '@type': 'Organization',
+          name: 'House of Urvaah'
+        }
+      }
+    };
+  }, [product, canonicalInfo]);
+
+  // Seamlessly redirect old or non-canonical product URLs (e.g., /product/bs-101 -> /product/bs-101/mocha-brown-embroidered-co-ord-set)
+  useEffect(() => {
+    // While navigating to another product, `product` still holds the previous one —
+    // redirecting then would bounce the user back to the product they just left.
+    const productMatchesRoute = product ? loadedIdRef.current === id : !loading;
+    if (canonicalInfo?.url && productMatchesRoute) {
+      if (location.pathname !== canonicalInfo.url) {
+        navigate(`${canonicalInfo.url}${location.search}${location.hash}`, { replace: true });
+      }
+    }
+  }, [canonicalInfo?.url, product, loading, id, location.pathname, location.search, location.hash, navigate]);
 
   // Authoritative canonical SEO URL and metadata resolution
   const canonicalInfo = useMemo(() => {
@@ -288,6 +327,7 @@ export const ProductDetail = () => {
       findLocalProduct(productId) ||
       BEST_SELLERS_PRODUCTS.find((p) => p.id === 'bs-101') ||
       BEST_SELLERS_PRODUCTS[0];
+    loadedIdRef.current = productId;
     setProduct(found);
   };
 
@@ -322,20 +362,29 @@ export const ProductDetail = () => {
     setMobileSlideIndex(0);
 
     if (id) {
-      // 1. Try local catalog first for instant response
+      // Local catalog entry is only used to fill gaps / as a fallback. Rendering it first and
+      // then swapping in the API gallery made every image change twice (visible flicker).
       const local = findLocalProduct(id);
-      if (local) {
-        setProduct(local);
-        setLoading(false);
-      }
 
+<<<<<<< HEAD
       // 2. Fetch from backend API to ensure authoritative product data
       const lookupId = canonicalInfo?.id || id;
+=======
+      // Fetch from backend API to ensure authoritative product data
+      // Resolve from the route id only — `canonicalInfo` is derived from the product still in
+      // state, which is the PREVIOUS product right after clicking a related/similar item.
+      const routeCanonical = resolveProductCanonical(id);
+      const lookupId = routeCanonical?.id || id;
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
       productApi
         .getProductById(lookupId)
         .then((data) => {
           if (isMounted && data && (data.name || data.title)) {
+<<<<<<< HEAD
             const canonicalData = resolveProductCanonical(data) || canonicalInfo;
+=======
+            const canonicalData = resolveProductCanonical(data) || routeCanonical;
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             const isCorsetSet = canonicalData?.id === 'bs-103' || String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
             const corsetGallery = [
               '/assets/Images/Corset01.png',
@@ -344,16 +393,30 @@ export const ProductDetail = () => {
               '/assets/Images/Corset04.png'
             ];
 
-            setProduct((prev) => ({
+            // Admin-managed images and name always win; the built-in corset photos are only a
+            // fallback for when the API returns no gallery
+            const apiGallery = (Array.isArray(data.gallery) && data.gallery.length > 0)
+              ? data.gallery
+              : (Array.isArray(data.images) && data.images.length > 0 ? data.images : []);
+            const useCorsetFallback = isCorsetSet && apiGallery.length === 0;
+
+            // Merge onto the local entry for THIS product only (never the previously viewed product)
+            const prev = local;
+            loadedIdRef.current = id;
+            setProduct({
               ...prev,
               ...data,
               id: canonicalData?.id || String(data.id || id),
+<<<<<<< HEAD
               name: isCorsetSet ? 'Sage Bloom Embroidered Corset' : (data.name || data.title || prev?.name),
+=======
+              name: data.name || data.title || (isCorsetSet ? 'Sage Bloom Embroidered Corset' : prev?.name),
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
-              image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
-              hoverImage: isCorsetSet ? corsetGallery[1] : (data.hoverImage || prev?.hoverImage || data.image),
-              gallery: isCorsetSet ? corsetGallery : (data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image])),
+              image: useCorsetFallback ? corsetGallery[0] : (apiGallery[0] || data.image || prev?.image),
+              hoverImage: useCorsetFallback ? corsetGallery[1] : (data.hoverImage || apiGallery[1] || prev?.hoverImage || data.image),
+              gallery: useCorsetFallback ? corsetGallery : (apiGallery.length > 0 ? apiGallery : (prev?.gallery || [data.image])),
               video_url: data.video_url || data.videoUrl || data.video || prev?.video_url || '',
               videoUrl: data.video_url || data.videoUrl || data.video || prev?.videoUrl || '',
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
@@ -361,23 +424,21 @@ export const ProductDetail = () => {
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
               specifications: (Array.isArray(data.specifications) && data.specifications.length > 0)
                 ? data.specifications
-                : (Array.isArray(data.productDetails) && data.productDetails.length > 0)
-                  ? data.productDetails
-                  : (Array.isArray(data.product_details) && data.product_details.length > 0)
-                    ? data.product_details
-                    : prev?.specifications || [],
+                : getLegacyDetailRows(data.productDetails || data.product_details).length > 0
+                  ? getLegacyDetailRows(data.productDetails || data.product_details)
+                  : prev?.specifications || [],
               careInstructions: data.careInstructions || data.care_instructions || prev?.careInstructions || '',
               description: (data.description !== undefined && data.description !== '') ? data.description : (prev?.description || ''),
               fullDescription: (data.fullDescription !== undefined && data.fullDescription !== '') ? data.fullDescription : (data.full_description || prev?.fullDescription || ''),
               full_description: (data.full_description !== undefined && data.full_description !== '') ? data.full_description : (data.fullDescription || prev?.full_description || ''),
               additionalInfo: (data.additionalInfo !== undefined && data.additionalInfo !== '') ? data.additionalInfo : (data.additional_info || prev?.additionalInfo || '')
-            }));
-          } else if (isMounted && !local) {
+            });
+          } else if (isMounted) {
             fallbackProduct(id);
           }
         })
         .catch(() => {
-          if (isMounted && !local) {
+          if (isMounted) {
             fallbackProduct(id);
           }
         })
@@ -398,14 +459,7 @@ export const ProductDetail = () => {
         ? product.gallery
         : (product?.images && product.images.length > 0
             ? product.images
-            : [
-                product?.image,
-                product?.hoverImage,
-                '/assets/Images/Brown02.png',
-                '/assets/Images/Brown03.png',
-                '/assets/Images/Brown04.png',
-                '/assets/Images/Brown01.png'
-              ]
+            : [product?.image, product?.hoverImage]
           )
       ).filter(Boolean)
     )
@@ -929,8 +983,16 @@ export const ProductDetail = () => {
     return '₹ ' + Number(val).toLocaleString('en-IN');
   };
 
-  // Structured key-value rows for the Additional Information table
+  // Structured key-value rows shown as a table inside Product Details (hidden when empty)
   const additionalInfoList = formatAdditionalInfoRows(product);
+  const hasSpecRows = additionalInfoList.length > 0;
+
+  // Rich Product Details content from the admin panel (section hidden when empty)
+  const productDetailsHtml = productDetailsToRichText(
+    product.productDetails || product.product_details,
+    product.specifications
+  );
+  const hasProductDetails = hasVisibleRichText(productDetailsHtml);
 
   const accordionItems = [
     {
@@ -955,7 +1017,7 @@ export const ProductDetail = () => {
       title: 'CHECK AVAILABILITY',
       content:
         product.availability ||
-        'Available in select House of Urvaah flagships across Mumbai, New Delhi, and Bengaluru. Contact boutique concierge for private styling appointments.'
+        'Available in select House of Urvaah flagships across Mumbai, New Delhi, and Bengaluru. Contact customer care for private styling appointments.'
     }
   ];
 
@@ -963,7 +1025,16 @@ export const ProductDetail = () => {
     <div className="w-full bg-white font-serif text-brand-dark min-h-screen pt-24 sm:pt-28 pb-20 selection:bg-brand-dark selection:text-white">
       <SEOHead
         title={canonicalInfo?.title || `${product.name} | House of Urvaah`}
+<<<<<<< HEAD
         description={canonicalInfo?.description || product.description || `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`}
+=======
+        description={
+          canonicalInfo?.description ||
+          product.shortDescription ||
+          (product.description ? product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '') ||
+          `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`
+        }
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
         keywords={canonicalInfo?.keywords || `${product.name}, ${product.category || 'Luxury Fashion'}, House of Urvaah apparel`}
         canonicalUrl={canonicalInfo?.canonicalUrl}
         schema={productSchema}
@@ -975,7 +1046,15 @@ export const ProductDetail = () => {
         {/* Breadcrumb Navigation Row */}
         <div className="mb-6 md:mb-8 pb-4 border-b border-neutral-100 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              sessionStorage.setItem('urvaah_home_should_restore', 'true');
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                const targetSection = location.state?.fromSection || sessionStorage.getItem('urvaah_home_last_section');
+                navigate(targetSection ? `/#${targetSection}` : '/');
+              }
+            }}
             className="inline-flex items-center gap-2 text-xs font-sans font-semibold tracking-[0.2em] uppercase text-brand-dark hover:opacity-70 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -1026,8 +1105,12 @@ export const ProductDetail = () => {
                   >
                     <video
                       src={productVideo}
-                      controls
+                      ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
+                      muted
+                      autoPlay
+                      loop
                       playsInline
+                      disablePictureInPicture
                       className="w-full h-full object-contain bg-white"
                     />
                     <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 flex items-center gap-1">
@@ -1144,10 +1227,12 @@ export const ProductDetail = () => {
                 >
                   <video
                     src={productVideo}
-                    controls
+                    ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
+                    muted
                     autoPlay
                     loop
                     playsInline
+                    disablePictureInPicture
                     className="w-full h-full object-contain bg-white"
                   />
                   <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase rounded flex items-center gap-1.5 border border-black/10 pointer-events-none">
@@ -1367,6 +1452,34 @@ export const ProductDetail = () => {
               </div>
             </div>
 
+            {/* Colours the admin set on this product (each colour once, in the admin preset order) */}
+            {(() => {
+              const byName = new Map();
+              (Array.isArray(product.colors) ? product.colors : []).forEach((raw) => {
+                const name = getColorName(raw);
+                if (!name || byName.has(name)) return;
+                const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
+                byName.set(name, preset ? preset.hex : getSwatchCss(raw));
+              });
+              const colours = [...byName.entries()].sort((a, b) => compareColorNames(a[0], b[0]));
+              if (colours.length === 0) return null;
+              return (
+                <div className="pt-4 font-sans">
+                  <span className="block text-xs sm:text-sm font-semibold tracking-wider uppercase text-brand-dark mb-2.5">
+                    {colours.length === 1 ? 'Colour' : 'Colours'}: <span className="font-normal normal-case tracking-normal text-neutral-600">{colours.map(([n]) => n).join(', ')}</span>
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {colours.map(([name, swatch]) => (
+                      <span key={name} className="inline-flex items-center gap-2 h-8 pl-1.5 pr-3 border border-neutral-200 rounded-full text-xs text-neutral-800">
+                        <span className="w-5 h-5 rounded-full border border-neutral-300 flex-shrink-0" style={{ background: swatch }} />
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
             {(() => {
               const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
@@ -1554,54 +1667,8 @@ export const ProductDetail = () => {
                 )}
               </div>
 
-              {/* Additional Information Accordion */}
-              <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => toggleAccordion('info')}
-                  className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                  aria-expanded={Boolean(openAccordions['info'])}
-                >
-                  <span>ADDITIONAL INFORMATION</span>
-                  {openAccordions['info'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                </button>
-                {openAccordions['info'] && (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-2xs">
-                    <table className="w-full text-xs sm:text-sm font-sans text-left border-collapse">
-                      <tbody className="divide-y divide-neutral-200/70">
-                        {additionalInfoList.map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className={`transition-colors hover:bg-neutral-50/80 ${
-                              idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'
-                            }`}
-                          >
-                            {row.title ? (
-                              <>
-                                <td className="py-2 px-3 sm:px-3.5 font-semibold text-neutral-900 w-28 sm:w-36 align-top border-r border-neutral-200/60 shrink-0 whitespace-nowrap">
-                                  {row.title}
-                                </td>
-                                <td className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
-                                  {row.value}
-                                </td>
-                              </>
-                            ) : (
-                              <td colSpan={2} className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
-                                {row.value}
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-
-              {/* Product Details (Dynamic Bullet Points) */}
-              {Array.isArray(product.productDetails || product.product_details) &&
-                (product.productDetails || product.product_details).filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim())).length > 0 && (
+              {/* Product Details: rich text and/or the specification table - only shown when admin has added content */}
+              {(hasProductDetails || hasSpecRows) && (
                   <div className="border-b border-neutral-200 pb-2.5 pt-1">
                     <button
                       type="button"
@@ -1612,52 +1679,45 @@ export const ProductDetail = () => {
                       <span>PRODUCT DETAILS</span>
                       {openAccordions['pdetails'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
                     </button>
-                    {openAccordions['pdetails'] && (
-                      <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2">
-                        <ul className="space-y-1.5">
-                          {(product.productDetails || product.product_details)
-                            .filter(d => (d.label && d.label.trim()) || (d.value && d.value.trim()))
-                            .map((detail, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 shrink-0 mt-1.5" />
-                                <div>
-                                  {detail.label && detail.label.trim() && (
-                                    <strong className="font-semibold text-neutral-900">{detail.label.trim()}: </strong>
-                                  )}
-                                  <span>{detail.value}</span>
-                                </div>
-                              </li>
+                    {openAccordions['pdetails'] && hasProductDetails && (
+                      <RichTextRenderer
+                        content={productDetailsHtml}
+                        className="mt-2 text-xs sm:text-sm pr-2"
+                      />
+                    )}
+                    {openAccordions['pdetails'] && hasSpecRows && (
+                      <div className={`mt-3 overflow-hidden rounded-lg border border-neutral-200/80 bg-white shadow-2xs`}>
+                        <table className="w-full text-xs sm:text-sm font-sans text-left border-collapse">
+                          <tbody className="divide-y divide-neutral-200/70">
+                            {additionalInfoList.map((row, idx) => (
+                              <tr
+                                key={idx}
+                                className={`transition-colors hover:bg-neutral-50/80 ${
+                                  idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'
+                                }`}
+                              >
+                                {row.title ? (
+                                  <>
+                                    <td className="py-2 px-3 sm:px-3.5 font-semibold text-neutral-900 w-28 sm:w-36 align-top border-r border-neutral-200/60 shrink-0 whitespace-nowrap">
+                                      {row.title}
+                                    </td>
+                                    <td className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                      {row.value}
+                                    </td>
+                                  </>
+                                ) : (
+                                  <td colSpan={2} className="py-2 px-3 sm:px-3.5 text-neutral-600 align-top">
+                                    {row.value}
+                                  </td>
+                                )}
+                              </tr>
                             ))}
-                        </ul>
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
                 )}
-
-              {/* Specifications Accordion */}
-              {Array.isArray(product.specifications) && product.specifications.length > 0 && (
-                <div className="border-b border-neutral-200/80 pb-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleAccordion('specs')}
-                    className="w-full flex justify-between items-center text-xs sm:text-sm font-bold tracking-widest uppercase text-brand-dark hover:opacity-75 transition-opacity text-left cursor-pointer"
-                    aria-expanded={Boolean(openAccordions['specs'])}
-                  >
-                    <span>SPECIFICATIONS</span>
-                    {openAccordions['specs'] ? <Minus className="w-4 h-4 stroke-[2]" /> : <Plus className="w-4 h-4 stroke-[2]" />}
-                  </button>
-                  {openAccordions['specs'] && (
-                    <div className="mt-2 text-xs sm:text-sm text-neutral-600 font-sans leading-relaxed pr-2 space-y-1.5">
-                      {product.specifications.map((sp, idx) => (
-                        <div key={idx} className="flex items-center justify-between border-b border-neutral-100 pb-0.5">
-                          <span className="font-semibold text-neutral-700">{sp.label}:</span>
-                          <span className="text-neutral-600">{sp.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Care Instructions Accordion */}
               {(product.careInstructions || product.care_instructions) && (
@@ -1979,9 +2039,12 @@ export const ProductDetail = () => {
               {lightboxSelectedMedia === 'video' && productVideo ? (
                 <video
                   src={productVideo}
-                  controls
+                  ref={(el) => { if (el) { el.muted = true; el.defaultMuted = true; } }}
+                  muted
                   autoPlay
+                  loop
                   playsInline
+                  disablePictureInPicture
                   className="max-w-[85vw] max-h-[75vh] object-contain drop-shadow-2xl"
                 />
               ) : (

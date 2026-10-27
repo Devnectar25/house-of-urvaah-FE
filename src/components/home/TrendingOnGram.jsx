@@ -1,11 +1,16 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check, Volume2, VolumeX, Play, Pause, Maximize2, Minimize2, ExternalLink, Film } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { getSupabaseMediaUrl, getOptimizedImageUrl, isPersistentMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
+<<<<<<< HEAD
+=======
+import { startVisiblePolling } from '../../lib/livePolling';
+import { useModalScrollLock } from '../../hooks/useModalScrollLock';
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -315,8 +320,8 @@ const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEn
     }
   }, [isActive, isMobile, isVideo, isSectionInView]);
 
-  const handleVideoClick = () => {
-    window.open('https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
+  const handleCardClick = () => {
+    onOpenLook();
   };
 
   const handleShopLookClick = (e) => {
@@ -324,11 +329,16 @@ const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEn
     onOpenLook();
   };
 
+  const handleInstagramPillClick = (e) => {
+    e.stopPropagation();
+    window.open(item.link || 'https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div
-      onClick={handleVideoClick}
+      onClick={handleCardClick}
       className="group relative w-full aspect-[9/16] rounded-xl overflow-hidden bg-neutral-900 select-none transition-all duration-300 cursor-pointer hover:shadow-xl"
-      title="Click video to view on Instagram"
+      title="Click to view full video and shop the look"
     >
       {/* Mobile Top Progress Bar for Active Reel */}
       {isMobile && isVideo && isActive && (
@@ -395,10 +405,15 @@ const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEn
 
       {/* Top Bar Overlay: Brand Tag */}
       <div className="absolute top-3 left-3 z-10">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/60 transition-colors">
+        <button
+          type="button"
+          onClick={handleInstagramPillClick}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/60 transition-colors cursor-pointer"
+          title="Open in Instagram"
+        >
           <InstagramIcon />
           <span>{item.handle}</span>
-        </div>
+        </button>
       </div>
 
       {/* Bottom Editorial Content Scrim Overlay */}
@@ -413,7 +428,7 @@ const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEn
           <button
             type="button"
             onClick={handleShopLookClick}
-            className="inline-flex items-center gap-1 text-[10px] tracking-[0.2em] uppercase text-white/90 font-sans border-b border-white/40 hover:border-white transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-[10px] tracking-[0.2em] uppercase text-white font-sans border-b border-white hover:border-white transition-colors cursor-pointer font-medium"
           >
             SHOP THE LOOK
           </button>
@@ -423,51 +438,92 @@ const VideoCard = ({ item, isActive, isMobile, isSectionInView, onOpenLook, onEn
   );
 };
 
-// Shop The Look Modal (Matching the uploaded reference layout)
+// Shop The Look Modal (Full Video & Shoppable Look Experience)
 const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onNext }) => {
   const modalVideoRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(look.product.image);
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
   const [isAdded, setIsAdded] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [isFullVideoMode, setIsFullVideoMode] = useState(false);
+  const [mobileTab, setMobileTab] = useState('video'); // 'video' | 'product'
   const { addToCart, setPdpProduct, setIsCartOpen } = useCart();
+  const navigate = useNavigate();
+
+  const isVideo = isVideoMedia(look.media_type, look.src);
 
   useEffect(() => {
     setSelectedImage(look.product.image);
     setSelectedImgIndex(0);
-    if (modalVideoRef.current) {
-      modalVideoRef.current.muted = true;
-      modalVideoRef.current.defaultMuted = true;
+    setVideoProgress(0);
+    setMobileTab('video');
+    if (modalVideoRef.current && isVideo) {
+      modalVideoRef.current.muted = isMuted;
       modalVideoRef.current.currentTime = 0;
-      modalVideoRef.current.play().catch(() => { });
+      modalVideoRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
     }
-  }, [look]);
+  }, [look, isVideo]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowLeft') onPrev();
       if (e.key === 'ArrowRight') onNext();
+      if (e.key === ' ' && modalVideoRef.current && isVideo) {
+        e.preventDefault();
+        handleTogglePlay();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onPrev, onNext]);
+  }, [onClose, onPrev, onNext, isPlaying, isVideo]);
 
-  // Lock background body scroll while modal is open
+  // Lock the page behind the modal (shared lock: pins the body so it cannot scroll, also on iOS)
+  useModalScrollLock(true, onClose);
+
+  // Preload every gallery photo (same resized URLs the viewer uses) so the arrows switch instantly
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    const originalPaddingRight = document.body.style.paddingRight;
-    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const gallery = Array.isArray(look?.product?.gallery) ? look.product.gallery : [];
+    const preloaded = gallery.flatMap((img) => [900, 160].map((w) => {
+      const im = new Image();
+      im.decoding = 'async';
+      im.src = getOptimizedImageUrl(img, w);
+      return im;
+    }));
+    return () => { preloaded.forEach((im) => { im.src = ''; }); };
+  }, [look]);
 
-    document.body.style.overflow = 'hidden';
-    if (scrollBarWidth > 0) {
-      document.body.style.paddingRight = `${scrollBarWidth}px`;
+  const handleTogglePlay = (e) => {
+    if (e) e.stopPropagation();
+    if (!modalVideoRef.current) return;
+    if (isPlaying) {
+      modalVideoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      modalVideoRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
     }
+  };
 
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.paddingRight = originalPaddingRight;
-    };
-  }, []);
+  const handleToggleMute = (e) => {
+    if (e) e.stopPropagation();
+    if (!modalVideoRef.current) return;
+    const newMuted = !isMuted;
+    modalVideoRef.current.muted = newMuted;
+    setIsMuted(newMuted);
+  };
+
+  const handleTimeUpdate = (e) => {
+    const vid = e.currentTarget;
+    if (vid && vid.duration) {
+      setVideoProgress((vid.currentTime / vid.duration) * 100);
+    }
+  };
 
   const handleThumbnailClick = (img, index) => {
     setSelectedImage(img);
@@ -488,7 +544,8 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     setSelectedImage(gallery[nextIdx]);
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e) => {
+    if (e) e.stopPropagation();
     const sizeStock = look.product?.sizeStock || look.product?.size_stock || {};
     const sizes = Array.isArray(look.product?.sizes) && look.product.sizes.length > 0 ? look.product.sizes : ['XS', 'S', 'M', 'L', 'XL'];
     const sizeToUse = sizes.find(sz => {
@@ -503,41 +560,47 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
     }, 1500);
   };
 
-  const navigate = useNavigate();
-
   const handleMoreInfo = () => {
+<<<<<<< HEAD
     if (look.product) {
       navigate(getProductUrl(look.product));
       window.scrollTo({ top: 0, behavior: 'instant' });
+=======
+    if (look?.product) {
+      try {
+        sessionStorage.setItem('urvaah_home_last_section', 'trending');
+        sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+        sessionStorage.setItem('urvaah_home_should_restore', 'true');
+      } catch (err) {}
+      navigate(getProductUrl(look.product), {
+        state: { fromSection: 'trending', fromScrollY: window.scrollY || 0 }
+      });
+>>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
     }
     onClose();
   };
 
-  const handleOpenCart = () => {
-    setIsCartOpen(true);
-    onClose();
-  };
 
   const handleInstagramRedirect = (e) => {
-    e.stopPropagation();
-    window.open('https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
+    if (e) e.stopPropagation();
+    window.open(look.link || 'https://www.instagram.com/houseofurvaah/', '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 select-none overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 select-none overflow-hidden overscroll-none font-sans">
       {/* Darkened Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/80 backdrop-blur-md"
+        className="fixed inset-0 bg-black/85 backdrop-blur-md"
       />
 
       {/* Close Button on Top Right */}
       <button
         onClick={onClose}
-        className="fixed top-4 right-4 sm:top-6 sm:right-6 z-50 w-10 h-10 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-lg border border-neutral-700/50"
+        className="fixed top-3 right-3 sm:top-5 sm:right-5 z-50 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-lg border border-neutral-700/50"
         aria-label="Close modal"
       >
         <X className="w-5 h-5" />
@@ -549,7 +612,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
           e.stopPropagation();
           onPrev();
         }}
-        className="fixed left-2 sm:left-6 md:left-10 top-1/2 -translate-y-1/2 z-50 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xl border border-neutral-700/50"
+        className="fixed left-2 sm:left-4 md:left-8 top-1/2 -translate-y-1/2 z-50 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xl border border-neutral-700/50"
         aria-label="Previous look"
       >
         <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -561,7 +624,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
           e.stopPropagation();
           onNext();
         }}
-        className="fixed right-2 sm:right-6 md:right-10 top-1/2 -translate-y-1/2 z-50 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xl border border-neutral-700/50"
+        className="fixed right-2 sm:right-4 md:right-8 top-1/2 -translate-y-1/2 z-50 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white flex items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xl border border-neutral-700/50"
         aria-label="Next look"
       >
         <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -574,44 +637,111 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="relative z-40 w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-200/60 max-h-[92vh] md:h-[640px]"
+        className={`relative z-40 w-full ${
+          isFullVideoMode
+            ? 'max-w-md sm:max-w-lg md:max-w-xl h-[90vh] md:h-[720px]'
+            : 'max-w-4xl max-h-[94vh] md:h-[660px]'
+        } bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-200/60 transition-all duration-300`}
       >
-        {/* Left Side: Vertical Fashion Video or Photo (Redirects to Instagram on click) */}
+        {/* Mobile Tab Switcher (Visible only on mobile when not in full video mode) */}
+        {!isFullVideoMode && (
+          <div className="md:hidden flex items-center border-b border-neutral-200 bg-neutral-100 p-1 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileTab('video')}
+              className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                mobileTab === 'video'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>Full Video Reel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab('product')}
+              className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                mobileTab === 'product'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span>Shop Outfit</span>
+            </button>
+          </div>
+        )}
+
+        {/* Video Column (Visible on Desktop always, or on Mobile when mobileTab === 'video' or in full video mode) */}
         <div
-          onClick={handleInstagramRedirect}
-          className="relative w-full md:w-[48%] h-[320px] sm:h-[400px] md:h-full bg-neutral-950 flex-shrink-0 overflow-hidden cursor-pointer group"
-          title="Click to view on Instagram"
+          className={`relative ${
+            isFullVideoMode
+              ? 'w-full h-full'
+              : mobileTab === 'video'
+              ? 'w-full h-[62vh] sm:h-[68vh] md:w-[48%] md:h-full'
+              : 'hidden md:flex md:w-[48%] md:h-full'
+          } bg-neutral-950 flex-shrink-0 overflow-hidden flex items-center justify-center select-none group`}
         >
-          {isVideoMedia(look.media_type, look.src) ? (
-            <video
-              ref={(el) => {
-                modalVideoRef.current = el;
-                if (el) {
-                  el.muted = true;
-                  el.defaultMuted = true;
-                }
-              }}
-              key={look.src}
-              src={look.src}
-              autoPlay
-              muted
-              loop
-              playsInline
-              onError={(e) => {
-                console.warn('Modal video playback error:', look.src);
-              }}
-              onPlay={(e) => {
-                if (e.currentTarget) {
-                  e.currentTarget.muted = true;
-                }
-              }}
-              onLoadedMetadata={(e) => {
-                if (e.currentTarget) {
-                  e.currentTarget.muted = true;
-                }
-              }}
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-            />
+          {isVideo ? (
+            <>
+              {/* Ambient blurred backdrop video to seamlessly fill letterbox margins */}
+              <video
+                key={`blur-${look.src}`}
+                src={look.src}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110 pointer-events-none"
+              />
+
+              {/* Main Full Uncropped Video (object-contain ensures 100% of video is visible from top to bottom) */}
+              <video
+                ref={(el) => {
+                  modalVideoRef.current = el;
+                  if (el) {
+                    el.muted = isMuted;
+                  }
+                }}
+                key={look.src}
+                src={look.src}
+                autoPlay
+                muted={isMuted}
+                loop
+                playsInline
+                onClick={handleTogglePlay}
+                onTimeUpdate={handleTimeUpdate}
+                onError={() => console.warn('Modal video playback error:', look.src)}
+                className="relative z-10 w-full h-full object-contain cursor-pointer"
+                title="Click to play / pause video"
+              />
+
+              {/* Center Play Indicator when paused */}
+              <AnimatePresence>
+                {!isPlaying && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    onClick={handleTogglePlay}
+                    className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 backdrop-blur-[1px] cursor-pointer"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-white/90 text-neutral-950 flex items-center justify-center shadow-2xl pl-1 hover:scale-105 transition-transform">
+                      <Play className="w-7 h-7 fill-current" />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Video Timeline Progress Bar */}
+              <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20 z-30 overflow-hidden">
+                <div
+                  className="h-full bg-white transition-all duration-100 ease-linear"
+                  style={{ width: `${videoProgress}%` }}
+                />
+              </div>
+            </>
           ) : (
             <img
               key={look.src}
@@ -621,160 +751,177 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                 e.currentTarget.onerror = null;
                 e.currentTarget.src = '/assets/Images/Blue01.png';
               }}
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+              className="relative z-10 w-full h-full object-contain"
             />
           )}
 
-          {/* Reel Tag Badge */}
-          <div className="absolute top-3.5 left-3.5 z-30 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/95 text-[10px] tracking-wider uppercase font-sans hover:bg-black/70 transition-colors">
-            <InstagramIcon />
-            <span>{look.handle}</span>
+          {/* Top Left: Instagram Account Badge */}
+          <div className="absolute top-3.5 left-3.5 z-30">
+            <button
+              type="button"
+              onClick={handleInstagramRedirect}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white/95 text-[11px] tracking-wider uppercase font-sans hover:bg-black/80 transition-colors shadow-lg cursor-pointer border border-white/10"
+              title="Open profile on Instagram"
+            >
+              <InstagramIcon />
+              <span>{look.handle}</span>
+              <ExternalLink className="w-3 h-3 text-white/70 ml-0.5" />
+            </button>
           </div>
 
-          {/* Instagram Account Profile Pill (Matching Screenshot 2) */}
-          <div className="absolute bottom-4 left-4 z-30 inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white border border-white/10 shadow-lg hover:bg-black/80 transition-colors">
-            <img
-              src={getSupabaseMediaUrl('logo.png')}
-              alt="House of Urvaah"
-              className="w-6 h-6 rounded-full object-cover bg-white p-0.5"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = '/assets/logo.png';
+          {/* Top Right: Video Controls (Sound Toggle & Full Video Mode Toggle) */}
+          <div className="absolute top-3.5 right-3.5 z-30 flex items-center gap-2">
+            {/* Storefront videos always play muted, so there is no sound toggle */}
+            {/* Desktop Mode Toggle (Expand to Full Video Mode vs Split View) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFullVideoMode(!isFullVideoMode);
               }}
-            />
-            <div className="flex flex-col text-left leading-tight">
-              <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-white">
-                <span>houseofurvaah</span>
-                <svg className="w-3.5 h-3.5 text-blue-400 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.9 14.7l-3.8-3.8 1.4-1.4 2.4 2.4 6.4-6.4 1.4 1.4-7.8 7.8z" />
-                </svg>
-              </div>
-              <span className="text-[9px] text-neutral-300 font-normal">House of Urvaah</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Product Details & Shoppable Panel (Scrollable) */}
-        <div className="w-full md:w-[52%] flex flex-col h-full overflow-hidden bg-white text-neutral-900 font-sans">
-          {/* Scrollable Content Area */}
-          <div 
-            className="flex-1 overflow-y-auto no-scrollbar scrollbar-none p-5 sm:p-6 md:p-7 space-y-4"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {/* Main Product Image Viewer with Carousel Controls */}
-            <div className="relative w-full h-[230px] sm:h-[260px] md:h-[280px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
-              <img
-                src={getSupabaseMediaUrl(selectedImage)}
-                alt={look.product.name}
-                onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = selectedImage;
-                }}
-                className="w-full h-full object-contain object-center transition-all duration-300 p-1"
-              />
-
-              {look.product.gallery.length > 1 && (
-                <>
-                  <button
-                    onClick={handlePrevImg}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 hover:bg-white text-neutral-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleNextImg}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 hover:bg-white text-neutral-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  {/* Indicator dots */}
-                  <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
-                    {look.product.gallery.map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-1.5 rounded-full transition-all ${i === selectedImgIndex ? 'w-4 bg-neutral-800' : 'w-1.5 bg-neutral-400/60'
-                          }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Product Title & Formatted Price */}
-            <div>
-              <h3 className="font-serif text-base sm:text-lg md:text-xl font-normal tracking-[0.04em] uppercase text-neutral-900 leading-snug">
-                {look.product.name}
-              </h3>
-              <p className="text-sm sm:text-base font-semibold text-neutral-900 mt-1 font-sans">
-                {look.product.formattedPrice}
-              </p>
-            </div>
-
-            {/* Selected Product Section with Thumbnails */}
-            <div className="pt-2 border-t border-neutral-100">
-              <span className="text-[11px] font-semibold text-neutral-800 uppercase tracking-wider block mb-2 font-sans">
-                Selected Product
-              </span>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                {look.product.gallery.map((img, idx) => {
-                  const isSelected = selectedImage === img;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleThumbnailClick(img, idx)}
-                      className={`relative w-12 h-14 sm:w-14 sm:h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-100 transition-all cursor-pointer flex items-center justify-center ${isSelected
-                        ? 'border-2 border-black ring-2 ring-black/10'
-                        : 'border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100'
-                        }`}
-                    >
-                      <img
-                        src={getSupabaseMediaUrl(img)}
-                        alt={look.product.name}
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = img;
-                        }}
-                        className="w-full h-full object-cover object-center"
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-
-          </div>
-
-          {/* Sticky Action Buttons Bar at the Bottom */}
-          <div className="p-4 sm:px-6 md:px-7 bg-white border-t border-neutral-100 flex items-center gap-2 sm:gap-3 flex-shrink-0 z-10 shadow-xs">
-            {/* More info button */}
-            <button
-              type="button"
-              onClick={handleMoreInfo}
-              className="flex-1 py-2.5 px-3 border border-neutral-300 hover:border-black rounded-lg text-[11px] sm:text-xs tracking-wider uppercase font-semibold text-neutral-800 hover:text-black transition-colors text-center cursor-pointer"
+              className="hidden md:flex w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black/80 text-white items-center justify-center backdrop-blur-md transition-all shadow-lg cursor-pointer border border-white/15"
+              title={isFullVideoMode ? 'Switch to Split View (Video + Details)' : 'Expand to Full Video Mode'}
+              aria-label="Toggle full video mode"
             >
-              More info
-            </button>
-
-            {/* Add to Cart button */}
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              className="flex-[2] py-2.5 px-4 bg-neutral-950 hover:bg-black text-white rounded-lg text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              {isAdded ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Added</span>
-                </>
+              {isFullVideoMode ? (
+                <Minimize2 className="w-4 h-4 text-white/90" />
               ) : (
-                <span>Add to cart</span>
+                <Maximize2 className="w-4 h-4 text-white/90" />
               )}
             </button>
           </div>
         </div>
+
+        {/* Right Side: Product Details & Shoppable Panel (Visible on Desktop always, or on Mobile when mobileTab === 'product') */}
+        {!isFullVideoMode && (
+          <div
+            className={`w-full ${
+              mobileTab === 'product' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
+            } md:w-[52%] h-full overflow-hidden bg-white text-neutral-900 font-sans`}
+          >
+            {/* Scrollable Content Area */}
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain no-scrollbar scrollbar-none p-5 sm:p-6 md:p-7 space-y-4"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {/* Main Product Image Viewer with Carousel Controls */}
+              <div className="relative mx-auto h-[360px] sm:h-[400px] md:h-[420px] aspect-[3/4] max-w-full rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
+                <img
+                  src={getOptimizedImageUrl(selectedImage, 900)}
+                  alt={look.product.name}
+                  decoding="async"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = getSupabaseMediaUrl(selectedImage);
+                  }}
+                  className="w-full h-full object-contain object-center transition-all duration-300"
+                />
+
+                {look.product.gallery.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevImg}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 hover:bg-white text-neutral-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleNextImg}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 hover:bg-white text-neutral-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    {/* Indicator dots */}
+                    <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+                      {look.product.gallery.map((_, i) => (
+                        <span
+                          key={i}
+                          className={`h-1.5 rounded-full transition-all ${
+                            i === selectedImgIndex ? 'w-4 bg-neutral-800' : 'w-1.5 bg-neutral-400/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Product Title & Formatted Price */}
+              <div>
+                <h3 className="font-serif text-base sm:text-lg md:text-xl font-normal tracking-[0.04em] uppercase text-neutral-900 leading-snug">
+                  {look.product.name}
+                </h3>
+                <p className="text-sm sm:text-base font-semibold text-neutral-900 mt-1 font-sans">
+                  {look.product.formattedPrice}
+                </p>
+              </div>
+
+              {/* Selected Product Section with Thumbnails */}
+              <div className="pt-2 border-t border-neutral-100">
+                <span className="text-[11px] font-semibold text-neutral-800 uppercase tracking-wider block mb-2 font-sans">
+                  Selected Product
+                </span>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                  {look.product.gallery.map((img, idx) => {
+                    const isSelected = selectedImage === img;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleThumbnailClick(img, idx)}
+                        className={`relative w-12 h-14 sm:w-14 sm:h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-100 transition-all cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? 'border-2 border-black ring-2 ring-black/10'
+                            : 'border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={getOptimizedImageUrl(img, 160)}
+                          alt={look.product.name}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getSupabaseMediaUrl(img);
+                          }}
+                          className="w-full h-full object-cover object-center"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Sticky Action Buttons Bar at the Bottom */}
+            <div className="p-4 sm:px-6 md:px-7 bg-white border-t border-neutral-100 flex items-center gap-2 sm:gap-3 flex-shrink-0 z-10 shadow-xs">
+              {/* More info button */}
+              <button
+                type="button"
+                onClick={handleMoreInfo}
+                className="flex-1 py-2.5 px-3 border border-neutral-300 hover:border-black rounded-lg text-[11px] sm:text-xs tracking-wider uppercase font-semibold text-neutral-800 hover:text-black transition-colors text-center cursor-pointer"
+              >
+                More info
+              </button>
+
+              {/* Add to Cart button */}
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="flex-[2] py-2.5 px-4 bg-neutral-950 hover:bg-black text-white rounded-lg text-[11px] sm:text-xs tracking-wider uppercase font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                {isAdded ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Added</span>
+                  </>
+                ) : (
+                  <span>Add to cart</span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );
@@ -795,24 +942,26 @@ export const TrendingOnGram = () => {
           const finalSrc = rawImage.startsWith('http') || rawImage.startsWith('/') ? rawImage : getSupabaseMediaUrl(rawImage);
 
           const fallbackProduct = fallback.product;
-          const hasCustomProductImage = Boolean(item.product_image && String(item.product_image).trim());
+          const hasCustomProductImage = isPersistentMediaUrl(item.product_image);
           const finalProductImage = hasCustomProductImage ? String(item.product_image).trim() : fallbackProduct.image;
 
           // Parse dynamic product gallery
           let customGallery = [];
           if (Array.isArray(item.product_gallery) && item.product_gallery.length > 0) {
-            customGallery = item.product_gallery.filter(Boolean);
+            customGallery = item.product_gallery.filter(isPersistentMediaUrl);
           } else if (typeof item.product_gallery === 'string') {
             try {
               const parsed = JSON.parse(item.product_gallery);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                customGallery = parsed.filter(Boolean);
+                customGallery = parsed.filter(isPersistentMediaUrl);
               }
             } catch (_) {}
           }
 
           let finalGallery = fallbackProduct.gallery || [];
           if (customGallery.length > 0) {
+            // Main image first, then the rest of the gallery (main image is optional)
+            if (hasCustomProductImage && !customGallery.includes(finalProductImage)) customGallery = [finalProductImage, ...customGallery];
             finalGallery = customGallery;
           } else if (hasCustomProductImage) {
             finalGallery = [finalProductImage];
@@ -837,7 +986,7 @@ export const TrendingOnGram = () => {
             price: item.product_price
               ? (parseFloat(String(item.product_price).replace(/[^\d.]/g, '')) || fallbackProduct.price)
               : fallbackProduct.price,
-            image: finalProductImage,
+            image: hasCustomProductImage ? finalProductImage : (customGallery[0] || fallbackProduct.image),
             gallery: finalGallery
           };
 
@@ -866,12 +1015,12 @@ export const TrendingOnGram = () => {
     const handleUpdate = () => fetchTrendingGram();
     window.addEventListener('urvaah_trending_gram_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    const interval = setInterval(fetchTrendingGram, 3000);
+    const stopLivePolling = startVisiblePolling(fetchTrendingGram);
 
     return () => {
       window.removeEventListener('urvaah_trending_gram_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 

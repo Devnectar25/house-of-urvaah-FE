@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import apiClient, { getAuthToken, setAuthToken, getStoredUser, setStoredUser, clearAuthSession } from '../lib/apiClient';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
@@ -38,11 +38,19 @@ export const CartProvider = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [user, setUser] = useState(() => getStoredUser()); // formatted user object
+  // Email already entered elsewhere (e.g. home page sign-in form): the modal starts the OTP step with it
+  const [authPrefillEmail, setAuthPrefillEmail] = useState('');
+  // A stored profile only counts as signed in together with its API token; without the token every
+  // protected request (orders, returns, profile) would fail with "Not authorized".
+  const [user, setUser] = useState(() => {
+    if (getAuthToken()) return getStoredUser();
+    try { localStorage.removeItem('urvaah_user'); } catch (e) {}
+    return null;
+  }); // formatted user object
   const [token, setTokenState] = useState(() => getAuthToken());
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(() => {
-    return !getAuthToken() && !getStoredUser();
+    return !getAuthToken();
   });
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [pdpProduct, setPdpProduct] = useState(null);
@@ -91,7 +99,7 @@ export const CartProvider = ({ children }) => {
     if (userData.id === '1' || userData.username === '1' || String(userData.email || userData.emailid || '').includes('@urvaah.local')) {
       return null;
     }
-    const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Atelier Member';
+    const fullName = userData.fullName || userData.name || userData.fullname || userData.user_metadata?.full_name || userData.email?.split('@')[0] || 'Store Member';
     const firstName = fullName.trim().split(' ')[0] || fullName;
     return {
       id: userData.id || userData.userid || userData.username || 'user',
@@ -133,7 +141,7 @@ export const CartProvider = ({ children }) => {
           ...res.user,
           addresses: res.addresses || []
         });
-        if (formatted) {
+        if (formatted && getAuthToken()) {
           setUser(formatted);
           setStoredUser(formatted);
           if (formatted.bankDetails?.accountNumber) {
@@ -161,7 +169,7 @@ export const CartProvider = ({ children }) => {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
-      if (res.success && res.user) {
+      if (res.success && res.user && getAuthToken()) {
         const formatted = formatUserData({
           ...res.user,
           addresses: user?.addresses || []
@@ -199,11 +207,8 @@ export const CartProvider = ({ children }) => {
     } else {
       // Fallback: check Supabase session
       supabase.auth.getSession().then(({ data: { session } }) => {
+        // A Supabase session has no API token, so it cannot place orders or requests: stay signed out
         setSession(session);
-        if (session?.user) {
-          const formatted = formatUserData(session.user);
-          setUser(formatted);
-        }
         setAuthLoading(false);
       }).catch(() => {
         setAuthLoading(false);
@@ -213,10 +218,6 @@ export const CartProvider = ({ children }) => {
     // Listen for Supabase Auth changes as fallback
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user && !getAuthToken()) {
-        const formatted = formatUserData(session.user);
-        setUser(formatted);
-      }
       if (!getAuthToken()) {
         setAuthLoading(false);
       }
@@ -459,12 +460,20 @@ export const CartProvider = ({ children }) => {
       let hasChanges = false;
       const verifiedCart = await Promise.all(
         cartToCheck.map(async (item) => {
-          const rawId = item.product?.id || item.productId || item.id;
-          const cleanId = String(rawId).replace(/\D/g, '');
-          if (!cleanId) return item;
+          const rawId = String(item.product?.id || item.productId || item.id || '').trim();
+          if (!rawId) return item;
+          // The API resolves catalog aliases (e.g. 'bs-104', '104'); only fall back to the
+          // digits-only form if the raw id isn't found.
+          const numericId = rawId.replace(/\D/g, '');
 
           try {
-            const res = await apiClient(`/api/products/${cleanId}`);
+            let res = await apiClient(`/api/products/${encodeURIComponent(rawId)}`).catch(() => null);
+            if ((!res || !res.success || !res.data) && numericId && numericId !== rawId) {
+              res = await apiClient(`/api/products/${numericId}`).catch(() => null);
+            }
+            if (!res || !res.success || !res.data) {
+              console.warn(`[CartContext] Live stock check failed for cart item "${rawId}"`);
+            }
             if (res && res.success && res.data) {
               const prod = res.data;
               const liveStock = Number(
@@ -540,6 +549,20 @@ export const CartProvider = ({ children }) => {
       syncLiveStock();
     }
   }, [isCartOpen, syncLiveStock]);
+
+  // Also re-validate a cached bag on page load and when the tab regains focus, so items that
+  // went out of stock while the bag sat in localStorage are flagged even before the drawer opens.
+  const syncLiveStockRef = useRef(syncLiveStock);
+  syncLiveStockRef.current = syncLiveStock;
+  const cartItemIdsKey = cart.map((it) => `${it.product?.id}:${it.selectedSize}`).join('|');
+  useEffect(() => {
+    if (cartItemIdsKey) syncLiveStockRef.current();
+  }, [cartItemIdsKey]);
+  useEffect(() => {
+    const handleFocus = () => syncLiveStockRef.current();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -669,7 +692,8 @@ export const CartProvider = ({ children }) => {
     } catch (err) {}
   };
 
-  const openAuthModal = (mode = 'login') => {
+  const openAuthModal = (mode = 'login', options = {}) => {
+    setAuthPrefillEmail(typeof options?.email === 'string' ? options.email.trim() : '');
     setAuthMode(mode);
     setIsAuthModalOpen(true);
   };
@@ -724,12 +748,15 @@ export const CartProvider = ({ children }) => {
       let updated;
       if (existingIndex > -1) {
         const existing = prevCart[existingIndex];
-        if (existing.quantity >= availableStock) {
+        const qtyToAdd = options.quantity || 1;
+        // options.setQuantity: set the line to exactly this quantity (idempotent, e.g. Reorder)
+        // instead of adding on top of what's already in the bag
+        const newQty = options.setQuantity
+          ? Math.min(qtyToAdd, availableStock)
+          : Math.min(existing.quantity + qtyToAdd, availableStock);
+        if (newQty === existing.quantity) {
           return prevCart;
         }
-
-        const qtyToAdd = options.quantity || 1;
-        const newQty = Math.min(existing.quantity + qtyToAdd, availableStock);
 
         updated = [...prevCart];
         updated[existingIndex] = {
@@ -777,7 +804,7 @@ export const CartProvider = ({ children }) => {
         try {
           await apiClient('/api/cart/add', {
             method: 'POST',
-            body: JSON.stringify({ userId, productId: numericId, quantity: options.quantity || 1, size: sizeToUse })
+            body: JSON.stringify({ userId, productId: numericId, quantity: options.quantity || 1, size: sizeToUse, setMode: Boolean(options.setQuantity) })
           });
         } catch (err) {
           console.warn('Cart add API sync warning:', err.message);
@@ -998,6 +1025,7 @@ export const CartProvider = ({ children }) => {
         setIsAuthModalOpen,
         authMode,
         setAuthMode,
+        authPrefillEmail,
         openAuthModal,
         setPendingAction,
         user,

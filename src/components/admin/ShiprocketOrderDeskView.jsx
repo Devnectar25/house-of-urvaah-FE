@@ -27,8 +27,10 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
+import { subscribeToOrderUpdates } from '../../lib/orderSync';
 import { shippingApi } from '../../services/shippingApi';
 import { OrderDetailModal } from './OrderDetailModal';
+import { getOrderGstInfo } from '../../utils/gstHelper';
 
 export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = false }) => {
   // State: Orders & Filters
@@ -55,23 +57,48 @@ export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = fal
   const [internalDetailOpen, setInternalDetailOpen] = useState(false);
 
   // Fetch Forward Orders from API
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // `silent` refreshes (live sync / polling) keep the current table on screen instead of the loading state
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
-      const res = await apiClient('/api/orders?limit=500').catch(() => ({ data: [] }));
+      const res = await apiClient('/api/orders?limit=500');
       const orderList = Array.isArray(res?.data) ? res.data : (res?.orders || []);
       setOrders(orderList);
+      if (silent) setError(null);
     } catch (err) {
       console.error('Failed to load orders for Shiprocket Order Desk:', err);
-      setError(err.message || 'Failed to load orders.');
+      // A failed background poll shouldn't wipe a table that's already showing
+      if (!silent) setError(err.message || 'Failed to load orders.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchOrders();
+  }, [fetchOrders]);
+
+  // Live updates without manual refresh: order change events (same tab, other tabs, Supabase CDC),
+  // window focus, and a periodic background poll — same strategy as the Store Orders tab.
+  useEffect(() => {
+    const unsubscribe = subscribeToOrderUpdates((payload) => {
+      if (!payload || (!payload.id && !payload.order_number)) return;
+      fetchOrders(true);
+    });
+    const handleFocus = () => fetchOrders(true);
+    window.addEventListener('focus', handleFocus);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchOrders(true);
+    }, 8000);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
   }, [fetchOrders]);
 
   // Run Serviceability Check for Inspector Widget
@@ -334,7 +361,7 @@ export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = fal
 
             <button
               type="button"
-              onClick={fetchOrders}
+              onClick={() => fetchOrders()}
               className="p-1.5 border border-neutral-200 rounded-xl hover:bg-neutral-100 text-neutral-600 transition-colors"
               title="Refresh Orders"
             >
@@ -435,7 +462,7 @@ export const ShiprocketOrderDeskView = ({ onSelectOrder = null, showHeader = fal
 
                       {/* Amount */}
                       <td className="py-3 px-3 font-bold text-neutral-900">
-                        ₹{Number(ord.total || ord.subtotal || 0).toLocaleString('en-IN')}
+                        ₹{Number(getOrderGstInfo(ord).total || ord.total || 0).toLocaleString('en-IN')}
                       </td>
 
                       {/* Actions */}

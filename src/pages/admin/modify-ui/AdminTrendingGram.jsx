@@ -32,6 +32,7 @@ import { apiClient, getAdminAuthToken } from '../../../lib/apiClient';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { getSupabaseMediaUrl } from '../../../lib/supabase';
 import { useModalScrollLock } from '../../../hooks/useModalScrollLock';
+import { uploadVideoDirect } from '../../../lib/directVideoUpload';
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -302,27 +303,32 @@ export const AdminTrendingGram = () => {
 
     setUploadingFile(true);
     try {
-      const uploadData = new FormData();
-      uploadData.append(isVideo ? 'video' : 'file', file);
-      if (!isVideo) uploadData.append('folder', 'trending');
+      let uploadedUrl;
+      if (isVideo) {
+        uploadedUrl = await uploadVideoDirect(file, 'trending/videos');
+      } else {
+        const uploadData = new FormData();
+        uploadData.append(isVideo ? 'video' : 'file', file);
+        if (!isVideo) uploadData.append('folder', 'trending');
 
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
-      const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
+        const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
+        const token = getAdminAuthToken() || localStorage.getItem('urvaah_admin_token') || localStorage.getItem('urvaah_token');
+        const endpoint = isVideo ? `${API_BASE}/api/upload/upload-video` : `${API_BASE}/api/upload/upload-image`;
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: uploadData
+        });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Upload failed');
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Upload failed');
+        }
+
+        uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
+        if (!uploadedUrl) throw new Error('No media URL returned by server');
       }
-
-      const uploadedUrl = data.url || data.videoUrl || data.filePath || data.data?.url;
-      if (!uploadedUrl) throw new Error('No media URL returned by server');
 
       setFormData((prev) => ({
         ...prev,
@@ -408,6 +414,11 @@ export const AdminTrendingGram = () => {
     } catch (err) {
       console.error('Product image upload error:', err);
       setProductUploadError(err.message || 'Upload failed');
+      // Upload failed: drop the temporary preview so it can't be saved
+      setFormData((prev) => {
+        const gallery = (Array.isArray(prev.product_gallery) ? prev.product_gallery : []).filter((img) => img !== localBlobUrl);
+        return { ...prev, product_gallery: gallery, product_image: prev.product_image === localBlobUrl ? (gallery[0] || '') : prev.product_image };
+      });
     } finally {
       setUploadingProductFile(false);
       e.target.value = '';
@@ -514,6 +525,10 @@ export const AdminTrendingGram = () => {
     } catch (err) {
       console.error(err);
       showToast('error', err.message || 'Upload failed');
+      setFormData((prev) => {
+        const gallery = (Array.isArray(prev.product_gallery) ? prev.product_gallery : []).filter((img) => img !== localBlobUrl);
+        return { ...prev, product_gallery: gallery, product_image: prev.product_image === localBlobUrl ? (gallery[0] || '') : prev.product_image };
+      });
     } finally {
       setUploadingProductFile(false);
       e.target.value = '';
@@ -541,13 +556,29 @@ export const AdminTrendingGram = () => {
       setUploadError('Post media (video or image) is required.');
       return;
     }
+    if (uploadingFile || uploadingProductFile) {
+      setUploadError('Please wait for the upload to finish before saving.');
+      return;
+    }
+    // blob: links are temporary previews that exist only in this browser tab: never save them
+    const isBlob = (v) => typeof v === 'string' && v.trim().toLowerCase().startsWith('blob:');
+    if (isBlob(formData.image)) {
+      setUploadError('The post media did not finish uploading. Please upload it again.');
+      return;
+    }
+    const cleanGallery = (Array.isArray(formData.product_gallery) ? formData.product_gallery : []).filter((g) => g && !isBlob(g));
+    const payload = {
+      ...formData,
+      product_gallery: cleanGallery,
+      product_image: isBlob(formData.product_image) ? (cleanGallery[0] || '') : formData.product_image
+    };
 
     setSaving(true);
     try {
       if (editingPost) {
         const res = await apiClient(`/api/ui/admin/trending-gram/${editingPost.id}`, {
           method: 'PUT',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
         if (!res?.success) throw new Error(res?.message || 'Update failed');
         showToast('success', 'Post updated successfully!');
@@ -555,7 +586,7 @@ export const AdminTrendingGram = () => {
         const res = await apiClient('/api/ui/admin/trending-gram', {
           method: 'POST',
           body: JSON.stringify({
-            ...formData,
+            ...payload,
             display_order: posts.length + 1
           })
         });

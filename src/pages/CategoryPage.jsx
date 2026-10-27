@@ -14,29 +14,17 @@ import { SEOHead } from '../components/common/SEOHead';
 import { ProductCard } from '../components/common/ProductCard';
 import { productApi } from '../services/productApi';
 import { apiClient } from '../lib/apiClient';
+import { isNewArrival, compareNewestFirst } from '../utils/newArrival';
+import { OCCASION_OPTIONS, FABRIC_OPTIONS, productHasOccasion, productHasFabric, productIsWearTwoWays } from '../constants/productFilters';
 
 // Canonical collection definitions
 const CANONICAL_COLLECTIONS = [
-  { slug: 'all', path: '/category/all', label: 'ALL' },
-  { slug: 'new-arrivals', path: '/new-arrivals', label: 'NEW ARRIVALS' },
+  { slug: 'all', path: '/category/all', label: 'ALL', alwaysShow: true },
+  { slug: 'new-arrivals', path: '/new-arrivals', label: 'NEW ARRIVALS', alwaysShow: true },
   { slug: 'co-ord-sets', path: '/co-ord-sets', label: 'CO-ORD SETS' },
   { slug: 'festive-wear', path: '/festive-wear', label: 'FESTIVE WEAR' },
   { slug: 'kurtis-and-dresses', path: '/kurtis-and-dresses', label: 'KURTIS AND DRESSES' },
   { slug: 'corset-tops', path: '/corset-tops', label: 'CORSET TOPS', minProducts: 2 }
-];
-
-// Occasion filter options specified in task requirements
-const OCCASION_OPTIONS = [
-  'Beach and Vacation',
-  'Night Out',
-  'College and Office',
-  'Festive and Wedding'
-];
-
-// Fabric filter options specified in task requirements
-const FABRIC_OPTIONS = [
-  'Cora Cotton',
-  'Tissue Silk'
 ];
 
 // Match product against collection slug
@@ -45,8 +33,9 @@ const productMatchesCategory = (product, slug) => {
   const norm = slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
 
   // New Arrivals contains all 6 current products eligible for storefront display
+  // New Arrivals: products added in the last 3 months, or set to "Always show" by the admin
   if (norm === 'new-arrivals' || norm === 'new-in') {
-    return true;
+    return isNewArrival(product);
   }
 
   const pCats = Array.isArray(product.categories) ? product.categories : [];
@@ -57,6 +46,17 @@ const productMatchesCategory = (product, slug) => {
   const pTitle = (product.name || product.title || '').toLowerCase();
   const pCatName = (product.category || '').toLowerCase().trim();
 
+  // Products the admin has categorised are matched on their categories only; guessing from the
+  // name ("Ivory Heart Corset Kurti" contains "corset") would put them in the wrong collection
+  const hasCategories = normalizedCats.length > 0 || Boolean(pCatName);
+  const catText = [pCatName, ...normalizedCats].join(' ');
+  if (hasCategories) {
+    if (norm === 'co-ord-sets' || norm === 'co-ord-set') return /co-?ord/.test(catText);
+    if (norm === 'festive-wear' || norm === 'ethnic-wear') return /festive|ethnic/.test(catText);
+    if (norm === 'kurtis-and-dresses' || norm === 'kurti' || norm === 'dresses') return /kurti|dress/.test(catText);
+    if (norm === 'corset-tops' || norm === 'corset') return /corset/.test(catText);
+  }
+
   if (norm === 'co-ord-sets' || norm === 'co-ord-set') {
     if (normalizedCats.some((c) => c.includes('co-ord'))) return true;
     return pTitle.includes('co-ord') || pTitle.includes('coord') || pCatName.includes('co-ord');
@@ -66,7 +66,6 @@ const productMatchesCategory = (product, slug) => {
     if (normalizedCats.some((c) => c.includes('festive') || c.includes('ethnic'))) return true;
     return (
       pTitle.includes('gharara') ||
-      pTitle.includes('corset') ||
       pCatName.includes('festive') ||
       pCatName.includes('ethnic')
     );
@@ -172,7 +171,7 @@ export const CategoryPage = ({ defaultCategory }) => {
   // Format collection title
   const categoryTitle = useMemo(() => {
     const norm = currentSlug.replace(/[^a-z0-9]+/g, '-');
-    if (norm === 'all') return 'ALL ATELIER PIECES';
+    if (norm === 'all') return 'ALL STORE PIECES';
     if (norm === 'new-arrivals') return 'NEW ARRIVALS';
     if (norm === 'co-ord-sets') return 'CO-ORD SETS';
     if (norm === 'festive-wear' || norm === 'ethnic-wear') return 'FESTIVE WEAR';
@@ -196,10 +195,18 @@ export const CategoryPage = ({ defaultCategory }) => {
 
   // Dynamically compute all collection pills: Canonical + dynamically created active categories
   const collectionPills = useMemo(() => {
-    const list = [...CANONICAL_COLLECTIONS];
+    const isActiveCat = (cat) => cat && cat.active !== false && cat.is_active !== false;
+    const slugOf = (cat) => (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+    const activeSlugs = categories.filter(isActiveCat).map(slugOf).filter(Boolean);
+    const matchesActive = (slug) => activeSlugs.some((s) => s === slug || s.includes(slug) || slug.includes(s));
+
+    // A collection whose category the admin deactivated is hidden (kept while categories are still loading)
+    const list = categories.length
+      ? CANONICAL_COLLECTIONS.filter((c) => c.alwaysShow || matchesActive(c.slug))
+      : [...CANONICAL_COLLECTIONS];
 
     categories.forEach((cat) => {
-      if (!cat || cat.active === false || cat.is_active === false) return;
+      if (!isActiveCat(cat)) return;
       const rawSlug = (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
       // Check if this category is already represented in CANONICAL_COLLECTIONS
       const alreadyIncluded = list.some(
@@ -226,8 +233,8 @@ export const CategoryPage = ({ defaultCategory }) => {
   // Dynamically extract available sizes from collection products
   const availableSizes = useMemo(() => {
     const sizeSet = new Set();
-    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'ONE SIZE'];
-    collectionProducts.forEach((p) => {
+    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'ONE SIZE', 'FREE SIZE'];
+    products.forEach((p) => {
       const sizes = Array.isArray(p.sizes) ? p.sizes : typeof p.sizes === 'string' ? [p.sizes] : [];
       sizes.forEach((s) => {
         if (s && typeof s === 'string') sizeSet.add(s.trim().toUpperCase());
@@ -241,44 +248,62 @@ export const CategoryPage = ({ defaultCategory }) => {
       if (idxB !== -1) return 1;
       return a.localeCompare(b);
     });
-  }, [collectionProducts]);
+  }, [products]);
+
+  // Fabric options = the fabrics of the home page "Fabric Edit" (admin: Modify UI > Fabric Video)
+  const [fabricEdit, setFabricEdit] = useState([]);
+  useEffect(() => {
+    let active = true;
+    apiClient('/api/ui/fabric-video')
+      .then((res) => {
+        const vids = Array.isArray(res?.data?.videos) ? res.data.videos : [];
+        const list = vids
+          .map((v) => {
+            const tag = String(v.tag || v.title || '').trim();
+            const slug = String(v.slug || v.fabric_slug || tag).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const label = tag.toLowerCase().replace(/(^|\s)\w/g, (c) => c.toUpperCase());
+            return tag && slug ? { label, slug } : null;
+          })
+          .filter(Boolean);
+        if (active) setFabricEdit(list);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const availableFabrics = useMemo(() => fabricEdit.map((f) => f.label), [fabricEdit]);
+  // A product belongs to a Fabric Edit fabric when it is linked to it (Fabric Video > Related Products)
+  const productInFabric = (p, label) => {
+    const f = fabricEdit.find((x) => x.label === label);
+    if (!f) return false;
+    const pSlug = String(p.fabric_slug || p.fabricSlug || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return pSlug === f.slug;
+  };
+
+  // Options with no product in the current collection are shown but disabled
+  const optionHasProducts = (key, opt) => collectionProducts.some((p) => {
+    if (key === 'fabric') return productInFabric(p, opt);
+    const sizes = Array.isArray(p.sizes) ? p.sizes : typeof p.sizes === 'string' ? [p.sizes] : [];
+    return sizes.some((sz) => String(sz).trim().toUpperCase() === opt);
+  });
+
 
   // Multi-facet filtering logic (AND combination across facets; OR within multi-select facets)
   const filteredProducts = useMemo(() => {
     return collectionProducts.filter((p) => {
       // 1. Occasion Filter
       if (selectedOccasions.length > 0) {
-        const pOccasion = (p.occasion || '').toLowerCase().trim();
-        const matchesOccasion = selectedOccasions.some((occ) => {
-          const occLower = occ.toLowerCase();
-          return pOccasion.includes(occLower) || occLower.includes(pOccasion);
-        });
+        const matchesOccasion = selectedOccasions.some((occ) => productHasOccasion(p, occ));
         if (!matchesOccasion) return false;
       }
 
       // 2. Wear It Two Ways Tag Filter
       if (isWearItTwoWays) {
-        const pTags = Array.isArray(p.tags) ? p.tags : [];
-        const hasTag =
-          pTags.some((t) => t.toLowerCase().includes('two ways')) ||
-          (typeof p.tag === 'string' && p.tag.toLowerCase().includes('two ways')) ||
-          (p.description && p.description.toLowerCase().includes('wear it two ways'));
-        if (!hasTag) return false;
+        if (!productIsWearTwoWays(p)) return false;
       }
 
       // 3. Fabric Filter
       if (selectedFabrics.length > 0) {
-        const pFabric = (p.fabric || '').toLowerCase();
-        const pDesc = (p.description || '').toLowerCase();
-        const pAddInfo = (p.additional_info || p.additionalInfo || '').toLowerCase();
-        const matchesFabric = selectedFabrics.some((fab) => {
-          const fabLower = fab.toLowerCase();
-          return (
-            pFabric.includes(fabLower) ||
-            pDesc.includes(fabLower) ||
-            pAddInfo.includes(fabLower)
-          );
-        });
+        const matchesFabric = selectedFabrics.some((fab) => productInFabric(p, fab));
         if (!matchesFabric) return false;
       }
 
@@ -298,10 +323,14 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedOccasions,
     isWearItTwoWays,
     selectedFabrics,
-    selectedSizes
+    selectedSizes,
+    fabricEdit
   ]);
 
-  const sortedProducts = filteredProducts;
+  // New Arrivals list the newest product first
+  const sortedProducts = (currentSlug === 'new-arrivals' || currentSlug === 'new-in')
+    ? [...filteredProducts].sort(compareNewestFirst)
+    : filteredProducts;
 
   // Reset all active filters
   const handleResetFilters = () => {
@@ -317,28 +346,29 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedFabrics.length > 0 ||
     selectedSizes.length > 0;
 
-  const toggleOccasion = (occ) => {
-    setSelectedOccasions((prev) =>
-      prev.includes(occ) ? prev.filter((o) => o !== occ) : [...prev, occ]
-    );
+  // Single-choice filtering: selecting any option replaces whatever filter was active before;
+  // clicking the active option again clears it
+  const selectOnly = (kind, value) => {
+    const isActive =
+      (kind === 'occasion' && selectedOccasions.includes(value)) ||
+      (kind === 'fabric' && selectedFabrics.includes(value)) ||
+      (kind === 'size' && selectedSizes.includes(value)) ||
+      (kind === 'twoWays' && isWearItTwoWays);
+    setSelectedOccasions(!isActive && kind === 'occasion' ? [value] : []);
+    setSelectedFabrics(!isActive && kind === 'fabric' ? [value] : []);
+    setSelectedSizes(!isActive && kind === 'size' ? [value] : []);
+    setIsWearItTwoWays(!isActive && kind === 'twoWays');
   };
 
-  const toggleFabric = (fab) => {
-    setSelectedFabrics((prev) =>
-      prev.includes(fab) ? prev.filter((f) => f !== fab) : [...prev, fab]
-    );
-  };
-
-  const toggleSize = (sz) => {
-    setSelectedSizes((prev) =>
-      prev.includes(sz) ? prev.filter((s) => s !== sz) : [...prev, sz]
-    );
-  };
+  const toggleOccasion = (occ) => selectOnly('occasion', occ);
+  const toggleFabric = (fab) => selectOnly('fabric', fab);
+  const toggleSize = (sz) => selectOnly('size', sz);
+  const toggleWearItTwoWays = () => selectOnly('twoWays', true);
 
   return (
     <main className="w-full min-h-screen bg-white font-serif select-none pt-24 sm:pt-28 md:pt-32 pb-20">
       <SEOHead
-        title={`${categoryTitle} Collection | House of Urvaah Atelier`}
+        title={`${categoryTitle} Collection | House of Urvaah`}
         description={`Explore the ${categoryTitle} collection at House of Urvaah. Handcrafted festive ensembles, minimalist co-ord sets, and contemporary women's designer apparel.`}
         keywords={`House of Urvaah, ${categoryTitle}, luxury clothing, designer fashion`}
       />
@@ -348,7 +378,7 @@ export const CategoryPage = ({ defaultCategory }) => {
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase font-sans">
-              ATELIER EDIT
+              STORE EDIT
             </span>
             <span className="text-neutral-300">•</span>
             <span className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase font-sans">
@@ -387,63 +417,54 @@ export const CategoryPage = ({ defaultCategory }) => {
           </div>
         </div>
 
-        {/* Unified Filter Toolbar & Facet Panel Container */}
-        <div className="border border-neutral-200 bg-white mb-4">
+        {/* Filter Toolbar & Panel (compact) */}
+        <div className="mb-5 border-y border-neutral-200 font-sans">
           {/* Top Row Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-neutral-50/80">
+          <div className="flex flex-wrap items-center justify-between gap-2 py-2">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Filter Toggle Button */}
               <button
                 type="button"
                 onClick={() => setIsFilterPanelOpen((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] tracking-wider uppercase transition-all border cursor-pointer select-none ${
+                aria-expanded={isFilterPanelOpen}
+                className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors border cursor-pointer select-none ${
                   isFilterPanelOpen || hasActiveFilters
-                    ? 'bg-black text-white border-black font-semibold'
+                    ? 'bg-black text-white border-black'
                     : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
                 }`}
               >
                 <SlidersHorizontal className="w-3 h-3 stroke-[1.75]" />
-                <span>Filters</span>
-                {hasActiveFilters && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                )}
-                <ChevronDown
-                  className={`w-3 h-3 transition-transform duration-200 ${
-                    isFilterPanelOpen ? 'rotate-180' : ''
-                  }`}
-                />
+                <span>Filter</span>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Quick Wear It Two Ways Toggle Pill */}
               <button
                 type="button"
-                onClick={() => setIsWearItTwoWays((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] tracking-wider uppercase transition-all border cursor-pointer select-none ${
+                onClick={toggleWearItTwoWays}
+                aria-pressed={isWearItTwoWays}
+                className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors border cursor-pointer select-none ${
                   isWearItTwoWays
-                    ? 'bg-black text-white border-black font-semibold shadow-2xs'
+                    ? 'bg-black text-white border-black'
                     : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
                 }`}
               >
-                <Sparkles className="w-3 h-3 text-amber-400" />
                 <span>Wear it 2 ways</span>
-                {isWearItTwoWays && <Check className="w-2.5 h-2.5 text-white stroke-[2.5]" />}
+                {isWearItTwoWays && <Check className="w-3 h-3 stroke-[2.5]" />}
               </button>
             </div>
 
-            {/* Clear All Filters Button (if active) */}
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 h-7 px-2 text-[11px] text-neutral-500 hover:text-black uppercase tracking-wider transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 h-7 text-[10px] font-semibold text-neutral-500 hover:text-black uppercase tracking-[0.14em] transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-2.5 h-2.5" />
-                <span>Reset All</span>
+                <X className="w-3 h-3" />
+                <span>Clear</span>
               </button>
             )}
           </div>
 
-          {/* Collapsible Filter Facet Panel (Directly Attached) */}
+          {/* Collapsible panel: Fabric and Size on one compact row */}
           <AnimatePresence>
             {isFilterPanelOpen && (
               <motion.div
@@ -451,132 +472,43 @@ export const CategoryPage = ({ defaultCategory }) => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="overflow-hidden border-t border-neutral-200 bg-white px-3 sm:px-4 py-2.5 font-sans"
+                className="overflow-hidden"
               >
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-6 max-w-4xl">
-                  {/* 1. Occasion Filter (Shown in Two Parts) */}
-                  <div className="md:col-span-6">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Occasion
-                    </h4>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                      {/* Part 1 */}
-                      <div className="space-y-1">
-                        {OCCASION_OPTIONS.slice(0, 2).map((occ) => {
-                          const isSelected = selectedOccasions.includes(occ);
-                          return (
-                            <label
-                              key={occ}
-                              onClick={() => toggleOccasion(occ)}
-                              className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
-                            >
-                              <div
-                                className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
-                                  isSelected
-                                    ? 'bg-black border-black text-white'
-                                    : 'bg-white border-neutral-400 hover:border-black'
-                                }`}
-                              >
-                                {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                              </div>
-                              <span className={isSelected ? 'font-semibold text-black' : ''}>
-                                {occ}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      {/* Part 2 */}
-                      <div className="space-y-1">
-                        {OCCASION_OPTIONS.slice(2).map((occ) => {
-                          const isSelected = selectedOccasions.includes(occ);
-                          return (
-                            <label
-                              key={occ}
-                              onClick={() => toggleOccasion(occ)}
-                              className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
-                            >
-                              <div
-                                className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
-                                  isSelected
-                                    ? 'bg-black border-black text-white'
-                                    : 'bg-white border-neutral-400 hover:border-black'
-                                }`}
-                              >
-                                {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                              </div>
-                              <span className={isSelected ? 'font-semibold text-black' : ''}>
-                                {occ}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Fabric Filter */}
-                  <div className="md:col-span-3">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Fabric
-                    </h4>
-                    <div className="space-y-1">
-                      {FABRIC_OPTIONS.map((fab) => {
-                        const isSelected = selectedFabrics.includes(fab);
+                <div className="flex flex-wrap gap-x-8 gap-y-3 pt-1 pb-3">
+                  {[
+                    { key: 'size', label: 'Size', options: availableSizes, isSelected: (o) => selectedSizes.includes(o), onPick: toggleSize }
+                  ].filter((g) => g.options.length > 0).map((group) => (
+                    <div key={group.key} className="flex flex-wrap items-center gap-1.5">
+                      <span className="mr-1 text-[10px] font-semibold tracking-[0.18em] uppercase text-neutral-400">
+                        {group.label}
+                      </span>
+                      {group.options.map((opt) => {
+                        const isSelected = group.isSelected(opt);
+                        const isEmpty = !isSelected && !optionHasProducts(group.key, opt);
                         return (
-                          <label
-                            key={fab}
-                            onClick={() => toggleFabric(fab)}
-                            className="flex items-center gap-1.5 text-[11px] text-neutral-700 hover:text-black cursor-pointer select-none py-0.5"
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => group.onPick(opt)}
+                            disabled={isEmpty}
+                            title={isEmpty ? 'Not available in this collection' : undefined}
+                            aria-pressed={isSelected}
+                            className={`h-7 rounded-full border text-[11px] transition-colors select-none ${
+                              group.key === 'size' ? 'min-w-[32px] px-2 font-semibold' : 'px-3'
+                            } ${
+                              isSelected
+                                ? 'bg-black text-white border-black cursor-pointer'
+                                : isEmpty
+                                ? 'bg-white text-neutral-300 border-neutral-200 cursor-not-allowed line-through decoration-neutral-300'
+                                : 'bg-white text-neutral-700 border-neutral-300 hover:border-black cursor-pointer'
+                            }`}
                           >
-                            <div
-                              className={`w-3 h-3 rounded-xs border flex items-center justify-center transition-colors flex-shrink-0 ${
-                                isSelected
-                                  ? 'bg-black border-black text-white'
-                                  : 'bg-white border-neutral-400 hover:border-black'
-                              }`}
-                            >
-                              {isSelected && <Check className="w-2 h-2 stroke-[2.5]" />}
-                            </div>
-                            <span className={isSelected ? 'font-semibold text-black' : ''}>
-                              {fab}
-                            </span>
-                          </label>
+                            {opt}
+                          </button>
                         );
                       })}
                     </div>
-                  </div>
-
-                  {/* 3. Available Sizes */}
-                  <div className="md:col-span-3">
-                    <h4 className="text-[9px] font-semibold tracking-[0.2em] uppercase text-black pb-1 border-b border-neutral-200 mb-2">
-                      Available Sizes
-                    </h4>
-                    {availableSizes.length === 0 ? (
-                      <p className="text-[11px] text-neutral-400 italic">No size variants</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {availableSizes.map((sz) => {
-                          const isSelected = selectedSizes.includes(sz);
-                          return (
-                            <button
-                              key={sz}
-                              type="button"
-                              onClick={() => toggleSize(sz)}
-                              className={`min-w-[28px] h-6 px-1.5 text-[11px] font-mono font-medium tracking-wider uppercase border transition-all cursor-pointer flex items-center justify-center ${
-                                isSelected
-                                  ? 'bg-black text-white border-black font-bold'
-                                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-black'
-                              }`}
-                            >
-                              {sz}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
               </motion.div>
             )}

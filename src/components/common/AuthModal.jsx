@@ -19,6 +19,7 @@ export const AuthModal = () => {
     user,
     loginUser,
     logoutUser,
+    authPrefillEmail,
   } = useCart();
 
   // Lock background screen scroll while Auth Modal is open and handle ESC key close
@@ -72,8 +73,13 @@ export const AuthModal = () => {
       setOtpDigits(['', '', '', '', '', '']);
       setResendCountdown(60);
       setCanResend(false);
+      // Email already entered on the page: use it and send the code straight away
+      if (authPrefillEmail) {
+        setEmail(authPrefillEmail);
+        handleSendOtp(null, authPrefillEmail);
+      }
     }
-  }, [isAuthModalOpen]);
+  }, [isAuthModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resend Countdown Timer effect
   useEffect(() => {
@@ -107,12 +113,12 @@ export const AuthModal = () => {
   }, [step]);
 
   // --- STEP 1: SEND OTP ---
-  const handleSendOtp = async (e) => {
+  const handleSendOtp = async (e, emailOverride) => {
     if (e) e.preventDefault();
     setServerError('');
     setFieldErrors({});
 
-    const cleanEmail = email.trim();
+    const cleanEmail = (typeof emailOverride === 'string' ? emailOverride : email).trim();
     const validation = validateEmailClient(cleanEmail);
     if (!validation.isValid) {
       setFieldErrors({ email: validation.message });
@@ -390,7 +396,7 @@ export const AuthModal = () => {
 
                 <div>
                   <span className="text-[10px] tracking-[0.3em] uppercase text-neutral-400 block mb-1">
-                    ATELIER MEMBER
+                    STORE MEMBER
                   </span>
                   <h3 className="text-xl font-serif tracking-[0.15em] uppercase text-[#111111]">
                     {user.name}
@@ -588,7 +594,7 @@ export const AuthModal = () => {
                         HEY, WE NEED A FEW DETAILS
                       </h3>
                       <p className="text-xs text-neutral-500 font-light mt-1.5 leading-relaxed">
-                        Complete your profile to customize your Atelier experience.
+                        Complete your profile to customize your Store experience.
                       </p>
                     </div>
 
@@ -693,7 +699,7 @@ export const AuthModal = () => {
           {/* Footer Security Notice */}
           <div className="bg-[#FAF8F3] px-6 py-3 border-t border-neutral-200/80 flex items-center justify-center gap-2 text-[10px] text-neutral-500 tracking-widest uppercase">
             <Shield className="w-3.5 h-3.5 text-neutral-400 stroke-[1.5]" />
-            256-BIT ENCRYPTED ATELIER CONCIERGE
+            256-BIT ENCRYPTED
           </div>
         </motion.div>
       </div>

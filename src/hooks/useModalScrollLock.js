@@ -36,11 +36,59 @@ if (typeof window !== 'undefined') {
   );
 }
 
-export const forceUnlockScroll = () => {
+// Safety net for storefront pages: third-party overlays (Razorpay checkout, SweetAlert) save and
+// restore the page's overflow themselves and can put back a locked state after our modals have
+// already unlocked, leaving the page frozen. When nothing is actually open, clear any leftover lock.
+// Something on screen actually covers the page: a fixed layer (modal, drawer, menu, alert, payment
+// window) that is visible and spans most of the viewport. A lock with nothing like this on screen
+// is a leftover (e.g. a component that thinks its modal is open but renders nothing).
+const isOverlayVisible = () => {
+  if (document.querySelector('.swal2-container')) return true;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  return [...document.body.querySelectorAll('*')].some((el) => {
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= vw * 0.5 && r.height >= vh * 0.6;
+  });
+};
+const isPageLocked = () => {
+  const b = document.body.style;
+  const h = document.documentElement.style;
+  return b.overflow === 'hidden' || b.position === 'fixed' || h.overflow === 'hidden';
+};
+let watchdogTimer = null;
+const checkStuckScroll = () => {
+  watchdogTimer = null;
+  if (window.location.pathname.startsWith('/admin')) return; // admin layout manages its own sidebar lock
+  if (isPageLocked() && !isOverlayVisible()) {
+    lockedScrollY = 0; // keep the current position, only remove the lock
+    // eslint-disable-next-line no-use-before-define
+    forceUnlockScroll();
+  }
+};
+if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined') {
+  const schedule = () => {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(checkStuckScroll, 400);
+  };
+  const startWatchdog = () => {
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+    // one call per node: a second observe() on the same node replaces the first one's options
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'], childList: true });
+  };
+  if (document.body) startWatchdog();
+  else window.addEventListener('DOMContentLoaded', startWatchdog, { once: true });
+}
+
+export const forceUnlockScroll = (resetToTop = false) => {
   activeLocksCount = 0;
   escapeHandlersStack.length = 0;
   if (typeof document !== 'undefined') {
-    const restoreY = lockedScrollY;
+    const restoreY = resetToTop ? 0 : lockedScrollY;
+    lockedScrollY = 0;
     document.body.removeAttribute('data-modal-open');
     document.documentElement.removeAttribute('data-modal-open');
     document.documentElement.style.overflow = '';
@@ -64,7 +112,9 @@ export const forceUnlockScroll = () => {
       adminScrollEl.style.overflow = '';
     }
 
-    if (restoreY) {
+    if (resetToTop) {
+      window.scrollTo(0, 0);
+    } else if (restoreY) {
       window.scrollTo(0, restoreY);
     }
   }
@@ -89,13 +139,16 @@ export const useModalScrollLock = (isOpen, onClose) => {
       document.body.setAttribute('data-modal-open', 'true');
       document.documentElement.setAttribute('data-modal-open', 'true');
 
-      initialHtmlOverflow = document.documentElement.style.overflow || '';
-      initialHtmlHeight = document.documentElement.style.height || '';
-      initialBodyOverflow = document.body.style.overflow || '';
-      initialBodyHeight = document.body.style.height || '';
+      // A page that is already locked (another overlay, payment window, alert) must never be
+      // remembered as its "normal" state, or closing this modal would leave it frozen
+      const unlocked = (v) => (v === 'hidden' || v === 'fixed' ? '' : v);
+      initialHtmlOverflow = unlocked(document.documentElement.style.overflow || '');
+      initialHtmlHeight = document.documentElement.style.height === '100%' ? '' : (document.documentElement.style.height || '');
+      initialBodyOverflow = unlocked(document.body.style.overflow || '');
+      initialBodyHeight = document.body.style.height === '100%' ? '' : (document.body.style.height || '');
       initialBodyPaddingRight = document.body.style.paddingRight || '';
-      initialBodyPosition = document.body.style.position || '';
-      initialBodyTop = document.body.style.top || '';
+      initialBodyPosition = unlocked(document.body.style.position || '');
+      initialBodyTop = initialBodyPosition ? (document.body.style.top || '') : '';
       initialBodyLeft = document.body.style.left || '';
       initialBodyRight = document.body.style.right || '';
       initialBodyWidth = document.body.style.width || '';

@@ -1,163 +1,266 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { AlignLeft, List, Eye, Code, Sparkles, HelpCircle, RotateCcw, Italic, Underline, Quote, Info, Type } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { AlignLeft, List, Eye, Code, Sparkles, RotateCcw, Italic, Underline, Quote, Type } from 'lucide-react';
 import RichTextRenderer from '../common/RichTextRenderer';
 
+/**
+ * RichDescriptionEditor:
+ * A visual WYSIWYG editor for luxury product descriptions.
+ * - In Visual Mode: users type and format text directly without seeing raw HTML tags (<p>, <h2>, <strong>, etc.)
+ * - In HTML Code Mode: users can view and tweak the raw HTML source
+ * - In Preview Mode: live storefront customer accordion preview
+ * - Plain Text button: cleanly strips all HTML tags to revert to clean plain text with one click
+ */
 export default function RichDescriptionEditor({
   value = '',
   onChange,
   placeholder = 'Comprehensive product story, artisan detailing, styling ideas, and garment drape overview...',
   title = 'OVERVIEW DESCRIPTION & DETAILS',
-  badgeText = 'STANDARD SECTION',
+  badgeText = 'RICH EDITOR',
   rows = 6,
   id = 'fullDescription',
 }) {
-  const textareaRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('edit'); // 'edit' | 'preview'
+  const visualEditorRef = useRef(null);
+  const isTypingRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
+  const [activeTab, setActiveTab] = useState('visual'); // 'visual' | 'code' | 'preview'
 
-  /**
-   * Helper to insert or wrap text at the current cursor/selection
-   */
-  const insertFormatting = useCallback((formatType) => {
-    const textarea = textareaRef.current;
-    const currentVal = value || '';
+  // Formatting active states for toolbar feedback
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    h2: false,
+    h3: false,
+    list: false,
+    quote: false,
+  });
 
-    // Switch to edit tab if currently in preview
-    if (activeTab !== 'edit') {
-      setActiveTab('edit');
+  // Decode HTML entities if text was previously stored with &lt; &gt;
+  const normalizedValue = useMemo(() => {
+    if (!value || typeof value !== 'string') return '';
+    if (/&lt;(?:h[1-6]|p|ul|ol|li|strong|b|em|i|u|span|blockquote|div)[\s\S]*&gt;/i.test(value)) {
+      try {
+        const doc = new DOMParser().parseFromString(value, 'text/html');
+        return doc.documentElement.textContent || value;
+      } catch (e) {
+        return value;
+      }
+    }
+    return value;
+  }, [value]);
+
+  // Sync external value changes into the contentEditable element
+  useEffect(() => {
+    if (activeTab === 'visual' && visualEditorRef.current && !isTypingRef.current) {
+      const currentHtml = visualEditorRef.current.innerHTML;
+      if (currentHtml !== normalizedValue) {
+        visualEditorRef.current.innerHTML = normalizedValue;
+      }
+    }
+  }, [normalizedValue, activeTab]);
+
+  // Query formatting state under the cursor
+  const updateActiveFormats = useCallback(() => {
+    try {
+      const isBold = document.queryCommandState('bold');
+      const isItalic = document.queryCommandState('italic');
+      const isUnderline = document.queryCommandState('underline');
+      const isList = document.queryCommandState('insertUnorderedList');
+      const block = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+
+      setActiveFormats({
+        bold: Boolean(isBold),
+        italic: Boolean(isItalic),
+        underline: Boolean(isUnderline),
+        list: Boolean(isList),
+        h2: block.includes('h2'),
+        h3: block.includes('h3'),
+        quote: block.includes('blockquote'),
+      });
+    } catch (e) {
+      // Ignored if queryCommandState is unavailable
+    }
+  }, []);
+
+  // Handle user typing inside the visual editor
+  const handleVisualInput = useCallback(() => {
+    if (!visualEditorRef.current) return;
+    isTypingRef.current = true;
+    let html = visualEditorRef.current.innerHTML;
+    const textContent = (visualEditorRef.current.textContent || '').trim();
+
+    // Reset when empty so placeholder displays
+    if (!textContent && (!html || html === '<br>' || html === '<p><br></p>' || html === '<div><br></div>')) {
+      html = '';
+      visualEditorRef.current.innerHTML = '';
     }
 
-    if (!textarea) {
-      // Fallback if textarea ref is not mounted yet
-      let snippet = '';
-      if (formatType === 'h2') snippet = '\n<h2>Section Heading</h2>\n';
-      else if (formatType === 'h3') snippet = '\n<h3>Subheading Title</h3>\n';
-      else if (formatType === 'p') snippet = '\n<p>Enter paragraph text here...</p>\n';
-      else if (formatType === 'bold') snippet = '<strong>bold text</strong>';
-      else if (formatType === 'list') snippet = '\n<ul>\n  <li>Feature or artisan detail</li>\n  <li>Premium fabric & silhouette</li>\n</ul>\n';
-      onChange?.(currentVal + snippet);
+    onChange?.(html);
+    updateActiveFormats();
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+    }, 150);
+  }, [onChange, updateActiveFormats]);
+
+  // Execute standard editor commands
+  const executeCommand = useCallback((command, val = null) => {
+    if (activeTab !== 'visual') {
+      setActiveTab('visual');
+    }
+    if (visualEditorRef.current) {
+      visualEditorRef.current.focus();
+    }
+    try {
+      document.execCommand(command, false, val);
+    } catch (e) {
+      console.warn('execCommand failed:', e);
+    }
+    handleVisualInput();
+  }, [activeTab, handleVisualInput]);
+
+  // Block formatting (H2, H3, P, Blockquote)
+  const formatBlock = useCallback((tagName) => {
+    if (activeTab !== 'visual') {
+      setActiveTab('visual');
+    }
+    if (visualEditorRef.current) {
+      visualEditorRef.current.focus();
+    }
+    try {
+      document.execCommand('formatBlock', false, `<${tagName}>`);
+    } catch (e) {
+      try {
+        document.execCommand('formatBlock', false, tagName);
+      } catch (err) {
+        console.warn('formatBlock failed:', err);
+      }
+    }
+    handleVisualInput();
+  }, [activeTab, handleVisualInput]);
+
+  // Toggle Heading 2 or Heading 3
+  const toggleHeading = useCallback((level) => {
+    const isCurrent = level === 'h2' ? activeFormats.h2 : activeFormats.h3;
+    if (isCurrent) {
+      formatBlock('p');
+    } else {
+      formatBlock(level);
+    }
+  }, [activeFormats, formatBlock]);
+
+  // Toggle Semibold font weight
+  const toggleSemibold = useCallback(() => {
+    if (activeTab !== 'visual') setActiveTab('visual');
+    if (visualEditorRef.current) visualEditorRef.current.focus();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    const range = selection.getRangeAt(0);
+    let parent = selection.anchorNode;
+    while (parent && parent !== visualEditorRef.current) {
+      if (parent.nodeType === 1 && (parent.classList?.contains('semibold') || parent.style?.fontWeight === '600')) {
+        const text = parent.innerText || parent.textContent;
+        const textNode = document.createTextNode(text);
+        parent.parentNode.replaceChild(textNode, parent);
+        handleVisualInput();
+        return;
+      }
+      parent = parent.parentNode;
+    }
+
+    const span = document.createElement('span');
+    span.className = 'semibold';
+    span.style.fontWeight = '600';
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      selection.addRange(newRange);
+    } catch (e) {
+      document.execCommand('bold', false, null);
+    }
+    handleVisualInput();
+  }, [activeTab, handleVisualInput]);
+
+  // Toggle Uppercase on selected text
+  const transformUppercase = useCallback(() => {
+    if (activeTab !== 'visual') setActiveTab('visual');
+    if (visualEditorRef.current) visualEditorRef.current.focus();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    const selectedText = selection.toString();
+    const isAllUpper = selectedText === selectedText.toUpperCase();
+    const transformed = isAllUpper ? selectedText.toLowerCase() : selectedText.toUpperCase();
+    try {
+      document.execCommand('insertText', false, transformed);
+    } catch (e) {
+      // fallback
+    }
+    handleVisualInput();
+  }, [activeTab, handleVisualInput]);
+
+  // Toggle Bullet List
+  const toggleBulletList = useCallback(() => {
+    executeCommand('insertUnorderedList');
+  }, [executeCommand]);
+
+  // Toggle Quote
+  const toggleQuote = useCallback(() => {
+    if (activeFormats.quote) {
+      formatBlock('p');
+    } else {
+      formatBlock('blockquote');
+    }
+  }, [activeFormats.quote, formatBlock]);
+
+  // Clear all HTML tags and revert to clean plain text
+  const clearFormatting = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      document.execCommand('removeFormat', false, null);
+      handleVisualInput();
       return;
     }
 
-    const start = textarea.selectionStart ?? currentVal.length;
-    const end = textarea.selectionEnd ?? currentVal.length;
-    const selectedText = currentVal.substring(start, end);
+    // Strip all HTML tags across the entire content
+    const raw = value || (visualEditorRef.current ? visualEditorRef.current.innerHTML : '');
+    const cleanText = raw
+      .replace(/<br\s*[\/]?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/h[1-6]>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim();
 
-    let replacement = '';
-    let newCursorStart = start;
-    let newCursorEnd = start;
+    const paragraphs = cleanText
+      .split(/\n+/)
+      .map(p => p.trim())
+      .filter(Boolean)
+      .map(p => `<p>${p}</p>`)
+      .join('\n');
 
-    switch (formatType) {
-      case 'h2': {
-        const text = selectedText || 'Section Heading';
-        replacement = `\n<h2>${text}</h2>\n`;
-        newCursorStart = start + (selectedText ? replacement.length : 5);
-        newCursorEnd = start + (selectedText ? replacement.length : 5 + text.length);
-        break;
-      }
-      case 'h3': {
-        const text = selectedText || 'Subheading Title';
-        replacement = `\n<h3>${text}</h3>\n`;
-        newCursorStart = start + (selectedText ? replacement.length : 5);
-        newCursorEnd = start + (selectedText ? replacement.length : 5 + text.length);
-        break;
-      }
-      case 'p': {
-        const text = selectedText || 'Enter paragraph story, artisan detailing, or styling overview...';
-        replacement = `\n<p>${text}</p>\n`;
-        newCursorStart = start + (selectedText ? replacement.length : 4);
-        newCursorEnd = start + (selectedText ? replacement.length : 4 + text.length);
-        break;
-      }
-      case 'bold': {
-        const text = selectedText || 'bold text';
-        replacement = `<strong>${text}</strong>`;
-        newCursorStart = start + (selectedText ? replacement.length : 8);
-        newCursorEnd = start + (selectedText ? replacement.length : 8 + text.length);
-        break;
-      }
-      case 'semibold': {
-        const text = selectedText || 'semibold text';
-        replacement = `<span class="semibold">${text}</span>`;
-        newCursorStart = start + (selectedText ? replacement.length : 23);
-        newCursorEnd = start + (selectedText ? replacement.length : 23 + text.length);
-        break;
-      }
-      case 'italic': {
-        const text = selectedText || 'italic text';
-        replacement = `<em>${text}</em>`;
-        newCursorStart = start + (selectedText ? replacement.length : 4);
-        newCursorEnd = start + (selectedText ? replacement.length : 4 + text.length);
-        break;
-      }
-      case 'underline': {
-        const text = selectedText || 'underlined text';
-        replacement = `<u>${text}</u>`;
-        newCursorStart = start + (selectedText ? replacement.length : 3);
-        newCursorEnd = start + (selectedText ? replacement.length : 3 + text.length);
-        break;
-      }
-      case 'uppercase': {
-        const text = selectedText ? selectedText.toUpperCase() : 'UPPERCASE TEXT';
-        replacement = `<span class="uppercase-text">${text}</span>`;
-        newCursorStart = start + replacement.length;
-        newCursorEnd = start + replacement.length;
-        break;
-      }
-      case 'quote': {
-        const text = selectedText || 'Key highlight or styling note';
-        replacement = `\n<blockquote>${text}</blockquote>\n`;
-        newCursorStart = start + (selectedText ? replacement.length : 13);
-        newCursorEnd = start + (selectedText ? replacement.length : 13 + text.length);
-        break;
-      }
-      case 'box': {
-        const text = selectedText || 'Important product or fitting note...';
-        replacement = `\n<div class="highlight-box">${text}</div>\n`;
-        newCursorStart = start + (selectedText ? replacement.length : 29);
-        newCursorEnd = start + (selectedText ? replacement.length : 29 + text.length);
-        break;
-      }
-      case 'list': {
-        if (selectedText) {
-          const lines = selectedText
-            .split('\n')
-            .map(l => l.replace(/^[-*•]\s*/, '').trim())
-            .filter(Boolean);
-
-          if (lines.length > 0) {
-            replacement = `\n<ul>\n${lines.map(l => `  <li>${l}</li>`).join('\n')}\n</ul>\n`;
-          } else {
-            replacement = `\n<ul>\n  <li>${selectedText.trim()}</li>\n</ul>\n`;
-          }
-          newCursorStart = start + replacement.length;
-          newCursorEnd = start + replacement.length;
-        } else {
-          replacement = '\n<ul>\n  <li>Artisanal hand-finished detailing and tailored seams</li>\n  <li>Crafted from breathable, premium luxury fabric</li>\n  <li>Designed for versatile day-to-evening occasion styling</li>\n</ul>\n';
-          newCursorStart = start + replacement.length;
-          newCursorEnd = start + replacement.length;
-        }
-        break;
-      }
-      default:
-        return;
+    if (visualEditorRef.current) {
+      visualEditorRef.current.innerHTML = paragraphs;
     }
-
-    const updatedValue = currentVal.substring(0, start) + replacement + currentVal.substring(end);
-    onChange?.(updatedValue);
-
-    // Re-focus and set selection
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorStart, newCursorEnd);
-    });
-  }, [value, onChange, activeTab]);
+    onChange?.(paragraphs);
+  }, [value, handleVisualInput, onChange]);
 
   return (
     <div className="space-y-2">
-      {/* 1. Header Bar with Blue Icon, Title, and Standard Section Badge */}
+      {/* 1. Header Bar with Blue Icon, Title, and Badge */}
       <div className="flex items-center justify-between gap-2 pt-1 pb-0.5">
         <div className="flex items-center gap-2">
-          {/* Blue outlined document lines icon matching design */}
           <div className="w-5 h-5 rounded flex items-center justify-center border border-blue-600 bg-white text-blue-600 shrink-0 shadow-2xs">
             <svg
               className="w-3.5 h-3.5 text-blue-600"
@@ -186,19 +289,24 @@ export default function RichDescriptionEditor({
         )}
       </div>
 
-      {/* 2. Editor Container with Toolbar and Input/Preview Area */}
+      {/* 2. Editor Container with Toolbar and Viewport */}
       <div className="rounded-xl border border-neutral-200/90 bg-white overflow-hidden shadow-2xs transition-all focus-within:border-brand-dark focus-within:ring-1 focus-within:ring-brand-dark/20">
-        {/* Toolbar matching exact screenshot specifications */}
+        {/* Toolbar */}
         <div className="bg-neutral-50/90 border-b border-neutral-200/80 px-2.5 sm:px-3 py-2 flex flex-wrap items-center justify-between gap-2">
           {/* Left formatting buttons */}
-          <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex items-center flex-wrap gap-1 sm:gap-1.5">
             {/* H2 Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('h2')}
-              title="Add Heading 2 (<h2>)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-bold shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleHeading('h2')}
+              title="Heading 2 (H2)"
+              className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md border text-xs font-bold transition-all cursor-pointer ${
+                activeFormats.h2
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100'
+              }`}
             >
               H2
             </button>
@@ -207,35 +315,46 @@ export default function RichDescriptionEditor({
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('h3')}
-              title="Add Heading 3 (<h3>)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-bold shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleHeading('h3')}
+              title="Heading 3 (H3)"
+              className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md border text-xs font-bold transition-all cursor-pointer ${
+                activeFormats.h3
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100'
+              }`}
             >
               H3
             </button>
 
-            {/* Paragraph Button (Highlighted with blue background & AlignLeft icon as shown in reference) */}
+            {/* Paragraph Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('p')}
-              title="Add Paragraph (<p>)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/90 text-blue-700 text-xs sm:text-sm font-bold shadow-2xs hover:bg-blue-100/80 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => formatBlock('p')}
+              title="Standard Paragraph (<p>)"
+              className="no-global-hover px-2 sm:px-2.5 py-1 rounded-md border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 text-xs font-medium transition-all cursor-pointer flex items-center gap-1"
             >
-              <AlignLeft className="w-3.5 h-3.5 stroke-[2.4]" />
-              <span>Paragraph</span>
+              <AlignLeft className="w-3.5 h-3.5 stroke-[2]" />
+              <span className="hidden xs:inline">Paragraph</span>
             </button>
 
             {/* Divider */}
-            <div className="h-5 w-px bg-neutral-200/80 mx-0.5 sm:mx-1 hidden xs:block" />
+            <div className="h-4 w-px bg-neutral-200 mx-0.5 hidden xs:block" />
 
-            {/* Bold (B) Button */}
+            {/* Bold Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('bold')}
-              title="Bold text (<strong>)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-900 text-xs sm:text-sm font-black shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => executeCommand('bold')}
+              title="Bold (Ctrl+B)"
+              className={`no-global-hover px-2 py-1 rounded-md border text-xs font-black transition-all cursor-pointer ${
+                activeFormats.bold
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-100'
+              }`}
             >
               B
             </button>
@@ -244,88 +363,136 @@ export default function RichDescriptionEditor({
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('semibold')}
-              title="Semibold text (weight 600)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-semibold shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggleSemibold}
+              title="Semibold (font-weight 600)"
+              className="no-global-hover px-2 py-1 rounded-md border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100 text-xs font-semibold transition-all cursor-pointer"
             >
               Semibold
             </button>
 
-            {/* Italic (I) Button */}
+            {/* Italic Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('italic')}
-              title="Italic text (<em>)"
-              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-medium italic shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => executeCommand('italic')}
+              title="Italic (Ctrl+I)"
+              className={`no-global-hover px-2 py-1 rounded-md border text-xs italic transition-all cursor-pointer flex items-center justify-center ${
+                activeFormats.italic
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100'
+              }`}
             >
               <Italic className="w-3.5 h-3.5" />
             </button>
 
-            {/* Underline (U) Button */}
+            {/* Underline Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('underline')}
-              title="Underline text (<u>)"
-              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-medium shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => executeCommand('underline')}
+              title="Underline (Ctrl+U)"
+              className={`no-global-hover px-2 py-1 rounded-md border text-xs transition-all cursor-pointer flex items-center justify-center ${
+                activeFormats.underline
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100'
+              }`}
             >
               <Underline className="w-3.5 h-3.5" />
             </button>
 
-            {/* Uppercase (TT) Button */}
+            {/* Uppercase TT Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('uppercase')}
-              title="Uppercase letters"
-              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={transformUppercase}
+              title="Uppercase Toggle"
+              className="no-global-hover px-2 py-1 rounded-md border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100 text-[11px] font-bold tracking-wider transition-all cursor-pointer"
             >
               TT
             </button>
 
             {/* Divider */}
-            <div className="h-5 w-px bg-neutral-200/80 mx-0.5 sm:mx-1 hidden xs:block" />
+            <div className="h-4 w-px bg-neutral-200 mx-0.5 hidden xs:block" />
 
-            {/* Bullet List Button with List icon */}
+            {/* Bullet List Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('list')}
-              title="Bullet List (<ul><li>)"
-              className="no-global-hover px-2.5 sm:px-3 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs sm:text-sm font-semibold shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggleBulletList}
+              title="Bullet List (•)"
+              className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md border text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                activeFormats.list
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-100'
+              }`}
             >
-              <List className="w-3.5 h-3.5 stroke-[2.4] text-neutral-700" />
-              <span>Bullet List</span>
+              <List className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span className="hidden sm:inline">List</span>
             </button>
 
-            {/* Highlight Box / Quote Button */}
+            {/* Quote Button */}
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => insertFormatting('quote')}
-              title="Quote / Callout (<blockquote>)"
-              className="no-global-hover px-2.5 py-1.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 text-xs font-medium shadow-2xs hover:bg-neutral-100 hover:border-neutral-300 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggleQuote}
+              title="Quote / Callout"
+              className={`no-global-hover px-2 py-1 rounded-md border text-xs font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                activeFormats.quote
+                  ? 'border-blue-500 bg-blue-100 text-blue-800'
+                  : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100'
+              }`}
             >
-              <Quote className="w-3.5 h-3.5 text-neutral-600" />
-              <span>Quote</span>
+              <Quote className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Quote</span>
+            </button>
+
+            {/* Plain Text Button */}
+            <button
+              type="button"
+              data-no-hover="true"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={clearFormatting}
+              title="Strip HTML tags & revert to clean plain text"
+              className="no-global-hover px-2 py-1 rounded-md border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Plain Text</span>
             </button>
           </div>
 
-          {/* Right toggle between Edit and Live Preview */}
+          {/* Right tab switcher: Visual Editor | HTML Code | Live Preview */}
           <div className="flex items-center gap-1 bg-neutral-200/60 p-0.5 rounded-lg text-xs font-semibold">
             <button
               type="button"
               data-no-hover="true"
-              onClick={() => setActiveTab('edit')}
+              onClick={() => setActiveTab('visual')}
               className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
-                activeTab === 'edit'
+                activeTab === 'visual'
                   ? 'bg-white text-brand-dark shadow-2xs font-bold'
                   : 'text-neutral-600 hover:text-black'
               }`}
             >
+              <Type className="w-3 h-3" />
+              <span>Visual</span>
+            </button>
+            <button
+              type="button"
+              data-no-hover="true"
+              onClick={() => setActiveTab('code')}
+              className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
+                activeTab === 'code'
+                  ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
               <Code className="w-3 h-3" />
-              <span>Editor</span>
+              <span>HTML</span>
             </button>
             <button
               type="button"
@@ -333,7 +500,7 @@ export default function RichDescriptionEditor({
               onClick={() => setActiveTab('preview')}
               className={`no-global-hover px-2 sm:px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 text-[11px] sm:text-xs ${
                 activeTab === 'preview'
-                  ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                  ? 'bg-white text-emerald-700 shadow-2xs font-bold'
                   : 'text-neutral-600 hover:text-black'
               }`}
             >
@@ -344,30 +511,57 @@ export default function RichDescriptionEditor({
         </div>
 
         {/* Content Area */}
-        {activeTab === 'edit' ? (
-          <div>
-            <textarea
+        {activeTab === 'visual' && (
+          <div className="relative">
+            <div
               id={id}
-              ref={textareaRef}
-              rows={rows}
-              value={value}
-              onChange={(e) => onChange?.(e.target.value)}
-              placeholder={placeholder}
-              className="w-full p-3.5 text-xs sm:text-sm font-sans text-brand-dark bg-white focus:outline-none transition-all resize-y leading-relaxed"
+              ref={visualEditorRef}
+              contentEditable={true}
+              data-placeholder={placeholder}
+              onInput={handleVisualInput}
+              onKeyUp={updateActiveFormats}
+              onMouseUp={updateActiveFormats}
+              className="rich-description-content visual-editor w-full p-4 text-xs sm:text-sm font-sans text-brand-dark bg-white focus:outline-none transition-all leading-relaxed"
+              spellCheck="true"
+              style={{ outline: 'none' }}
             />
             {/* Quick helper footer */}
-            <div className="px-3.5 py-2 bg-neutral-50/60 border-t border-neutral-100 flex flex-wrap items-center justify-between text-[11px] text-neutral-500 gap-2">
+            <div className="px-3.5 py-2 bg-neutral-50/70 border-t border-neutral-100 flex flex-wrap items-center justify-between text-[11px] text-neutral-500 gap-2">
               <span className="flex items-center gap-1.5 flex-wrap">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                Select text and click <strong className="font-semibold text-neutral-700">H2</strong>, <strong className="font-semibold text-neutral-700">H3</strong>, <strong className="font-semibold text-neutral-700">Paragraph</strong>, <strong className="font-semibold text-neutral-700">Bold</strong>, <strong className="font-semibold text-neutral-700">Semibold</strong>, <strong className="font-semibold text-neutral-700">Italic</strong>, <strong className="font-semibold text-neutral-700">Underline</strong>, or <strong className="font-semibold text-neutral-700">Bullet List</strong>.
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <strong className="font-semibold text-neutral-700">Visual Mode:</strong> Clean formatted text. No HTML tags shown. Use toolbar or shortcuts (Ctrl+B, Ctrl+I).
               </span>
               <span className="tabular-nums font-mono text-[10px] text-neutral-400">
-                {value ? value.length : 0} chars
+                {visualEditorRef.current ? (visualEditorRef.current.textContent || '').length : (value || '').replace(/<[^>]+>/g, '').length} chars
               </span>
             </div>
           </div>
-        ) : (
-          <div className="p-4 sm:p-5 bg-neutral-50/40 min-h-[160px] max-h-[360px] overflow-y-auto">
+        )}
+
+        {activeTab === 'code' && (
+          <div>
+            <textarea
+              id={`${id}-code`}
+              rows={rows}
+              value={value || ''}
+              onChange={(e) => onChange?.(e.target.value)}
+              placeholder="HTML source code: <p>...</p>"
+              className="w-full p-3.5 text-xs font-mono text-neutral-800 bg-neutral-50 focus:outline-none transition-all resize-y leading-relaxed"
+            />
+            <div className="px-3.5 py-2 bg-neutral-50/70 border-t border-neutral-100 flex flex-wrap items-center justify-between text-[11px] text-neutral-500 gap-2">
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                <strong className="font-semibold text-neutral-700">HTML Source Mode:</strong> Directly inspect or edit raw HTML tags. Switch back to Visual mode at any time.
+              </span>
+              <span className="tabular-nums font-mono text-[10px] text-neutral-400">
+                {(value || '').length} chars
+              </span>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'preview' && (
+          <div className="p-4 sm:p-5 bg-neutral-50/40 min-h-[160px] max-h-[380px] overflow-y-auto">
             <div className="mb-3 pb-2 border-b border-neutral-200/60 flex items-center justify-between">
               <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-blue-600" />
@@ -381,8 +575,8 @@ export default function RichDescriptionEditor({
             {value && value.trim() ? (
               <RichTextRenderer content={value} />
             ) : (
-              <div className="text-xs text-neutral-400 italic py-4 text-center">
-                No description added yet. Switch to Editor tab or click the toolbar buttons above to add headings, paragraphs, and bullet points.
+              <div className="text-xs text-neutral-400 italic py-6 text-center">
+                No description added yet. Switch to Visual Editor tab to start writing.
               </div>
             )}
           </div>

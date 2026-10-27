@@ -31,6 +31,7 @@ import { InvoiceModal } from '../common/InvoiceModal';
 import { ShippingLabelModal } from './ShippingLabelModal';
 import { PickupManifestModal } from './PickupManifestModal';
 import { broadcastOrderUpdate } from '../../lib/orderSync';
+import { getReturnGstBreakdown } from '../../utils/gstHelper';
 
 // Reverse / Return lifecycle status options
 const RETURN_STATUS_OPTIONS = [
@@ -525,36 +526,44 @@ export const ReturnOrderDetailModal = ({
           ) : order ? (
             <>
               {/* Order High-Level Summary Card */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Total Refundable</span>
-                  <span className="font-bold text-neutral-900 text-sm mt-0.5 block">
-                    ₹{Number(order.total || order.subtotal || 0).toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Payment Method</span>
-                  <span className="font-semibold text-neutral-800 uppercase mt-0.5 block">
-                    {order.payment_method === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (Razorpay)'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Return Status</span>
-                  <span className="inline-block mt-0.5 px-2 py-0.5 bg-neutral-200 text-neutral-900 rounded-md font-bold text-[11px]">
-                    {order.status || 'Pending'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Refund Status</span>
-                  <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                    order.refund_status === 'Completed' || order.refund_status === 'Refunded'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {order.refund_status || 'Pending'}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const retGst = getReturnGstBreakdown(order);
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Total Refundable</span>
+                      <span className="font-bold text-neutral-900 text-sm mt-0.5 block">
+                        ₹{retGst.totalRefund.toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-neutral-500 block mt-0.5">
+                        Base ₹{retGst.baseTotal.toLocaleString('en-IN')} + GST ({retGst.taxRate}%): <span className="text-emerald-700 font-semibold">+₹{retGst.gstTotal.toLocaleString('en-IN')}</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Payment Method</span>
+                      <span className="font-semibold text-neutral-800 uppercase mt-0.5 block">
+                        {order.payment_method === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (Razorpay)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Return Status</span>
+                      <span className="inline-block mt-0.5 px-2 py-0.5 bg-neutral-200 text-neutral-900 rounded-md font-bold text-[11px]">
+                        {order.status || 'Pending'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-neutral-400 block">Refund Status</span>
+                      <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                        order.refund_status === 'Completed' || order.refund_status === 'Refunded'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {order.refund_status || 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Status Update Form */}
               <div className="bg-white border border-neutral-200/90 rounded-xl p-4 sm:p-5 space-y-4">
@@ -729,7 +738,7 @@ export const ReturnOrderDetailModal = ({
                           <p className="text-[10px] text-sky-800 mt-1 pl-6">Reason registered</p>
                         </div>
 
-                        {/* Step 2: Atelier Approved */}
+                        {/* Step 2: Store Approved */}
                         <div className={`p-2.5 rounded-lg border ${
                           isS2 ? 'bg-sky-50/60 border-sky-300' : 'bg-neutral-50 border-neutral-200 opacity-60'
                         }`}>
@@ -769,7 +778,7 @@ export const ReturnOrderDetailModal = ({
                           </p>
                         </div>
 
-                        {/* Step 4: In Transit to Atelier */}
+                        {/* Step 4: In Transit to House of Urvaah */}
                         <div className={`p-2.5 rounded-lg border ${
                           isS4
                             ? 'bg-sky-50/60 border-sky-300'
@@ -973,10 +982,10 @@ export const ReturnOrderDetailModal = ({
                       disabled={logisticsLoading}
                       onClick={() => handleSimulateReturnMilestone('RECEIVED_ATELIER')}
                       className="px-2.5 py-2 bg-white hover:bg-neutral-100 border border-neutral-300 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-emerald-600"
-                      title="Package arrives at Atelier, restocks inventory & routes to refund desk"
+                      title="Package arrives at House of Urvaah, restocks inventory & routes to refund desk"
                     >
                       <Building className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Received at Atelier (Restocked)</span>
+                      <span>Received at House of Urvaah (Restocked)</span>
                     </button>
 
                     <button
@@ -1081,7 +1090,7 @@ export const ReturnOrderDetailModal = ({
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-neutral-900">{item.name || item.title || 'Atelier Item'}</p>
+                            <p className="font-semibold text-neutral-900">{item.name || item.title || 'Store Item'}</p>
                             <p className="text-[11px] text-neutral-500">
                               Qty: {item.quantity || 1} • Size: {item.size || 'M'}
                             </p>
@@ -1197,31 +1206,37 @@ export const ReturnOrderDetailModal = ({
             </div>
 
             {(() => {
-              const returnItems = (order?.items || []).filter(i => {
-                const act = (i.return_action || '').toLowerCase();
-                const stat = (i.status || '').toLowerCase();
-                return act === 'return' || stat.includes('return');
-              });
-              const refundAmount = Number(
-                order?.refund_eligible_amount || 
-                (returnItems.length > 0 
-                  ? returnItems.reduce((sum, it) => sum + (Number(it.price || 0) * (it.quantity || 1)), 0) 
-                  : order?.total) || 
-                0
-              );
+              const retGst = getReturnGstBreakdown(order);
+              const refundAmount = retGst.totalRefund;
               return (
-                <p className="text-neutral-600 leading-relaxed">
-                  Disburse financial refund of{' '}
-                  <strong className="text-neutral-950 text-sm">
-                    ₹{refundAmount.toLocaleString('en-IN')}
-                  </strong>{' '}
-                  {returnItems.length > 0 && returnItems.length < (order?.items?.length || 1) && (
-                    <span className="text-emerald-700 font-semibold text-[11px] block mt-0.5">
-                      (Pro-rata refund for {returnItems.length} returned item; remaining items kept or replaced)
+                <div className="space-y-2">
+                  <p className="text-neutral-600 leading-relaxed">
+                    Disburse financial refund of{' '}
+                    <strong className="text-neutral-950 text-sm">
+                      ₹{refundAmount.toLocaleString('en-IN')}
+                    </strong>{' '}
+                    for Order #{order?.order_number}.
+                  </p>
+                  <div className="p-2.5 bg-neutral-50 rounded-lg border border-neutral-200 text-[11px] space-y-1">
+                    <div className="flex justify-between text-neutral-600">
+                      <span>Item Base Value:</span>
+                      <span className="font-semibold text-neutral-900">₹{retGst.baseTotal.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-900 font-semibold">
+                      <span>GST Refund Amount ({retGst.taxRate}%):</span>
+                      <span className="font-bold">+₹{retGst.gstTotal.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="pt-1 border-t border-neutral-200 flex justify-between font-bold text-xs text-neutral-950">
+                      <span>Total Payout:</span>
+                      <span className="text-emerald-700">₹{refundAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                  {retGst.isPartial && (
+                    <span className="text-emerald-700 font-semibold text-[11px] block">
+                      (Pro-rata refund for {retGst.returnItems.length} returned item; remaining items kept or replaced)
                     </span>
                   )}
-                  for Order #{order?.order_number}.
-                </p>
+                </div>
               );
             })()}
 

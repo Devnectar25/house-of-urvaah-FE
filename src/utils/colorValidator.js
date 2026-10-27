@@ -300,3 +300,51 @@ export function filterValidColors(colorList) {
   }
   return result;
 }
+
+/**
+ * Shopper-facing name for a color the admin picked: a preset (stored as its name or its HEX) or a
+ * typed color name. Returns null for the "Default" placeholder and for HEX codes that are not one
+ * of the admin presets (old seeded values the admin never chose), so filters only offer real picks.
+ */
+export function getColorName(colorStr) {
+  if (!colorStr || typeof colorStr !== 'string') return null;
+  const clean = colorStr.trim();
+  if (!clean || clean.toLowerCase() === 'default') return null;
+  if (!isHexColor(clean) && !isBareHex(clean)) return normalizeColor(clean);
+  const hex = normalizeColor(clean);
+  const preset = POPULAR_FASHION_COLORS.find((c) => c.hex.toUpperCase() === hex);
+  return preset ? preset.name : null;
+}
+
+/** Sort color names in the admin preset order (Black, White, Wine Red...), then A-Z */
+export function compareColorNames(a, b) {
+  const rank = (n) => {
+    const i = POPULAR_FASHION_COLORS.findIndex((c) => c.name.toLowerCase() === String(n).toLowerCase());
+    return i === -1 ? POPULAR_FASHION_COLORS.length : i;
+  };
+  return rank(a) - rank(b) || String(a).localeCompare(String(b));
+}
+
+/** True when a stored color is this preset, saved either by name or by its HEX code */
+export function isPresetColor(color, preset) {
+  const c = String(color || '').trim().toLowerCase();
+  return c === preset.name.toLowerCase() || c === preset.hex.toLowerCase();
+}
+
+/**
+ * Clean a stored color list for the admin form: preset HEX codes become the preset name
+ * (#111111 -> Black), duplicates are removed and the "Default" placeholder is dropped when real
+ * colors exist. Saving the form then stores each color once, by name.
+ */
+export function normalizePresetColors(colors) {
+  if (!Array.isArray(colors)) return [];
+  const out = [];
+  colors.forEach((raw) => {
+    if (typeof raw !== 'string' || !raw.trim()) return;
+    const preset = POPULAR_FASHION_COLORS.find((p) => isPresetColor(raw, p));
+    const value = preset ? preset.name : raw.trim();
+    if (!out.some((v) => v.toLowerCase() === value.toLowerCase())) out.push(value);
+  });
+  const real = out.filter((c) => c.toLowerCase() !== 'default');
+  return real.length > 0 ? real : out;
+}

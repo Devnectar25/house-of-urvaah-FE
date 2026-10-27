@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { startVisiblePolling } from '../../lib/livePolling';
 
 const DEFAULT_CATEGORIES = [
   {
@@ -162,12 +163,12 @@ export const WhatsHot = () => {
     window.addEventListener('storage', handleUpdate);
 
     // Continuous polling interval for seamless multi-tab / session synchronization
-    const interval = setInterval(fetchCategories, 3000);
+    const stopLivePolling = startVisiblePolling(fetchCategories);
 
     return () => {
       window.removeEventListener('urvaah_categories_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
-      clearInterval(interval);
+      stopLivePolling();
     };
   }, []);
 
@@ -255,9 +256,17 @@ export const WhatsHot = () => {
             >
               <Link
                 to={category.link}
-                onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem('urvaah_home_last_section', 'whats-hot');
+                    sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+                    sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                  } catch (err) {}
+                }}
+                state={{ fromSection: 'whats-hot', fromScrollY: window.scrollY || 0 }}
                 className="block w-full h-full relative cursor-pointer"
               >
+
                 <img
                   src={category.image}
                   alt={category.title}

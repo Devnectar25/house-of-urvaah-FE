@@ -29,6 +29,7 @@ import { OrderDetailModal } from '../../components/admin/OrderDetailModal';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../../lib/orderSync';
 import { ShiprocketOrderDeskView } from '../../components/admin/ShiprocketOrderDeskView';
+import { getOrderGstInfo } from '../../utils/gstHelper';
 
 const checkStatusMatches = (orderStatus, filterStatus, order = null) => {
   if (!filterStatus || filterStatus === 'all') return true;
@@ -189,6 +190,22 @@ const formatOrderDateTime = (dateStr) => {
   }
 
   return { date, time, isRecent, relative };
+};
+
+
+// Return / replacement requests waiting for the admin stay on top (newest request first)
+const PENDING_REQUEST_STATUSES = ['return requested', 'return request processing', 'replace requested', 'replacement requested', 'replacement request processing', 'return & replacement requested'];
+const isPendingRequest = (order) => PENDING_REQUEST_STATUSES.includes(String(order?.status || '').toLowerCase());
+const compareOrdersForList = (a, b, direction) => {
+  const reqA = isPendingRequest(a);
+  const reqB = isPendingRequest(b);
+  if (reqA !== reqB) return reqA ? -1 : 1;
+  if (reqA) {
+    return new Date(b.return_request_at || b.updated_at || 0).getTime() - new Date(a.return_request_at || a.updated_at || 0).getTime();
+  }
+  const timeA = new Date(a.created_at || 0).getTime();
+  const timeB = new Date(b.created_at || 0).getTime();
+  return direction === 'asc' ? timeA - timeB : timeB - timeA;
 };
 
 export const AdminOrders = () => {
@@ -452,12 +469,8 @@ export const AdminOrders = () => {
         list = list.filter((o) => new Date(o.created_at).getTime() <= toTs);
       }
 
-      // Guarantee recent orders appear at the top by default (created_at DESC)
-      list.sort((a, b) => {
-        const timeA = new Date(a.created_at || 0).getTime();
-        const timeB = new Date(b.created_at || 0).getTime();
-        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-      });
+      // Return / replacement requests first, then the rest by order date
+      list.sort((a, b) => compareOrdersForList(a, b, sortOrder));
 
       setOrders(list);
       setTotalOrders(pagination.totalOrders ?? list.length);
@@ -525,6 +538,8 @@ export const AdminOrders = () => {
   // Auto periodic background poll (every 8s) to ensure live real-time sync for counts & orders
   useEffect(() => {
     const interval = setInterval(() => {
+      // Skip while the tab is hidden; the focus listener above refreshes on return
+      if (document.visibilityState !== 'visible') return;
       fetchOrders(true);
       fetchStats(true);
     }, 8000);
@@ -537,11 +552,7 @@ export const AdminOrders = () => {
     const nextOrder = sortOrder === 'desc' ? 'asc' : 'desc';
     setSortOrder(nextOrder);
     setOrders((prev) =>
-      [...prev].sort((a, b) => {
-        const timeA = new Date(a.created_at || 0).getTime();
-        const timeB = new Date(b.created_at || 0).getTime();
-        return nextOrder === 'asc' ? timeA - timeB : timeB - timeA;
-      })
+      [...prev].sort((a, b) => compareOrdersForList(a, b, nextOrder))
     );
   };
 
@@ -605,6 +616,9 @@ export const AdminOrders = () => {
   const formatOrderStatusDisplay = (status) => {
     if (!status) return 'Pending';
     const s = String(status).toLowerCase();
+    if (s.includes('return qc rejected')) {
+      return 'QC Rejected';
+    }
     if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
       return 'Received at HOU';
     }
@@ -659,6 +673,9 @@ export const AdminOrders = () => {
     if (s.includes('received at house of urvaah') || s.includes('received at homved')) {
       return 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold';
     }
+    if (s.includes('return rejected') || s.includes('return qc rejected')) {
+      return 'bg-rose-50 text-rose-700 border-rose-200 font-bold';
+    }
     if (s.includes('return')) {
       return 'bg-orange-50 text-orange-700 border-orange-200';
     }
@@ -686,6 +703,9 @@ export const AdminOrders = () => {
   // Helper for Payment Status Pill Styling
   const getPaymentStatusPill = (status) => {
     const s = (status || '').toLowerCase();
+    if (s.startsWith('cod')) {
+      return 'bg-sky-50 text-sky-800 border-sky-200 whitespace-nowrap';
+    }
     if (s === 'paid') {
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     }
@@ -1389,8 +1409,10 @@ export const AdminOrders = () => {
                   const itemsList = Array.isArray(ord.items) ? ord.items : [];
                   const itemCount = itemsList.length || 1;
                   const dateTimeInfo = formatOrderDateTime(ord.created_at);
-                  const formattedTotal = ord.total
-                    ? `₹${parseFloat(ord.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  const ordGst = getOrderGstInfo(ord);
+                  const effectiveOrdTotal = Math.max(parseFloat(ord.total || 0), ordGst.total);
+                  const formattedTotal = effectiveOrdTotal > 0
+                    ? `₹${effectiveOrdTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                     : '₹0.00';
 
                   return (
@@ -1452,20 +1474,43 @@ export const AdminOrders = () => {
 
                       {/* Order Status Pill */}
                       <td className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center justify-center gap-1.5">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${getOrderStatusPill(
-                              ord.status
-                            )}`}
-                          >
-                            {formatOrderStatusDisplay(ord.status)}
-                          </span>
-                          {ord.isPreview && (
+                        <div className="inline-flex flex-col items-center justify-center gap-1">
+                          <div className="inline-flex items-center justify-center gap-1.5">
                             <span
-                              className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
-                              title="Unsaved Preview — Click Save Status Changes in Modal to persist"
-                            />
-                          )}
+                              className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${getOrderStatusPill(
+                                ord.status
+                              )}`}
+                            >
+                              {/* A new order is waiting to be processed: say so instead of a bare "Pending" */}
+                              {String(ord.status || 'pending').toLowerCase() === 'pending' ? 'New Order' : formatOrderStatusDisplay(ord.status)}
+                            </span>
+                            {ord.isPreview && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
+                                title="Unsaved Preview — Click Save Status Changes in Modal to persist"
+                              />
+                            )}
+                          </div>
+                          {Boolean(ord.return_rejection_reason) && (() => {
+                            // Return and replacement rejections both store return_rejection_reason; label by request type
+                            const returnType = (ord.return_type || '').toLowerCase();
+                            const items = Array.isArray(ord.items) ? ord.items : [];
+                            const hasReplace = returnType.includes('replace') || returnType.includes('exchange') ||
+                              Boolean(ord.replacement_size) ||
+                              items.some(it => (it.return_action || '').toLowerCase() === 'replace' || (it.status || '').toLowerCase().includes('replace'));
+                            const hasReturn = returnType === 'return' ||
+                              items.some(it => (it.return_action || '').toLowerCase() === 'return' || (it.status || '').toLowerCase().includes('return'));
+                            const label = hasReplace && hasReturn
+                              ? 'Return & Replacement Rejected'
+                              : hasReplace
+                              ? 'Replacement Rejected'
+                              : 'Return Rejected';
+                            return (
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase font-sans leading-none tracking-tight">
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
 
@@ -1482,8 +1527,11 @@ export const AdminOrders = () => {
                             return <span className="text-neutral-400 text-xs font-mono">—</span>;
                           }
 
+                          // COD is collected on delivery: show that rather than "Pending"
                           const displayPaymentStatus = isPaid
                             ? 'Paid'
+                            : (isCod && ['pending', ''].includes(String(ord.payment_status || '').toLowerCase()))
+                            ? 'COD · Due on delivery'
                             : (ord.payment_status || 'Pending');
 
                           return (

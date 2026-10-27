@@ -28,9 +28,17 @@ import {
   normalizeColor,
   getSwatchCss,
   filterValidColors,
-  POPULAR_FASHION_COLORS
+  POPULAR_FASHION_COLORS,
+  isPresetColor,
+  normalizePresetColors
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
+import ProductFilterPicker from './ProductFilterPicker';
+import { newArrivalToOption, NEW_ARRIVAL_DAYS } from '../../utils/newArrival';
+import { readProductFilters, buildFilterPayload } from '../../constants/productFilters';
+import { fetchRecommendationStatus } from '../../constants/recommendations';
+import { getLegacyDetailRows, productDetailsToRichText, richTextToProductDetails } from '../../utils/productDetailsContent';
+import { uploadVideoDirect } from '../../lib/directVideoUpload';
 
 
 const DEFAULT_CATEGORIES = [
@@ -59,7 +67,17 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   const imagesRef = useRef(null);
 
   // Form State initialized from product prop
+  // Live status of the home page "Recommended for you" section (minimum product count)
+  const [recommendationStatus, setRecommendationStatus] = useState(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetchRecommendationStatus().then((st) => { if (active) setRecommendationStatus(st); }).catch(() => {});
+    return () => { active = false; };
+  }, [isOpen]);
   const [formData, setFormData] = useState({
+    shopFilters: readProductFilters(null),
+    new_arrival_option: 'auto',
     name: '',
     category_id: '',
     subCategory: '',
@@ -67,7 +85,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     description: '',
     fullDescription: '',
     nameOptions: [],
-    productDetails: [],
+    productDetailsText: '',
     originalPrice: 0,
     discountPercent: 0,
     price: 0,
@@ -156,17 +174,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             label: s.label || s.title || '',
             value: s.value || ''
           }));
-        } else if (Array.isArray(data.productDetails) && data.productDetails.length > 0) {
-          specPairs = data.productDetails.map(s => ({
+        } else if (getLegacyDetailRows(data.productDetails || data.product_details).length > 0) {
+          specPairs = getLegacyDetailRows(data.productDetails || data.product_details).map(s => ({
             label: s.label || s.title || '',
             value: s.value || ''
           }));
-        } else if (Array.isArray(data.product_details) && data.product_details.length > 0) {
-          specPairs = data.product_details.map(s => ({
-            label: s.label || s.title || '',
-            value: s.value || ''
-          }));
-        } else if (data.specifications && typeof data.specifications === 'object') {
+        } else if (data.specifications && typeof data.specifications === 'object' && !Array.isArray(data.specifications)) {
           specPairs = Object.entries(data.specifications).map(([label, value]) => ({ label, value: String(value || '') }));
         } else if (data.fabric || data.fitType) {
           if (data.fabric) specPairs.push({ label: 'Fabric', value: data.fabric });
@@ -215,13 +228,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         setFormData({
           name: data.name || data.title || '',
+          shopFilters: readProductFilters(data),
+          new_arrival_option: newArrivalToOption(data.new_arrival),
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
           description: data.fullDescription || data.full_description || data.fulldescription || data.description || '',
           fullDescription: data.fullDescription || data.full_description || data.fulldescription || data.description || '',
           nameOptions: nameOpts,
-          productDetails: prodDetails,
+          productDetailsText: productDetailsToRichText(prodDetails, data.specifications),
           originalPrice: origPrice,
           discountPercent: calcDiscount,
           price: currPrice,
@@ -233,7 +248,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           rating: ratingVal,
           reviews: reviewsCount,
           sizes: validSizes,
-          colors: Array.isArray(data.colors) && data.colors.length > 0 ? (filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
+          colors: Array.isArray(data.colors) && data.colors.length > 0 ? normalizePresetColors(filterValidColors(data.colors).length > 0 ? filterValidColors(data.colors) : data.colors) : ['Default'],
           specifications: specPairs,
           careInstructions: data.careInstructions || data.care_instructions || '',
           images: Array.isArray(data.images) && data.images.length > 0
@@ -285,13 +300,15 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
         setFormData({
           name: product.name || '',
+          shopFilters: readProductFilters(product),
+          new_arrival_option: newArrivalToOption(product.new_arrival),
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
           description: product.fullDescription || product.full_description || product.fulldescription || product.description || '',
           fullDescription: product.fullDescription || product.full_description || product.fulldescription || product.description || '',
           nameOptions: nameOpts,
-          productDetails: prodDetails,
+          productDetailsText: productDetailsToRichText(prodDetails, product?.specifications),
           originalPrice: product.originalPrice || product.price || 0,
           discountPercent: product.discount || 0,
           price: product.price || 0,
@@ -303,7 +320,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           rating: fallbackRating,
           reviews: fallbackReviews,
           sizes: validSizes,
-          colors: Array.isArray(product.colors) ? (filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
+          colors: Array.isArray(product.colors) ? normalizePresetColors(filterValidColors(product.colors).length > 0 ? filterValidColors(product.colors) : product.colors) : ['Default'],
           specifications: [],
           careInstructions: product.careInstructions || '',
           images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : []),
@@ -364,29 +381,6 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     setFormData(prev => ({
       ...prev,
       nameOptions: (prev.nameOptions || []).filter((_, idx) => idx !== indexToRemove)
-    }));
-  };
-
-  // Product Details Handlers
-  const handleAddProductDetail = () => {
-    setFormData(prev => ({
-      ...prev,
-      productDetails: [...(prev.productDetails || []), { label: '', value: '' }]
-    }));
-  };
-
-  const handleProductDetailChange = (index, field, value) => {
-    setFormData(prev => {
-      const updated = [...(prev.productDetails || [])];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, productDetails: updated };
-    });
-  };
-
-  const handleRemoveProductDetail = (indexToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      productDetails: (prev.productDetails || []).filter((_, idx) => idx !== indexToRemove)
     }));
   };
 
@@ -493,13 +487,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
 
   // Color pill & preset handlers
   const handleTogglePresetColor = (colorName) => {
-    const isSelected = formData.colors.some(
-      c => c.toLowerCase() === colorName.toLowerCase()
-    );
+    // A preset may be stored by name or by its HEX code (#111111 = Black): match and remove both
+    const preset = POPULAR_FASHION_COLORS.find(p => p.name.toLowerCase() === colorName.toLowerCase());
+    const matches = (c) => (preset ? isPresetColor(c, preset) : c.toLowerCase() === colorName.toLowerCase());
+    const isSelected = formData.colors.some(matches);
     if (isSelected) {
       setFormData(prev => ({
         ...prev,
-        colors: prev.colors.filter(c => c.toLowerCase() !== colorName.toLowerCase())
+        colors: prev.colors.filter(c => !matches(c))
       }));
     } else {
       const result = validateColorInput(colorName, formData.colors);
@@ -675,31 +670,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     setSubmitError(null);
 
     try {
-      const uploadData = new FormData();
-      uploadData.append('video', file);
-      uploadData.append('folderName', 'products/videos');
-
-      const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
-      const token = localStorage.getItem('urvaah_token');
-
-      const res = await fetch(`${API_BASE}/api/upload/upload-video`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadData
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Video upload failed');
-      }
-
-      const uploadedUrl = data.url || data.data?.url || data.filePath;
-      if (uploadedUrl) {
-        setFormData(prev => ({ ...prev, video_url: uploadedUrl }));
-        setSubmitError(null);
-      } else {
-        throw new Error('No video URL returned from server.');
-      }
+      const uploadedUrl = await uploadVideoDirect(file, 'products/videos');
+      setFormData(prev => ({ ...prev, video_url: uploadedUrl }));
+      setSubmitError(null);
     } catch (err) {
       console.error('Video upload failed:', err);
       setSubmitError(err.message || 'Video upload failed. Please try again or provide a direct video URL.');
@@ -790,10 +763,12 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     try {
       const validNameOptions = (formData.nameOptions || []).map(n => n.trim()).filter(Boolean);
       const validSpecs = (formData.specifications || []).filter(s => (s.label && s.label.trim()) || (s.value && s.value.trim()));
-      const validProductDetails = (formData.productDetails || []).filter(d => d.label.trim() || d.value.trim());
+      const validProductDetails = richTextToProductDetails(formData.productDetailsText);
 
       const payload = {
         title: formData.name.trim(),
+        ...(formData.shopFilters ? buildFilterPayload(formData.shopFilters) : {}),
+        new_arrival: formData.new_arrival_option || 'auto',
         productname: formData.name.trim(),
         category_id: formData.category_id,
         subcategory_name: formData.subCategory,
@@ -804,8 +779,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         full_description: (formData.fullDescription || formData.description || '').trim(),
         nameOptions: validNameOptions,
         name_options: validNameOptions,
-        productDetails: validSpecs.length > 0 ? validSpecs : validProductDetails,
-        product_details: validSpecs.length > 0 ? validSpecs : validProductDetails,
+        // Product Details are independent of Additional Information (specifications)
+        productDetails: validProductDetails,
+        product_details: validProductDetails,
         originalPrice: Number(formData.originalPrice) || Number(formData.price),
         originalprice: Number(formData.originalPrice) || Number(formData.price),
         discountPercent: Number(formData.discountPercent) || 0,
@@ -1154,6 +1130,11 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                         ? "Featured in 'Recommended For You' collections."
                         : 'Not featured in recommendation lists.'}
                     </p>
+                    {recommendationStatus && (
+                    <p className={`text-[11px] mt-1 leading-snug ${recommendationStatus.missing > 0 ? 'text-amber-700 font-semibold' : 'text-neutral-500'}`}>
+                      {recommendationStatus.text}
+                    </p>
+                  )}
                   </div>
                   <button
                     type="button"
@@ -1191,46 +1172,56 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 {errors.name && <p className="text-[11px] text-rose-600 font-medium">{errors.name}</p>}
               </div>
 
-              {/* 2. Category & Subcategory Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    ref={categoryRef}
-                    value={formData.category_id}
-                    onChange={(e) => {
-                      setFormData(prev => ({ ...prev, category_id: e.target.value }));
-                      validateField('category_id', e.target.value);
-                    }}
-                    onBlur={() => handleBlur('category_id')}
-                    className={`w-full px-3.5 py-2.5 bg-neutral-50 border rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 transition-all ${
-                      errors.category_id ? 'border-rose-400 focus:ring-rose-400' : 'border-neutral-200 focus:ring-brand-dark'
-                    }`}
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category_id && <p className="text-[11px] text-rose-600 font-medium">{errors.category_id}</p>}
-                </div>
+              {/* 2. Category */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                  Category <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  ref={categoryRef}
+                  value={formData.category_id}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, category_id: e.target.value }));
+                    validateField('category_id', e.target.value);
+                  }}
+                  onBlur={() => handleBlur('category_id')}
+                  className={`w-full px-3.5 py-2.5 bg-neutral-50 border rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 transition-all ${
+                    errors.category_id ? 'border-rose-400 focus:ring-rose-400' : 'border-neutral-200 focus:ring-brand-dark'
+                  }`}
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.category_id && <p className="text-[11px] text-rose-600 font-medium">{errors.category_id}</p>}
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Subcategory (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.subCategory}
-                    onChange={(e) => setFormData(prev => ({ ...prev, subCategory: e.target.value }))}
-                    placeholder="e.g. Festive Lehengas, Dupattas"
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all"
-                  />
+              {/* Shop Filters: storefront collection filters this product appears under */}
+              <ProductFilterPicker
+                value={formData.shopFilters}
+                onChange={(shopFilters) => setFormData(prev => ({ ...prev, shopFilters }))}
+              />
+
+              {/* New Arrivals placement */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl border border-neutral-200/80 bg-neutral-50/60">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">New Arrivals</label>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Automatic shows the product in New Arrivals for {Math.round(NEW_ARRIVAL_DAYS / 30)} months after it is created, newest first.
+                  </p>
                 </div>
+                <select
+                  value={formData.new_arrival_option || 'auto'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, new_arrival_option: e.target.value }))}
+                  className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-800 focus:outline-none focus:border-black cursor-pointer"
+                >
+                  <option value="auto">Automatic (3 months)</option>
+                  <option value="always">Always show</option>
+                  <option value="hide">Don't show</option>
+                </select>
               </div>
 
               {/* 3. Short Description */}
@@ -1305,52 +1296,118 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   </div>
                 </div>
 
-                {/* Product Details (Dynamic Key/Value List) */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider">
-                      Product Details (Bullet Points)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleAddProductDetail}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-dark hover:text-black no-underline hover:no-underline cursor-pointer transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Detail
-                    </button>
+                {/* Product Details (Rich Editor) - hidden on the storefront when left empty */}
+                <RichDescriptionEditor
+                  id="productDetails"
+                  value={formData.productDetailsText || ''}
+                  onChange={(val) => setFormData(prev => ({ ...prev, productDetailsText: val }))}
+                  placeholder="Fabric, fit, lining, closure, care notes... Use headings and bullet lists to structure the details."
+                  title="PRODUCT DETAILS"
+                  badgeText="RICH EDITOR"
+                  rows={5}
+                />
+
+                {/* Product Details table (storefront) - shown under the rich details, hidden when empty */}
+                <div className="space-y-3 pt-3 border-t border-neutral-200/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                          Product Details Table
+                        </label>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
+                          Shown in Product Details
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">
+                        Rows shown as a table inside the "PRODUCT DETAILS" section on the product page. Leave empty to hide the table.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={handleLoadAdditionalInfoTemplate}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
+                        title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
+                      >
+                        Load Preset
+                      </button>
+                      {(formData.specifications || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearAdditionalInfo}
+                          className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
+                          title="Clear all rows"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleAddSpecification}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {!formData.productDetails || formData.productDetails.length === 0 ? (
-                      <p className="text-xs text-neutral-400 italic">No product details added.</p>
-                    ) : (
-                      formData.productDetails.map((detail, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+
+                  {!formData.specifications || formData.specifications.length === 0 ? (
+                    <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
+                      <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleLoadAdditionalInfoTemplate}
+                          className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                        >
+                          Load Standard Preset Rows
+                        </button>
+                        <span className="text-neutral-300">•</span>
+                        <button
+                          type="button"
+                          onClick={handleAddSpecification}
+                          className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
+                        >
+                          + Add Custom Row
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                        <div className="col-span-4">Attribute / Title</div>
+                        <div className="col-span-7">Value / Specification Detail</div>
+                        <div className="col-span-1 text-center">Action</div>
+                      </div>
+                      {formData.specifications.map((spec, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
                           <input
                             type="text"
-                            value={detail.label}
-                            onChange={(e) => handleProductDetailChange(idx, 'label', e.target.value)}
-                            placeholder="Label (e.g. Fabric)"
-                            className="w-1/3 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                            value={spec.label}
+                            onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
+                            placeholder="e.g. Fabric, Closure, Lining, Care"
+                            className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
                           />
                           <input
                             type="text"
-                            value={detail.value}
-                            onChange={(e) => handleProductDetailChange(idx, 'value', e.target.value)}
-                            placeholder="Value (e.g. Cora cotton - breathable)"
-                            className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:bg-white"
+                            value={spec.value}
+                            onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
+                            placeholder="e.g. Embroidered fabric with sequin detailing"
+                            className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveProductDetail(idx)}
-                            className="p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            title="Remove detail"
+                            onClick={() => handleRemoveSpecification(idx)}
+                            className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Remove row"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1733,7 +1790,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                         }`}
                       >
                         <span
-                          className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                          className={`w-2.5 h-2.5 rounded-full border shrink-0 ${isSelected ? 'border-white/80' : 'border-black/20'}`}
                           style={{ background: hex }}
                         />
                         <span>{isSelected ? `✓ ${name}` : `+ ${name}`}</span>
@@ -1749,7 +1806,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                       : 'border-neutral-200 focus-within:border-neutral-400'
                   }`}
                 >
-                  {formData.colors.map((col) => (
+                  {/* Presets are toggled above; only custom colors are listed here */}
+                  {formData.colors.filter((col) => !POPULAR_FASHION_COLORS.some(({ name, hex }) => col.toLowerCase() === name.toLowerCase() || col.toLowerCase() === hex.toLowerCase())).map((col) => (
                     <span
                       key={col}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-neutral-200 text-brand-dark text-xs font-semibold rounded-md shadow-2xs"
@@ -1798,109 +1856,6 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium pt-0.5 animate-in fade-in">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>{colorError}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 9. Additional Information (Storefront Accordion) */}
-              <div className="space-y-3 pt-3 border-t border-neutral-200/80">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
-                        Additional Information
-                      </label>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-neutral-900 text-white rounded">
-                        Storefront Accordion
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      Dynamically customize rows displayed under the "ADDITIONAL INFORMATION" accordion on the product page.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={handleLoadAdditionalInfoTemplate}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded transition-colors cursor-pointer"
-                      title="Load standard luxury apparel preset rows (Fabric, Skirt hem, Closure, Lining, Top)"
-                    >
-                      Load Preset
-                    </button>
-                    {(formData.specifications || []).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAdditionalInfo}
-                        className="text-[11px] font-semibold text-neutral-400 hover:text-rose-600 px-1 py-1 transition-colors cursor-pointer"
-                        title="Clear all rows"
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleAddSpecification}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-dark hover:bg-neutral-800 px-2.5 py-1 rounded transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Row
-                    </button>
-                  </div>
-                </div>
-
-                {!formData.specifications || formData.specifications.length === 0 ? (
-                  <div className="p-4 bg-neutral-50 border border-dashed border-neutral-200 rounded-xl text-center">
-                    <p className="text-xs text-neutral-500 mb-2">No additional information rows configured yet.</p>
-                    <div className="flex items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleLoadAdditionalInfoTemplate}
-                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
-                      >
-                        Load Standard Preset Rows
-                      </button>
-                      <span className="text-neutral-300">•</span>
-                      <button
-                        type="button"
-                        onClick={handleAddSpecification}
-                        className="text-xs font-bold text-brand-dark hover:underline cursor-pointer"
-                      >
-                        + Add Custom Row
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                      <div className="col-span-4">Attribute / Title</div>
-                      <div className="col-span-7">Value / Specification Detail</div>
-                      <div className="col-span-1 text-center">Action</div>
-                    </div>
-                    {formData.specifications.map((spec, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 bg-neutral-50/80 rounded-lg border border-neutral-200/70">
-                        <input
-                          type="text"
-                          value={spec.label}
-                          onChange={(e) => handleSpecChange(idx, 'label', e.target.value)}
-                          placeholder="e.g. Fabric, Closure, Lining, Care"
-                          className="w-full sm:w-1/3 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans font-medium text-brand-dark focus:outline-none focus:border-brand-dark"
-                        />
-                        <input
-                          type="text"
-                          value={spec.value}
-                          onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
-                          placeholder="e.g. Embroidered fabric with sequin detailing"
-                          className="w-full sm:flex-1 px-3 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-sans text-brand-dark focus:outline-none focus:border-brand-dark"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSpecification(idx)}
-                          className="self-end sm:self-center p-2 text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
-                          title="Remove row"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
@@ -2056,6 +2011,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                     <video
                       src={formData.video_url}
                       controls
+                      muted
                       playsInline
                       className="w-full max-h-56 object-contain bg-black"
                     />
