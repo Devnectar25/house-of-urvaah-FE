@@ -65,3 +65,20 @@ export const getSupabaseMediaUrl = (path) => {
 
   return `${CDN_BASE_URL}/${cleanPath}`;
 };
+
+/**
+ * Resized, compressed copy of a storage image (Supabase image transformations). Browsers that
+ * accept WebP get WebP automatically: a 1.6 MB PNG becomes ~70 KB at width 600. Non-storage URLs
+ * (blob previews, other hosts, videos) are returned unchanged.
+ */
+export const getOptimizedImageUrl = (path, width = 800, quality = 75) => {
+  const url = getSupabaseMediaUrl(path);
+  const marker = '/storage/v1/object/public/';
+  if (!url.includes(marker) || /\.(mp4|webm|mov|m4v|gif|svg)(\?|$)/i.test(url)) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url.replace(marker, '/storage/v1/render/image/public/')}${sep}width=${width}&quality=${quality}`;
+};
+
+/** A stored media value that can actually be loaded by other visitors (not a tab-local preview) */
+export const isPersistentMediaUrl = (path) =>
+  typeof path === 'string' && path.trim() !== '' && !/^blob:/i.test(path.trim());

@@ -6,6 +6,7 @@ import {
   Sliders,
   Percent,
   CreditCard,
+  Banknote,
   Receipt,
   AlertCircle,
   Info,
@@ -20,6 +21,7 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import apiClient from '../../lib/apiClient';
 
 const DEFAULT_SETTINGS = {
+  gst_enabled: true,
   gst_percentage: 18,
   enable_tiered_gst: true,
   gst_threshold: 2500,
@@ -27,6 +29,8 @@ const DEFAULT_SETTINGS = {
   gst_rate_above: 18,
   card_charge_enabled: true,
   card_charge_percentage: 2,
+  cod_charge_enabled: false,
+  cod_charge_amount: 0,
   store_name: 'House of Urvaah',
   support_email: 'houseofurvaah@gmail.com',
   free_shipping_threshold: 2999,
@@ -58,6 +62,7 @@ export const AdminSettings = () => {
       if (res && res.success && res.data) {
         const d = res.data;
         const loaded = {
+          gst_enabled: d.gst_enabled !== false,
           gst_percentage: Number(d.gst_percentage) || 18,
           enable_tiered_gst: Boolean(d.enable_tiered_gst),
           gst_threshold: Number(d.gst_threshold) || 2500,
@@ -65,6 +70,8 @@ export const AdminSettings = () => {
           gst_rate_above: Number(d.gst_rate_above) || 18,
           card_charge_enabled: Boolean(d.card_charge_enabled),
           card_charge_percentage: Number(d.card_charge_percentage) || 2,
+          cod_charge_enabled: d.cod_charge_enabled === true,
+          cod_charge_amount: Number(d.cod_charge_amount) || 0,
           store_name: d.store_name || 'House of Urvaah',
           support_email: d.support_email || 'houseofurvaah@gmail.com',
           free_shipping_threshold: Number(d.free_shipping_threshold) || 2999,
@@ -110,6 +117,7 @@ export const AdminSettings = () => {
       if (res && res.success && res.data) {
         const d = res.data;
         const updated = {
+          gst_enabled: d.gst_enabled !== false,
           gst_percentage: Number(d.gst_percentage) || 18,
           enable_tiered_gst: Boolean(d.enable_tiered_gst),
           gst_threshold: Number(d.gst_threshold) || 2500,
@@ -117,6 +125,8 @@ export const AdminSettings = () => {
           gst_rate_above: Number(d.gst_rate_above) || 18,
           card_charge_enabled: Boolean(d.card_charge_enabled),
           card_charge_percentage: Number(d.card_charge_percentage) || 2,
+          cod_charge_enabled: d.cod_charge_enabled === true,
+          cod_charge_amount: Number(d.cod_charge_amount) || 0,
           store_name: d.store_name || 'House of Urvaah',
           support_email: d.support_email || 'houseofurvaah@gmail.com',
           free_shipping_threshold: Number(d.free_shipping_threshold) || 2999,
@@ -145,6 +155,7 @@ export const AdminSettings = () => {
 
   // Simulator calculations
   const simTaxRate = useMemo(() => {
+    if (!settings.gst_enabled) return 0;
     if (settings.enable_tiered_gst) {
       return simSubtotal > settings.gst_threshold ? settings.gst_rate_above : settings.gst_rate_below;
     }
@@ -164,7 +175,11 @@ export const AdminSettings = () => {
     return 0;
   }, [simBasePayable, simPaymentMethod, settings]);
 
-  const simGrandTotal = simBasePayable + simCardSurcharge;
+  const simCodCharge = simPaymentMethod === 'cod' && settings.cod_charge_enabled
+    ? Math.round(Number(settings.cod_charge_amount) || 0)
+    : 0;
+
+  const simGrandTotal = simBasePayable + simCardSurcharge + simCodCharge;
 
   const formatCurrency = (val) => {
     return `${settings.currency_symbol || '₹'}${Number(val || 0).toLocaleString('en-IN')}`;
@@ -235,11 +250,45 @@ export const AdminSettings = () => {
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70">
-                    Active in DB
+                  <span
+                    className={`text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                      settings.gst_enabled
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200/70'
+                        : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                    }`}
+                  >
+                    {settings.gst_enabled ? 'GST Enabled' : 'Disabled'}
                   </span>
                 </div>
 
+                {/* GST on/off */}
+                <div className="flex items-center justify-between p-3.5 bg-neutral-50/80 rounded-xl border border-neutral-200/80">
+                  <div className="space-y-0.5 pr-4">
+                    <div className="text-xs font-bold text-brand-dark uppercase tracking-wider">
+                      Charge GST on Orders
+                    </div>
+                    <div className="text-[11px] text-neutral-500 leading-snug">
+                      When off, no GST is added at checkout and the GST line is hidden. Orders already placed keep the GST they were charged.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.gst_enabled}
+                    onClick={() => handleChange('gst_enabled', !settings.gst_enabled)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.gst_enabled ? 'bg-emerald-600' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.gst_enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {settings.gst_enabled && (<>
                 {/* Standard GST Percentage */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -385,6 +434,7 @@ export const AdminSettings = () => {
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
 
               {/* ─────────────────────────────────────────────────────────────
@@ -479,6 +529,102 @@ export const AdminSettings = () => {
                           }`}
                         >
                           {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ─────────────────────────────────────────────────────────────
+                  CARD 2B: CASH ON DELIVERY CHARGE
+                  ───────────────────────────────────────────────────────────── */}
+              <div className="bg-white border border-neutral-200/90 rounded-2xl p-6 shadow-2xs space-y-5 transition-all">
+                <div className="border-b border-neutral-100 pb-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-sky-800 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Banknote className="w-4 h-4 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-admin font-bold text-brand-dark uppercase tracking-wider">
+                        Cash on Delivery Charge
+                      </h3>
+                      <p className="text-[11px] text-neutral-500">
+                        Flat amount added to the order total when the customer chooses Cash on Delivery.
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                      settings.cod_charge_enabled
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200/70'
+                        : 'bg-neutral-100 text-neutral-600 border-neutral-200'
+                    }`}
+                  >
+                    {settings.cod_charge_enabled ? 'COD Charge On' : 'Disabled'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 bg-neutral-50/80 rounded-xl border border-neutral-200/80">
+                  <div className="space-y-0.5 pr-4">
+                    <div className="text-xs font-bold text-brand-dark uppercase tracking-wider">
+                      Apply COD Charge
+                    </div>
+                    <div className="text-[11px] text-neutral-500 leading-snug">
+                      When on, COD orders include this charge at checkout, on the order page and on the invoice. UPI and card payments are not affected.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.cod_charge_enabled}
+                    onClick={() => handleChange('cod_charge_enabled', !settings.cod_charge_enabled)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      settings.cod_charge_enabled ? 'bg-sky-700' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        settings.cod_charge_enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {settings.cod_charge_enabled && (
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
+                      COD Charge Amount (₹)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 font-bold text-xs">₹</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={Number(settings.cod_charge_amount) > 0 ? String(Number(settings.cod_charge_amount)) : ''}
+                        onChange={(e) => {
+                          // digits only, no leading zeros ("0100" -> 100), capped at 5000
+                          const digits = e.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                          handleChange('cod_charge_amount', Math.min(5000, Number(digits) || 0));
+                        }}
+                        className="w-full pl-8 pr-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-semibold text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-dark/20 focus:border-brand-dark transition-all"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Common:</span>
+                      {[49, 99, 149, 199].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => handleChange('cod_charge_amount', amt)}
+                          className={`text-[11px] px-2.5 py-0.5 rounded-md font-mono font-medium transition-all cursor-pointer ${
+                            Number(settings.cod_charge_amount) === amt
+                              ? 'bg-brand-dark text-white shadow-2xs'
+                              : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                          }`}
+                        >
+                          ₹{amt}
                         </button>
                       ))}
                     </div>
@@ -625,7 +771,7 @@ export const AdminSettings = () => {
                     <label className="block text-[11px] font-semibold text-neutral-700 uppercase tracking-wider mb-1">
                       Simulated Payment Method
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setSimPaymentMethod('upi')}
@@ -635,7 +781,18 @@ export const AdminSettings = () => {
                             : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
                         }`}
                       >
-                        <span>UPI / COD (0%)</span>
+                        <span>UPI</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSimPaymentMethod('cod')}
+                        className={`text-xs py-2 px-3 rounded-lg border font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          simPaymentMethod === 'cod'
+                            ? 'bg-sky-800 text-white border-sky-800 shadow-2xs'
+                            : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+                        }`}
+                      >
+                        <span>COD ({settings.cod_charge_enabled ? `₹${Number(settings.cod_charge_amount) || 0}` : 'Off'})</span>
                       </button>
                       <button
                         type="button"
@@ -671,6 +828,13 @@ export const AdminSettings = () => {
                     </span>
                     <span className="font-bold text-neutral-900">+{formatCurrency(simTaxAmount)}</span>
                   </div>
+
+                  {simCodCharge > 0 && (
+                    <div className="flex justify-between items-center text-sky-900 bg-sky-50 p-2 rounded-lg border border-sky-200/80">
+                      <span className="font-sans uppercase text-[11px] font-semibold tracking-wider">COD Charge</span>
+                      <span className="font-bold">+{formatCurrency(simCodCharge)}</span>
+                    </div>
+                  )}
 
                   {simPaymentMethod === 'card' && settings.card_charge_enabled && (
                     <div className="flex justify-between items-center text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200/80">

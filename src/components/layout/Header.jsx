@@ -191,6 +191,9 @@ export const Header = () => {
               aria-label="House of Urvaah Home"
               data-allow-guest="true"
               onClick={() => {
+                sessionStorage.removeItem('urvaah_home_last_section');
+                sessionStorage.removeItem('urvaah_home_scroll_y');
+                sessionStorage.removeItem('urvaah_home_should_restore');
                 window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
               }}
               className="inline-flex items-center justify-center py-1"

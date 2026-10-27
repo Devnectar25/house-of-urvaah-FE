@@ -42,7 +42,7 @@ import { getOrderGstInfo, getItemGstBreakdown, getReturnGstBreakdown } from '../
 // Status options matching House of Urvaah lifecycle and policy values
 const ORDER_STATUS_OPTIONS = [
   { value: 'Placed', label: 'Placed' },
-  { value: 'Pending', label: 'Pending' },
+  { value: 'Pending', label: 'New Order (Pending)' },
   { value: 'Confirmed', label: 'Confirmed' },
   { value: 'Processing', label: 'Processing' },
   { value: 'Packed', label: 'Packed' },
@@ -4955,11 +4955,15 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                         onChange={(e) => handlePaymentStatusChange(e.target.value)}
                         className="w-full bg-white border border-neutral-200 text-brand-dark text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-dark font-medium cursor-pointer"
                       >
-                        {PAYMENT_STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
+                        {PAYMENT_STATUS_OPTIONS.map((opt) => {
+                          // COD is collected on delivery: label the pending state that way
+                          const isCodOrder = /cod|cash/i.test(`${order?.payment_method || ''} ${order?.payment_type || ''}`);
+                          return (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.value === 'Pending' && isCodOrder ? 'COD · Due on delivery' : opt.label}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -5083,7 +5087,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                     ['awb assigned', 'pickup scheduled', 'picked up', 'shipped', 'in transit', 'out for delivery', 'delivered'].some(s => logisticsLower.includes(s)) ||
                     ['shipped', 'in transit', 'out for delivery', 'delivered'].some(s => curSt.includes(s))
                   );
-                  const awbLockTitle = 'Generate AWB & Mark Shipped first';
+                  const awbLockTitle = 'Waiting for the courier AWB';
 
                   if (isOrderCancelled) {
                     return (
@@ -5125,7 +5129,8 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                   return (
                     <>
                       <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {(!isAwbGenerated || ['placed', 'confirmed', 'pending', 'processing'].includes(curSt)) && (
+                        {/* AWB is generated automatically when the order is placed; this only appears if that failed */}
+                        {!isAwbGenerated && (
                           <button
                             type="button"
                             disabled={logisticsLoading}
@@ -5133,7 +5138,7 @@ export const OrderDetailModal = ({ orderId, isOpen, onClose, onOptimisticPreview
                             className="px-3.5 py-2 bg-neutral-950 hover:bg-black text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
                           >
                             {logisticsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
-                            <span>Generate AWB &amp; Mark Shipped</span>
+                            <span>Retry AWB Generation</span>
                           </button>
                         )}
 

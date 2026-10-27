@@ -29,6 +29,19 @@ export const CategoryGrid = () => {
   const [isHovered, setIsHovered] = useState(false);
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
 
+  const handleProductNavigate = (prod) => {
+    if (!prod) return;
+    try {
+      sessionStorage.setItem('urvaah_home_last_section', 'recommended');
+      sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+      sessionStorage.setItem('urvaah_home_should_restore', 'true');
+    } catch (err) {}
+    navigate(getProductUrl(prod), {
+      state: { fromSection: 'recommended', fromScrollY: window.scrollY || 0 }
+    });
+  };
+
+
   const lastUserInteractionRef = useRef(0);
   const targetScrollLeftRef = useRef(null);
 
@@ -268,12 +281,7 @@ export const CategoryGrid = () => {
             >
               {/* Product Photo Container */}
               <div
-                onClick={() => {
-                  if (product) {
-                    navigate(getProductUrl(product));
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                  }
-                }}
+                onClick={() => handleProductNavigate(product)}
                 className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100/90 cursor-pointer"
               >
                 <img
@@ -319,12 +327,7 @@ export const CategoryGrid = () => {
 
               {/* Product Info Below Image */}
               <div
-                onClick={() => {
-                  if (product) {
-                    navigate(getProductUrl(product));
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                  }
-                }}
+                onClick={() => handleProductNavigate(product)}
                 className="mt-2.5 flex flex-col text-left cursor-pointer hover:opacity-80 transition-opacity"
               >
                 <h3 className="text-[11px] sm:text-xs font-semibold tracking-wider text-brand-dark uppercase line-clamp-1">
