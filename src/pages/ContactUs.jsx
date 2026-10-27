@@ -99,7 +99,7 @@ export const ContactUs = () => {
     name: '',
     email: '',
     phone: '',
-    subject: 'Order Inquiry',
+    subject: 'Order & Delivery Inquiry',
     message: '',
   });
   const [customSubject, setCustomSubject] = useState('');
@@ -387,7 +387,7 @@ export const ContactUs = () => {
           <div className="w-16 h-[1px] bg-neutral-900/30 mb-6" />
 
           <p className="max-w-2xl text-base sm:text-lg md:text-xl font-serif leading-relaxed text-neutral-700 tracking-wide font-light text-center">
-            Our Customer Care is available to assist you with bespoke styling, order inquiries, boutique appointments, and press relations.
+            Our Customer Care is available to assist you with bespoke styling, order inquiries, returns & exchanges, and sizing consultations.
           </p>
         </motion.div>
       </section>
@@ -522,10 +522,12 @@ export const ContactUs = () => {
                       onChange={handleChange}
                       className="w-full bg-white border border-neutral-300 px-4 py-3 text-xs text-neutral-900 font-medium focus:outline-none focus:border-black transition-colors"
                     >
-                      <option value="Order Inquiry">Order & Delivery Inquiry</option>
-                      <option value="Private Customer Care">Private Customer Care & Styling</option>
-                      <option value="Boutique Appointment">Boutique Appointment</option>
-                      <option value="Press & Media">Press, PR & Wholesale</option>
+                      <option value="Order & Delivery Inquiry">Order & Delivery Inquiry</option>
+                      <option value="Returns, Exchanges & Refunds">Returns, Exchanges & Refunds</option>
+                      <option value="Size, Fit & Styling Advice">Size, Fit & Styling Advice</option>
+                      <option value="Payment, Invoice & Billing">Payment, Invoice & Billing</option>
+                      <option value="Private Customer Care">Private Customer Care & Bespoke Orders</option>
+                      <option value="Press, PR & Wholesale">Press, PR & Wholesale</option>
                       <option value="Other">Other (Write Custom Subject)</option>
                     </select>
 

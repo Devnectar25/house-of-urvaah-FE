@@ -500,6 +500,26 @@ button:not(.no-global-hover):not([data-no-hover="true"]) {
   color: #111827;
 }
 
+/* Visual WYSIWYG ContentEditable Editor Styles */
+.visual-editor {
+  min-height: 140px;
+  max-height: 380px;
+  overflow-y: auto;
+  outline: none !important;
+}
+
+.visual-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+  display: block;
+  font-style: italic;
+}
+
+.visual-editor:focus {
+  outline: none !important;
+}
+
 /* Global High-End Frosted Glass Backdrop Blur for Modals & Overlays */
 .swal2-container.swal2-backdrop-show {
   background: rgba(0, 0, 0, 0.6) !important;

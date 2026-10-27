@@ -137,9 +137,9 @@ export const AboutUs = () => {
               alt="House of Urvaah Editorial Portrait"
               className="w-full h-full object-contain filter brightness-[0.97] transition-all duration-700 ease-out group-hover:opacity-0 group-hover:scale-105"
             />
-            {/* Hover Image: Corset03 */}
+            {/* Hover Image: corset back view (lace-up) */}
             <img
-              src={getSupabaseMediaUrl('Images/Corset03.png')}
+              src={getSupabaseMediaUrl('products/1793011853371-Corset03.png')}
               alt="House of Urvaah Editorial Portrait Hover"
               className="absolute inset-0 w-full h-full object-contain filter brightness-[0.97] opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:scale-105"
             />

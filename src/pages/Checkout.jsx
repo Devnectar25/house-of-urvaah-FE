@@ -47,6 +47,7 @@ import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModa
 import { shippingApi } from '../services/shippingApi';
 import { useModalScrollLock, forceUnlockScroll } from '../hooks/useModalScrollLock';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
+import { startVisiblePolling } from '../lib/livePolling';
 import Swal from 'sweetalert2';
 import { getProductUrl } from '../utils/productUrl';
 
@@ -1129,6 +1130,11 @@ export const Checkout = () => {
         String(payload.order_number || payload.orderNumber || '').toLowerCase() === targetNum ||
         String(payload.id || '').toLowerCase() === targetNum;
 
+      if (match) {
+        clearTimeout(window.__urvaahOrderRefreshTimer);
+        window.__urvaahOrderRefreshTimer = setTimeout(() => silentRefreshRef.current?.(), 600);
+      }
+
       if (match && payload.status) {
         setPlacedOrderDetails((prev) => {
           if (!prev) return prev;
@@ -1198,11 +1204,11 @@ export const Checkout = () => {
   }, [location.state?.openAddressEdit, placedOrderDetails, user]);
 
   // On-demand order status refresh (called strictly as required)
-  const refreshLatestStatus = async () => {
+  const refreshLatestStatus = async ({ silent = false } = {}) => {
     const currentOrderNum = placedOrderNumber || placedOrderDetails?.orderNumber || searchParams.get('orderNumber') || searchParams.get('orderId');
     if (!currentOrderNum || isRefreshingStatus) return;
 
-    setIsRefreshingStatus(true);
+    if (!silent) setIsRefreshingStatus(true);
     try {
       const res = await apiClient(`/api/orders/${currentOrderNum}`);
       const ord = res?.data || res?.order;
@@ -1227,14 +1233,26 @@ export const Checkout = () => {
         } else {
           setOrderCancelled(false);
         }
-        showToast('Order details refreshed.', 'success');
+        if (!silent) showToast('Order details refreshed.', 'success');
       }
     } catch (e) {
       console.warn('Manual order status refresh warning:', e.message);
     } finally {
-      setIsRefreshingStatus(false);
+      if (!silent) setIsRefreshingStatus(false);
     }
   };
+
+  // Keep an open order page in step with admin changes made on other devices: reload the full
+  // order (items, pickup stage, replacement order) on every update signal and every 15s while the
+  // tab is visible, until the order reaches a final state.
+  const silentRefreshRef = useRef(null);
+  silentRefreshRef.current = () => refreshLatestStatus({ silent: true });
+  const liveOrderStatus = String(placedOrderDetails?.status || '').toLowerCase();
+  const isFinalOrderState = ['delivered', 'cancelled', 'canceled', 'refunded', 'returned', 'returned & replaced'].includes(liveOrderStatus);
+  useEffect(() => {
+    if (!orderPlaced || isFinalOrderState) return undefined;
+    return startVisiblePolling(() => silentRefreshRef.current?.(), 15000);
+  }, [orderPlaced, isFinalOrderState]);
 
   useEffect(() => {
     if (user) {
@@ -2092,7 +2110,13 @@ export const Checkout = () => {
               VIEW MY ORDERS
             </Link>
             <Link
-              to="/"
+              to="/#best-sellers"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                  sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                } catch (e) {}
+              }}
               className="inline-block border border-neutral-300 text-brand-dark text-xs font-sans font-bold tracking-[0.25em] uppercase px-6 py-3.5 hover:border-black transition-colors"
             >
               EXPLORE COLLECTION
@@ -2311,7 +2335,7 @@ export const Checkout = () => {
 
     const isDelivered = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed'));
     const isReplacementDelivered = isReplacementForwardOrder && !isOrderCancelled && !isCancellationRequested && (currentStatusStr.includes('delivered') || currentStatusStr.includes('completed') || Boolean(details.delivered_at || details.deliveredAt));
-    const isInvoiceEligible = isDelivered || isReplacementDelivered || isCustomerInvoiceEligible(details); // kept items stay invoiceable on partial returns
+    const isInvoiceEligible = isDelivered || isReplacementDelivered || isReturnQcRejected || isReturnRejected || isCustomerInvoiceEligible(details); // kept items stay invoiceable on partial returns
     const isOutForDelivery = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isDelivered || currentStatusStr.includes('out') || currentStatusStr.includes('delivery'));
     const isShipped = !isOrderCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isOutForDelivery || currentStatusStr.includes('shipped') || currentStatusStr.includes('transit') || currentStatusStr.includes('dispatched'));
 
@@ -6131,7 +6155,13 @@ export const Checkout = () => {
             Please add items to your cart before proceeding to checkout.
           </p>
           <Link
-            to="/"
+            to="/#best-sellers"
+            onClick={() => {
+              try {
+                sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                sessionStorage.setItem('urvaah_home_should_restore', 'true');
+              } catch (e) {}
+            }}
             className="inline-block bg-brand-dark text-white text-xs font-sans font-bold tracking-[0.25em] uppercase px-8 py-3.5 hover:bg-neutral-800 transition-colors"
           >
             EXPLORE COLLECTION

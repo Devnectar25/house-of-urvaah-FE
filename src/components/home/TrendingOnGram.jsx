@@ -482,6 +482,18 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   // Lock the page behind the modal (shared lock: pins the body so it cannot scroll, also on iOS)
   useModalScrollLock(true, onClose);
 
+  // Preload every gallery photo (same resized URLs the viewer uses) so the arrows switch instantly
+  useEffect(() => {
+    const gallery = Array.isArray(look?.product?.gallery) ? look.product.gallery : [];
+    const preloaded = gallery.flatMap((img) => [900, 160].map((w) => {
+      const im = new Image();
+      im.decoding = 'async';
+      im.src = getOptimizedImageUrl(img, w);
+      return im;
+    }));
+    return () => { preloaded.forEach((im) => { im.src = ''; }); };
+  }, [look]);
+
   const handleTogglePlay = (e) => {
     if (e) e.stopPropagation();
     if (!modalVideoRef.current) return;
@@ -784,7 +796,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {/* Main Product Image Viewer with Carousel Controls */}
-              <div className="relative w-full h-[320px] sm:h-[360px] md:h-[380px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
+              <div className="relative mx-auto h-[360px] sm:h-[400px] md:h-[420px] aspect-[3/4] max-w-full rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
                 <img
                   src={getOptimizedImageUrl(selectedImage, 900)}
                   alt={look.product.name}
@@ -793,7 +805,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = getSupabaseMediaUrl(selectedImage);
                   }}
-                  className="w-full h-full object-cover object-top transition-all duration-300"
+                  className="w-full h-full object-contain object-center transition-all duration-300"
                 />
 
                 {look.product.gallery.length > 1 && (

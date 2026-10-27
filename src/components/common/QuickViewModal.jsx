@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import { Button } from './Button';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 import { StockNotificationModal } from '../product/StockNotificationModal';
+import RichTextRenderer from './RichTextRenderer';
 
 export const QuickViewModal = () => {
   const { quickViewProduct, setQuickViewProduct, addToCart, toggleWishlist, isInWishlist, user } = useCart();
@@ -150,9 +151,18 @@ export const QuickViewModal = () => {
                 {formatPrice(quickViewProduct.price)}
               </div>
 
-              <p className="text-xs text-neutral-600 leading-relaxed mb-6 font-light">
-                {quickViewProduct.description}
-              </p>
+              {quickViewProduct.shortDescription ? (
+                <p className="text-xs text-neutral-600 leading-relaxed mb-6 font-light">
+                  {quickViewProduct.shortDescription}
+                </p>
+              ) : (
+                <div className="mb-6">
+                  <RichTextRenderer
+                    content={quickViewProduct.description}
+                    className="text-xs text-neutral-600 leading-relaxed font-light line-clamp-4"
+                  />
+                </div>
+              )}
 
               {/* Size Selection */}
               <div className="mb-6">

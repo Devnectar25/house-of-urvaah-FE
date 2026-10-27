@@ -4048,7 +4048,19 @@ export const Account = () => {
                   Explore our latest luxury edit to make your first purchase.
                 </p>
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                      sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                    } catch (e) {}
+                    navigate('/#best-sellers');
+                    setTimeout(() => {
+                      const el = document.getElementById('best-sellers');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }, 150);
+                  }}
                   className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer"
                 >
                   EXPLORE COLLECTION
@@ -4230,7 +4242,7 @@ export const Account = () => {
 
                   const isDelivered = !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed')) && !isInReturnFlow && !isInReplacementFlow;
                   const isReplacementDelivered = isReplacementForwardOrder && !isCancelled && !isCancellationRequested && (statusLower.includes('delivered') || statusLower.includes('completed') || Boolean(ord.delivered_at));
-                  const isInvoiceEligible = isDelivered || isReplacementDelivered || isCustomerInvoiceEligible(ord); // kept items stay invoiceable on partial returns
+                  const isInvoiceEligible = isDelivered || isReplacementDelivered || isReturnQcRejected || isReturnRejected || isCustomerInvoiceEligible(ord); // kept items stay invoiceable on partial returns
                   const isOutForDelivery = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isDelivered || statusLower.includes('out') || statusLower.includes('delivery'));
                   const isShipped = !isCancelled && !isCancellationRequested && !isInReturnFlow && !isInReplacementFlow && (isOutForDelivery || statusLower.includes('shipped') || statusLower.includes('transit') || statusLower.includes('dispatched'));
                   const isDeliveredOrderEver = isProductEverDelivered || isDelivered;
@@ -4955,7 +4967,19 @@ export const Account = () => {
                   Explore our luxury collection and click the heart icon on any piece to save it for later.
                 </p>
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                      sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                    } catch (e) {}
+                    navigate('/#best-sellers');
+                    setTimeout(() => {
+                      const el = document.getElementById('best-sellers');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }, 150);
+                  }}
                   className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer shadow-xs"
                 >
                   EXPLORE COLLECTION

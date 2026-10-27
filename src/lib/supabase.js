@@ -76,7 +76,9 @@ export const getOptimizedImageUrl = (path, width = 800, quality = 75) => {
   const marker = '/storage/v1/object/public/';
   if (!url.includes(marker) || /\.(mp4|webm|mov|m4v|gif|svg)(\?|$)/i.test(url)) return url;
   const sep = url.includes('?') ? '&' : '?';
-  return `${url.replace(marker, '/storage/v1/render/image/public/')}${sep}width=${width}&quality=${quality}`;
+  // resize=contain keeps the whole photo: without it Supabase keeps the original height and crops
+  // the width to a thin centre strip
+  return `${url.replace(marker, '/storage/v1/render/image/public/')}${sep}width=${width}&quality=${quality}&resize=contain`;
 };
 
 /** A stored media value that can actually be loaded by other visitors (not a tab-local preview) */

@@ -196,10 +196,10 @@ export const Footer = () => {
                 </a>
               </div>
 
-              {/* Client Concierge / Customer Care Details */}
+              {/* Customer Care Details */}
               <div className="pt-3.5 border-t border-neutral-200 font-sans">
                 <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-2">
-                  CLIENT CONCIERGE
+                  CUSTOMER CARE
                 </p>
                 <div className="space-y-2 text-xs text-neutral-600">
                   <a

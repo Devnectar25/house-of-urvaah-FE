@@ -192,6 +192,22 @@ const formatOrderDateTime = (dateStr) => {
   return { date, time, isRecent, relative };
 };
 
+
+// Return / replacement requests waiting for the admin stay on top (newest request first)
+const PENDING_REQUEST_STATUSES = ['return requested', 'return request processing', 'replace requested', 'replacement requested', 'replacement request processing', 'return & replacement requested'];
+const isPendingRequest = (order) => PENDING_REQUEST_STATUSES.includes(String(order?.status || '').toLowerCase());
+const compareOrdersForList = (a, b, direction) => {
+  const reqA = isPendingRequest(a);
+  const reqB = isPendingRequest(b);
+  if (reqA !== reqB) return reqA ? -1 : 1;
+  if (reqA) {
+    return new Date(b.return_request_at || b.updated_at || 0).getTime() - new Date(a.return_request_at || a.updated_at || 0).getTime();
+  }
+  const timeA = new Date(a.created_at || 0).getTime();
+  const timeB = new Date(b.created_at || 0).getTime();
+  return direction === 'asc' ? timeA - timeB : timeB - timeA;
+};
+
 export const AdminOrders = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -453,12 +469,8 @@ export const AdminOrders = () => {
         list = list.filter((o) => new Date(o.created_at).getTime() <= toTs);
       }
 
-      // Guarantee recent orders appear at the top by default (created_at DESC)
-      list.sort((a, b) => {
-        const timeA = new Date(a.created_at || 0).getTime();
-        const timeB = new Date(b.created_at || 0).getTime();
-        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-      });
+      // Return / replacement requests first, then the rest by order date
+      list.sort((a, b) => compareOrdersForList(a, b, sortOrder));
 
       setOrders(list);
       setTotalOrders(pagination.totalOrders ?? list.length);
@@ -540,11 +552,7 @@ export const AdminOrders = () => {
     const nextOrder = sortOrder === 'desc' ? 'asc' : 'desc';
     setSortOrder(nextOrder);
     setOrders((prev) =>
-      [...prev].sort((a, b) => {
-        const timeA = new Date(a.created_at || 0).getTime();
-        const timeB = new Date(b.created_at || 0).getTime();
-        return nextOrder === 'asc' ? timeA - timeB : timeB - timeA;
-      })
+      [...prev].sort((a, b) => compareOrdersForList(a, b, nextOrder))
     );
   };
 
