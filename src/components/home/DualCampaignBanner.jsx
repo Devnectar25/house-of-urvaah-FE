@@ -4,10 +4,7 @@ import { motion } from 'framer-motion';
 import { getSupabaseMediaUrl, CDN_BASE_URL } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
-<<<<<<< HEAD
-=======
 import { startVisiblePolling } from '../../lib/livePolling';
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 const SUPABASE_CDN = CDN_BASE_URL || 'https://fhbdceauisvlcpmuzpmf.supabase.co/storage/v1/object/public/houseofurvaah-media';
 
@@ -59,6 +56,7 @@ export const DualCampaignBanner = () => {
     navigate(getProductUrl(slug), {
       state: { fromSection: 'hero-campaign', fromScrollY: window.scrollY || 0 }
     });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // Dynamic banner data for all 4 positions from admin configuration
@@ -142,11 +140,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-<<<<<<< HEAD
-            onClick={() => navigate(getProductUrl(topLeftData?.link || 'bs-102'))}
-=======
             onClick={() => handleBannerClick(topLeftData?.link || 'bs-102')}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {blueImages.map((src, i) => (
@@ -168,11 +162,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-<<<<<<< HEAD
-            onClick={() => navigate(getProductUrl(bottomLeftData?.link || 'bs-104'))}
-=======
             onClick={() => handleBannerClick(bottomLeftData?.link || 'bs-104')}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {peachImages.map((src, i) => (
@@ -201,11 +191,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-<<<<<<< HEAD
-            onClick={() => navigate(getProductUrl(topRightData?.link || 'bs-101'))}
-=======
             onClick={() => handleBannerClick(topRightData?.link || 'bs-101')}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {brownImages.map((src, i) => (
@@ -227,11 +213,7 @@ export const DualCampaignBanner = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-<<<<<<< HEAD
-            onClick={() => navigate(getProductUrl(bottomRightData?.link || 'bs-103'))}
-=======
             onClick={() => handleBannerClick(bottomRightData?.link || 'bs-103')}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             className="group relative w-full h-[65vh] sm:h-[90vh] md:h-[125vh] lg:h-[135vh] overflow-hidden bg-neutral-100 cursor-pointer"
           >
             {corsetImages.map((src, i) => (

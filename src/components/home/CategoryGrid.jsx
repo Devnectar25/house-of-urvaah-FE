@@ -6,8 +6,6 @@ import { useCart } from '../../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { productApi } from '../../services/productApi';
 import { getProductUrl } from '../../utils/productUrl';
-<<<<<<< HEAD
-=======
 import { startVisiblePolling } from '../../lib/livePolling';
 import { MIN_RECOMMENDED_PRODUCTS } from '../../constants/recommendations';
 
@@ -21,7 +19,6 @@ const getRecommendedCover = (product) => {
   const idx = RECOMMENDED_COVER_INDEX[String(product?.id)];
   return (idx !== undefined && gallery[idx]) || product?.image;
 };
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
@@ -42,6 +39,7 @@ export const CategoryGrid = () => {
     navigate(getProductUrl(prod), {
       state: { fromSection: 'recommended', fromScrollY: window.scrollY || 0 }
     });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
 
@@ -284,16 +282,7 @@ export const CategoryGrid = () => {
             >
               {/* Product Photo Container */}
               <div
-<<<<<<< HEAD
-                onClick={() => {
-                  if (product) {
-                    navigate(getProductUrl(product));
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                  }
-                }}
-=======
                 onClick={() => handleProductNavigate(product)}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
                 className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100/90 cursor-pointer"
               >
                 <img
@@ -339,16 +328,7 @@ export const CategoryGrid = () => {
 
               {/* Product Info Below Image */}
               <div
-<<<<<<< HEAD
-                onClick={() => {
-                  if (product) {
-                    navigate(getProductUrl(product));
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                  }
-                }}
-=======
                 onClick={() => handleProductNavigate(product)}
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
                 className="mt-2.5 flex flex-col text-left cursor-pointer hover:opacity-80 transition-opacity"
               >
                 <h3 className="text-[11px] sm:text-xs font-semibold tracking-wider text-brand-dark uppercase line-clamp-1">

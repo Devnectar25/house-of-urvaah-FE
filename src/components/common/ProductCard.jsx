@@ -136,10 +136,6 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
   const handleCardClick = (e) => {
     if (isStockModalOpen) return;
     if (product) {
-<<<<<<< HEAD
-      navigate(getProductUrl(product));
-      window.scrollTo({ top: 0, behavior: 'instant' });
-=======
       // Find parent section id if on homepage
       const sectionEl = e?.currentTarget?.closest('section[id], [data-section-id]');
       const sectionId = sectionEl?.getAttribute('data-section-id') || sectionEl?.id || 'best-sellers';
@@ -151,7 +147,7 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
       navigate(getProductUrl(product), {
         state: { fromSection: sectionId, fromScrollY: window.scrollY || 0 }
       });
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   };
 

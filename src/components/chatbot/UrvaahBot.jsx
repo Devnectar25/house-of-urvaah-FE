@@ -622,10 +622,6 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
     }
 
     if (product) {
-<<<<<<< HEAD
-      navigate(getProductUrl(product));
-      window.scrollTo({ top: 0, behavior: 'instant' });
-=======
       if (window.location.pathname === '/' || window.location.pathname === '') {
         try {
           sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
@@ -635,7 +631,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
       navigate(getProductUrl(product), {
         state: { fromScrollY: window.scrollY || 0 }
       });
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
+      window.scrollTo({ top: 0, behavior: 'instant' });
     } else if (setPdpProduct) {
       setPdpProduct(product);
     }

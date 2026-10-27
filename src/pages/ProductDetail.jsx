@@ -41,13 +41,9 @@ import { DeliveryReminderWidget } from '../components/product/DeliveryReminderWi
 import { StockNotificationModal } from '../components/product/StockNotificationModal';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
 import RichTextRenderer from '../components/common/RichTextRenderer';
-<<<<<<< HEAD
-import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
-=======
 import { getColorName, getSwatchCss, compareColorNames, POPULAR_FASHION_COLORS } from '../utils/colorValidator';
 import { resolveProductCanonical, getProductUrl } from '../utils/productUrl';
 import { getLegacyDetailRows, productDetailsToRichText, hasVisibleRichText } from '../utils/productDetailsContent';
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 
 const ALL_CATALOG_PRODUCTS = [...BEST_SELLERS_PRODUCTS, ...MOCK_PRODUCTS];
@@ -246,51 +242,6 @@ export const ProductDetail = () => {
     }
   }, [canonicalInfo?.url, product, loading, id, location.pathname, location.search, location.hash, navigate]);
 
-  // Authoritative canonical SEO URL and metadata resolution
-  const canonicalInfo = useMemo(() => {
-    return resolveProductCanonical(product || id);
-  }, [product, id]);
-
-  // Dynamic Product Structured Data (JSON-LD) for Rich Snippets & Search Engines
-  const productSchema = useMemo(() => {
-    if (!product) return null;
-    const price = product.price || 8990;
-    const canonical = canonicalInfo?.canonicalUrl || `https://houseofurvaah.com/product/${product.id}`;
-    return {
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: product.name,
-      image: [product.image].filter(Boolean),
-      description: canonicalInfo?.description || product.description,
-      sku: String(product.id),
-      brand: {
-        '@type': 'Brand',
-        name: 'House of Urvaah'
-      },
-      offers: {
-        '@type': 'Offer',
-        url: canonical,
-        priceCurrency: 'INR',
-        price: price,
-        availability: (product.inStock !== false && (product.stockQuantity ?? 1) > 0)
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/OutOfStock',
-        seller: {
-          '@type': 'Organization',
-          name: 'House of Urvaah'
-        }
-      }
-    };
-  }, [product, canonicalInfo]);
-
-  // Seamlessly redirect old or non-canonical product URLs (e.g., /product/bs-101 -> /product/bs-101/mocha-brown-embroidered-co-ord-set)
-  useEffect(() => {
-    if (canonicalInfo?.url && (product || !loading)) {
-      if (location.pathname !== canonicalInfo.url) {
-        navigate(`${canonicalInfo.url}${location.search}${location.hash}`, { replace: true });
-      }
-    }
-  }, [canonicalInfo?.url, product, loading, location.pathname, location.search, location.hash, navigate]);
 
   // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
@@ -366,25 +317,16 @@ export const ProductDetail = () => {
       // then swapping in the API gallery made every image change twice (visible flicker).
       const local = findLocalProduct(id);
 
-<<<<<<< HEAD
-      // 2. Fetch from backend API to ensure authoritative product data
-      const lookupId = canonicalInfo?.id || id;
-=======
       // Fetch from backend API to ensure authoritative product data
       // Resolve from the route id only — `canonicalInfo` is derived from the product still in
       // state, which is the PREVIOUS product right after clicking a related/similar item.
       const routeCanonical = resolveProductCanonical(id);
       const lookupId = routeCanonical?.id || id;
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
       productApi
         .getProductById(lookupId)
         .then((data) => {
           if (isMounted && data && (data.name || data.title)) {
-<<<<<<< HEAD
-            const canonicalData = resolveProductCanonical(data) || canonicalInfo;
-=======
             const canonicalData = resolveProductCanonical(data) || routeCanonical;
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
             const isCorsetSet = canonicalData?.id === 'bs-103' || String(id) === '106' || String(id) === '103' || String(id) === 'bs-103' || String(id) === 'prod-102' || (data.name && data.name.includes('CORSET')) || (data.title && data.title.includes('ASYMMETRICAL'));
             const corsetGallery = [
               '/assets/Images/Corset01.png',
@@ -407,11 +349,7 @@ export const ProductDetail = () => {
               ...prev,
               ...data,
               id: canonicalData?.id || String(data.id || id),
-<<<<<<< HEAD
-              name: isCorsetSet ? 'Sage Bloom Embroidered Corset' : (data.name || data.title || prev?.name),
-=======
               name: data.name || data.title || (isCorsetSet ? 'Sage Bloom Embroidered Corset' : prev?.name),
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
               image: useCorsetFallback ? corsetGallery[0] : (apiGallery[0] || data.image || prev?.image),
@@ -1025,16 +963,12 @@ export const ProductDetail = () => {
     <div className="w-full bg-white font-serif text-brand-dark min-h-screen pt-24 sm:pt-28 pb-20 selection:bg-brand-dark selection:text-white">
       <SEOHead
         title={canonicalInfo?.title || `${product.name} | House of Urvaah`}
-<<<<<<< HEAD
-        description={canonicalInfo?.description || product.description || `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`}
-=======
         description={
           canonicalInfo?.description ||
           product.shortDescription ||
           (product.description ? product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '') ||
           `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`
         }
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
         keywords={canonicalInfo?.keywords || `${product.name}, ${product.category || 'Luxury Fashion'}, House of Urvaah apparel`}
         canonicalUrl={canonicalInfo?.canonicalUrl}
         schema={productSchema}

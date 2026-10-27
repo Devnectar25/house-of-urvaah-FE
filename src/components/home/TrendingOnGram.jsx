@@ -6,11 +6,8 @@ import { useCart } from '../../context/CartContext';
 import { getSupabaseMediaUrl, getOptimizedImageUrl, isPersistentMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
-<<<<<<< HEAD
-=======
 import { startVisiblePolling } from '../../lib/livePolling';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 const isVideoMedia = (mediaType, url) => {
   if (url && typeof url === 'string') {
@@ -561,11 +558,6 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   };
 
   const handleMoreInfo = () => {
-<<<<<<< HEAD
-    if (look.product) {
-      navigate(getProductUrl(look.product));
-      window.scrollTo({ top: 0, behavior: 'instant' });
-=======
     if (look?.product) {
       try {
         sessionStorage.setItem('urvaah_home_last_section', 'trending');
@@ -575,7 +567,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
       navigate(getProductUrl(look.product), {
         state: { fromSection: 'trending', fromScrollY: window.scrollY || 0 }
       });
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
     onClose();
   };

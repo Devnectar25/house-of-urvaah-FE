@@ -6,9 +6,6 @@ import { useCart } from '../../context/CartContext';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ProductCard } from '../common/ProductCard';
 import { productApi } from '../../services/productApi';
-<<<<<<< HEAD
-import { getProductUrl } from '../../utils/productUrl';
-=======
 import { getProductUrl, resolveProductCanonical } from '../../utils/productUrl';
 
 // DB and mock catalog use different ids for the same piece (e.g. '105' vs 'bs-101'),
@@ -17,7 +14,6 @@ const getDedupeKey = (p) => {
   const canonicalId = resolveProductCanonical(p)?.id;
   return String(canonicalId || p.id || p.product_id || p.productId || p.name || '').toLowerCase();
 };
->>>>>>> a5056200ba650f42929f3f17f392ae0ce8acce99
 
 export const SearchOverlay = () => {
   const { isSearchOpen, setIsSearchOpen } = useCart();
