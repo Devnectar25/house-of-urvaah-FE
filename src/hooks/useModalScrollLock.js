@@ -39,11 +39,19 @@ if (typeof window !== 'undefined') {
 // Safety net for storefront pages: third-party overlays (Razorpay checkout, SweetAlert) save and
 // restore the page's overflow themselves and can put back a locked state after our modals have
 // already unlocked, leaving the page frozen. When nothing is actually open, clear any leftover lock.
+// Something on screen actually covers the page: a fixed layer (modal, drawer, menu, alert, payment
+// window) that is visible and spans most of the viewport. A lock with nothing like this on screen
+// is a leftover (e.g. a component that thinks its modal is open but renders nothing).
 const isOverlayVisible = () => {
-  if (activeLocksCount > 0) return true;
   if (document.querySelector('.swal2-container')) return true;
-  return [...document.querySelectorAll('.razorpay-container, iframe.razorpay-checkout-frame')]
-    .some((el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  return [...document.body.querySelectorAll('*')].some((el) => {
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width >= vw * 0.5 && r.height >= vh * 0.6;
+  });
 };
 const isPageLocked = () => {
   const b = document.body.style;

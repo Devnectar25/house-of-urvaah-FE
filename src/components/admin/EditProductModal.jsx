@@ -34,6 +34,7 @@ import {
 } from '../../utils/colorValidator';
 import RichDescriptionEditor from './RichDescriptionEditor';
 import ProductFilterPicker from './ProductFilterPicker';
+import { newArrivalToOption, NEW_ARRIVAL_DAYS } from '../../utils/newArrival';
 import { readProductFilters, buildFilterPayload } from '../../constants/productFilters';
 import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { getLegacyDetailRows, productDetailsToRichText, richTextToProductDetails } from '../../utils/productDetailsContent';
@@ -76,6 +77,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   }, [isOpen]);
   const [formData, setFormData] = useState({
     shopFilters: readProductFilters(null),
+    new_arrival_option: 'auto',
     name: '',
     category_id: '',
     subCategory: '',
@@ -227,6 +229,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         setFormData({
           name: data.name || data.title || '',
           shopFilters: readProductFilters(data),
+          new_arrival_option: newArrivalToOption(data.new_arrival),
           category_id: data.categoryId || data.category_id || '',
           subCategory: data.subCategory || data.subcategory_name || '',
           shortDescription: data.shortDescription || data.shortdescription || '',
@@ -298,6 +301,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         setFormData({
           name: product.name || '',
           shopFilters: readProductFilters(product),
+          new_arrival_option: newArrivalToOption(product.new_arrival),
           category_id: product.categoryId || product.category_id || '',
           subCategory: product.subCategory || '',
           shortDescription: product.shortDescription || '',
@@ -764,6 +768,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
       const payload = {
         title: formData.name.trim(),
         ...(formData.shopFilters ? buildFilterPayload(formData.shopFilters) : {}),
+        new_arrival: formData.new_arrival_option || 'auto',
         productname: formData.name.trim(),
         category_id: formData.category_id,
         subcategory_name: formData.subCategory,
@@ -1214,6 +1219,25 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 value={formData.shopFilters}
                 onChange={(shopFilters) => setFormData(prev => ({ ...prev, shopFilters }))}
               />
+
+              {/* New Arrivals placement */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl border border-neutral-200/80 bg-neutral-50/60">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">New Arrivals</label>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Automatic shows the product in New Arrivals for {Math.round(NEW_ARRIVAL_DAYS / 30)} months after it is created, newest first.
+                  </p>
+                </div>
+                <select
+                  value={formData.new_arrival_option || 'auto'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, new_arrival_option: e.target.value }))}
+                  className="px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-800 focus:outline-none focus:border-black cursor-pointer"
+                >
+                  <option value="auto">Automatic (3 months)</option>
+                  <option value="always">Always show</option>
+                  <option value="hide">Don't show</option>
+                </select>
+              </div>
 
               {/* 3. Short Description */}
               <div className="space-y-1.5">

@@ -133,13 +133,23 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
     }, 450);
   };
 
-  const handleCardClick = () => {
+  const handleCardClick = (e) => {
     if (isStockModalOpen) return;
     if (product) {
-      navigate(getProductUrl(product));
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      // Find parent section id if on homepage
+      const sectionEl = e?.currentTarget?.closest('section[id], [data-section-id]');
+      const sectionId = sectionEl?.getAttribute('data-section-id') || sectionEl?.id || 'best-sellers';
+      try {
+        sessionStorage.setItem('urvaah_home_last_section', sectionId);
+        sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+        sessionStorage.setItem('urvaah_home_should_restore', 'true');
+      } catch (err) {}
+      navigate(getProductUrl(product), {
+        state: { fromSection: sectionId, fromScrollY: window.scrollY || 0 }
+      });
     }
   };
+
 
   const formatPrice = (val) => {
     return new Intl.NumberFormat('en-IN', {

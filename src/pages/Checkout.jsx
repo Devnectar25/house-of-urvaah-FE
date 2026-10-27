@@ -214,11 +214,15 @@ const formatOrderDetails = (ord, currentUser) => {
   let rawTax = Number(ord.tax || ord.tax_amount || ord.taxAmount || 0);
   let rawTaxRate = Number(ord.tax_rate || ord.taxRate || ord.gst_percentage || 0);
 
+  const gstOff = ord.gst_applied === false; // order placed while GST was switched off
+  if (gstOff) { rawTax = 0; rawTaxRate = 0; }
+
   // If tax was not directly provided or is 0, compute fallback from totalPaid vs subtotal
-  if (!rawTax && totalPaid > (subtotal - discount + shippingFee)) {
-    rawTax = Math.max(0, Math.round(totalPaid - (subtotal - discount) - shippingFee));
+  const codFee = Number(ord.cod_charge || ord.codCharge || 0); // COD charge is not tax
+  if (!gstOff && !rawTax && totalPaid > (subtotal - discount + shippingFee + codFee)) {
+    rawTax = Math.max(0, Math.round(totalPaid - (subtotal - discount) - shippingFee - codFee));
   }
-  if (!rawTaxRate) {
+  if (!rawTaxRate && !gstOff) {
     if (rawTax > 0 && (subtotal - discount) > 0) {
       rawTaxRate = Math.round((rawTax / (subtotal - discount)) * 100);
     } else {
@@ -243,6 +247,8 @@ const formatOrderDetails = (ord, currentUser) => {
     subtotal: subtotal,
     tax: rawTax,
     taxRate: rawTaxRate,
+    gst_applied: ord.gst_applied,
+    cod_charge: Number(ord.cod_charge || ord.codCharge || 0),
     discount: discount,
     shippingFee: shippingFee,
     totalPaid: totalPaid,
@@ -580,6 +586,8 @@ export const Checkout = () => {
     gst_rate_above: 18,
     card_charge_enabled: true,
     card_charge_percentage: 2,
+    cod_charge_enabled: false,
+    cod_charge_amount: 0,
     free_shipping_threshold: 2999
   });
 
@@ -1255,9 +1263,10 @@ export const Checkout = () => {
     : 0;
   const taxableAmount = Math.max(0, orderSubtotal - discountAmount);
 
-  // Dynamic GST Tax Rule from Admin Settings
-  let taxRate = Number(storeSettings.gst_percentage) || 18;
-  if (storeSettings.enable_tiered_gst) {
+  // Dynamic GST Tax Rule from Admin Settings (GST can be switched off entirely)
+  const gstEnabled = storeSettings.gst_enabled !== false;
+  let taxRate = gstEnabled ? (Number(storeSettings.gst_percentage) || 18) : 0;
+  if (gstEnabled && storeSettings.enable_tiered_gst) {
     taxRate = taxableAmount > (Number(storeSettings.gst_threshold) || 2500)
       ? (Number(storeSettings.gst_rate_above) || 18)
       : (Number(storeSettings.gst_rate_below) || 5);
@@ -1269,7 +1278,10 @@ export const Checkout = () => {
   const cardSurcharge = (paymentMethod === 'card' && storeSettings.card_charge_enabled)
     ? Math.round(basePayable * ((Number(storeSettings.card_charge_percentage) || 2) / 100))
     : 0;
-  const grandTotal = basePayable + cardSurcharge;
+  // Optional flat Cash-on-Delivery charge from Admin Settings
+  const codChargeAmount = storeSettings.cod_charge_enabled ? Math.max(0, Math.round(Number(storeSettings.cod_charge_amount) || 0)) : 0;
+  const codCharge = paymentMethod === 'cod' ? codChargeAmount : 0;
+  const grandTotal = basePayable + cardSurcharge + codCharge;
 
   // Apply Coupon Handler
   const handleApplyCoupon = (e) => {
@@ -1437,6 +1449,7 @@ export const Checkout = () => {
       subtotal: orderSubtotal,
       tax: taxAmount,
       taxRate: taxRate,
+      cod_charge: codCharge,
       discount: discountAmount,
       shippingFee: shippingFee,
       totalPaid: finalPaid,
@@ -3732,8 +3745,8 @@ export const Checkout = () => {
                     const disc = Number(details.discount || 0);
                     const ship = Number(details.shippingFee || 0);
                     const tot = Number(details.totalPaid || 0);
-                    const computedDiff = Math.max(0, Math.round(tot - (baseSub - disc) - ship));
-                    const effectiveTax = Number(details.tax) > 0 ? Number(details.tax) : computedDiff;
+                    const computedDiff = Math.max(0, Math.round(tot - (baseSub - disc) - ship - Number(details.cod_charge || 0)));
+                    const effectiveTax = details.gst_applied === false ? 0 : (Number(details.tax) > 0 ? Number(details.tax) : computedDiff);
                     const effectiveRate = details.taxRate || (effectiveTax > 0 && (baseSub - disc) > 0
                       ? Math.round((effectiveTax / (baseSub - disc)) * 100)
                       : (baseSub > 2500 ? 18 : 5));
@@ -3748,6 +3761,12 @@ export const Checkout = () => {
                     }
                     return null;
                   })()}
+                  {Number(details.cod_charge || 0) > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="uppercase tracking-wider">Cash on Delivery Charge</span>
+                      <span className="font-semibold text-black">+{formatPrice(Number(details.cod_charge))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="uppercase tracking-wider">Shipping</span>
                     <span className="font-semibold text-black">
@@ -6678,6 +6697,8 @@ export const Checkout = () => {
                         <p className="text-neutral-500 text-[11px] mt-0.5">
                           {shippingServiceability.checked && !shippingServiceability.codAvailable
                             ? 'Courier COD is not supported for this PIN code. Please use UPI or Cards.'
+                            : codChargeAmount > 0
+                            ? `Pay with cash or UPI upon delivery. A COD charge of ${formatPrice(codChargeAmount)} applies.`
                             : 'Pay with cash or UPI upon delivery.'}
                         </p>
                       </div>
@@ -7044,7 +7065,8 @@ export const Checkout = () => {
                   </div>
                 )}
 
-                {/* Tax / GST Line Item */}
+                {/* Tax / GST Line Item (hidden when GST is switched off) */}
+                {gstEnabled && (
                 <div className="flex justify-between items-center text-neutral-600">
                   <span className="uppercase tracking-wider">
                     GST / Tax ({taxRate}%)
@@ -7053,6 +7075,15 @@ export const Checkout = () => {
                     +{formatPrice(taxAmount)}
                   </span>
                 </div>
+                )}
+
+                {/* COD charge line (if COD selected and a charge is set) */}
+                {codCharge > 0 && (
+                  <div className="flex justify-between items-center text-neutral-600">
+                    <span className="uppercase tracking-wider">Cash on Delivery Charge</span>
+                    <span className="font-semibold text-neutral-900 font-sans tabular-nums">+{formatPrice(codCharge)}</span>
+                  </div>
+                )}
 
                 {/* Card Surcharge Line Item (if card selected and enabled) */}
                 {paymentMethod === 'card' && storeSettings.card_charge_enabled && Number(storeSettings.card_charge_percentage) > 0 && (
@@ -7078,9 +7109,11 @@ export const Checkout = () => {
                   <span className="font-serif tracking-widest uppercase">TOTAL</span>
                   <span className="font-serif tracking-wider">{formatPrice(grandTotal)}</span>
                 </div>
+                {gstEnabled && (
                 <p className="text-[10px] text-neutral-400 text-right uppercase tracking-wider">
                   Includes {taxRate}% GST ({formatPrice(taxAmount)}) & Luxury taxes
                 </p>
+                )}
               </div>
 
               {/* PERKS BADGES */}
@@ -7475,10 +7508,18 @@ export const Checkout = () => {
                     </div>
                   )}
 
+                  {gstEnabled && (
                   <div className="flex justify-between text-neutral-600">
                     <span>GST / Taxes ({taxRate}%)</span>
                     <span className="font-medium tabular-nums">+{formatPrice(taxAmount)}</span>
                   </div>
+                  )}
+                  {codCharge > 0 && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>Cash on Delivery Charge</span>
+                    <span className="font-medium tabular-nums">+{formatPrice(codCharge)}</span>
+                  </div>
+                  )}
 
                   <div className="pt-3 border-t border-neutral-200 flex justify-between items-baseline">
                     <div>

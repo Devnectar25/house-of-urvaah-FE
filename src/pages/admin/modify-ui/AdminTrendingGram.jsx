@@ -414,6 +414,11 @@ export const AdminTrendingGram = () => {
     } catch (err) {
       console.error('Product image upload error:', err);
       setProductUploadError(err.message || 'Upload failed');
+      // Upload failed: drop the temporary preview so it can't be saved
+      setFormData((prev) => {
+        const gallery = (Array.isArray(prev.product_gallery) ? prev.product_gallery : []).filter((img) => img !== localBlobUrl);
+        return { ...prev, product_gallery: gallery, product_image: prev.product_image === localBlobUrl ? (gallery[0] || '') : prev.product_image };
+      });
     } finally {
       setUploadingProductFile(false);
       e.target.value = '';
@@ -520,6 +525,10 @@ export const AdminTrendingGram = () => {
     } catch (err) {
       console.error(err);
       showToast('error', err.message || 'Upload failed');
+      setFormData((prev) => {
+        const gallery = (Array.isArray(prev.product_gallery) ? prev.product_gallery : []).filter((img) => img !== localBlobUrl);
+        return { ...prev, product_gallery: gallery, product_image: prev.product_image === localBlobUrl ? (gallery[0] || '') : prev.product_image };
+      });
     } finally {
       setUploadingProductFile(false);
       e.target.value = '';
@@ -547,13 +556,29 @@ export const AdminTrendingGram = () => {
       setUploadError('Post media (video or image) is required.');
       return;
     }
+    if (uploadingFile || uploadingProductFile) {
+      setUploadError('Please wait for the upload to finish before saving.');
+      return;
+    }
+    // blob: links are temporary previews that exist only in this browser tab: never save them
+    const isBlob = (v) => typeof v === 'string' && v.trim().toLowerCase().startsWith('blob:');
+    if (isBlob(formData.image)) {
+      setUploadError('The post media did not finish uploading. Please upload it again.');
+      return;
+    }
+    const cleanGallery = (Array.isArray(formData.product_gallery) ? formData.product_gallery : []).filter((g) => g && !isBlob(g));
+    const payload = {
+      ...formData,
+      product_gallery: cleanGallery,
+      product_image: isBlob(formData.product_image) ? (cleanGallery[0] || '') : formData.product_image
+    };
 
     setSaving(true);
     try {
       if (editingPost) {
         const res = await apiClient(`/api/ui/admin/trending-gram/${editingPost.id}`, {
           method: 'PUT',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
         if (!res?.success) throw new Error(res?.message || 'Update failed');
         showToast('success', 'Post updated successfully!');
@@ -561,7 +586,7 @@ export const AdminTrendingGram = () => {
         const res = await apiClient('/api/ui/admin/trending-gram', {
           method: 'POST',
           body: JSON.stringify({
-            ...formData,
+            ...payload,
             display_order: posts.length + 1
           })
         });

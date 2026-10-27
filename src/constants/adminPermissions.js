@@ -30,7 +30,6 @@ export const PERMISSION_GROUPS = [
     group: 'Communication',
     options: [
       { id: 'email-notifications', label: 'Email Notifications' },
-      { id: 'newsletter', label: 'Newsletter' },
       { id: 'stock-notifications', label: 'Stock Alerts' },
       { id: 'faqs', label: 'FAQs' }
     ]
@@ -38,7 +37,7 @@ export const PERMISSION_GROUPS = [
   {
     group: 'Storefront & System',
     options: [
-      { id: 'modify-ui', label: 'Modify UI (Homepage Content)' },
+      { id: 'modify-ui', label: 'Edit Homepage' },
       { id: 'error-monitoring', label: 'Error Monitoring' },
       { id: 'settings', label: 'Settings' }
     ]

@@ -144,11 +144,6 @@ export const AboutUs = () => {
               className="absolute inset-0 w-full h-full object-contain filter brightness-[0.97] opacity-0 transition-all duration-700 ease-out group-hover:opacity-100 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-black/5 pointer-events-none" />
-            <div className="absolute bottom-5 left-5 bg-white/90 backdrop-blur-md px-3.5 py-1.5 border border-white/80">
-              <span className="text-[10px] tracking-[0.25em] font-serif uppercase text-neutral-800">
-                AUTUMN / WINTER 2026 — STORE NO. 01
-              </span>
-            </div>
           </motion.div>
         </div>
       </section>

@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ChevronDown,
-  ArrowRight,
-  Check,
-  Loader2,
-  MapPin
+  MapPin,
+  Mail,
+  Phone,
+  Clock
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { apiClient } from '../../lib/apiClient';
 
 let cachedPrimaryBoutique = null;
+let cachedConcierge = null;
 
 export const Footer = () => {
   const [openSections, setOpenSections] = useState({
@@ -19,27 +20,35 @@ export const Footer = () => {
     connect: false,
   });
 
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterStatus, setNewsletterStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
-  const [newsletterMessage, setNewsletterMessage] = useState('');
-
   const [primaryBoutique, setPrimaryBoutique] = useState(() => cachedPrimaryBoutique || {
     name: 'House of Urvaah',
-    address: 'Mumbai - 400070'
+    address: 'Mumbai, Maharashtra 400070'
+  });
+
+  const [concierge, setConcierge] = useState(() => cachedConcierge || {
+    email: 'houseofurvaah@gmail.com',
+    phone: '+91 98333 25657',
+    hours: 'Monday – Saturday: 10:00 AM – 8:00 PM IST'
   });
 
   useEffect(() => {
     let isMounted = true;
     apiClient('/api/ui/contact-info')
       .then((res) => {
-        if (isMounted && res?.success && res.data?.primary_location) {
-          const prim = res.data.primary_location;
-          const formatted = {
-            name: prim.name || 'House of Urvaah',
-            address: prim.address || 'Mumbai - 400070'
-          };
-          cachedPrimaryBoutique = formatted;
-          setPrimaryBoutique(formatted);
+        if (isMounted && res?.success) {
+          if (res.data?.primary_location) {
+            const prim = res.data.primary_location;
+            const formatted = {
+              name: prim.name || 'House of Urvaah',
+              address: prim.address || 'Mumbai, Maharashtra 400070'
+            };
+            cachedPrimaryBoutique = formatted;
+            setPrimaryBoutique(formatted);
+          }
+          if (res.data?.concierge) {
+            cachedConcierge = res.data.concierge;
+            setConcierge(res.data.concierge);
+          }
         }
       })
       .catch(() => {});
@@ -50,58 +59,6 @@ export const Footer = () => {
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const validateEmailFormat = (email) => {
-    if (!email || !email.trim()) return 'Email address is required.';
-    const trimmed = email.trim();
-    if (trimmed.length > 254) return 'Email address is too long.';
-    if (trimmed.includes('..')) return 'Email cannot contain consecutive dots.';
-    const parts = trimmed.split('@');
-    if (parts.length !== 2) return 'Please enter a valid email with a single @ symbol.';
-    const [local, domain] = parts;
-    if (!local) return 'Please enter the username portion before @.';
-    if (!domain || !domain.includes('.')) return 'Please provide a valid domain (e.g. domain.com).';
-    const domainParts = domain.split('.');
-    const tld = domainParts[domainParts.length - 1];
-    if (!tld || tld.length < 2) return 'Please provide a valid top-level domain (e.g. .com, .in).';
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-    if (!emailRegex.test(trimmed)) return 'Please enter a valid email address (e.g. name@domain.com).';
-    return null;
-  };
-
-  const handleNewsletterSubmit = async (e) => {
-    e.preventDefault();
-    const valError = validateEmailFormat(newsletterEmail);
-    if (valError) {
-      setNewsletterStatus('error');
-      setNewsletterMessage(valError);
-      return;
-    }
-
-    setNewsletterStatus('loading');
-    setNewsletterMessage('');
-
-    try {
-      const data = await apiClient('/api/newsletter/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({
-          email: newsletterEmail.trim().toLowerCase(),
-          source: 'footer'
-        })
-      });
-
-      setNewsletterStatus('success');
-      setNewsletterMessage(data?.message || 'Thank you for subscribing to House of Urvaah.');
-      setNewsletterEmail('');
-      setTimeout(() => {
-        setNewsletterStatus('idle');
-        setNewsletterMessage('');
-      }, 5000);
-    } catch (err) {
-      setNewsletterStatus('error');
-      setNewsletterMessage(err.message || 'Subscription failed. Please check your internet connection.');
-    }
   };
 
   return (
@@ -122,8 +79,9 @@ export const Footer = () => {
                 <p className="text-center">{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
                 <p className="whitespace-pre-line text-neutral-600 text-center">
                   {primaryBoutique.address ? primaryBoutique.address
-                    .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai - 400070')
-                    .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : 'Mumbai - 400070'}
+                    .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra 400070')
+                    .replace('Mumbai - 400070', 'Mumbai, Maharashtra 400070')
+                    .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : 'Mumbai, Maharashtra 400070'}
                 </p>
                 <div className="pt-2.5 flex justify-center">
                   <a 
@@ -179,7 +137,7 @@ export const Footer = () => {
             </ul>
           </div>
 
-          {/* Column 4: CONNECT & NEWSLETTER */}
+          {/* Column 4: CONNECT */}
           <div className="pb-4 sm:pb-0">
             <button
               type="button"
@@ -190,7 +148,8 @@ export const Footer = () => {
               <ChevronDown className={`w-4 h-4 text-neutral-500 sm:hidden transition-transform duration-200 ${openSections.connect ? 'rotate-180' : ''}`} />
             </button>
             <div className={`space-y-4 ${openSections.connect ? 'block pt-2' : 'hidden sm:block'}`}>
-              <div className="flex items-center gap-3 sm:gap-4 text-neutral-700 mb-6">
+              {/* Social Media Links */}
+              <div className="flex items-center gap-3 sm:gap-4 text-neutral-700">
                 <a 
                   href="https://instagram.com/houseofurvaah" 
                   target="_blank" 
@@ -237,54 +196,33 @@ export const Footer = () => {
                 </a>
               </div>
 
-              {/* Newsletter Subscription */}
-              <div className="pt-2">
-                <h5 className="text-xs font-semibold tracking-[0.2em] uppercase text-neutral-900 mb-2">
-                  NEWSLETTER
-                </h5>
-                <p className="text-xs text-neutral-600 leading-relaxed font-normal mb-3.5">
-                  Subscribe for store updates, private sales & runway invitations.
+              {/* Client Concierge / Customer Care Details */}
+              <div className="pt-3.5 border-t border-neutral-200 font-sans">
+                <p className="text-[10px] sm:text-[11px] font-serif uppercase tracking-[0.2em] text-neutral-800 font-semibold mb-2">
+                  CLIENT CONCIERGE
                 </p>
-                <form onSubmit={handleNewsletterSubmit} className="space-y-2">
-                  <div className="flex items-stretch bg-white border border-neutral-300 hover:border-neutral-400 focus-within:border-black transition-colors rounded-xs overflow-hidden shadow-2xs">
-                    <input
-                      type="email"
-                      placeholder="ENTER YOUR EMAIL"
-                      value={newsletterEmail}
-                      onChange={(e) => {
-                        setNewsletterEmail(e.target.value);
-                        if (newsletterStatus === 'error') setNewsletterStatus('idle');
-                      }}
-                      className="w-full bg-white text-xs tracking-[0.18em] uppercase outline-none py-2.5 px-3.5 placeholder:text-neutral-400 font-sans font-normal text-neutral-900 h-10 min-w-0"
-                      aria-label="Newsletter email address"
-                    />
-                    <button
-                      type="submit"
-                      disabled={newsletterStatus === 'loading'}
-                      aria-label="Subscribe to newsletter"
-                      className="bg-black hover:bg-neutral-800 disabled:bg-neutral-700 text-white px-3.5 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0 h-10 group"
-                    >
-                      {newsletterStatus === 'loading' ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      ) : (
-                        <ArrowRight className="w-4 h-4 stroke-[1.75] group-hover:translate-x-0.5 transition-transform" />
-                      )}
-                    </button>
+                <div className="space-y-2 text-xs text-neutral-600">
+                  <a
+                    href={`mailto:${concierge.email || 'houseofurvaah@gmail.com'}`}
+                    className="flex items-center gap-2 hover:text-black transition-colors group"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black transition-colors shrink-0" />
+                    <span className="truncate">{concierge.email || 'houseofurvaah@gmail.com'}</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/${(concierge.phone || '919833325657').replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 hover:text-black transition-colors group"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-neutral-400 group-hover:text-black transition-colors shrink-0" />
+                    <span>{concierge.phone || '+91 98333 25657'}</span>
+                  </a>
+                  <div className="flex items-start gap-2 text-[11px] text-neutral-400 pt-0.5">
+                    <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
+                    <span className="leading-tight">{concierge.hours || 'Mon – Sat: 10:00 AM – 8:00 PM IST'}</span>
                   </div>
-
-                  {newsletterStatus === 'error' && (
-                    <p className="text-xs text-rose-600 font-medium tracking-wide px-1">
-                      {newsletterMessage}
-                    </p>
-                  )}
-
-                  {newsletterStatus === 'success' && (
-                    <div className="p-2.5 bg-black text-white text-xs tracking-wider uppercase font-medium flex items-center gap-2 px-3 shadow-xs rounded-xs">
-                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 stroke-[2.5]" />
-                      <span>{newsletterMessage || 'Thank you for subscribing'}</span>
-                    </div>
-                  )}
-                </form>
+                </div>
               </div>
             </div>
           </div>

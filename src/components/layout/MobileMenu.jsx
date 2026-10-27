@@ -11,7 +11,7 @@ const TABS = ['WOMAN'];
 const WEBSITE_SECTIONS = [
   {
     id: 'discover',
-    title: 'DISCOVER THE MAISON',
+    title: 'DISCOVER HOUSE OF URVAAH',
     items: [
       { label: 'BEST SELLERS', target: 'best-sellers' },
       { label: 'TRENDING ON THE GRAM', target: 'trending' },
@@ -24,8 +24,8 @@ const WEBSITE_SECTIONS = [
     id: 'concierge',
     title: 'CUSTOMER CARE',
     items: [
-      { label: 'ABOUT US / OUR STORY', isRoute: true, to: '/about' },
-      { label: 'CONTACT US / CUSTOMER CARE', isRoute: true, to: '/contact' },
+      { label: 'ABOUT US', isRoute: true, to: '/about' },
+      { label: 'CONTACT US', isRoute: true, to: '/contact' },
       { label: 'FREQUENTLY ASKED QUESTIONS', isRoute: true, to: '/faqs' },
       { label: 'MY WISHLIST', isRoute: true, to: '/wishlist' },
       { label: 'ACCOUNT & ORDERS', isRoute: true, to: '/account' }

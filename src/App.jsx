@@ -56,7 +56,6 @@ import { AdminBoutiquesConcierge } from './pages/admin/modify-ui/AdminBoutiquesC
 import { AdminStockNotifications } from './pages/admin/AdminStockNotifications';
 import { AdminErrorMonitoring } from './pages/admin/AdminErrorMonitoring';
 import { AdminEmailNotifications } from './pages/admin/AdminEmailNotifications';
-import { AdminNewsletter } from './pages/admin/AdminNewsletter';
 import { StockUnsubscribe } from './pages/StockUnsubscribe';
 import { getAdminStoredUser, getStoredUser } from './lib/apiClient';
 
@@ -269,7 +268,6 @@ export function AppContent() {
         <Route path="refund-desk" element={<PermissionGuard moduleKey="refunds"><AdminRefundDesk /></PermissionGuard>} />
         <Route path="shiprocket-refund-desk" element={<Navigate to="/admin/refunds?view=shiprocket" replace />} />
         <Route path="email-notifications" element={<PermissionGuard moduleKey="email-notifications"><AdminEmailNotifications /></PermissionGuard>} />
-        <Route path="newsletter" element={<PermissionGuard moduleKey="newsletter"><AdminNewsletter /></PermissionGuard>} />
         <Route path="stock-notifications" element={<PermissionGuard moduleKey="stock-notifications"><AdminStockNotifications /></PermissionGuard>} />
         <Route path="reviews" element={<PermissionGuard moduleKey="reviews"><AdminReviews /></PermissionGuard>} />
         <Route path="faqs" element={<PermissionGuard moduleKey="faqs"><AdminFaqs /></PermissionGuard>} />

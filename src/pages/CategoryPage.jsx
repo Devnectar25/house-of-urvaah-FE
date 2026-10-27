@@ -14,6 +14,7 @@ import { SEOHead } from '../components/common/SEOHead';
 import { ProductCard } from '../components/common/ProductCard';
 import { productApi } from '../services/productApi';
 import { apiClient } from '../lib/apiClient';
+import { isNewArrival, compareNewestFirst } from '../utils/newArrival';
 import { OCCASION_OPTIONS, FABRIC_OPTIONS, productHasOccasion, productHasFabric, productIsWearTwoWays } from '../constants/productFilters';
 
 // Canonical collection definitions
@@ -32,8 +33,9 @@ const productMatchesCategory = (product, slug) => {
   const norm = slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
 
   // New Arrivals contains all 6 current products eligible for storefront display
+  // New Arrivals: products added in the last 3 months, or set to "Always show" by the admin
   if (norm === 'new-arrivals' || norm === 'new-in') {
-    return true;
+    return isNewArrival(product);
   }
 
   const pCats = Array.isArray(product.categories) ? product.categories : [];
@@ -64,7 +66,6 @@ const productMatchesCategory = (product, slug) => {
     if (normalizedCats.some((c) => c.includes('festive') || c.includes('ethnic'))) return true;
     return (
       pTitle.includes('gharara') ||
-      pTitle.includes('corset') ||
       pCatName.includes('festive') ||
       pCatName.includes('ethnic')
     );
@@ -224,8 +225,8 @@ export const CategoryPage = ({ defaultCategory }) => {
   // Dynamically extract available sizes from collection products
   const availableSizes = useMemo(() => {
     const sizeSet = new Set();
-    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'ONE SIZE'];
-    collectionProducts.forEach((p) => {
+    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'ONE SIZE', 'FREE SIZE'];
+    products.forEach((p) => {
       const sizes = Array.isArray(p.sizes) ? p.sizes : typeof p.sizes === 'string' ? [p.sizes] : [];
       sizes.forEach((s) => {
         if (s && typeof s === 'string') sizeSet.add(s.trim().toUpperCase());
@@ -239,7 +240,43 @@ export const CategoryPage = ({ defaultCategory }) => {
       if (idxB !== -1) return 1;
       return a.localeCompare(b);
     });
-  }, [collectionProducts]);
+  }, [products]);
+
+  // Fabric options = the fabrics of the home page "Fabric Edit" (admin: Modify UI > Fabric Video)
+  const [fabricEdit, setFabricEdit] = useState([]);
+  useEffect(() => {
+    let active = true;
+    apiClient('/api/ui/fabric-video')
+      .then((res) => {
+        const vids = Array.isArray(res?.data?.videos) ? res.data.videos : [];
+        const list = vids
+          .map((v) => {
+            const tag = String(v.tag || v.title || '').trim();
+            const slug = String(v.slug || v.fabric_slug || tag).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const label = tag.toLowerCase().replace(/(^|\s)\w/g, (c) => c.toUpperCase());
+            return tag && slug ? { label, slug } : null;
+          })
+          .filter(Boolean);
+        if (active) setFabricEdit(list);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const availableFabrics = useMemo(() => fabricEdit.map((f) => f.label), [fabricEdit]);
+  // A product belongs to a Fabric Edit fabric when it is linked to it (Fabric Video > Related Products)
+  const productInFabric = (p, label) => {
+    const f = fabricEdit.find((x) => x.label === label);
+    if (!f) return false;
+    const pSlug = String(p.fabric_slug || p.fabricSlug || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return pSlug === f.slug;
+  };
+
+  // Options with no product in the current collection are shown but disabled
+  const optionHasProducts = (key, opt) => collectionProducts.some((p) => {
+    if (key === 'fabric') return productInFabric(p, opt);
+    const sizes = Array.isArray(p.sizes) ? p.sizes : typeof p.sizes === 'string' ? [p.sizes] : [];
+    return sizes.some((sz) => String(sz).trim().toUpperCase() === opt);
+  });
 
 
   // Multi-facet filtering logic (AND combination across facets; OR within multi-select facets)
@@ -258,7 +295,7 @@ export const CategoryPage = ({ defaultCategory }) => {
 
       // 3. Fabric Filter
       if (selectedFabrics.length > 0) {
-        const matchesFabric = selectedFabrics.some((fab) => productHasFabric(p, fab));
+        const matchesFabric = selectedFabrics.some((fab) => productInFabric(p, fab));
         if (!matchesFabric) return false;
       }
 
@@ -278,10 +315,14 @@ export const CategoryPage = ({ defaultCategory }) => {
     selectedOccasions,
     isWearItTwoWays,
     selectedFabrics,
-    selectedSizes
+    selectedSizes,
+    fabricEdit
   ]);
 
-  const sortedProducts = filteredProducts;
+  // New Arrivals list the newest product first
+  const sortedProducts = (currentSlug === 'new-arrivals' || currentSlug === 'new-in')
+    ? [...filteredProducts].sort(compareNewestFirst)
+    : filteredProducts;
 
   // Reset all active filters
   const handleResetFilters = () => {
@@ -368,61 +409,54 @@ export const CategoryPage = ({ defaultCategory }) => {
           </div>
         </div>
 
-        {/* Unified Filter Toolbar & Facet Panel Container */}
-        <div className="mb-5 rounded-2xl border border-[#E7E2D8] bg-[#FAF8F3] font-sans overflow-hidden">
+        {/* Filter Toolbar & Panel (compact) */}
+        <div className="mb-5 border-y border-neutral-200 font-sans">
           {/* Top Row Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 py-2">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Filter Toggle Button */}
               <button
                 type="button"
                 onClick={() => setIsFilterPanelOpen((prev) => !prev)}
                 aria-expanded={isFilterPanelOpen}
-                className={`inline-flex items-center gap-2 h-9 px-4 rounded-full text-[11px] font-semibold tracking-[0.14em] uppercase transition-all border cursor-pointer select-none ${
-                  isFilterPanelOpen
+                className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors border cursor-pointer select-none ${
+                  isFilterPanelOpen || hasActiveFilters
                     ? 'bg-black text-white border-black'
-                    : 'bg-white text-neutral-900 border-[#E7E2D8] hover:border-black'
+                    : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
                 }`}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 stroke-[1.75]" />
-                <span>Filters</span>
-                {hasActiveFilters && (
-                  <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] leading-[18px] text-center ${isFilterPanelOpen ? 'bg-white text-black' : 'bg-black text-white'}`}>1</span>
-                )}
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
+                <SlidersHorizontal className="w-3 h-3 stroke-[1.75]" />
+                <span>Filter</span>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Quick Wear It Two Ways Toggle Pill */}
               <button
                 type="button"
                 onClick={toggleWearItTwoWays}
                 aria-pressed={isWearItTwoWays}
-                className={`inline-flex items-center gap-2 h-9 px-4 rounded-full text-[11px] font-semibold tracking-[0.14em] uppercase transition-all border cursor-pointer select-none ${
+                className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-semibold tracking-[0.14em] uppercase transition-colors border cursor-pointer select-none ${
                   isWearItTwoWays
                     ? 'bg-black text-white border-black'
-                    : 'bg-white text-neutral-900 border-[#E7E2D8] hover:border-black'
+                    : 'bg-white text-neutral-800 border-neutral-300 hover:border-black'
                 }`}
               >
-                <Sparkles className={`w-3.5 h-3.5 ${isWearItTwoWays ? 'text-[#c5a880]' : 'text-[#8c734b]'}`} />
                 <span>Wear it 2 ways</span>
                 {isWearItTwoWays && <Check className="w-3 h-3 stroke-[2.5]" />}
               </button>
             </div>
 
-            {/* Clear All Filters Button (if active) */}
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex items-center gap-1.5 h-9 px-3 text-[11px] font-semibold text-neutral-500 hover:text-black uppercase tracking-[0.14em] transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 h-7 text-[10px] font-semibold text-neutral-500 hover:text-black uppercase tracking-[0.14em] transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset All</span>
+                <X className="w-3 h-3" />
+                <span>Clear</span>
               </button>
             )}
           </div>
 
-          {/* Collapsible Filter Facet Panel (Directly Attached) */}
+          {/* Collapsible panel: Fabric and Size on one compact row */}
           <AnimatePresence>
             {isFilterPanelOpen && (
               <motion.div
@@ -430,50 +464,43 @@ export const CategoryPage = ({ defaultCategory }) => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="overflow-hidden border-t border-[#E7E2D8] bg-white"
+                className="overflow-hidden"
               >
-                <div className="divide-y divide-[#F0ECE4]">
+                <div className="flex flex-wrap gap-x-8 gap-y-3 pt-1 pb-3">
                   {[
-                    { key: 'occasion', label: 'Occasion', options: OCCASION_OPTIONS, isSelected: (o) => selectedOccasions.includes(o), onPick: toggleOccasion },
-                    { key: 'fabric', label: 'Fabric', options: FABRIC_OPTIONS, isSelected: (o) => selectedFabrics.includes(o), onPick: toggleFabric },
                     { key: 'size', label: 'Size', options: availableSizes, isSelected: (o) => selectedSizes.includes(o), onPick: toggleSize }
-                  ].map((group) => (
-                    <div key={group.key} className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-6 px-3 sm:px-4 py-3.5">
-                      <h4 className="sm:w-28 flex-shrink-0 text-[10px] font-semibold tracking-[0.22em] uppercase text-neutral-500">
+                  ].filter((g) => g.options.length > 0).map((group) => (
+                    <div key={group.key} className="flex flex-wrap items-center gap-1.5">
+                      <span className="mr-1 text-[10px] font-semibold tracking-[0.18em] uppercase text-neutral-400">
                         {group.label}
-                      </h4>
-                      {group.options.length === 0 ? (
-                        <p className="text-xs text-neutral-400 italic">No size variants</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {group.options.map((opt) => {
-                            const isSelected = group.isSelected(opt);
-                            return (
-                              <button
-                                key={opt}
-                                type="button"
-                                onClick={() => group.onPick(opt)}
-                                aria-pressed={isSelected}
-                                className={`inline-flex items-center justify-center gap-1.5 h-8 rounded-full border text-xs transition-all cursor-pointer select-none ${
-                                  group.key === 'size' ? 'min-w-[44px] px-3 font-semibold tracking-wider' : 'px-4'
-                                } ${
-                                  isSelected
-                                    ? 'bg-black text-white border-black font-semibold'
-                                    : 'bg-white text-neutral-700 border-[#E7E2D8] hover:border-black hover:text-black'
-                                }`}
-                              >
-                                {isSelected && group.key !== 'size' && <Check className="w-3 h-3 stroke-[2.5]" />}
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      </span>
+                      {group.options.map((opt) => {
+                        const isSelected = group.isSelected(opt);
+                        const isEmpty = !isSelected && !optionHasProducts(group.key, opt);
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => group.onPick(opt)}
+                            disabled={isEmpty}
+                            title={isEmpty ? 'Not available in this collection' : undefined}
+                            aria-pressed={isSelected}
+                            className={`h-7 rounded-full border text-[11px] transition-colors select-none ${
+                              group.key === 'size' ? 'min-w-[32px] px-2 font-semibold' : 'px-3'
+                            } ${
+                              isSelected
+                                ? 'bg-black text-white border-black cursor-pointer'
+                                : isEmpty
+                                ? 'bg-white text-neutral-300 border-neutral-200 cursor-not-allowed line-through decoration-neutral-300'
+                                : 'bg-white text-neutral-700 border-neutral-300 hover:border-black cursor-pointer'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
                     </div>
                   ))}
-                  <p className="px-3 sm:px-4 py-2 text-[10px] tracking-wider text-neutral-400 bg-[#FAF8F3]">
-                    Choose one filter at a time. Tap it again to clear.
-                  </p>
                 </div>
               </motion.div>
             )}

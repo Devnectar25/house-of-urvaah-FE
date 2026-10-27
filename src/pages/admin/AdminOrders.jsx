@@ -695,6 +695,9 @@ export const AdminOrders = () => {
   // Helper for Payment Status Pill Styling
   const getPaymentStatusPill = (status) => {
     const s = (status || '').toLowerCase();
+    if (s.startsWith('cod')) {
+      return 'bg-sky-50 text-sky-800 border-sky-200 whitespace-nowrap';
+    }
     if (s === 'paid') {
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     }
@@ -1470,7 +1473,8 @@ export const AdminOrders = () => {
                                 ord.status
                               )}`}
                             >
-                              {formatOrderStatusDisplay(ord.status)}
+                              {/* A new order is waiting to be processed: say so instead of a bare "Pending" */}
+                              {String(ord.status || 'pending').toLowerCase() === 'pending' ? 'New Order' : formatOrderStatusDisplay(ord.status)}
                             </span>
                             {ord.isPreview && (
                               <span
@@ -1515,8 +1519,11 @@ export const AdminOrders = () => {
                             return <span className="text-neutral-400 text-xs font-mono">—</span>;
                           }
 
+                          // COD is collected on delivery: show that rather than "Pending"
                           const displayPaymentStatus = isPaid
                             ? 'Paid'
+                            : (isCod && ['pending', ''].includes(String(ord.payment_status || '').toLowerCase()))
+                            ? 'COD · Due on delivery'
                             : (ord.payment_status || 'Pending');
 
                           return (

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ShoppingBag, ShoppingCart, Check, Volume2, VolumeX, Play, Pause, Maximize2, Minimize2, ExternalLink, Film } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { getSupabaseMediaUrl } from '../../lib/supabase';
+import { getSupabaseMediaUrl, getOptimizedImageUrl, isPersistentMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { getProductUrl } from '../../utils/productUrl';
 import { startVisiblePolling } from '../../lib/livePolling';
@@ -546,12 +546,19 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
   };
 
   const handleMoreInfo = () => {
-    if (look.product) {
-      navigate(getProductUrl(look.product));
-      window.scrollTo({ top: 0, behavior: 'instant' });
+    if (look?.product) {
+      try {
+        sessionStorage.setItem('urvaah_home_last_section', 'trending');
+        sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+        sessionStorage.setItem('urvaah_home_should_restore', 'true');
+      } catch (err) {}
+      navigate(getProductUrl(look.product), {
+        state: { fromSection: 'trending', fromScrollY: window.scrollY || 0 }
+      });
     }
     onClose();
   };
+
 
   const handleInstagramRedirect = (e) => {
     if (e) e.stopPropagation();
@@ -779,11 +786,12 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
               {/* Main Product Image Viewer with Carousel Controls */}
               <div className="relative w-full h-[320px] sm:h-[360px] md:h-[380px] rounded-xl overflow-hidden bg-neutral-100 group shadow-xs flex items-center justify-center">
                 <img
-                  src={getSupabaseMediaUrl(selectedImage)}
+                  src={getOptimizedImageUrl(selectedImage, 900)}
                   alt={look.product.name}
+                  decoding="async"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = selectedImage;
+                    e.currentTarget.src = getSupabaseMediaUrl(selectedImage);
                   }}
                   className="w-full h-full object-cover object-top transition-all duration-300"
                 />
@@ -847,11 +855,13 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
                         }`}
                       >
                         <img
-                          src={getSupabaseMediaUrl(img)}
+                          src={getOptimizedImageUrl(img, 160)}
                           alt={look.product.name}
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
-                            e.currentTarget.src = img;
+                            e.currentTarget.src = getSupabaseMediaUrl(img);
                           }}
                           className="w-full h-full object-cover object-center"
                         />
@@ -911,24 +921,26 @@ export const TrendingOnGram = () => {
           const finalSrc = rawImage.startsWith('http') || rawImage.startsWith('/') ? rawImage : getSupabaseMediaUrl(rawImage);
 
           const fallbackProduct = fallback.product;
-          const hasCustomProductImage = Boolean(item.product_image && String(item.product_image).trim());
+          const hasCustomProductImage = isPersistentMediaUrl(item.product_image);
           const finalProductImage = hasCustomProductImage ? String(item.product_image).trim() : fallbackProduct.image;
 
           // Parse dynamic product gallery
           let customGallery = [];
           if (Array.isArray(item.product_gallery) && item.product_gallery.length > 0) {
-            customGallery = item.product_gallery.filter(Boolean);
+            customGallery = item.product_gallery.filter(isPersistentMediaUrl);
           } else if (typeof item.product_gallery === 'string') {
             try {
               const parsed = JSON.parse(item.product_gallery);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                customGallery = parsed.filter(Boolean);
+                customGallery = parsed.filter(isPersistentMediaUrl);
               }
             } catch (_) {}
           }
 
           let finalGallery = fallbackProduct.gallery || [];
           if (customGallery.length > 0) {
+            // Main image first, then the rest of the gallery (main image is optional)
+            if (hasCustomProductImage && !customGallery.includes(finalProductImage)) customGallery = [finalProductImage, ...customGallery];
             finalGallery = customGallery;
           } else if (hasCustomProductImage) {
             finalGallery = [finalProductImage];
@@ -953,7 +965,7 @@ export const TrendingOnGram = () => {
             price: item.product_price
               ? (parseFloat(String(item.product_price).replace(/[^\d.]/g, '')) || fallbackProduct.price)
               : fallbackProduct.price,
-            image: finalProductImage,
+            image: hasCustomProductImage ? finalProductImage : (customGallery[0] || fallbackProduct.image),
             gallery: finalGallery
           };
 

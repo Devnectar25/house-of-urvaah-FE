@@ -256,9 +256,17 @@ export const WhatsHot = () => {
             >
               <Link
                 to={category.link}
-                onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem('urvaah_home_last_section', 'whats-hot');
+                    sessionStorage.setItem('urvaah_home_scroll_y', String(window.scrollY || 0));
+                    sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                  } catch (err) {}
+                }}
+                state={{ fromSection: 'whats-hot', fromScrollY: window.scrollY || 0 }}
                 className="block w-full h-full relative cursor-pointer"
               >
+
                 <img
                   src={category.image}
                   alt={category.title}

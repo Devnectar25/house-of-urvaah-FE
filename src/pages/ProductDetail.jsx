@@ -967,7 +967,15 @@ export const ProductDetail = () => {
         {/* Breadcrumb Navigation Row */}
         <div className="mb-6 md:mb-8 pb-4 border-b border-neutral-100 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              sessionStorage.setItem('urvaah_home_should_restore', 'true');
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                const targetSection = location.state?.fromSection || sessionStorage.getItem('urvaah_home_last_section');
+                navigate(targetSection ? `/#${targetSection}` : '/');
+              }
+            }}
             className="inline-flex items-center gap-2 text-xs font-sans font-semibold tracking-[0.2em] uppercase text-brand-dark hover:opacity-70 transition-opacity cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />

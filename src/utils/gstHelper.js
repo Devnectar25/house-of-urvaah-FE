@@ -6,10 +6,17 @@
 
 export const getOrderGstInfo = (ord) => {
   if (!ord) return { taxRate: 18, totalTax: 0, subtotal: 0, total: 0, taxRatio: 0.18 };
+  // Order placed while GST was switched off in the admin settings: no GST at all
+  if (ord.gst_applied === false) {
+    const sub = Number(ord.subtotal || ord.original_total || ord.originalTotal || 0);
+    const tot = Number(ord.total || ord.totalPaid || ord.total_amount || 0);
+    return { taxRate: 0, totalTax: 0, subtotal: sub, total: tot, taxRatio: 0 };
+  }
   const subtotal = Number(ord.subtotal || ord.original_total || ord.originalTotal || 0);
   const rawTotal = Number(ord.total || ord.totalPaid || ord.total_amount || 0);
   const discount = Number(ord.discount_amount || ord.discount || 0);
   const shipping = Number(ord.shipping || ord.shipping_cost || ord.shipping_fee || ord.shippingFee || 0);
+  const codCharge = Number(ord.cod_charge || ord.codCharge || 0); // flat COD charge, not tax
   let tax = Number(ord.tax || ord.tax_amount || ord.taxAmount || 0);
   let taxRate = Number(ord.tax_rate || ord.taxRate || ord.gst_percentage || 0);
 
@@ -17,7 +24,7 @@ export const getOrderGstInfo = (ord) => {
 
   // If tax is not directly provided, check if rawTotal has tax difference above netTaxable
   if (!tax && rawTotal > netTaxable && netTaxable > 0) {
-    tax = Math.max(0, Math.round(rawTotal - netTaxable - shipping));
+    tax = Math.max(0, Math.round(rawTotal - netTaxable - shipping - codCharge));
   }
 
   // Determine tax rate: fallback to 18% for luxury items > 2500, else 5%
@@ -34,7 +41,7 @@ export const getOrderGstInfo = (ord) => {
     tax = Math.round(netTaxable * (taxRate / 100));
   }
 
-  const computedTotal = netTaxable + tax + shipping;
+  const computedTotal = netTaxable + tax + shipping + codCharge;
   const effectiveTotal = Math.max(rawTotal, computedTotal);
   const taxRatio = netTaxable > 0 && tax > 0 ? (tax / netTaxable) : (taxRate / 100);
 

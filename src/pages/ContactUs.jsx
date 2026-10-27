@@ -102,6 +102,8 @@ export const ContactUs = () => {
     subject: 'Order Inquiry',
     message: '',
   });
+  const [customSubject, setCustomSubject] = useState('');
+  const [customSubjectError, setCustomSubjectError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -186,7 +188,7 @@ export const ContactUs = () => {
         {
           id: 1,
           name: 'House of Urvaah',
-          address: 'Mumbai - 400070',
+          address: 'Mumbai, Maharashtra 400070',
           phone: '+91 98333 25657',
           is_active: true
         },
@@ -267,6 +269,9 @@ export const ContactUs = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'subject' && value !== 'Other') {
+      setCustomSubjectError('');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -281,10 +286,21 @@ export const ContactUs = () => {
       return;
     }
 
+    if (formData.subject === 'Other' && !customSubject.trim()) {
+      setCustomSubjectError('Please enter your enquiry subject');
+      const customSubjectEl = document.getElementById('contact-custom-subject-input');
+      customSubjectEl?.focus();
+      return;
+    }
+
     if (!formData.name || !formData.email || !formData.message) return;
 
     setSubmitting(true);
     setSubmitError(null);
+
+    const finalSubject = formData.subject === 'Other'
+      ? customSubject.trim()
+      : formData.subject;
 
     try {
       await apiClient('/api/contact/submit', {
@@ -293,7 +309,7 @@ export const ContactUs = () => {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
-          subject: formData.subject,
+          subject: finalSubject,
           message: formData.message,
         }),
       });
@@ -301,6 +317,8 @@ export const ContactUs = () => {
       setIsSubmitted(true);
       setPhoneError('');
       setPhoneTouched(false);
+      setCustomSubject('');
+      setCustomSubjectError('');
       setFormData({
         name: '',
         email: '',
@@ -508,7 +526,35 @@ export const ContactUs = () => {
                       <option value="Private Customer Care">Private Customer Care & Styling</option>
                       <option value="Boutique Appointment">Boutique Appointment</option>
                       <option value="Press & Media">Press, PR & Wholesale</option>
+                      <option value="Other">Other (Write Custom Subject)</option>
                     </select>
+
+                    {formData.subject === 'Other' && (
+                      <div className="pt-1">
+                        <input
+                          id="contact-custom-subject-input"
+                          type="text"
+                          name="customSubject"
+                          required
+                          value={customSubject}
+                          onChange={(e) => {
+                            setCustomSubject(e.target.value);
+                            if (customSubjectError) setCustomSubjectError('');
+                          }}
+                          placeholder="Enter your custom subject *"
+                          className={`w-full bg-white border ${
+                            customSubjectError
+                              ? 'border-rose-500 focus:border-rose-600'
+                              : 'border-neutral-300 focus:border-black'
+                          } px-4 py-3 text-xs text-neutral-900 placeholder:text-neutral-400 font-medium focus:outline-none transition-colors`}
+                        />
+                        {customSubjectError && (
+                          <p className="text-[11px] text-rose-600 font-sans tracking-wide mt-1 flex items-center gap-1 font-medium">
+                            {customSubjectError}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -627,7 +673,8 @@ export const ContactUs = () => {
                       </h4>
                       <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
                         {loc.address ? loc.address
-                          .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai - 400070')
+                          .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra 400070')
+                          .replace('Mumbai - 400070', 'Mumbai, Maharashtra 400070')
                           .replace('Eastern winds, 1402, E wing, Kurla East', 'Eastern winds, 1402, E wing,\nKurla East')
                           .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>
@@ -821,7 +868,7 @@ export const ContactUs = () => {
               OUR CUSTOMER CARE IS AT YOUR SERVICE
             </h3>
             <p className="text-xs font-serif text-neutral-600 max-w-lg font-light">
-              Chat in real time with our AI fashion stylist <strong className="font-semibold text-neutral-900">Urvaah Bot</strong>, or dispatch a direct inquiry to our styling salon.
+              Chat in real time with our AI fashion stylist <strong className="font-semibold text-neutral-900">House of Urvaah Bot</strong>, or dispatch a direct inquiry to our styling salon.
             </p>
           </div>
 
@@ -831,7 +878,7 @@ export const ContactUs = () => {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#111111] text-white text-xs font-serif uppercase tracking-[0.2em] font-semibold hover:bg-neutral-800 transition-all cursor-pointer"
             >
               <WomanAiIcon className="w-4 h-4 text-emerald-400" />
-              <span>ASK URVAAH BOT</span>
+              <span>ASK HOUSE OF URVAAH BOT</span>
             </button>
             <button
               type="button"
