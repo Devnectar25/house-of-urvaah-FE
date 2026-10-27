@@ -198,7 +198,19 @@ export const Wishlist = () => {
               Explore our luxury collection and click the heart icon on any piece to save it for later.
             </p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                  sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                } catch (e) {}
+                navigate('/#best-sellers');
+                setTimeout(() => {
+                  const el = document.getElementById('best-sellers');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 150);
+              }}
               className="bg-brand-dark hover:bg-neutral-800 text-white text-xs font-semibold tracking-widest px-8 py-3.5 uppercase transition-colors cursor-pointer shadow-xs"
             >
               EXPLORE COLLECTION

@@ -1172,46 +1172,31 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                 {errors.name && <p className="text-[11px] text-rose-600 font-medium">{errors.name}</p>}
               </div>
 
-              {/* 2. Category & Subcategory Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    ref={categoryRef}
-                    value={formData.category_id}
-                    onChange={(e) => {
-                      setFormData(prev => ({ ...prev, category_id: e.target.value }));
-                      validateField('category_id', e.target.value);
-                    }}
-                    onBlur={() => handleBlur('category_id')}
-                    className={`w-full px-3.5 py-2.5 bg-neutral-50 border rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 transition-all ${
-                      errors.category_id ? 'border-rose-400 focus:ring-rose-400' : 'border-neutral-200 focus:ring-brand-dark'
-                    }`}
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category_id && <p className="text-[11px] text-rose-600 font-medium">{errors.category_id}</p>}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                    Subcategory (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.subCategory}
-                    onChange={(e) => setFormData(prev => ({ ...prev, subCategory: e.target.value }))}
-                    placeholder="e.g. Festive Lehengas, Dupattas"
-                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-dark transition-all"
-                  />
-                </div>
+              {/* 2. Category */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                  Category <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  ref={categoryRef}
+                  value={formData.category_id}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, category_id: e.target.value }));
+                    validateField('category_id', e.target.value);
+                  }}
+                  onBlur={() => handleBlur('category_id')}
+                  className={`w-full px-3.5 py-2.5 bg-neutral-50 border rounded-xl text-xs font-sans text-brand-dark focus:outline-none focus:bg-white focus:ring-1 transition-all ${
+                    errors.category_id ? 'border-rose-400 focus:ring-rose-400' : 'border-neutral-200 focus:ring-brand-dark'
+                  }`}
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.category_id && <p className="text-[11px] text-rose-600 font-medium">{errors.category_id}</p>}
               </div>
 
               {/* Shop Filters: storefront collection filters this product appears under */}

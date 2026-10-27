@@ -334,6 +334,13 @@ export const ProductDetail = () => {
               '/assets/Images/Corset04.png'
             ];
 
+            // Admin-managed images and name always win; the built-in corset photos are only a
+            // fallback for when the API returns no gallery
+            const apiGallery = (Array.isArray(data.gallery) && data.gallery.length > 0)
+              ? data.gallery
+              : (Array.isArray(data.images) && data.images.length > 0 ? data.images : []);
+            const useCorsetFallback = isCorsetSet && apiGallery.length === 0;
+
             // Merge onto the local entry for THIS product only (never the previously viewed product)
             const prev = local;
             loadedIdRef.current = id;
@@ -341,12 +348,12 @@ export const ProductDetail = () => {
               ...prev,
               ...data,
               id: canonicalData?.id || String(data.id || id),
-              name: isCorsetSet ? 'Sage Bloom Embroidered Corset' : (data.name || data.title || prev?.name),
+              name: data.name || data.title || (isCorsetSet ? 'Sage Bloom Embroidered Corset' : prev?.name),
               price: parseFloat(data.price) || prev?.price || 12990,
               originalPrice: parseFloat(data.originalPrice || data.originalprice) || prev?.originalPrice,
-              image: isCorsetSet ? corsetGallery[0] : (data.image || prev?.image),
-              hoverImage: isCorsetSet ? corsetGallery[1] : (data.hoverImage || prev?.hoverImage || data.image),
-              gallery: isCorsetSet ? corsetGallery : (data.gallery && data.gallery.length > 0 ? data.gallery : (prev?.gallery || [data.image])),
+              image: useCorsetFallback ? corsetGallery[0] : (apiGallery[0] || data.image || prev?.image),
+              hoverImage: useCorsetFallback ? corsetGallery[1] : (data.hoverImage || apiGallery[1] || prev?.hoverImage || data.image),
+              gallery: useCorsetFallback ? corsetGallery : (apiGallery.length > 0 ? apiGallery : (prev?.gallery || [data.image])),
               video_url: data.video_url || data.videoUrl || data.video || prev?.video_url || '',
               videoUrl: data.video_url || data.videoUrl || data.video || prev?.videoUrl || '',
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
@@ -955,7 +962,12 @@ export const ProductDetail = () => {
     <div className="w-full bg-white font-serif text-brand-dark min-h-screen pt-24 sm:pt-28 pb-20 selection:bg-brand-dark selection:text-white">
       <SEOHead
         title={canonicalInfo?.title || `${product.name} | House of Urvaah`}
-        description={canonicalInfo?.description || product.description || `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`}
+        description={
+          canonicalInfo?.description ||
+          product.shortDescription ||
+          (product.description ? product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '') ||
+          `Shop ${product.name} at House of Urvaah. High-fashion luxury silhouette crafted from premium virgin fabrics.`
+        }
         keywords={canonicalInfo?.keywords || `${product.name}, ${product.category || 'Luxury Fashion'}, House of Urvaah apparel`}
         canonicalUrl={canonicalInfo?.canonicalUrl}
         schema={productSchema}

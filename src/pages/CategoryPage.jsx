@@ -19,8 +19,8 @@ import { OCCASION_OPTIONS, FABRIC_OPTIONS, productHasOccasion, productHasFabric,
 
 // Canonical collection definitions
 const CANONICAL_COLLECTIONS = [
-  { slug: 'all', path: '/category/all', label: 'ALL' },
-  { slug: 'new-arrivals', path: '/new-arrivals', label: 'NEW ARRIVALS' },
+  { slug: 'all', path: '/category/all', label: 'ALL', alwaysShow: true },
+  { slug: 'new-arrivals', path: '/new-arrivals', label: 'NEW ARRIVALS', alwaysShow: true },
   { slug: 'co-ord-sets', path: '/co-ord-sets', label: 'CO-ORD SETS' },
   { slug: 'festive-wear', path: '/festive-wear', label: 'FESTIVE WEAR' },
   { slug: 'kurtis-and-dresses', path: '/kurtis-and-dresses', label: 'KURTIS AND DRESSES' },
@@ -195,10 +195,18 @@ export const CategoryPage = ({ defaultCategory }) => {
 
   // Dynamically compute all collection pills: Canonical + dynamically created active categories
   const collectionPills = useMemo(() => {
-    const list = [...CANONICAL_COLLECTIONS];
+    const isActiveCat = (cat) => cat && cat.active !== false && cat.is_active !== false;
+    const slugOf = (cat) => (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+    const activeSlugs = categories.filter(isActiveCat).map(slugOf).filter(Boolean);
+    const matchesActive = (slug) => activeSlugs.some((s) => s === slug || s.includes(slug) || slug.includes(s));
+
+    // A collection whose category the admin deactivated is hidden (kept while categories are still loading)
+    const list = categories.length
+      ? CANONICAL_COLLECTIONS.filter((c) => c.alwaysShow || matchesActive(c.slug))
+      : [...CANONICAL_COLLECTIONS];
 
     categories.forEach((cat) => {
-      if (!cat || cat.active === false || cat.is_active === false) return;
+      if (!isActiveCat(cat)) return;
       const rawSlug = (cat.slug || cat.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
       // Check if this category is already represented in CANONICAL_COLLECTIONS
       const alreadyIncluded = list.some(

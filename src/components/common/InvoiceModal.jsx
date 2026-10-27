@@ -71,7 +71,16 @@ export const InvoiceModal = ({ isOpen, onClose, order, orderId }) => {
       const isAdmin = Boolean(getAdminAuthToken());
       const orderStatusStr = String(order?.status || '').toLowerCase();
       const origStatusStr = String(order?.original_status || '').toLowerCase();
-      const isDelivered = orderStatusStr.includes('delivered') || origStatusStr.includes('delivered') || Boolean(order?.delivered_at || order?.deliveredAt);
+      const isQCRejected =
+        orderStatusStr === 'return qc rejected' ||
+        orderStatusStr === 'return rejected' ||
+        orderStatusStr === 'replace rejected' ||
+        String(order?.return_qc_status || '').toLowerCase() === 'rejected';
+      const isDelivered =
+        orderStatusStr.includes('delivered') ||
+        origStatusStr.includes('delivered') ||
+        isQCRejected ||
+        Boolean(order?.delivered_at || order?.deliveredAt);
 
       if (order && !isAdmin && !isDelivered) {
         if (isMounted) {

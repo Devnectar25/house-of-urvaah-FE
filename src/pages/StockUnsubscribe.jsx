@@ -68,7 +68,13 @@ export const StockUnsubscribe = () => {
             </p>
             <div className="pt-4">
               <Link
-                to="/"
+                to="/#best-sellers"
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem('urvaah_home_last_section', 'best-sellers');
+                    sessionStorage.setItem('urvaah_home_should_restore', 'true');
+                  } catch (e) {}
+                }}
                 className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold tracking-widest px-6 py-3 uppercase hover:bg-neutral-800 transition-colors font-sans"
               >
                 <span>EXPLORE COLLECTION</span>

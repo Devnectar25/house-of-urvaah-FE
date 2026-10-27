@@ -67,11 +67,12 @@ export const Home = () => {
     };
   }, []);
 
-  // Restore scroll position when returning back to Home from a product or collection
+  // Restore scroll position when returning back to Home from a product or collection, or navigating to a section hash
   useEffect(() => {
-    const savedSection = sessionStorage.getItem('urvaah_home_last_section');
+    const hashTarget = (window.location.hash || '').replace('#', '');
+    const savedSection = hashTarget || sessionStorage.getItem('urvaah_home_last_section');
     const savedY = parseInt(sessionStorage.getItem('urvaah_home_scroll_y') || '0', 10);
-    const shouldRestore = sessionStorage.getItem('urvaah_home_should_restore') === 'true';
+    const shouldRestore = sessionStorage.getItem('urvaah_home_should_restore') === 'true' || Boolean(hashTarget);
 
     if (shouldRestore || savedSection || savedY > 0) {
       sessionStorage.removeItem('urvaah_home_should_restore');
@@ -81,7 +82,7 @@ export const Home = () => {
         if (savedSection) {
           const el = document.getElementById(savedSection);
           if (el) {
-            el.scrollIntoView({ behavior: 'instant', block: 'start' });
+            el.scrollIntoView({ behavior: hashTarget ? 'smooth' : 'instant', block: 'start' });
             ok = true;
           }
         }

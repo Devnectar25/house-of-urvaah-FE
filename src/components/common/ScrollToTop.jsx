@@ -57,8 +57,8 @@ export const ScrollToTop = () => {
     // Reset any lingering scroll locks when navigating between views
     forceUnlockScroll();
 
-    // Do not scroll to top if target is the FAQs anchor or route
-    if (pathname === '/faqs' || pathname === '/faq' || hash === '#faqs') {
+    // Do not scroll to top if target is the FAQs anchor or route, or if a homepage section hash is present
+    if (pathname === '/faqs' || pathname === '/faq' || hash === '#faqs' || (isHomePage && hash)) {
       return;
     }
 
