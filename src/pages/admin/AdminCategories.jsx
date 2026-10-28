@@ -213,6 +213,7 @@ export const AdminCategories = () => {
       {/* Add / Edit Category Modal */}
       <CategoryModal
         category={selectedCategory}
+        existingCategories={categories}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCategorySaved={handleCategorySaved}
@@ -392,7 +393,7 @@ export const AdminCategories = () => {
                 Array.from({ length: 5 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="py-3.5 px-4">
-                      <div className="w-12 h-12 bg-neutral-200 rounded-lg" />
+                      <div className="w-12 h-16 bg-neutral-200 rounded-lg aspect-[3/4]" />
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="h-4 bg-neutral-200 rounded w-36" />
@@ -452,14 +453,14 @@ export const AdminCategories = () => {
                       key={catId}
                       className="hover:bg-neutral-50/80 transition-colors group"
                     >
-                      {/* Image Thumbnail */}
+                      {/* Image Thumbnail - 3:4 Aspect Ratio */}
                       <td className="py-3 px-4">
-                        <div className="w-12 h-12 rounded-lg border border-neutral-200/80 bg-neutral-50 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-2xs">
+                        <div className="w-12 h-16 rounded-lg border border-neutral-200/80 bg-neutral-50 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-2xs aspect-[3/4]">
                           {imageUrl ? (
                             <img
                               src={imageUrl}
                               alt={cat.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                               onError={(e) => {
                                 e.target.onerror = null;
                                 if (rawImageUrl && rawImageUrl !== imageUrl) {

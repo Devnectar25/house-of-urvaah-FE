@@ -22,7 +22,7 @@ export const Footer = () => {
 
   const [primaryBoutique, setPrimaryBoutique] = useState(() => cachedPrimaryBoutique || {
     name: 'House of Urvaah',
-    address: 'Mumbai, Maharashtra 400070'
+    address: 'Mumbai, Maharashtra, India 400070'
   });
 
   const [concierge, setConcierge] = useState(() => cachedConcierge || {
@@ -40,7 +40,7 @@ export const Footer = () => {
             const prim = res.data.primary_location;
             const formatted = {
               name: prim.name || 'House of Urvaah',
-              address: prim.address || 'Mumbai, Maharashtra 400070'
+              address: prim.address ? prim.address.replace(/Maharashtra\s*,?\s*400070/i, 'Maharashtra, India 400070') : 'Mumbai, Maharashtra, India 400070'
             };
             cachedPrimaryBoutique = formatted;
             setPrimaryBoutique(formatted);
@@ -79,9 +79,10 @@ export const Footer = () => {
                 <p className="text-center">{primaryBoutique.name?.startsWith('House of') ? primaryBoutique.name : `House of Urvaah • ${primaryBoutique.name}`}</p>
                 <p className="whitespace-pre-line text-neutral-600 text-center">
                   {primaryBoutique.address ? primaryBoutique.address
-                    .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra 400070')
-                    .replace('Mumbai - 400070', 'Mumbai, Maharashtra 400070')
-                    .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : 'Mumbai, Maharashtra 400070'}
+                    .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra, India 400070')
+                    .replace('Mumbai - 400070', 'Mumbai, Maharashtra, India 400070')
+                    .replace(/Maharashtra\s*,?\s*400070/i, 'Maharashtra, India 400070')
+                    .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : 'Mumbai, Maharashtra, India 400070'}
                 </p>
                 <div className="pt-2.5 flex justify-center">
                   <a 

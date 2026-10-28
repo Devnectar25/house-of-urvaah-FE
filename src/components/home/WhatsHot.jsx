@@ -34,13 +34,6 @@ const DEFAULT_CATEGORIES = [
     title: 'CORSET',
     image: '/assets/Images/Corset04.png',
     link: '/corset-tops'
-  },
-  {
-    id: 'hot-5',
-    anchorId: 'new-arrivals',
-    title: 'NEW ARRIVALS',
-    image: '/assets/Images/Brown01.png',
-    link: '/new-arrivals'
   }
 ];
 
@@ -65,40 +58,35 @@ export const WhatsHot = () => {
       const res = await apiClient('/api/categories/active');
       const list = Array.isArray(res) ? res : (res?.data || res?.data?.data || []);
       if (Array.isArray(list) && list.length > 0) {
-        const mapped = list.map((cat, idx) => {
-          const rawName = cat.name || cat.title || `Category ${idx + 1}`;
-          let title = rawName.toUpperCase();
-          if (title === 'KURTI' || title === 'KURTIS') {
-            title = 'KURTIS AND DRESSES';
-          }
-          if (title === 'ETHNIC WEAR' || title === 'ETHNIC') {
-            title = 'FESTIVE WEAR';
-          }
-          const anchorId = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-          const rawImg = cat.category_image || cat.image_url || cat.image || '';
-          
-          return {
-            id: cat.id || cat.category_id || `cat-${idx}`,
-            anchorId: anchorId || `cat-${idx}`,
-            title: title,
-            image: rawImg ? getSupabaseMediaUrl(rawImg) : '/assets/Images/Brown01.png',
-            link: getCanonicalCategoryUrl(anchorId)
-          };
-        });
-
-        // Ensure "NEW ARRIVALS" category is present
-        const hasNewArrivals = mapped.some((c) => c.title.includes('NEW ARRIVAL'));
-        if (!hasNewArrivals) {
-          mapped.push({
-            id: 'cat-new-arrivals',
-            anchorId: 'new-arrivals',
-            title: 'NEW ARRIVALS',
-            image: '/assets/Images/Brown01.png',
-            link: '/new-arrivals'
+        const mapped = list
+          .filter((cat) => {
+            const rawImg = cat.category_image || cat.image_url || cat.image || '';
+            return !rawImg.includes('Brown01.png');
+          })
+          .map((cat, idx) => {
+            const rawName = cat.name || cat.title || `Category ${idx + 1}`;
+            let title = rawName.toUpperCase();
+            if (title === 'KURTI' || title === 'KURTIS') {
+              title = 'KURTIS AND DRESSES';
+            }
+            if (title === 'ETHNIC WEAR' || title === 'ETHNIC') {
+              title = 'FESTIVE WEAR';
+            }
+            const anchorId = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+            const rawImg = cat.category_image || cat.image_url || cat.image || '';
+            
+            return {
+              id: cat.id || cat.category_id || `cat-${idx}`,
+              anchorId: anchorId || `cat-${idx}`,
+              title: title,
+              image: rawImg ? getSupabaseMediaUrl(rawImg) : '/assets/Images/Blue02.png',
+              link: getCanonicalCategoryUrl(anchorId)
+            };
           });
-        }
 
-        setCategories(mapped);
+        if (mapped.length > 0) {
+          setCategories(mapped);
+        }
       }
     } catch (err) {
       console.warn('[WhatsHot] Failed to fetch live categories:', err.message);
@@ -252,7 +240,7 @@ export const WhatsHot = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: idx * 0.08 }}
-              className="group/card relative block aspect-[3/4] md:aspect-[4/5] overflow-hidden bg-neutral-100 w-[78vw] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-14px)] lg:w-[calc(25%-15px)] min-w-[78vw] sm:min-w-[calc(50%-8px)] md:min-w-[calc(33.333%-14px)] lg:min-w-[calc(25%-15px)] flex-shrink-0 snap-start"
+              className="group/card relative block aspect-[3/4] overflow-hidden bg-neutral-100 w-[78vw] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-14px)] lg:w-[calc(25%-15px)] min-w-[78vw] sm:min-w-[calc(50%-8px)] md:min-w-[calc(33.333%-14px)] lg:min-w-[calc(25%-15px)] flex-shrink-0 snap-start"
             >
               <Link
                 to={category.link}
@@ -265,6 +253,7 @@ export const WhatsHot = () => {
                 }}
                 state={{ fromSection: 'whats-hot', fromScrollY: window.scrollY || 0 }}
                 className="block w-full h-full relative cursor-pointer"
+                aria-label={category.title}
               >
 
                 <img
@@ -272,32 +261,10 @@ export const WhatsHot = () => {
                   alt={category.title}
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = '/assets/Images/Brown01.png';
+                    e.target.src = '/assets/Images/Blue02.png';
                   }}
                   className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover/card:scale-[1.03]"
                 />
-                {/* Category Text directly over clear image */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10 transition-colors group-hover/card:bg-black/10">
-                  <h3 
-                    className="text-white text-2xl md:text-3xl lg:text-4xl font-serif tracking-[0.15em] uppercase font-extrabold leading-tight transition-transform duration-300 group-hover/card:scale-105"
-                    style={{ textShadow: '0px 2px 8px rgba(0,0,0,0.7), 0px 1px 3px rgba(0,0,0,0.5)' }}
-                  >
-                    {category.title === 'KURTIS AND DRESSES' ? (
-                      <>
-                        <span>KURTIS</span>
-                        <br />
-                        <span className="text-xl sm:text-2xl md:text-3xl lg:text-3xl">AND DRESSES</span>
-                      </>
-                    ) : (
-                      category.title.split(' ').map((word, i) => (
-                        <React.Fragment key={i}>
-                          {word}
-                          <br />
-                        </React.Fragment>
-                      ))
-                    )}
-                  </h3>
-                </div>
               </Link>
             </motion.div>
           ))}
