@@ -12,7 +12,7 @@ import { apiClient } from '../../lib/apiClient';
 import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { useModalScrollLock } from '../../hooks/useModalScrollLock';
 
-export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) => {
+export const CategoryModal = ({ category, existingCategories = [], isOpen, onClose, onCategorySaved }) => {
   // Lock background scrolling on both window and admin layout content container
   useModalScrollLock(isOpen, onClose);
 
@@ -89,10 +89,23 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
   const validateField = (field, value) => {
     let errorMsg = '';
     if (field === 'name') {
-      if (!value || !value.trim()) {
+      const trimmed = (value || '').trim();
+      if (!trimmed) {
         errorMsg = 'Category name is required.';
-      } else if (value.trim().length < 2) {
+      } else if (trimmed.length < 2) {
         errorMsg = 'Category name must be at least 2 characters.';
+      } else {
+        const currentId = category?.category_id || category?.id;
+        const normalized = trimmed.toLowerCase();
+        const isDuplicate = existingCategories.some((cat) => {
+          const catId = cat.category_id || cat.id;
+          if (isEdit && String(catId) === String(currentId)) return false;
+          return (cat.name || '').trim().toLowerCase() === normalized;
+        });
+
+        if (isDuplicate) {
+          errorMsg = `Category "${trimmed}" already exists. Please choose a different name.`;
+        }
       }
     }
     setErrors((prev) => ({ ...prev, [field]: errorMsg }));
@@ -107,6 +120,9 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       validateField(field, value);
+    }
+    if (submitError) {
+      setSubmitError(null);
     }
   };
 
@@ -260,7 +276,14 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
       onClose();
     } catch (err) {
       console.error('Failed to save category:', err);
-      setSubmitError(err.message || `Failed to ${isEdit ? 'update' : 'create'} category. Please try again.`);
+      const errMsg = err.message || `Failed to ${isEdit ? 'update' : 'create'} category. Please try again.`;
+      setSubmitError(errMsg);
+      if (errMsg.toLowerCase().includes('already exists')) {
+        setErrors((prev) => ({ ...prev, name: errMsg }));
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+        }
+      }
     } finally {
       setSubmitting(false);
     }
@@ -363,10 +386,15 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
 
           {/* Category Image Section (Boxed Sub-section) */}
           <div className="border border-neutral-200/80 rounded-xl p-4 bg-neutral-50/40 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-brand-dark uppercase tracking-wider">
-                Category Image
-              </label>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <label className="block text-xs font-semibold text-brand-dark uppercase tracking-wider">
+                  Category Image
+                </label>
+                <span className="text-[10px] font-medium text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-md border border-neutral-200">
+                  3:4 Ratio (e.g. 1080 × 1440 px)
+                </span>
+              </div>
 
               {!showUrlInput && (
                 <button
@@ -382,13 +410,13 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
 
             {/* Sub-Section Content: Thumbnail + Status & Actions */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-1">
-              {/* Thumbnail Area */}
+              {/* Thumbnail Area - Aspect 3:4 matching storefront HOT LIST */}
               {currentImagePreview && !isImageRemoved ? (
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-xs flex-shrink-0 group">
+                <div className="relative w-20 sm:w-24 aspect-[3/4] rounded-xl border border-neutral-200 bg-white overflow-hidden shadow-xs flex-shrink-0 group">
                   <img
                     src={currentImagePreview}
                     alt="Category Thumbnail"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-center"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = 'https://via.placeholder.com/150?text=Invalid+Image';
@@ -403,10 +431,10 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
                   )}
                 </div>
               ) : (
-                /* Empty Placeholder State */
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-100/60 flex flex-col items-center justify-center text-neutral-400 flex-shrink-0">
+                /* Empty Placeholder State - 3:4 Aspect Ratio */
+                <div className="w-20 sm:w-24 aspect-[3/4] rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-100/60 flex flex-col items-center justify-center text-neutral-400 flex-shrink-0">
                   <ImageIcon className="w-6 h-6 stroke-[1.5]" />
-                  <span className="text-[10px] text-neutral-400 mt-1 font-medium">No Image</span>
+                  <span className="text-[10px] text-neutral-400 mt-1 font-medium">3:4 Ratio</span>
                 </div>
               )}
 
@@ -418,6 +446,9 @@ export const CategoryModal = ({ category, isOpen, onClose, onCategorySaved }) =>
                   </h4>
                   <p className="text-[11px] text-neutral-500 font-medium mt-0.5">
                     {getImageStatusText()}
+                  </p>
+                  <p className="text-[10px] text-neutral-400 mt-0.5 leading-snug">
+                    Displays on "THE HOT LIST" in 3:4 vertical ratio without cropping.
                   </p>
                 </div>
 

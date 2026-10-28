@@ -188,7 +188,7 @@ export const ContactUs = () => {
         {
           id: 1,
           name: 'House of Urvaah',
-          address: 'Mumbai, Maharashtra 400070',
+          address: 'Mumbai, Maharashtra, India 400070',
           phone: '+91 98333 25657',
           is_active: true
         },
@@ -675,8 +675,9 @@ export const ContactUs = () => {
                       </h4>
                       <p className="leading-relaxed text-neutral-800 whitespace-pre-line">
                         {loc.address ? loc.address
-                          .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra 400070')
-                          .replace('Mumbai - 400070', 'Mumbai, Maharashtra 400070')
+                          .replace(/Eastern winds[\s\S]*?(Mumbai\s*400070|Mumbai\s*-\s*400070)/i, 'Mumbai, Maharashtra, India 400070')
+                          .replace('Mumbai - 400070', 'Mumbai, Maharashtra, India 400070')
+                          .replace(/Maharashtra\s*,?\s*400070/i, 'Maharashtra, India 400070')
                           .replace('Eastern winds, 1402, E wing, Kurla East', 'Eastern winds, 1402, E wing,\nKurla East')
                           .replace('Kala Ghoda Arts District, Colaba Causeway', 'Kala Ghoda Arts District,\nColaba Causeway') : ''}
                       </p>

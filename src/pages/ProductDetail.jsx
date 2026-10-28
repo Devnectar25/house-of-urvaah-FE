@@ -242,6 +242,7 @@ export const ProductDetail = () => {
     }
   }, [canonicalInfo?.url, product, loading, id, location.pathname, location.search, location.hash, navigate]);
 
+
   // Gallery & Image Viewer / Zoom States
   const [selectedImage, setSelectedImage] = useState('');
   const [selectedMediaType, setSelectedMediaType] = useState('image'); // 'image' | 'video'

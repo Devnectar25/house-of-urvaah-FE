@@ -14,13 +14,16 @@ import { useCart } from '../context/CartContext';
 // Flag to control visibility of the "PRICE DROP ERA" (StealDeals) section on the homepage
 const SHOW_PRICE_DROP_ERA = false;
 
+// Flag to control visibility of the "REFINED WITH CONSCIENCE" (BrandStory) section on the homepage (temporarily hidden upon request)
+const SHOW_BRAND_STORY = false;
+
 const HOMEPAGE_SECTIONS = [
   'best-sellers',
   'trending',
   'whats-hot',
   'recommended',
   'editorial',
-  'brand-story'
+  ...(SHOW_BRAND_STORY ? ['brand-story'] : [])
 ];
 
 export const Home = () => {
@@ -150,10 +153,12 @@ export const Home = () => {
         <EditorialBanner />
       </section>
 
-      {/* 4.8 Sustainability / Brand Story Strip */}
-      <section id="brand-story" className="scroll-mt-20">
-        <BrandStory />
-      </section>
+      {/* 4.8 Sustainability / Brand Story Strip (REFINED WITH CONSCIENCE - temporarily hidden) */}
+      {SHOW_BRAND_STORY && (
+        <section id="brand-story" className="scroll-mt-20">
+          <BrandStory />
+        </section>
+      )}
     </main>
   );
 };

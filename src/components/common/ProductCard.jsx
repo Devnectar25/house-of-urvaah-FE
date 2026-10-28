@@ -147,6 +147,7 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
       navigate(getProductUrl(product), {
         state: { fromSection: sectionId, fromScrollY: window.scrollY || 0 }
       });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   };
 

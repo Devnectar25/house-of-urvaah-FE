@@ -56,6 +56,7 @@ export const DualCampaignBanner = () => {
     navigate(getProductUrl(slug), {
       state: { fromSection: 'hero-campaign', fromScrollY: window.scrollY || 0 }
     });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // Dynamic banner data for all 4 positions from admin configuration

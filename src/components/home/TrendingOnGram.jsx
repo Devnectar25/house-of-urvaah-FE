@@ -567,6 +567,7 @@ const ShopTheLookModal = ({ look, currentIndex, totalLooks, onClose, onPrev, onN
       navigate(getProductUrl(look.product), {
         state: { fromSection: 'trending', fromScrollY: window.scrollY || 0 }
       });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
     onClose();
   };

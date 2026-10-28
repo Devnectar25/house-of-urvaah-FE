@@ -631,6 +631,7 @@ export const UrvaahBot = ({ isOpen, onClose }) => {
       navigate(getProductUrl(product), {
         state: { fromScrollY: window.scrollY || 0 }
       });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     } else if (setPdpProduct) {
       setPdpProduct(product);
     }

@@ -39,6 +39,7 @@ export const CategoryGrid = () => {
     navigate(getProductUrl(prod), {
       state: { fromSection: 'recommended', fromScrollY: window.scrollY || 0 }
     });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
 
