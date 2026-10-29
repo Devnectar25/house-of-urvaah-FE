@@ -40,6 +40,8 @@ const DEFAULT_CATEGORIES = [
 export const WhatsHot = () => {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const scrollRef = useRef(null);
+  const targetScrollLeftRef = useRef(null);
+  const snapTimerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
@@ -130,16 +132,37 @@ export const WhatsHot = () => {
     const step = getScrollStep();
     const currentScroll = el.scrollLeft;
 
-    let nextScroll;
-    if (direction === 'right') {
-      nextScroll = Math.min(maxScroll, currentScroll + step);
-    } else {
-      nextScroll = Math.max(0, currentScroll - step);
+    let baseScroll = targetScrollLeftRef.current !== null ? targetScrollLeftRef.current : currentScroll;
+    if (Math.abs(baseScroll - currentScroll) > step * 2) {
+      baseScroll = currentScroll;
     }
 
+    let nextScroll;
+    if (direction === 'right') {
+      nextScroll = Math.min(maxScroll, baseScroll + step);
+    } else {
+      nextScroll = Math.max(0, baseScroll - step);
+    }
+
+    if (maxScroll - nextScroll < 30) nextScroll = maxScroll;
+    if (nextScroll < 30) nextScroll = 0;
+
+    targetScrollLeftRef.current = nextScroll;
+
+    // Disarm CSS scroll-snap during programmatic smooth scroll so it won't snap back on single click
+    el.style.scrollSnapType = 'none';
     el.scrollTo({ left: nextScroll, behavior: 'smooth' });
-    setTimeout(checkScrollPosition, 100);
-    setTimeout(checkScrollPosition, 350);
+
+    clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.style.scrollSnapType = '';
+      }
+    }, 450);
+
+    setTimeout(checkScrollPosition, 60);
+    setTimeout(checkScrollPosition, 200);
+    setTimeout(checkScrollPosition, 500);
   };
 
   useEffect(() => {
@@ -164,16 +187,24 @@ export const WhatsHot = () => {
     const el = scrollRef.current;
     if (!el) return;
 
+    const handleScrollEvent = () => {
+      checkScrollPosition();
+      if (scrollRef.current) {
+        targetScrollLeftRef.current = scrollRef.current.scrollLeft;
+      }
+    };
+
     checkScrollPosition();
-    el.addEventListener('scroll', checkScrollPosition, { passive: true });
+    el.addEventListener('scroll', handleScrollEvent, { passive: true });
     window.addEventListener('resize', checkScrollPosition, { passive: true });
 
     const timer = setTimeout(checkScrollPosition, 200);
 
     return () => {
-      el.removeEventListener('scroll', checkScrollPosition);
+      el.removeEventListener('scroll', handleScrollEvent);
       window.removeEventListener('resize', checkScrollPosition);
       clearTimeout(timer);
+      if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
     };
   }, [checkScrollPosition, categories]);
 
@@ -206,7 +237,7 @@ export const WhatsHot = () => {
           }`}
           aria-label="Scroll left categories"
         >
-          <ChevronLeft className="w-5 h-5 stroke-[2]" />
+          <ChevronLeft className="w-5 h-5 stroke-[2] pointer-events-none" />
         </button>
 
         {/* Right Floating Arrow Button */}
@@ -224,13 +255,13 @@ export const WhatsHot = () => {
           }`}
           aria-label="Scroll right categories"
         >
-          <ChevronRight className="w-5 h-5 stroke-[2]" />
+          <ChevronRight className="w-5 h-5 stroke-[2] pointer-events-none" />
         </button>
 
         {/* Scrollable Track: 4 visible at once on desktop, seamlessly scrollable */}
         <div
           ref={scrollRef}
-          className="flex gap-4 md:gap-5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-3"
+          className="flex gap-4 md:gap-5 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-3"
         >
           {categories.map((category, idx) => (
             <motion.div
