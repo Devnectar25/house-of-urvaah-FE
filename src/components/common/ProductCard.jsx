@@ -80,13 +80,18 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
     setHasSubscribedStock(true);
   };
 
+  // Limit automatic carousel to at most 2 images per product
+  const activeCarouselImages = Array.isArray(product?.carouselImages) && product.carouselImages.length > 1
+    ? product.carouselImages.slice(0, 2)
+    : null;
+
   useEffect(() => {
-    if (!product?.carouselImages || product.carouselImages.length <= 1) return;
+    if (!activeCarouselImages || activeCarouselImages.length <= 1) return;
     const interval = setInterval(() => {
-      setCarouselIndex((prev) => (prev + 1) % product.carouselImages.length);
+      setCarouselIndex((prev) => (prev + 1) % activeCarouselImages.length);
     }, 2500); // crossfade every 2.5s matching banner sections
     return () => clearInterval(interval);
-  }, [product?.carouselImages]);
+  }, [activeCarouselImages]);
 
   // Close size selection when clicking anywhere outside this card
   useEffect(() => {
@@ -175,9 +180,9 @@ export const ProductCard = ({ product, onQuickView, hideColorDots = true, hideOr
     >
       {/* Image Container */}
       <div className="relative w-full aspect-[3/4] bg-neutral-100 overflow-hidden mb-3">
-        {/* Primary & Hover / Auto Carousel Images */}
-        {product.carouselImages && product.carouselImages.length > 1 ? (
-          product.carouselImages.map((src, i) => (
+        {/* Primary & Hover / Auto Carousel Images (capped at 2 images) */}
+        {activeCarouselImages && activeCarouselImages.length > 1 ? (
+          activeCarouselImages.map((src, i) => (
             <img
               key={src}
               src={src}

@@ -63,6 +63,11 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
           const mainImg = p.image || galleryArr[0] || '/assets/Images/Brown01.png';
           const hoverImg = p.hoverImage || galleryArr[1] || mainImg;
 
+          // Limit to only 2 images for the automatic card effect
+          const twoImages = galleryArr.length >= 2
+            ? galleryArr.slice(0, 2)
+            : [mainImg, hoverImg].filter(Boolean);
+
           return {
             ...p,
             id: String(p.id || p.product_id),
@@ -71,7 +76,7 @@ export const RelatedProducts = ({ currentProduct, onQuickView }) => {
             originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
             image: mainImg,
             hoverImage: hoverImg,
-            carouselImages: galleryArr.length > 0 ? galleryArr : [mainImg, hoverImg]
+            carouselImages: twoImages.length > 1 ? twoImages : [mainImg]
           };
         });
 

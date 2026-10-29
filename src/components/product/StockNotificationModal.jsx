@@ -77,7 +77,7 @@ export const StockNotificationModal = ({
 
     try {
       const payload = {
-        productId: product.id,
+        productId: product?.product_id || product?.db_id || product?.id,
         size: selectedSize || null,
         color: selectedColor || null,
         email: cleanEmail || null,

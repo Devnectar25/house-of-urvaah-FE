@@ -193,18 +193,45 @@ const formatOrderDateTime = (dateStr) => {
 };
 
 
-// Return / replacement requests waiting for the admin stay on top (newest request first)
-const PENDING_REQUEST_STATUSES = ['return requested', 'return request processing', 'replace requested', 'replacement requested', 'replacement request processing', 'return & replacement requested'];
-const isPendingRequest = (order) => PENDING_REQUEST_STATUSES.includes(String(order?.status || '').toLowerCase());
-const compareOrdersForList = (a, b, direction) => {
-  const reqA = isPendingRequest(a);
-  const reqB = isPendingRequest(b);
-  if (reqA !== reqB) return reqA ? -1 : 1;
-  if (reqA) {
-    return new Date(b.return_request_at || b.updated_at || 0).getTime() - new Date(a.return_request_at || a.updated_at || 0).getTime();
+// Active customer requests waiting for admin action (cancellation, return, replacement)
+const PENDING_REQUEST_STATUSES = [
+  'cancellation requested',
+  'cancel_requested',
+  'return requested',
+  'return request processing',
+  'replace requested',
+  'replacement requested',
+  'replacement request processing',
+  'return & replacement requested'
+];
+
+const isPendingRequest = (order) => {
+  if (!order) return false;
+  const statusLower = String(order.status || '').toLowerCase().trim();
+  if (PENDING_REQUEST_STATUSES.includes(statusLower)) return true;
+
+  // Check if any individual item in the order has an active pending request
+  if (Array.isArray(order.items)) {
+    return order.items.some((it) => {
+      const itStatus = String(it.status || '').toLowerCase().trim();
+      return PENDING_REQUEST_STATUSES.includes(itStatus);
+    });
   }
-  const timeA = new Date(a.created_at || 0).getTime();
-  const timeB = new Date(b.created_at || 0).getTime();
+  return false;
+};
+
+const getOrderActivityTime = (order) => {
+  if (!order) return 0;
+  const tCreated = order.created_at ? new Date(order.created_at).getTime() : 0;
+  const tUpdated = order.updated_at ? new Date(order.updated_at).getTime() : 0;
+  const tCancelled = order.cancelled_at ? new Date(order.cancelled_at).getTime() : 0;
+  const tReturnReq = order.return_request_at ? new Date(order.return_request_at).getTime() : 0;
+  return Math.max(tCreated, tUpdated, tCancelled, tReturnReq);
+};
+
+const compareOrdersForList = (a, b, direction = 'desc') => {
+  const timeA = getOrderActivityTime(a);
+  const timeB = getOrderActivityTime(b);
   return direction === 'asc' ? timeA - timeB : timeB - timeA;
 };
 
@@ -1408,7 +1435,9 @@ export const AdminOrders = () => {
                 orders.map((ord) => {
                   const itemsList = Array.isArray(ord.items) ? ord.items : [];
                   const itemCount = itemsList.length || 1;
-                  const dateTimeInfo = formatOrderDateTime(ord.created_at);
+                  const isPending = isPendingRequest(ord);
+                  const activityTime = getOrderActivityTime(ord);
+                  const dateTimeInfo = formatOrderDateTime(activityTime || ord.created_at);
                   const ordGst = getOrderGstInfo(ord);
                   const effectiveOrdTotal = Math.max(parseFloat(ord.total || 0), ordGst.total);
                   const formattedTotal = effectiveOrdTotal > 0
@@ -1458,6 +1487,13 @@ export const AdminOrders = () => {
                             {dateTimeInfo.time}
                           </div>
                         )}
+                        {isPending && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-tight bg-amber-100 text-amber-900 border border-amber-300">
+                              Action Required
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Items */}
@@ -1491,6 +1527,21 @@ export const AdminOrders = () => {
                               />
                             )}
                           </div>
+                          {(() => {
+                            const items = Array.isArray(ord.items) ? ord.items : [];
+                            const pendingItem = items.find(it => {
+                              const s = String(it.status || '').toLowerCase();
+                              return s.includes('return request') || s.includes('replace') || s.includes('cancellation request');
+                            });
+                            if (pendingItem && !String(ord.status || '').toLowerCase().includes('request')) {
+                              return (
+                                <span className="inline-block px-2 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300 uppercase font-sans leading-none tracking-tight mt-0.5">
+                                  Item: {pendingItem.status}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                           {Boolean(ord.return_rejection_reason) && (() => {
                             // Return and replacement rejections both store return_rejection_reason; label by request type
                             const returnType = (ord.return_type || '').toLowerCase();
