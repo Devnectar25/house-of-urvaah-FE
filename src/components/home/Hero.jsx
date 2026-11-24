@@ -56,19 +56,34 @@ export const Hero = () => {
 
   const activeSlide = heroSlides[activeSlideIndex] || null;
 
+  const isVideoMedia = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    const clean = url.split('?')[0].toLowerCase().trim();
+    return (
+      clean.endsWith('.mp4') ||
+      clean.endsWith('.webm') ||
+      clean.endsWith('.mov') ||
+      clean.endsWith('.m4v') ||
+      clean.includes('/videos/') ||
+      clean.includes('/video/')
+    );
+  };
+
   const desktopMediaUrl = activeSlide?.desktop_image
     ? getSupabaseMediaUrl(activeSlide.desktop_image)
     : fallbackVideoSrc;
 
   const mobileMediaUrl = activeSlide?.mobile_image
     ? getSupabaseMediaUrl(activeSlide.mobile_image)
-    : fallbackMobileVideoSrc;
+    : (activeSlide?.desktop_image ? getSupabaseMediaUrl(activeSlide.desktop_image) : fallbackMobileVideoSrc);
 
   const currentMediaUrl = isMobile ? mobileMediaUrl : desktopMediaUrl;
 
   const isVideo = isMobile
-    ? (activeSlide?.mobile_image ? (activeSlide.media_type === 'video' || activeSlide.mobile_image.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i)) : true)
-    : (activeSlide ? (activeSlide.media_type === 'video' || (activeSlide.desktop_image && activeSlide.desktop_image.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i))) : true);
+    ? (activeSlide?.mobile_image
+        ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.mobile_image))
+        : (activeSlide?.desktop_image ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.desktop_image)) : true))
+    : (activeSlide ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.desktop_image)) : true);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -80,17 +95,19 @@ export const Hero = () => {
   }, [currentMediaUrl, isMobile]);
 
   return (
-    <section className="relative w-full h-screen overflow-hidden bg-white text-brand-dark font-serif select-none">
+    <section className="relative w-full aspect-[9/16] max-h-[100dvh] min-h-0 md:aspect-auto md:max-h-none md:h-screen md:h-[100dvh] md:min-h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
       {/* Full-bleed Looping Cinematic Media Background */}
       <div className="absolute inset-0 z-0 bg-neutral-900">
         {isVideo ? (
           <video
             ref={videoRef}
             key={`${currentMediaUrl}_${isMobile ? 'mobile' : 'desktop'}`}
+            src={currentMediaUrl}
             autoPlay
             muted
             loop
             playsInline
+            webkit-playsinline="true"
             preload="auto"
             className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
           >
