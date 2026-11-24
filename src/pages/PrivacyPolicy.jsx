@@ -1,266 +1,163 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import {
-  Eye,
-  Lock,
-  Cookie,
-  Share2,
-  Smartphone,
-  Shield,
-  Mail,
-  FileText,
-} from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 
 export const PrivacyPolicy = () => {
   return (
-    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-20 pb-4 md:pt-28 md:pb-6 overflow-x-hidden">
+    <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-20 pb-16 md:pt-28 md:pb-24 overflow-x-hidden">
       <SEOHead
         title="Privacy Policy | House of Urvaah"
         description="Read the official House of Urvaah Privacy Policy to learn how we collect, handle, and safeguard your personal information and shopping security."
         keywords="House of Urvaah privacy policy, data security, customer privacy, legal terms"
       />
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-16 mb-3 md:mb-4">
+      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 mb-8 md:mb-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="text-center flex flex-col items-center"
         >
-          <span className="px-3.5 py-1 bg-neutral-100 text-neutral-800 text-[10px] sm:text-xs font-serif font-semibold rounded-full uppercase tracking-[0.25em] mb-2.5 inline-block">
+          <span className="text-[10px] sm:text-xs font-serif uppercase tracking-[0.3em] text-neutral-400 block mb-2">
             LEGAL &amp; COMPLIANCE
           </span>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-wider uppercase text-[#111111] mb-3 md:mb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-normal tracking-[0.15em] uppercase text-[#111111] mb-2">
             PRIVACY POLICY
           </h1>
-          <div className="w-16 h-[1px] bg-neutral-900/30" />
+          <p className="text-xs sm:text-sm text-neutral-500 font-serif italic mb-4">
+            Last updated: November 24, 2026
+          </p>
+          <div className="w-12 h-[1px] bg-neutral-900/30" />
         </motion.div>
       </section>
 
-      {/* 2. POLICY DOCUMENT CONTENT WRAPPED IN CENTERED CARD */}
-      <section className="w-full max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-12">
+      {/* 2. POLICY DOCUMENT CONTENT - SEAMLESS LUXURY EDITORIAL LAYOUT */}
+      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 lg:px-12">
         <motion.article
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white rounded-2xl shadow-sm border border-neutral-200/90 p-6 sm:p-10 md:p-14 space-y-12 text-neutral-800 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="space-y-10 sm:space-y-12 text-neutral-700 leading-relaxed font-light text-sm sm:text-base font-serif"
         >
           {/* INTRODUCTORY PARAGRAPHS */}
-          <div className="space-y-5 pb-6 border-b border-neutral-200">
+          <div className="space-y-5 pb-8 border-b border-neutral-200">
             <p>
               This Privacy Policy applies to our practices in connection with the House of Urvaah online store, available on the website www.houseofurvaah.com and any associated store pages or mobile application (the &quot;Platform&quot; or &quot;House of Urvaah&quot;). It describes how House of Urvaah (&quot;House of Urvaah&quot;, the &quot;Company&quot;, &quot;we&quot;, &quot;us&quot; or &quot;our&quot;) collects, uses, shares, stores and protects information when you (the &quot;User&quot;, &quot;Customer&quot; or &quot;you&quot;) access the Platform or purchase products through it.
             </p>
             <p>
               Protecting your privacy is a priority. Any personal information you voluntarily provide will be treated with a high standard of security and confidentiality and used strictly for the purposes described in this Privacy Policy. By accessing the Platform or placing an order, you consent to the data practices described here. This Privacy Policy should be read together with the Terms &amp; Conditions, the Shipping Information, the Returns &amp; Exchanges Policy, and the Cookie Settings.
             </p>
-            <div className="p-4 sm:p-5 bg-neutral-50 border border-neutral-200 rounded-xl flex items-start gap-3.5">
-              <FileText className="w-5 h-5 text-neutral-800 shrink-0 mt-0.5" />
-              <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
-                We process personal data in accordance with the Digital Personal Data Protection Act, 2023 (&quot;DPDP Act&quot;), the Information Technology Act, 2000 and the rules thereunder, and other applicable Indian law.
+          </div>
+
+          {/* SECTION 1 */}
+          <div className="space-y-4">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              1. Information We Collect
+            </h2>
+            <div className="space-y-1.5">
+              <p className="font-semibold text-neutral-900">
+                Payment information:
+              </p>
+              <p>
+                We do not store your full card number, CVV, UPI PIN or net-banking credentials. We may receive limited details such as payment status, transaction ID and the last four digits of your card.
               </p>
             </div>
           </div>
 
-          {/* SECTION 1 */}
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Eye className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                1. Information We Collect
-              </h2>
-            </div>
-            <p>
-              We collect data to provide you with the best shopping experience. This includes:
-            </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                <strong className="font-semibold text-neutral-900">Contact information:</strong> First and last name, email address, postal/shipping address, city, state, PIN code, country, and phone number.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Account information:</strong> Registration details, login ID, password (stored in encrypted form), size preferences, wishlist items, and order history.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Order &amp; transaction information:</strong> Products ordered, items placed in your bag, order date, value, invoices, delivery details, transaction history, and style preferences.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Financial / payment information:</strong> Payment instrument details, mode/manner of payment, and billing information. Card, UPI, and bank details are processed securely by third-party payment service providers; the Company does not store full card numbers.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Reviews &amp; user content:</strong> Ratings, reviews, feedback, fit notes, photos, questions, and other content you submit about products or the Platform.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Technical &amp; usage information:</strong> Device and app usage, browser type, IP address, referral data, server-log data, and similar information collected by automated means such as cookies and pixels.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Marketing &amp; preference information:</strong> Communication preferences, responses to surveys or promotions, offer engagement, and style/category interests used to personalize your feed.
-              </li>
-            </ul>
-          </div>
-
           {/* SECTION 2 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Lock className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                2. How We Use Your Information
-              </h2>
-            </div>
-            <p>
-              We use your information to operate and improve the Platform, including:
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              2. Legal Basis and Consent
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              We process your personal data based on your consent, to perform our contract with you (fulfilling your order), and to meet legal obligations, in line with the Information Technology Act, 2000, the rules made under it, and the Digital Personal Data Protection Act, 2023, as applicable. You may withdraw consent at any time by contacting us; withdrawal does not affect processing already done, and may limit our ability to fulfil some services.
             </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>Creating, managing, and authenticating your account;</li>
-              <li>Processing, fulfilling, delivering, tracking, and handling cancellations, refunds, or returns/exchanges;</li>
-              <li>Processing secure payments and issuing invoices;</li>
-              <li>Communicating order status updates, delivery coordination, and queries via SMS, email, in-app notification, and phone;</li>
-              <li>Personalizing your shopping experience with relevant product recommendations, sizing guidance, and layout design;</li>
-              <li>Publishing and displaying reviews, ratings, and feedback you submit;</li>
-              <li>Sending newsletters, promotional communication, private sale invitations, and marketing campaigns (where not opted out);</li>
-              <li>Conducting internal trend research, demographical analysis, and usage analytics;</li>
-              <li>Detecting, preventing, and addressing fraud, security incidents, abuse, and other illegal activities;</li>
-              <li>Complying with applicable company audits, billing, and regulatory laws.</li>
-            </ul>
           </div>
 
           {/* SECTION 3 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Cookie className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                3. Cookies, Analytics &amp; Advertising
-              </h2>
-            </div>
-            <p>
-              Each time you visit the Platform, our servers log basic technical information (e.g. browser type, device, domain name, referral data, and site activity). We use cookies, pixels, and similar technologies to maintain your bag/cart session, remember preferences, and analyze site performance. You can manage cookies in your browser settings; disabling them may affect Platform functionality. Further detail is provided in our Cookie Settings.
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              3. Who We Share Your Information With
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              We do not sell your personal information. We share it only with:
             </p>
+            <ul className="space-y-2.5 pl-5 list-disc marker:text-neutral-400">
+              <li>Courier and logistics partners to deliver your order</li>
+              <li>Payment gateways to process payments and refunds</li>
+            </ul>
+            <div className="pt-3 space-y-1.5">
+              <h3 className="text-sm sm:text-base font-serif font-semibold text-neutral-900">
+                Data retention
+              </h3>
+              <p className="text-neutral-700 leading-relaxed">
+                We keep personal data only as long as needed for the purposes above, or as required by law (for example, tax and invoice records are retained for the period required under Indian law). After that, we delete or anonymise it.
+              </p>
+            </div>
           </div>
 
           {/* SECTION 4 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Share2 className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                4. How We Share Your Information
-              </h2>
-            </div>
-            <p>
-              We do not sell your identifiable personal information. We share data only as follows:
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              4. Data Security
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              We use reasonable security practices, including SSL/HTTPS encryption and access controls. No method of transmission over the internet is completely secure, so we cannot guarantee absolute security. Please keep your account password confidential.
             </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                <strong className="font-semibold text-neutral-900">Fulfillment &amp; logistics partners:</strong> Minimum necessary info (name, delivery address, phone, order value) is shared with courier partners to coordinate delivery and return/exchange requests.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Payment service providers:</strong> Transaction details are shared with gateway aggregators and banks to process payments and refunds securely.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Service providers:</strong> Trusted providers handling hosting, analytics, customer support, and marketing assistance operate under strict data-protection agreements.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Brand &amp; design partners:</strong> For collaborations or limited-edition drops, basic order information may be shared for fulfillment purposes only.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Within the House of Urvaah group:</strong> Shared with affiliates to maintain account consistency and benefits, subject to law.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Legal, safety &amp; compliance:</strong> Disclosed to regulatory or law-enforcement authorities where required to comply with legal processes or prevent fraud.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Business transfers:</strong> Data may be transferred as a business asset in a merger, acquisition, or restructuring.
-              </li>
-            </ul>
           </div>
 
           {/* SECTION 5 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Smartphone className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                5. App &amp; Device Permissions
-              </h2>
-            </div>
-            <p>
-              For mobile app users, the Platform may request permissions to provide specific functions:
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              5. Your Rights
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              Subject to applicable law, you may:
             </p>
-            <ul className="space-y-3 pl-5 list-disc marker:text-neutral-400">
-              <li>
-                <strong className="font-semibold text-neutral-900">Location:</strong> To verify address, check PIN code serviceability, and speed up delivery.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">SMS:</strong> To auto-read One-Time Passwords (OTPs) securely.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Phone:</strong> To allow one-click calls to support or delivery agents.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Media / storage / camera:</strong> To save invoices, upload photos for return/exchange claims, and enable virtual try-on or fit-check features where available.
-              </li>
-              <li>
-                <strong className="font-semibold text-neutral-900">Notifications:</strong> For delivery alerts, order updates, and new-drop announcements.
-              </li>
+            <ul className="space-y-2.5 pl-5 list-disc marker:text-neutral-400">
+              <li>Access the personal data we hold about you;</li>
+              <li>Ask us to correct or update inaccurate data;</li>
+              <li>Ask us to delete your data (except where we must retain it by law);</li>
+              <li>Withdraw consent or opt out of marketing messages (use the &quot;unsubscribe&quot; link or write to us);</li>
+              <li>Nominate another person to exercise your rights in case of death or incapacity, as provided under the DPDP Act;</li>
+              <li>Raise a grievance with us.</li>
             </ul>
-            <p className="text-xs sm:text-sm text-neutral-500 italic mt-2">
-              You can manage or revoke these permissions in your mobile operating system settings at any time.
+            <p className="text-neutral-700 leading-relaxed pt-1">
+              To exercise these rights, email{' '}
+              <a
+                href="mailto:houseofurvaah.yahoo.com"
+                className="underline underline-offset-4 hover:text-neutral-900 transition-colors font-normal"
+              >
+                houseofurvaah.yahoo.com
+              </a>
+              . We will respond within a reasonable time and in any case within the period required by law.
             </p>
           </div>
 
           {/* SECTION 6 */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Shield className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                6. Data Security
-              </h2>
-            </div>
-            <div className="p-5 sm:p-6 bg-neutral-50 rounded-xl border border-neutral-200">
-              <p>
-                We implement reasonable technical and organizational security measures — including SSL/TLS encryption for payment and login data — to protect your information against unauthorized access or disclosure.
-              </p>
-            </div>
-          </div>
-
-          {/* SECTION 7 - CONTACT US WITH 2-COLUMN STRUCTURED CARD */}
-          <div className="space-y-4 pt-4 border-t border-neutral-100">
-            <div className="flex items-center gap-3.5 mb-2">
-              <div className="p-2 sm:p-2.5 bg-neutral-100 rounded-full text-neutral-900 shrink-0">
-                <Mail className="w-5 h-5 text-neutral-900" />
-              </div>
-              <h2 className="text-lg sm:text-xl md:text-2xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
-                7. Contact Us
-              </h2>
-            </div>
-            <p>
-              For any privacy-related questions, concerns, or requests, please reach out to our Grievance Officer at:
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              6. Children
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              Our Website is not intended for anyone under 18. We do not knowingly collect personal data from children without verifiable consent of a parent or guardian. If you believe a child has given us data, please contact us and we will delete it.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-xs sm:text-sm">
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Grievance Inquiries</p>
-                <p className="font-semibold text-neutral-900">Email: houseofurvaah@gmail.com</p>
-              </div>
-              <div>
-                <p className="text-neutral-400 text-[11px] uppercase tracking-wider mb-1">Customer Support</p>
-                <p className="font-semibold text-neutral-900">Support: houseofurvaah@gmail.com</p>
-              </div>
-            </div>
           </div>
 
-          {/* CLOSING LEGAL NOTICE NESTED BOTTOM BANNER */}
-          <div className="border-t border-neutral-200 pt-8 mt-12 bg-neutral-50 -mx-6 -mb-6 sm:-mx-10 sm:-mb-10 md:-mx-14 md:-mb-14 p-6 sm:p-10 rounded-b-2xl text-center space-y-3">
-            <div className="max-w-3xl mx-auto text-xs sm:text-sm text-neutral-600 italic leading-relaxed">
-              This Privacy Policy is provided as a starting draft based on the structure of a reference policy and is not a substitute for legal advice. Before publishing this on a live site, have it reviewed by a qualified lawyer to ensure it accurately reflects House of Urvaah&apos;s actual data practices, entity details, and compliance obligations under the DPDP Act, 2023 and any other applicable law.
+          {/* SECTION 7 */}
+          <div className="space-y-4 pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+              7. Third-Party Links
+            </h2>
+            <p className="text-neutral-700 leading-relaxed">
+              The Website may link to third-party sites (such as social media). We are not responsible for their privacy practices; please read their policies.
+            </p>
+          </div>
+
+          {/* CHANGES TO THIS POLICY */}
+          <div className="pt-8 border-t border-neutral-200">
+            <div className="border-l-2 border-neutral-900 pl-4 sm:pl-5 py-1 text-xs sm:text-sm text-neutral-600 leading-relaxed italic">
+              Changes to this policy: We may update this policy from time to time. The &quot;Last updated&quot; date above shows the latest version. Continued use of the Website means you accept the changes.
             </div>
           </div>
         </motion.article>

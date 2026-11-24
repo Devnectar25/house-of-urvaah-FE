@@ -14,6 +14,19 @@ import { MIN_RECOMMENDED_PRODUCTS } from '../../constants/recommendations';
 // Mocha Brown set, product 105, as id 101).
 const RECOMMENDED_COVER_INDEX = { '101': 2, '105': 2 };
 
+const getFormattedPrice = (p) => {
+  if (!p) return '';
+  const raw = p.formattedPrice || p.formatted_price || p.price || p.product_price || p.originalPrice || p.original_price || p.sale_price;
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const s = String(raw).trim();
+    if (s.startsWith('₹') && !s.includes('NaN')) return s;
+    const num = Number(s.replace(/[^\d.]/g, ''));
+    if (!isNaN(num) && num > 0) return `₹ ${num.toLocaleString('en-IN')}`;
+    return s && !s.includes('NaN') ? `₹ ${s}` : '';
+  }
+  return '';
+};
+
 const getRecommendedCover = (product) => {
   const gallery = Array.isArray(product?.images) && product.images.length ? product.images : (product?.gallery || []);
   const idx = RECOMMENDED_COVER_INDEX[String(product?.id)];
@@ -22,6 +35,7 @@ const getRecommendedCover = (product) => {
 
 export const CategoryGrid = () => {
   const scrollRef = useRef(null);
+  const snapTimerRef = useRef(null);
   const navigate = useNavigate();
   const [productsList, setProductsList] = useState([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -56,7 +70,7 @@ export const CategoryGrid = () => {
         if (isMounted) {
           const dbProductsMapped = data.map((p) => ({
             ...p,
-            formattedPrice: p.formattedPrice || `₹ ${Number(p.price).toLocaleString('en-IN')}`,
+            formattedPrice: getFormattedPrice(p),
           }));
           setProductsList((prev) => {
             if (
@@ -131,6 +145,7 @@ export const CategoryGrid = () => {
     return () => {
       el.removeEventListener('scroll', handleScrollEvent);
       window.removeEventListener('resize', checkScrollPosition);
+      if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
     };
   }, []);
 
@@ -182,7 +197,15 @@ export const CategoryGrid = () => {
     }
 
     targetScrollLeftRef.current = nextScroll;
+    el.style.scrollSnapType = 'none';
     el.scrollTo({ left: nextScroll, behavior: 'smooth' });
+
+    clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.style.scrollSnapType = '';
+      }
+    }, 450);
 
     setTimeout(checkScrollPosition, 80);
     setTimeout(checkScrollPosition, 350);
@@ -203,12 +226,26 @@ export const CategoryGrid = () => {
 
         if (scrollLeft >= maxScroll - 15) {
           targetScrollLeftRef.current = 0;
+          el.style.scrollSnapType = 'none';
           el.scrollTo({ left: 0, behavior: 'smooth' });
+          clearTimeout(snapTimerRef.current);
+          snapTimerRef.current = setTimeout(() => {
+            if (scrollRef.current) {
+              scrollRef.current.style.scrollSnapType = '';
+            }
+          }, 450);
         } else {
           const step = getCardStep();
           const nextScroll = Math.min(maxScroll, scrollLeft + step);
           targetScrollLeftRef.current = nextScroll;
+          el.style.scrollSnapType = 'none';
           el.scrollTo({ left: nextScroll, behavior: 'smooth' });
+          clearTimeout(snapTimerRef.current);
+          snapTimerRef.current = setTimeout(() => {
+            if (scrollRef.current) {
+              scrollRef.current.style.scrollSnapType = '';
+            }
+          }, 450);
         }
       }, 4500);
     }
@@ -257,7 +294,7 @@ export const CategoryGrid = () => {
             e.stopPropagation();
             handleScroll('left');
           }}
-          className={`absolute left-1 sm:left-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollLeft
+          className={`absolute left-2 sm:left-3 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollLeft
               ? 'opacity-100 hover:bg-white hover:scale-105 cursor-pointer pointer-events-auto'
               : 'opacity-0 pointer-events-none'
             }`}
@@ -269,7 +306,7 @@ export const CategoryGrid = () => {
         {/* Single Horizontal Track (1 Row, 4 Visible at once on Desktop) */}
         <div
           ref={scrollRef}
-          className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-2 -mx-4 px-4 sm:mx-0 sm:px-0"
+          className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-3 -mr-4 pr-4 sm:mr-0 sm:pr-0"
         >
           {productsList.map((product, idx) => (
             <motion.div
@@ -278,7 +315,7 @@ export const CategoryGrid = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: idx * 0.08 }}
-              className="group/card relative flex flex-col min-w-[70vw] sm:min-w-[45vw] md:min-w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] w-[calc(25%-0.75rem)] flex-shrink-0 snap-start"
+              className="group/card relative flex flex-col w-[82vw] min-w-[82vw] sm:min-w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.5rem)] md:min-w-[calc(33.333%-0.75rem)] md:w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] lg:w-[calc(25%-0.75rem)] flex-shrink-0 snap-start"
             >
               {/* Product Photo Container */}
               <div
@@ -331,11 +368,11 @@ export const CategoryGrid = () => {
                 onClick={() => handleProductNavigate(product)}
                 className="mt-2.5 flex flex-col text-left cursor-pointer hover:opacity-80 transition-opacity"
               >
-                <h3 className="text-[11px] sm:text-xs font-semibold tracking-wider text-brand-dark uppercase line-clamp-1">
+                <h3 className="text-[11px] sm:text-xs font-semibold tracking-wider text-brand-dark uppercase leading-snug break-words">
                   {product.name}
                 </h3>
-                <span className="text-[11px] sm:text-xs text-neutral-500 font-normal mt-0.5">
-                  {product.formattedPrice}
+                <span className="text-[11px] sm:text-xs text-neutral-600 font-normal mt-0.5 block">
+                  {product.formattedPrice || getFormattedPrice(product)}
                 </span>
               </div>
             </motion.div>
@@ -350,7 +387,7 @@ export const CategoryGrid = () => {
             e.stopPropagation();
             handleScroll('right');
           }}
-          className={`absolute right-1 sm:right-2 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollRight
+          className={`absolute right-2 sm:right-3 top-[42%] -translate-y-1/2 z-20 p-2.5 sm:p-3 rounded-full bg-white/95 shadow-lg text-brand-dark transition-all duration-300 border border-neutral-200/80 items-center justify-center flex ${canScrollRight
               ? 'opacity-100 hover:bg-white hover:scale-105 cursor-pointer pointer-events-auto'
               : 'opacity-0 pointer-events-none'
             }`}
