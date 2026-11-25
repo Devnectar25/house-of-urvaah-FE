@@ -1132,15 +1132,15 @@ export const TrendingOnGram = () => {
       case 2:
         return 'lg:grid-cols-2 max-w-3xl mx-auto';
       case 3:
-        return 'lg:grid-cols-3';
+        return 'lg:grid-cols-3 max-w-5xl mx-auto';
       case 4:
-        return 'lg:grid-cols-4';
+        return 'lg:grid-cols-4 max-w-7xl mx-auto';
       case 5:
-        return 'lg:grid-cols-5';
+        return 'lg:grid-cols-5 mx-auto';
       case 6:
-        return 'lg:grid-cols-3 xl:grid-cols-6';
+        return 'lg:grid-cols-3 xl:grid-cols-6 mx-auto';
       default:
-        return 'lg:grid-cols-4';
+        return 'lg:grid-cols-4 mx-auto';
     }
   };
 
@@ -1164,7 +1164,7 @@ export const TrendingOnGram = () => {
       <div
         ref={carouselRef}
         onScroll={handleCarouselScroll}
-        className={`w-full flex lg:grid ${getGridColsClass(gramPosts.length)} gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 scrollbar-none`}
+        className={`w-full flex lg:grid ${getGridColsClass(gramPosts.length)} gap-4 sm:gap-6 md:gap-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-4 lg:pb-0 scrollbar-none`}
       >
         {gramPosts.map((item, idx) => (
           <motion.div
@@ -1173,7 +1173,7 @@ export const TrendingOnGram = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
-            className="snap-center flex-shrink-0 w-[88vw] sm:w-[48vw] md:w-[38vw] lg:w-full"
+            className="snap-center flex-shrink-0 w-full min-w-full sm:min-w-[48vw] sm:w-[48vw] md:min-w-[38vw] md:w-[38vw] lg:w-full lg:min-w-0"
           >
             <VideoCard
               item={item}

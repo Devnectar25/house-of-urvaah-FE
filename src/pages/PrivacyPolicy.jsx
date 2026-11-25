@@ -11,7 +11,7 @@ export const PrivacyPolicy = () => {
         keywords="House of Urvaah privacy policy, data security, customer privacy, legal terms"
       />
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 mb-8 md:mb-12">
+      <section className="w-full max-w-[960px] mx-auto px-4 sm:px-8 md:px-12 mb-8 md:mb-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -32,15 +32,15 @@ export const PrivacyPolicy = () => {
       </section>
 
       {/* 2. POLICY DOCUMENT CONTENT - SEAMLESS LUXURY EDITORIAL LAYOUT */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 lg:px-12">
+      <section className="w-full max-w-[960px] mx-auto px-4 sm:px-8 md:px-12">
         <motion.article
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-10 sm:space-y-12 text-neutral-700 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="space-y-8 sm:space-y-10 md:space-y-12 text-neutral-700 leading-relaxed font-light text-sm sm:text-base font-serif text-left sm:text-justify [text-justify:inter-word] break-words"
         >
           {/* INTRODUCTORY PARAGRAPHS */}
-          <div className="space-y-5 pb-8 border-b border-neutral-200">
+          <div className="space-y-5 pb-6 sm:pb-8 border-b border-neutral-200 text-left sm:text-justify [text-justify:inter-word]">
             <p>
               This Privacy Policy applies to our practices in connection with the House of Urvaah online store, available on the website www.houseofurvaah.com and any associated store pages or mobile application (the &quot;Platform&quot; or &quot;House of Urvaah&quot;). It describes how House of Urvaah (&quot;House of Urvaah&quot;, the &quot;Company&quot;, &quot;we&quot;, &quot;us&quot; or &quot;our&quot;) collects, uses, shares, stores and protects information when you (the &quot;User&quot;, &quot;Customer&quot; or &quot;you&quot;) access the Platform or purchase products through it.
             </p>
@@ -50,12 +50,12 @@ export const PrivacyPolicy = () => {
           </div>
 
           {/* SECTION 1 */}
-          <div className="space-y-4">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               1. Information We Collect
             </h2>
-            <div className="space-y-1.5">
-              <p className="font-semibold text-neutral-900">
+            <div className="space-y-1.5 text-left sm:text-justify [text-justify:inter-word]">
+              <p className="font-semibold text-neutral-900 text-left">
                 Payment information:
               </p>
               <p>
@@ -65,56 +65,56 @@ export const PrivacyPolicy = () => {
           </div>
 
           {/* SECTION 2 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               2. Legal Basis and Consent
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We process your personal data based on your consent, to perform our contract with you (fulfilling your order), and to meet legal obligations, in line with the Information Technology Act, 2000, the rules made under it, and the Digital Personal Data Protection Act, 2023, as applicable. You may withdraw consent at any time by contacting us; withdrawal does not affect processing already done, and may limit our ability to fulfil some services.
             </p>
           </div>
 
           {/* SECTION 3 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               3. Who We Share Your Information With
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We do not sell your personal information. We share it only with:
             </p>
-            <ul className="space-y-2.5 pl-5 list-disc marker:text-neutral-400">
+            <ul className="space-y-2.5 pl-5 sm:pl-6 list-disc marker:text-neutral-400 text-left sm:text-justify [text-justify:inter-word]">
               <li>Courier and logistics partners to deliver your order</li>
               <li>Payment gateways to process payments and refunds</li>
             </ul>
-            <div className="pt-3 space-y-1.5">
-              <h3 className="text-sm sm:text-base font-serif font-semibold text-neutral-900">
+            <div className="pt-2 sm:pt-3 space-y-1.5">
+              <h3 className="text-sm sm:text-base font-serif font-semibold text-neutral-900 text-left">
                 Data retention
               </h3>
-              <p className="text-neutral-700 leading-relaxed">
+              <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
                 We keep personal data only as long as needed for the purposes above, or as required by law (for example, tax and invoice records are retained for the period required under Indian law). After that, we delete or anonymise it.
               </p>
             </div>
           </div>
 
           {/* SECTION 4 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               4. Data Security
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We use reasonable security practices, including SSL/HTTPS encryption and access controls. No method of transmission over the internet is completely secure, so we cannot guarantee absolute security. Please keep your account password confidential.
             </p>
           </div>
 
           {/* SECTION 5 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               5. Your Rights
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left">
               Subject to applicable law, you may:
             </p>
-            <ul className="space-y-2.5 pl-5 list-disc marker:text-neutral-400">
+            <ul className="space-y-2.5 pl-5 sm:pl-6 list-disc marker:text-neutral-400 text-left sm:text-justify [text-justify:inter-word]">
               <li>Access the personal data we hold about you;</li>
               <li>Ask us to correct or update inaccurate data;</li>
               <li>Ask us to delete your data (except where we must retain it by law);</li>
@@ -122,41 +122,41 @@ export const PrivacyPolicy = () => {
               <li>Nominate another person to exercise your rights in case of death or incapacity, as provided under the DPDP Act;</li>
               <li>Raise a grievance with us.</li>
             </ul>
-            <p className="text-neutral-700 leading-relaxed pt-1">
+            <p className="text-neutral-700 leading-relaxed pt-1 text-left">
               To exercise these rights, email{' '}
               <a
-                href="mailto:houseofurvaah.yahoo.com"
+                href="mailto:houseofurvaah@yahoo.com"
                 className="underline underline-offset-4 hover:text-neutral-900 transition-colors font-normal"
               >
-                houseofurvaah.yahoo.com
+                houseofurvaah@yahoo.com
               </a>
               . We will respond within a reasonable time and in any case within the period required by law.
             </p>
           </div>
 
           {/* SECTION 6 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               6. Children
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Our Website is not intended for anyone under 18. We do not knowingly collect personal data from children without verifiable consent of a parent or guardian. If you believe a child has given us data, please contact us and we will delete it.
             </p>
           </div>
 
           {/* SECTION 7 */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               7. Third-Party Links
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               The Website may link to third-party sites (such as social media). We are not responsible for their privacy practices; please read their policies.
             </p>
           </div>
 
           {/* CHANGES TO THIS POLICY */}
-          <div className="pt-8 border-t border-neutral-200">
-            <div className="border-l-2 border-neutral-900 pl-4 sm:pl-5 py-1 text-xs sm:text-sm text-neutral-600 leading-relaxed italic">
+          <div className="pt-6 sm:pt-8 border-t border-neutral-200">
+            <div className="border-l-2 border-neutral-900 pl-4 sm:pl-5 py-1 text-xs sm:text-sm text-neutral-600 leading-relaxed italic text-left sm:text-justify [text-justify:inter-word]">
               Changes to this policy: We may update this policy from time to time. The &quot;Last updated&quot; date above shows the latest version. Continued use of the Website means you accept the changes.
             </div>
           </div>

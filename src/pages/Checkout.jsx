@@ -1913,7 +1913,7 @@ export const Checkout = () => {
       }
 
       const rzpLoaded = await loadRazorpayScript();
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_SIPp9QznVVM48W';
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_U41xssFNCzWnaz';
 
       if (!rzpLoaded || !window.Razorpay) {
         setIsPlacingOrder(false);

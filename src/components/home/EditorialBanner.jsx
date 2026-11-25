@@ -303,7 +303,7 @@ export const EditorialBanner = () => {
                       state={{ videoName: item.name, tag: item.tag }}
                       data-video-card="true"
                       aria-label={`Explore all outfits crafted in ${item.tag || item.name} fabric`}
-                      className="relative block flex-shrink-0 w-[80vw] sm:w-[calc(50%-5px)] md:w-[calc(33.333%-7px)] snap-start aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 text-left"
+                      className="relative block flex-shrink-0 w-full min-w-full sm:min-w-[calc(50%-5px)] sm:w-[calc(50%-5px)] md:min-w-[calc(33.333%-7px)] md:w-[calc(33.333%-7px)] snap-start aspect-[9/14] overflow-hidden bg-[#EBEBE6] group select-none cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 text-left"
                     >
                       {/* Individual Video Tag with subtle hover state */}
                       <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 z-20 bg-white/95 backdrop-blur-md px-2.5 sm:px-3 py-1 text-[8px] sm:text-[9px] md:text-[9.5px] tracking-[0.22em] sm:tracking-[0.25em] font-serif uppercase text-brand-dark shadow-sm pointer-events-none select-none whitespace-nowrap transition-colors duration-200 group-hover:bg-black group-hover:text-white">

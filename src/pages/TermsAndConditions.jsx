@@ -12,7 +12,7 @@ export const TermsAndConditions = () => {
         keywords="House of Urvaah terms and conditions, terms of service, legal notice, user agreement"
       />
       {/* 1. HERO HEADER */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 mb-8 md:mb-12">
+      <section className="w-full max-w-[960px] mx-auto px-4 sm:px-8 md:px-12 mb-8 md:mb-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -33,85 +33,85 @@ export const TermsAndConditions = () => {
       </section>
 
       {/* 2. POLICY DOCUMENT CONTENT */}
-      <section className="w-full max-w-[1000px] mx-auto px-6 sm:px-10 lg:px-12">
+      <section className="w-full max-w-[960px] mx-auto px-4 sm:px-8 md:px-12">
         <motion.article
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-10 sm:space-y-12 text-neutral-700 leading-relaxed font-light text-sm sm:text-base font-serif"
+          className="space-y-8 sm:space-y-10 md:space-y-12 text-neutral-700 leading-relaxed font-light text-sm sm:text-base font-serif text-left sm:text-justify [text-justify:inter-word] break-words"
         >
           {/* PREAMBLE / INTRODUCTORY STATEMENT */}
-          <div className="pb-8 border-b border-neutral-200">
-            <p className="text-neutral-700 leading-relaxed">
+          <div className="pb-6 sm:pb-8 border-b border-neutral-200">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Welcome to House Of Urvaah. These Terms and Conditions (&quot;Terms&quot;) govern your access to and use of www.houseofurvaah.com and any purchase you make from us. By using the Website or placing an order, you agree to these Terms. If you do not agree, please do not use the Website.
             </p>
           </div>
 
           {/* 1. ELIGIBILITY */}
-          <div className="space-y-4">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               1. Eligibility
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               You must be at least 18 years old and capable of entering into a legally binding contract under the Indian Contract Act, 1872 to place an order. If you are under 18, you may use the Website only with a parent or guardian&apos;s involvement.
             </p>
           </div>
 
           {/* 2. YOUR ACCOUNT */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               2. Your Account
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               You are responsible for keeping your account details confidential and for all activity under your account. Please give us accurate and current information. We may suspend or close accounts that provide false information or breach these Terms.
             </p>
           </div>
 
           {/* 3. PRODUCTS AND DESCRIPTIONS */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               3. Products and Descriptions
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We try to display our products, colours, sizes and details as accurately as possible. However, because of screen settings, lighting and the handcrafted nature of some items, slight variations in colour, finish or dimensions may occur, and these are not defects. All products are subject to availability, and we may discontinue or modify a product at any time.
             </p>
           </div>
 
           {/* 4. PRICING AND PAYMENT */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               4. Pricing and Payment
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               All prices are in Indian Rupees and, unless stated otherwise, are inclusive of applicable GST. Shipping charges are extra and shown at checkout.
             </p>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We may change prices at any time without notice, but the price you see when you place your order is the price you pay.
             </p>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We may cancel an order if a product was listed at an incorrect price due to a genuine error, and will refund any amount paid.
             </p>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Payments are made through secure third-party gateways using methods such as UPI, cards, net banking, wallets and Cash on Delivery, if available. We are not responsible for failures or errors on the part of the payment provider or your bank.
             </p>
           </div>
 
           {/* 5. ORDER ACCEPTANCE */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               5. Order Acceptance
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Placing an order is an offer to buy. A contract is formed only when we confirm and dispatch your order. We may refuse or cancel any order for reasons such as stock unavailability, suspected fraud, pricing errors, or inability to deliver to your location. If we cancel a paid order, we will refund you in full.
             </p>
           </div>
 
           {/* 6. SHIPPING AND DELIVERY */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               6. Shipping and Delivery
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Shipping is governed by our{' '}
               <Link
                 to="/shipping-policy"
@@ -124,11 +124,11 @@ export const TermsAndConditions = () => {
           </div>
 
           {/* 7. RETURNS, EXCHANGES AND REFUNDS */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               7. Returns, Exchanges and Refunds
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Returns, exchanges and refunds are governed by our{' '}
               <Link
                 to="/return-refund-policy"
@@ -141,34 +141,34 @@ export const TermsAndConditions = () => {
           </div>
 
           {/* 8. DISCOUNTS AND PROMOTIONS */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               8. Discounts and Promotions
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Discount codes and offers are valid only for the stated period and conditions, cannot be combined unless stated, have no cash value, and may be withdrawn at any time. We may cancel orders where a promotion has been misused.
             </p>
           </div>
 
           {/* 9. INTELLECTUAL PROPERTY */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               9. Intellectual Property
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               All content on the Website, including the House Of Urvaah name, logo, designs, product images, photographs, text, graphics and layout, belongs to us or our licensors and is protected by Indian copyright, trademark and other laws. You may not copy, reproduce, modify, distribute, or use any of it for commercial purposes without our prior written permission.
             </p>
           </div>
 
           {/* 10. USER CONDUCT */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               10. User Conduct
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               You agree not to:
             </p>
-            <ul className="space-y-2.5 pl-5 list-disc marker:text-neutral-400 text-neutral-700 leading-relaxed">
+            <ul className="space-y-2.5 pl-5 sm:pl-6 list-disc marker:text-neutral-400 text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               <li>Use the Website for any unlawful or fraudulent purpose;</li>
               <li>Attempt to hack, disrupt or overload the Website or its security;</li>
               <li>Use bots, scrapers or automated tools without permission;</li>
@@ -178,71 +178,71 @@ export const TermsAndConditions = () => {
           </div>
 
           {/* 11. REVIEWS AND USER CONTENT */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               11. Reviews and User Content
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               If you submit reviews, photos or comments, you grant us a non-exclusive, royalty-free, worldwide licence to use, display and reproduce them for operating and promoting the Website. You confirm you own or have the right to share that content. We may remove content at our discretion.
             </p>
           </div>
 
           {/* 12. DISCLAIMER OF WARRANTIES */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               12. Disclaimer of Warranties
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               The Website and its content are provided &quot;as is&quot; and &quot;as available&quot;. To the fullest extent permitted by law, we do not guarantee that the Website will be uninterrupted, error-free or free from viruses. Nothing in these Terms limits any right you have as a consumer under the Consumer Protection Act, 2019 or other applicable law.
             </p>
           </div>
 
           {/* 13. LIMITATION OF LIABILITY */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               13. Limitation of Liability
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               To the extent permitted by law, House Of Urvaah will not be liable for any indirect, incidental or consequential loss arising from your use of the Website or products. Our total liability for any claim relating to an order will not exceed the amount you paid for that order.
             </p>
           </div>
 
           {/* 14. INDEMNITY */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               14. Indemnity
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               You agree to indemnify and hold harmless House Of Urvaah, its owners and employees from claims, losses or expenses arising from your breach of these Terms or misuse of the Website.
             </p>
           </div>
 
           {/* 15. FORCE MAJEURE */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               15. Force Majeure
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We are not liable for delay or failure to perform caused by events beyond our reasonable control, including natural disasters, pandemics, strikes, government action, internet or power failure, or courier disruptions.
             </p>
           </div>
 
           {/* 16. THIRD-PARTY LINKS AND SERVICES */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               16. Third-Party Links and Services
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               The Website may contain links to third-party websites or services. We do not control or endorse them and are not responsible for their content or practices.
             </p>
           </div>
 
           {/* 17. PRIVACY AND COOKIES */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               17. Privacy and Cookies
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               Your use of the Website is also governed by our{' '}
               <Link
                 to="/privacy-policy"
@@ -262,31 +262,31 @@ export const TermsAndConditions = () => {
           </div>
 
           {/* 18. GOVERNING LAW AND JURISDICTION */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               18. Governing Law and Jurisdiction
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               These Terms are governed by the laws of India. Subject to any rights you have as a consumer, the courts at Mumbai, Maharashtra shall have exclusive jurisdiction over any dispute.
             </p>
           </div>
 
           {/* 19. CHANGES TO THESE TERMS */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               19. Changes to These Terms
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               We may update these Terms at any time. The updated version applies from the date it is posted on the Website. Please review them periodically.
             </p>
           </div>
 
           {/* 20. GRIEVANCE REDRESSAL */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               20. Grievance Redressal
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left">
               For complaints, contact our Grievance Officer: [Name], Email:{' '}
               <a
                 href="mailto:houseofurvaah@yahoo.com"
@@ -306,11 +306,11 @@ export const TermsAndConditions = () => {
           </div>
 
           {/* 21. CONTACT US */}
-          <div className="space-y-4 pt-8 border-t border-neutral-200">
-            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase">
+          <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-neutral-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-serif font-bold tracking-[0.1em] text-brand-dark uppercase text-left">
               21. Contact Us
             </h2>
-            <p className="text-neutral-700 leading-relaxed">
+            <p className="text-neutral-700 leading-relaxed text-left">
               House Of Urvaah, [Full address], Mumbai, Maharashtra, India. Email:{' '}
               <a
                 href="mailto:houseofurvaah@yahoo.com"
