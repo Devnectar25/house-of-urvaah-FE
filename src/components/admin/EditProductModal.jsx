@@ -39,6 +39,7 @@ import { readProductFilters, buildFilterPayload } from '../../constants/productF
 import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { getLegacyDetailRows, productDetailsToRichText, richTextToProductDetails } from '../../utils/productDetailsContent';
 import { uploadVideoDirect } from '../../lib/directVideoUpload';
+import ColorWiseImages from './ColorWiseImages';
 
 
 const DEFAULT_CATEGORIES = [
@@ -115,6 +116,7 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   // Delete confirmation step state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [colorImages, setColorImages] = useState([]);
 
   // Size, Color, Image & Video input buffers
   const [sizeInput, setSizeInput] = useState('');
@@ -256,6 +258,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
             : (data.image ? [data.image] : []),
           video_url: data.video_url || data.videoUrl || data.video || product?.video_url || product?.videoUrl || ''
         });
+        const initialColorImages = Array.isArray(data.colorImages) ? data.colorImages : (Array.isArray(data.color_images) ? data.color_images : []);
+        setColorImages(initialColorImages);
       } catch (err) {
         console.warn('Falling back to list row product data:', err);
         let nameOpts = product?.nameOptions || product?.name_options || [];
@@ -326,6 +330,8 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
           images: Array.isArray(product.images) ? product.images : (product.image ? [product.image] : []),
           video_url: product?.video_url || product?.videoUrl || product?.video || ''
         });
+        const fallbackColorImages = Array.isArray(product?.colorImages) ? product.colorImages : (Array.isArray(product?.color_images) ? product.color_images : []);
+        setColorImages(fallbackColorImages);
       } finally {
         setFetchingDetail(false);
       }
@@ -492,9 +498,24 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
     const matches = (c) => (preset ? isPresetColor(c, preset) : c.toLowerCase() === colorName.toLowerCase());
     const isSelected = formData.colors.some(matches);
     if (isSelected) {
+      const removedColor = formData.colors.find(matches) || colorName;
+      const hasImages = (colorImages || []).some(ci => {
+        const match = (ci.color || '').trim().toLowerCase() === removedColor.trim().toLowerCase() ||
+                      (preset && ci.color.toLowerCase() === preset.name.toLowerCase());
+        return match && Array.isArray(ci.images) && ci.images.length > 0;
+      });
+      if (hasImages) {
+        const ok = window.confirm(`The color "${preset ? preset.name : colorName}" has colour-wise images. Removing this color will also remove its images. Are you sure?`);
+        if (!ok) return;
+      }
       setFormData(prev => ({
         ...prev,
         colors: prev.colors.filter(c => !matches(c))
+      }));
+      setColorImages(prev => prev.filter(ci => {
+        const m = (ci.color || '').trim().toLowerCase() === removedColor.trim().toLowerCase() ||
+                  (preset && ci.color.toLowerCase() === preset.name.toLowerCase());
+        return !m;
       }));
     } else {
       const result = validateColorInput(colorName, formData.colors);
@@ -526,10 +547,19 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
   };
 
   const handleRemoveColor = (colorToRemove) => {
+    const hasImages = (colorImages || []).some(ci => {
+      const match = (ci.color || '').trim().toLowerCase() === colorToRemove.trim().toLowerCase();
+      return match && Array.isArray(ci.images) && ci.images.length > 0;
+    });
+    if (hasImages) {
+      const ok = window.confirm(`The color "${colorToRemove}" has colour-wise images. Removing this color will also remove its images. Are you sure?`);
+      if (!ok) return;
+    }
     setFormData(prev => ({
       ...prev,
       colors: prev.colors.filter(c => c !== colorToRemove)
     }));
+    setColorImages(prev => prev.filter(ci => (ci.color || '').trim().toLowerCase() !== colorToRemove.trim().toLowerCase()));
     setColorError(null);
   };
 
@@ -808,7 +838,9 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
         images: formData.images,
         image: formData.images[0] || '',
         video_url: formData.video_url || '',
-        videoUrl: formData.video_url || ''
+        videoUrl: formData.video_url || '',
+        colorImages: colorImages,
+        color_images: colorImages
       };
 
       const res = await apiClient(`/api/products/${product.id}`, {
@@ -1989,6 +2021,14 @@ export const EditProductModal = ({ product, isOpen, onClose, onProductUpdated, o
                   )}
                 </div>
               </div>
+
+              {/* 11b. Colour-Wise Images (Optional) */}
+              <ColorWiseImages
+                colors={formData.colors}
+                sizes={formData.sizes}
+                colorImages={colorImages}
+                onChange={setColorImages}
+              />
 
               {/* 12. Product Video (Single Video) */}
               <div className="space-y-3 pt-3 border-t border-neutral-100">

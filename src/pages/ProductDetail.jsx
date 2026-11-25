@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom';
 import {
   Heart,
   ShoppingBag,
@@ -244,6 +244,9 @@ export const ProductDetail = () => {
 
 
   // Gallery & Image Viewer / Zoom States
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedColor, setSelectedColor] = useState('');
+  const [isFading, setIsFading] = useState(false);
   const [selectedImage, setSelectedImage] = useState('');
   const [selectedMediaType, setSelectedMediaType] = useState('image'); // 'image' | 'video'
   const [lightboxSelectedMedia, setLightboxSelectedMedia] = useState('image'); // 'image' | 'video'
@@ -358,6 +361,8 @@ export const ProductDetail = () => {
               video_url: data.video_url || data.videoUrl || data.video || prev?.video_url || '',
               videoUrl: data.video_url || data.videoUrl || data.video || prev?.videoUrl || '',
               sizes: data.sizes || prev?.sizes || ['XS', 'S', 'M', 'L', 'XL'],
+              colors: (Array.isArray(data.colors) && data.colors.length > 0) ? data.colors : (prev?.colors || ['Default']),
+              colorImages: (Array.isArray(data.colorImages) ? data.colorImages : (Array.isArray(data.color_images) ? data.color_images : (prev?.colorImages || []))),
               nameOptions: data.nameOptions || data.name_options || prev?.nameOptions || [],
               productDetails: data.productDetails || data.product_details || prev?.productDetails || [],
               specifications: (Array.isArray(data.specifications) && data.specifications.length > 0)
@@ -391,19 +396,259 @@ export const ProductDetail = () => {
   }, [id]);
 
 
-  const gallery = Array.from(
-    new Set(
-      (product?.gallery && product.gallery.length > 0
-        ? product.gallery
-        : (product?.images && product.images.length > 0
-            ? product.images
-            : [product?.image, product?.hoverImage]
-          )
-      ).filter(Boolean)
-    )
-  );
+  // Colours the admin set on this product (each colour once, in the admin preset order)
+  const availableColours = useMemo(() => {
+    if (!product) return [];
+    const byName = new Map();
 
-  const productVideo = product?.video_url || product?.videoUrl || product?.video || null;
+    const addColor = (raw) => {
+      if (!raw) return;
+      const clean = typeof raw === 'string' ? raw.trim() : '';
+      if (!clean || clean.toLowerCase() === 'default') return;
+      const name = getColorName(clean) || clean;
+      if (!name || byName.has(name)) return;
+      const preset = POPULAR_FASHION_COLORS.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      byName.set(name, preset ? preset.hex : getSwatchCss(clean));
+    };
+
+    (Array.isArray(product.colors) ? product.colors : []).forEach(addColor);
+
+    const ciList = Array.isArray(product.colorImages) ? product.colorImages : (Array.isArray(product.color_images) ? product.color_images : []);
+    ciList.forEach((item) => {
+      addColor(item?.color);
+    });
+
+    return [...byName.entries()].sort((a, b) => compareColorNames(a[0], b[0]));
+  }, [product]);
+
+  // Sync selectedColor on product load or URL param change (?color=<name>)
+  useEffect(() => {
+    if (availableColours.length === 0) {
+      setSelectedColor('');
+      return;
+    }
+    const colorParam = searchParams.get('color');
+    if (colorParam) {
+      const matched = availableColours.find(
+        ([name]) => name.trim().toLowerCase() === colorParam.trim().toLowerCase()
+      );
+      if (matched) {
+        setSelectedColor(matched[0]);
+        return;
+      }
+    }
+    // If no ?color param in URL, do not auto-force a colour so the original product images show by default
+    setSelectedColor((prev) => {
+      if (!prev) return '';
+      const stillValid = availableColours.some(
+        ([name]) => name.trim().toLowerCase() === prev.trim().toLowerCase()
+      );
+      return stillValid ? prev : '';
+    });
+  }, [availableColours, searchParams]);
+
+  // Preload cover images of other colours for instant switching
+  useEffect(() => {
+    const ciList = Array.isArray(product?.colorImages) ? product.colorImages : (Array.isArray(product?.color_images) ? product.color_images : []);
+    if (ciList.length === 0) return;
+    ciList.forEach((ci) => {
+      if (Array.isArray(ci?.images) && ci.images[0]) {
+        const img = new Image();
+        img.src = ci.images[0];
+      }
+    });
+  }, [product]);
+
+  // Base default gallery from product
+  const defaultGallery = useMemo(() => {
+    return Array.from(
+      new Set(
+        (product?.gallery && product.gallery.length > 0
+          ? product.gallery
+          : (product?.images && product.images.length > 0
+              ? product.images
+              : [product?.image, product?.hoverImage]
+            )
+        ).filter(Boolean)
+      )
+    );
+  }, [product]);
+
+  // Active gallery: switched to selected colour's images if available; falls back to default gallery
+  const gallery = useMemo(() => {
+    if (!product) return [];
+    const ciList = Array.isArray(product.colorImages) ? product.colorImages : (Array.isArray(product.color_images) ? product.color_images : []);
+    if (selectedColor && ciList.length > 0) {
+      const selectedDisplayName = getColorName(selectedColor) || selectedColor;
+      const match = ciList.find((item) => {
+        if (!item?.color) return false;
+        const itemDisplayName = getColorName(item.color) || item.color;
+        return (
+          item.color.trim().toLowerCase() === selectedColor.trim().toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedDisplayName.trim().toLowerCase() ||
+          item.color.trim().toLowerCase() === selectedDisplayName.trim().toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedColor.trim().toLowerCase()
+        );
+      });
+      if (match && Array.isArray(match.images) && match.images.length > 0) {
+        return match.images.filter(Boolean);
+      }
+    }
+    return defaultGallery;
+  }, [product, selectedColor, defaultGallery]);
+
+  // Handler for colour chip selection (clicking an active colour toggles back to the original product)
+  const handleColorChange = (colorName) => {
+    if (!colorName) return;
+    const cleanName = colorName.trim();
+
+    // If this colour is already selected, unselect it and revert to the original product
+    if (selectedColor && selectedColor.trim().toLowerCase() === cleanName.toLowerCase()) {
+      setSelectedColor('');
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('color');
+        return next;
+      }, { replace: true });
+
+      setSelectedMediaType('image');
+      setSelectedImage(defaultGallery[0] || '');
+      setIsZoomed(false);
+      setMobileSlideIndex(0);
+      setLightboxZoom(1);
+      setLightboxPan({ x: 0, y: 0 });
+
+      setIsFading(true);
+      setTimeout(() => setIsFading(false), 200);
+      return;
+    }
+
+    setSelectedColor(cleanName);
+
+    // Update URL param using React Router useSearchParams with replace: true
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('color', cleanName);
+      return next;
+    }, { replace: true });
+
+    // Determine the images for this colour (or fallback to default)
+    let nextImages = defaultGallery;
+    const ciList = Array.isArray(product?.colorImages) ? product.colorImages : (Array.isArray(product?.color_images) ? product.color_images : []);
+    if (ciList.length > 0) {
+      const selectedDisplayName = getColorName(cleanName) || cleanName;
+      const match = ciList.find((item) => {
+        if (!item?.color) return false;
+        const itemDisplayName = getColorName(item.color) || item.color;
+        return (
+          item.color.trim().toLowerCase() === cleanName.toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedDisplayName.toLowerCase() ||
+          item.color.trim().toLowerCase() === selectedDisplayName.toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === cleanName.toLowerCase()
+        );
+      });
+      if (match && Array.isArray(match.images) && match.images.length > 0) {
+        nextImages = match.images.filter(Boolean);
+      }
+    }
+
+    // Auto-adjust size if currently selected size is out of stock in the new colour
+    if (ciList.length > 0) {
+      const selectedDisplayName = getColorName(cleanName) || cleanName;
+      const targetColorEntry = ciList.find((item) => {
+        if (!item?.color) return false;
+        const itemDisplayName = getColorName(item.color) || item.color;
+        return (
+          item.color.trim().toLowerCase() === cleanName.toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedDisplayName.toLowerCase() ||
+          item.color.trim().toLowerCase() === selectedDisplayName.toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === cleanName.toLowerCase()
+        );
+      });
+      const colStock = targetColorEntry?.sizeStock || targetColorEntry?.size_stock;
+      const targetSizeStock =
+        colStock && typeof colStock === 'object' && Object.keys(colStock).length > 0
+          ? colStock
+          : product?.sizeStock || product?.size_stock || {};
+
+      const matchK = Object.keys(targetSizeStock).find(
+        (k) => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase()
+      );
+      const qty = matchK !== undefined ? parseInt(targetSizeStock[matchK], 10) || 0 : null;
+      if (qty !== null && qty <= 0) {
+        const firstInStock = availableSizes.find((sz) => {
+          const k = Object.keys(targetSizeStock).find(
+            (key) => key.trim().toUpperCase() === sz.trim().toUpperCase()
+          );
+          return k !== undefined ? (parseInt(targetSizeStock[k], 10) || 0) > 0 : false;
+        });
+        if (firstInStock) {
+          setSelectedSize(firstInStock);
+        }
+      }
+    }
+
+    // Reset media viewer, active image, zoom & lightbox
+    setSelectedMediaType('image');
+    setSelectedImage(nextImages[0] || defaultGallery[0] || '');
+    setIsZoomed(false);
+    setMobileSlideIndex(0);
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+
+    // Smooth ~200ms transition fade
+    setIsFading(true);
+    setTimeout(() => setIsFading(false), 200);
+  };
+
+  // Active colour entry matching the currently selected colour
+  const activeColorEntry = useMemo(() => {
+    if (!product || !selectedColor) return null;
+    const ciList = Array.isArray(product.colorImages)
+      ? product.colorImages
+      : (Array.isArray(product.color_images) ? product.color_images : []);
+    if (ciList.length === 0) return null;
+    const selectedDisplayName = getColorName(selectedColor) || selectedColor;
+    return (
+      ciList.find((item) => {
+        if (!item?.color) return false;
+        const itemDisplayName = getColorName(item.color) || item.color;
+        return (
+          item.color.trim().toLowerCase() === selectedColor.trim().toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedDisplayName.trim().toLowerCase() ||
+          item.color.trim().toLowerCase() === selectedDisplayName.trim().toLowerCase() ||
+          itemDisplayName.trim().toLowerCase() === selectedColor.trim().toLowerCase()
+        );
+      }) || null
+    );
+  }, [product, selectedColor]);
+
+  // Is the active video a colour-specific fabric video?
+  const isFabricVideo = useMemo(() => {
+    const v = activeColorEntry?.video || activeColorEntry?.video_url;
+    return typeof v === 'string' && v.trim().length > 0;
+  }, [activeColorEntry]);
+
+  // Active video: colour fabric video if present, otherwise default product video
+  const activeVideo = useMemo(() => {
+    const v = activeColorEntry?.video || activeColorEntry?.video_url;
+    if (typeof v === 'string' && v.trim().length > 0) {
+      return v.trim();
+    }
+    return product?.video_url || product?.videoUrl || product?.video || null;
+  }, [activeColorEntry, product]);
+
+  const productVideo = activeVideo;
+
+  // Active size stock: colour-specific size stock if present, otherwise product's default size stock
+  const activeSizeStock = useMemo(() => {
+    const colStock = activeColorEntry?.sizeStock || activeColorEntry?.size_stock;
+    if (colStock && typeof colStock === 'object' && Object.keys(colStock).length > 0) {
+      return colStock;
+    }
+    return product?.sizeStock || product?.size_stock || {};
+  }, [activeColorEntry, product]);
+
   const totalMobileSlides = gallery.length + (productVideo ? 1 : 0);
 
   const availableSizes = product?.sizes || ['XS', 'S', 'M', 'L', 'XL'];
@@ -629,7 +874,7 @@ export const ProductDetail = () => {
         setSelectedImage(gallery[0]);
       }
       if (availableSizes && availableSizes.length > 0) {
-        const sizeStock = product.sizeStock || product.size_stock || {};
+        const sizeStock = activeSizeStock;
         const firstInStock = availableSizes.find(sz => {
           const matchK = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === sz.trim().toUpperCase());
           return matchK !== undefined ? (parseInt(sizeStock[matchK], 10) || 0) > 0 : false;
@@ -638,6 +883,15 @@ export const ProductDetail = () => {
       }
     }
   }, [product?.id]);
+
+  // Keep selectedImage in sync whenever gallery changes (ensuring the main image always belongs to the active gallery)
+  useEffect(() => {
+    if (gallery && gallery.length > 0) {
+      if (!selectedImage || !gallery.includes(selectedImage)) {
+        setSelectedImage(gallery[0]);
+      }
+    }
+  }, [gallery, selectedImage]);
 
   if (loading) {
     return (
@@ -676,7 +930,7 @@ export const ProductDetail = () => {
   const handleAddToCart = () => {
     // Check if the currently selected size is in stock
     const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
-    const sizeStock = product.sizeStock || product.size_stock || {};
+    const sizeStock = activeSizeStock;
     const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
     const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
     const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
@@ -1006,7 +1260,7 @@ export const ProductDetail = () => {
               <div
                 ref={mobileScrollRef}
                 onScroll={handleMobileScroll}
-                className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none w-full touch-pan-x"
+                className={`flex overflow-x-auto snap-x snap-mandatory scrollbar-none w-full touch-pan-x transition-opacity duration-200 ${isFading ? 'opacity-70' : 'opacity-100'}`}
               >
                 {/* Images first */}
                 {gallery.map((imgUrl, idx) => (
@@ -1049,7 +1303,7 @@ export const ProductDetail = () => {
                     />
                     <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase border border-black/5 flex items-center gap-1">
                       <Play className="w-2.5 h-2.5 fill-current" />
-                      <span>Video</span>
+                      <span>{isFabricVideo ? 'Fabric Video' : 'Video'}</span>
                     </div>
                   </div>
                 )}
@@ -1139,7 +1393,7 @@ export const ProductDetail = () => {
                         ? 'ring-1.5 ring-black ring-offset-1 opacity-100 shadow-sm'
                         : 'border border-neutral-200 opacity-70 hover:opacity-100 hover:border-neutral-400'
                     }`}
-                    title="Watch product video"
+                    title={isFabricVideo ? `Watch ${selectedColor} fabric video` : "Watch product video"}
                   >
                     <video
                       src={productVideo}
@@ -1171,15 +1425,15 @@ export const ProductDetail = () => {
                   />
                   <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm text-brand-dark px-2.5 py-1 text-[9px] font-semibold tracking-widest uppercase rounded flex items-center gap-1.5 border border-black/10 pointer-events-none">
                     <Play className="w-3 h-3 fill-current" />
-                    <span>Product Video</span>
+                    <span>{isFabricVideo ? 'Fabric Video' : 'Product Video'}</span>
                   </div>
                 </div>
               ) : (
                 <div
                   ref={desktopImageContainerRef}
-                  className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-colors ${
+                  className={`flex-1 w-full relative aspect-[3/4] max-w-[620px] bg-[#F5F5F0] overflow-hidden shadow-xs border border-neutral-200/60 flex items-center justify-center p-2 group transition-all duration-200 ${
                     isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'
-                  }`}
+                  } ${isFading ? 'opacity-70' : 'opacity-100'}`}
                   onMouseMove={handleMainMouseMove}
                   onMouseLeave={handleMainMouseLeave}
                   onClick={handleMainImageClick}
@@ -1328,7 +1582,7 @@ export const ProductDetail = () => {
                   SIZE: <span className="font-semibold text-black">{selectedSize}</span>
                 </span>
                 {(() => {
-                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const sizeStock = activeSizeStock;
                   const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
                   const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
                   if (sizeQty !== null) {
@@ -1345,7 +1599,7 @@ export const ProductDetail = () => {
               {/* Selectable Size Boxes */}
               <div className="flex flex-wrap gap-2 font-sans">
                 {availableSizes.map((sz) => {
-                  const sizeStock = product.sizeStock || product.size_stock || {};
+                  const sizeStock = activeSizeStock;
                   const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(sz).trim().toUpperCase());
                   const isSizeOut = matchKey !== undefined && (parseInt(sizeStock[matchKey], 10) || 0) <= 0;
                   const isSelected = selectedSize === sz;
@@ -1388,27 +1642,45 @@ export const ProductDetail = () => {
 
             {/* Colours the admin set on this product (each colour once, in the admin preset order) */}
             {(() => {
-              const byName = new Map();
-              (Array.isArray(product.colors) ? product.colors : []).forEach((raw) => {
-                const name = getColorName(raw);
-                if (!name || byName.has(name)) return;
-                const preset = POPULAR_FASHION_COLORS.find((c) => c.name === name);
-                byName.set(name, preset ? preset.hex : getSwatchCss(raw));
-              });
-              const colours = [...byName.entries()].sort((a, b) => compareColorNames(a[0], b[0]));
-              if (colours.length === 0) return null;
+              if (availableColours.length === 0) return null;
               return (
                 <div className="pt-4 font-sans">
                   <span className="block text-xs sm:text-sm font-semibold tracking-wider uppercase text-brand-dark mb-2.5">
-                    {colours.length === 1 ? 'Colour' : 'Colours'}: <span className="font-normal normal-case tracking-normal text-neutral-600">{colours.map(([n]) => n).join(', ')}</span>
+                    {availableColours.length === 1 ? 'Colour' : 'Colours'}:{' '}
+                    <span className="font-normal normal-case tracking-normal text-neutral-600">
+                      {selectedColor ? selectedColor : 'Original Product'}
+                    </span>
                   </span>
-                  <div className="flex flex-wrap gap-2">
-                    {colours.map(([name, swatch]) => (
-                      <span key={name} className="inline-flex items-center gap-2 h-8 pl-1.5 pr-3 border border-neutral-200 rounded-full text-xs text-neutral-800">
-                        <span className="w-5 h-5 rounded-full border border-neutral-300 flex-shrink-0" style={{ background: swatch }} />
-                        {name}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {availableColours.map(([name, swatch]) => {
+                      const isSelected = selectedColor && selectedColor.trim().toLowerCase() === name.trim().toLowerCase();
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => handleColorChange(name)}
+                          className={`inline-flex items-center gap-2 h-8 pl-1.5 pr-3 border rounded-full text-xs transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-black ring-1 ring-black text-black font-semibold bg-neutral-50 shadow-xs'
+                              : 'border-neutral-200 text-neutral-800 hover:border-neutral-400 bg-white'
+                          }`}
+                          title={isSelected ? `Click to unselect ${name} and view original product` : `View in ${name}`}
+                        >
+                          <span className="w-5 h-5 rounded-full border border-neutral-300 flex-shrink-0" style={{ background: swatch }} />
+                          {name}
+                        </button>
+                      );
+                    })}
+                    {selectedColor && (
+                      <button
+                        type="button"
+                        onClick={() => handleColorChange(selectedColor)}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 border border-neutral-300 rounded-full text-xs text-neutral-600 hover:text-black hover:border-black transition-all cursor-pointer bg-neutral-50"
+                        title="Revert to original product"
+                      >
+                        <span>✕ Show Original</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1417,7 +1689,7 @@ export const ProductDetail = () => {
             {/* 7. ACTION BUTTON ROW: ADD TO CART OR NOTIFY ME + WISHLIST + SHARE */}
             {(() => {
               const totalStock = Number(product.stockQuantity ?? product.quantity ?? product.stock ?? 0);
-              const sizeStock = product.sizeStock || product.size_stock || {};
+              const sizeStock = activeSizeStock;
               const matchKey = Object.keys(sizeStock).find(k => k.trim().toUpperCase() === String(selectedSize).trim().toUpperCase());
               const sizeQty = matchKey !== undefined ? Math.max(0, parseInt(sizeStock[matchKey], 10) || 0) : null;
               const isSelectedSizeOut = (sizeQty !== null && sizeQty <= 0) || totalStock <= 0 || (product.inStock === false && totalStock <= 0);
@@ -2182,7 +2454,7 @@ export const ProductDetail = () => {
         onClose={() => setIsStockModalOpen(false)}
         product={product}
         selectedSize={selectedSize}
-        selectedColor="Default"
+        selectedColor={selectedColor || "Default"}
         user={user}
         onSubscribed={handleStockSubscribed}
       />

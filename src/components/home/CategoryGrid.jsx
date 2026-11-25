@@ -40,6 +40,7 @@ export const CategoryGrid = () => {
   const [productsList, setProductsList] = useState([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [activeProductIndex, setActiveProductIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
 
@@ -134,6 +135,13 @@ export const CategoryGrid = () => {
     checkScrollPosition();
     const handleScrollEvent = () => {
       checkScrollPosition();
+      if (scrollRef.current) {
+        const step = getCardStep();
+        if (step > 0) {
+          const idx = Math.round(scrollRef.current.scrollLeft / step);
+          setActiveProductIndex(Math.max(0, Math.min(productsList.length - 1, idx)));
+        }
+      }
       if (Date.now() - lastUserInteractionRef.current > 500) {
         targetScrollLeftRef.current = null;
       }
@@ -147,7 +155,7 @@ export const CategoryGrid = () => {
       window.removeEventListener('resize', checkScrollPosition);
       if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
     };
-  }, []);
+  }, [productsList]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -155,6 +163,23 @@ export const CategoryGrid = () => {
     }, 150);
     return () => clearTimeout(timer);
   }, [productsList]);
+
+  const scrollToCard = (idx) => {
+    if (!scrollRef.current) return;
+    const step = getCardStep();
+    const nextScroll = idx * step;
+    lastUserInteractionRef.current = Date.now();
+    targetScrollLeftRef.current = nextScroll;
+    scrollRef.current.style.scrollSnapType = 'none';
+    scrollRef.current.scrollTo({ left: nextScroll, behavior: 'smooth' });
+    setActiveProductIndex(idx);
+    clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.style.scrollSnapType = '';
+      }
+    }, 450);
+  };
 
   const getCardStep = () => {
     if (!scrollRef.current) return 320;
@@ -200,6 +225,11 @@ export const CategoryGrid = () => {
     el.style.scrollSnapType = 'none';
     el.scrollTo({ left: nextScroll, behavior: 'smooth' });
 
+    if (step > 0) {
+      const idx = Math.round(nextScroll / step);
+      setActiveProductIndex(Math.max(0, Math.min(productsList.length - 1, idx)));
+    }
+
     clearTimeout(snapTimerRef.current);
     snapTimerRef.current = setTimeout(() => {
       if (scrollRef.current) {
@@ -226,6 +256,7 @@ export const CategoryGrid = () => {
 
         if (scrollLeft >= maxScroll - 15) {
           targetScrollLeftRef.current = 0;
+          setActiveProductIndex(0);
           el.style.scrollSnapType = 'none';
           el.scrollTo({ left: 0, behavior: 'smooth' });
           clearTimeout(snapTimerRef.current);
@@ -240,6 +271,10 @@ export const CategoryGrid = () => {
           targetScrollLeftRef.current = nextScroll;
           el.style.scrollSnapType = 'none';
           el.scrollTo({ left: nextScroll, behavior: 'smooth' });
+          if (step > 0) {
+            const idx = Math.round(nextScroll / step);
+            setActiveProductIndex(Math.max(0, Math.min(productsList.length - 1, idx)));
+          }
           clearTimeout(snapTimerRef.current);
           snapTimerRef.current = setTimeout(() => {
             if (scrollRef.current) {
@@ -306,7 +341,7 @@ export const CategoryGrid = () => {
         {/* Single Horizontal Track (1 Row, 4 Visible at once on Desktop) */}
         <div
           ref={scrollRef}
-          className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-3 -mr-4 pr-4 sm:mr-0 sm:pr-0"
+          className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory sm:snap-none pb-3"
         >
           {productsList.map((product, idx) => (
             <motion.div
@@ -315,7 +350,7 @@ export const CategoryGrid = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: idx * 0.08 }}
-              className="group/card relative flex flex-col w-[82vw] min-w-[82vw] sm:min-w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.5rem)] md:min-w-[calc(33.333%-0.75rem)] md:w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] lg:w-[calc(25%-0.75rem)] flex-shrink-0 snap-start"
+              className="group/card relative flex flex-col w-full min-w-full sm:min-w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.5rem)] md:min-w-[calc(33.333%-0.75rem)] md:w-[calc(33.333%-0.75rem)] lg:min-w-[calc(25%-0.75rem)] lg:w-[calc(25%-0.75rem)] flex-shrink-0 snap-start"
             >
               {/* Product Photo Container */}
               <div
@@ -395,6 +430,23 @@ export const CategoryGrid = () => {
         >
           <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2]" />
         </button>
+
+        {/* Mobile Carousel Dot Indicators */}
+        {productsList.length > 1 && (
+          <div className="flex sm:hidden justify-center items-center gap-1.5 mt-5">
+            {productsList.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => scrollToCard(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  idx === activeProductIndex ? 'w-6 bg-black' : 'w-1.5 bg-neutral-300'
+                }`}
+                aria-label={`Go to product ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

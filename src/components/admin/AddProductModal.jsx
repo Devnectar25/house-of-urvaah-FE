@@ -36,6 +36,7 @@ import { readProductFilters, buildFilterPayload } from '../../constants/productF
 import { fetchRecommendationStatus } from '../../constants/recommendations';
 import { richTextToProductDetails } from '../../utils/productDetailsContent';
 import { uploadVideoDirect } from '../../lib/directVideoUpload';
+import ColorWiseImages from './ColorWiseImages';
 
 
 const DEFAULT_ADDITIONAL_INFO_TEMPLATE = [
@@ -101,6 +102,7 @@ const DEFAULT_CATEGORIES = [
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [colorImages, setColorImages] = useState([]);
 
   // Size, Color, Image & Video URL input buffers
   const [sizeInput, setSizeInput] = useState('');
@@ -263,9 +265,24 @@ const DEFAULT_CATEGORIES = [
     const matches = (c) => (preset ? isPresetColor(c, preset) : c.toLowerCase() === colorName.toLowerCase());
     const isSelected = formData.colors.some(matches);
     if (isSelected) {
+      const removedColor = formData.colors.find(matches) || colorName;
+      const hasImages = (colorImages || []).some(ci => {
+        const match = (ci.color || '').trim().toLowerCase() === removedColor.trim().toLowerCase() ||
+                      (preset && ci.color.toLowerCase() === preset.name.toLowerCase());
+        return match && Array.isArray(ci.images) && ci.images.length > 0;
+      });
+      if (hasImages) {
+        const ok = window.confirm(`The color "${preset ? preset.name : colorName}" has colour-wise images. Removing this color will also remove its images. Are you sure?`);
+        if (!ok) return;
+      }
       setFormData(prev => ({
         ...prev,
         colors: prev.colors.filter(c => !matches(c))
+      }));
+      setColorImages(prev => prev.filter(ci => {
+        const m = (ci.color || '').trim().toLowerCase() === removedColor.trim().toLowerCase() ||
+                  (preset && ci.color.toLowerCase() === preset.name.toLowerCase());
+        return !m;
       }));
     } else {
       const result = validateColorInput(colorName, formData.colors);
@@ -297,10 +314,19 @@ const DEFAULT_CATEGORIES = [
   };
 
   const handleRemoveColor = (colorToRemove) => {
+    const hasImages = (colorImages || []).some(ci => {
+      const match = (ci.color || '').trim().toLowerCase() === colorToRemove.trim().toLowerCase();
+      return match && Array.isArray(ci.images) && ci.images.length > 0;
+    });
+    if (hasImages) {
+      const ok = window.confirm(`The color "${colorToRemove}" has colour-wise images. Removing this color will also remove its images. Are you sure?`);
+      if (!ok) return;
+    }
     setFormData(prev => ({
       ...prev,
       colors: prev.colors.filter(c => c !== colorToRemove)
     }));
+    setColorImages(prev => prev.filter(ci => (ci.color || '').trim().toLowerCase() !== colorToRemove.trim().toLowerCase()));
     setColorError(null);
   };
 
@@ -593,7 +619,9 @@ const DEFAULT_CATEGORIES = [
         images: formData.images,
         image: formData.images[0] || '',
         video_url: formData.video_url || '',
-        videoUrl: formData.video_url || ''
+        videoUrl: formData.video_url || '',
+        colorImages: colorImages,
+        color_images: colorImages
       };
 
       const res = await apiClient('/api/products', {
@@ -1457,6 +1485,14 @@ const DEFAULT_CATEGORIES = [
                 )}
               </div>
             </div>
+
+            {/* 11b. Colour-Wise Images (Optional) */}
+            <ColorWiseImages
+              colors={formData.colors}
+              sizes={formData.sizes}
+              colorImages={colorImages}
+              onChange={setColorImages}
+            />
 
             {/* 12. Product Video (Single Video) */}
             <div className="space-y-3 pt-3 border-t border-neutral-100">

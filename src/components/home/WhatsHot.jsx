@@ -44,6 +44,7 @@ export const WhatsHot = () => {
   const snapTimerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
 
   const getCanonicalCategoryUrl = (slug) => {
     const s = String(slug || '').toLowerCase().trim();
@@ -149,6 +150,11 @@ export const WhatsHot = () => {
 
     targetScrollLeftRef.current = nextScroll;
 
+    if (step > 0) {
+      const idx = Math.round(nextScroll / step);
+      setActiveCategoryIndex(Math.max(0, Math.min(categories.length - 1, idx)));
+    }
+
     // Disarm CSS scroll-snap during programmatic smooth scroll so it won't snap back on single click
     el.style.scrollSnapType = 'none';
     el.scrollTo({ left: nextScroll, behavior: 'smooth' });
@@ -183,6 +189,22 @@ export const WhatsHot = () => {
     };
   }, []);
 
+  const scrollToCard = (idx) => {
+    if (!scrollRef.current) return;
+    const step = getScrollStep();
+    const nextScroll = idx * step;
+    targetScrollLeftRef.current = nextScroll;
+    scrollRef.current.style.scrollSnapType = 'none';
+    scrollRef.current.scrollTo({ left: nextScroll, behavior: 'smooth' });
+    setActiveCategoryIndex(idx);
+    clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.style.scrollSnapType = '';
+      }
+    }, 450);
+  };
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -191,6 +213,11 @@ export const WhatsHot = () => {
       checkScrollPosition();
       if (scrollRef.current) {
         targetScrollLeftRef.current = scrollRef.current.scrollLeft;
+        const step = getScrollStep();
+        if (step > 0) {
+          const idx = Math.round(scrollRef.current.scrollLeft / step);
+          setActiveCategoryIndex(Math.max(0, Math.min(categories.length - 1, idx)));
+        }
       }
     };
 
@@ -261,7 +288,7 @@ export const WhatsHot = () => {
         {/* Scrollable Track: 4 visible at once on desktop, seamlessly scrollable */}
         <div
           ref={scrollRef}
-          className="flex gap-4 md:gap-5 overflow-x-auto no-scrollbar snap-x snap-proximity sm:snap-none pb-3"
+          className="flex gap-4 md:gap-5 overflow-x-auto no-scrollbar snap-x snap-mandatory sm:snap-none pb-3"
         >
           {categories.map((category, idx) => (
             <motion.div
@@ -271,7 +298,7 @@ export const WhatsHot = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: idx * 0.08 }}
-              className="group/card relative block aspect-[3/4] overflow-hidden bg-neutral-100 w-[78vw] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-14px)] lg:w-[calc(25%-15px)] min-w-[78vw] sm:min-w-[calc(50%-8px)] md:min-w-[calc(33.333%-14px)] lg:min-w-[calc(25%-15px)] flex-shrink-0 snap-start"
+              className="group/card relative block aspect-[3/4] overflow-hidden bg-neutral-100 w-full min-w-full sm:min-w-[calc(50%-8px)] sm:w-[calc(50%-8px)] md:min-w-[calc(33.333%-14px)] md:w-[calc(33.333%-14px)] lg:min-w-[calc(25%-15px)] lg:w-[calc(25%-15px)] flex-shrink-0 snap-start"
             >
               <Link
                 to={category.link}
@@ -294,12 +321,29 @@ export const WhatsHot = () => {
                     e.target.onerror = null;
                     e.target.src = '/assets/Images/Blue02.png';
                   }}
-                  className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover/card:scale-[1.03]"
+                  className="w-full h-full object-contain sm:object-cover object-center transition-transform duration-700 ease-out group-hover/card:scale-[1.03]"
                 />
               </Link>
             </motion.div>
           ))}
         </div>
+
+        {/* Mobile Carousel Dot Indicators */}
+        {categories.length > 1 && (
+          <div className="flex sm:hidden justify-center items-center gap-1.5 mt-5">
+            {categories.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => scrollToCard(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  idx === activeCategoryIndex ? 'w-6 bg-black' : 'w-1.5 bg-neutral-300'
+                }`}
+                aria-label={`Go to category ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
