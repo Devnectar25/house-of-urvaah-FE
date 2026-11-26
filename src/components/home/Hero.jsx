@@ -3,6 +3,11 @@ import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { startVisiblePolling } from '../../lib/livePolling';
 
+// TESTING ONLY: when set, the mobile hero plays this local 1080x1920 (9:16) test
+// video (green = safe zone, red/blue = edges that may trim on some phones)
+// instead of the admin/Supabase one. Set to null before going live.
+const MOBILE_TEST_VIDEO = '/assets/video/testing-video.mp4';
+
 export const Hero = () => {
   const fallbackVideoSrc = getSupabaseMediaUrl('HOU_desktop');
   const fallbackMobileVideoSrc = getSupabaseMediaUrl('HOU_mobile');
@@ -77,9 +82,12 @@ export const Hero = () => {
     ? getSupabaseMediaUrl(activeSlide.mobile_image)
     : (activeSlide?.desktop_image ? getSupabaseMediaUrl(activeSlide.desktop_image) : fallbackMobileVideoSrc);
 
-  const currentMediaUrl = isMobile ? mobileMediaUrl : desktopMediaUrl;
+  const useMobileTest = isMobile && !!MOBILE_TEST_VIDEO;
+  const currentMediaUrl = useMobileTest
+    ? MOBILE_TEST_VIDEO
+    : (isMobile ? mobileMediaUrl : desktopMediaUrl);
 
-  const isVideo = isMobile
+  const isVideo = useMobileTest ? true : isMobile
     ? (activeSlide?.mobile_image
         ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.mobile_image))
         : (activeSlide?.desktop_image ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.desktop_image)) : true))
