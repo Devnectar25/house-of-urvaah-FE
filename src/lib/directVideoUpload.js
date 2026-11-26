@@ -13,7 +13,7 @@ export async function uploadVideoDirect(file, folderName = 'products/videos') {
   const res = await apiClient('/api/upload/video-upload-url', {
     method: 'POST',
     isAdmin: true,
-    body: JSON.stringify({ fileName: file.name, contentType: file.type, folderName })
+    body: JSON.stringify({ fileName: file.name, contentType: file.type, fileSize: file.size, folderName })
   });
   const info = res?.data;
   if (!info?.path || !info?.token) throw new Error('Could not prepare the video upload. Please try again.');
