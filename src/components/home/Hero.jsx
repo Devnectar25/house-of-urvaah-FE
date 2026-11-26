@@ -3,47 +3,72 @@ import { getSupabaseMediaUrl } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { startVisiblePolling } from '../../lib/livePolling';
 
-// TESTING ONLY: when set, the mobile hero plays this local 1080x1920 (9:16) test
-// video (green = safe zone, red/blue = edges that may trim on some phones)
-// instead of the admin/Supabase one. Set to null before going live.
-const MOBILE_TEST_VIDEO = '/assets/video/testing-video.mp4';
+// TESTING ONLY: set to a local path (e.g. '/assets/video/testing-video.mp4') to force
+// that video on phones instead of the admin's mobile slides. Keep null in production.
+const MOBILE_TEST_VIDEO = null;
 
+const MOBILE_QUERY = '(max-width: 767px)';
+const getIsMobile = () =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(MOBILE_QUERY).matches
+    : false;
+
+/**
+ * Home page hero. Desktop and mobile hero slides are fully independent records:
+ *  - phones (< 768px) request ONLY active mobile slides  -> /api/ui/hero?device=mobile
+ *  - tablets / laptops / desktops request ONLY active desktop slides -> ?device=desktop
+ * Only the current device's media is ever rendered, so phones never download desktop
+ * videos and vice versa. With no active slide for a device, that device's default
+ * House of Urvaah video is used.
+ */
 export const Hero = () => {
   const fallbackVideoSrc = getSupabaseMediaUrl('HOU_desktop');
   const fallbackMobileVideoSrc = getSupabaseMediaUrl('HOU_mobile');
   const localFallbackSrc = '/assets/video/Hero-section-video-two.mp4';
   const videoRef = useRef(null);
 
-  const [heroSlides, setHeroSlides] = useState([]);
-  const [activeSlideIndex] = useState(0);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
+  const [isMobile, setIsMobile] = useState(getIsMobile);
+  const device = isMobile ? 'mobile' : 'desktop';
+  const deviceRef = useRef(device);
+  deviceRef.current = device;
+
+  // Slides are tagged with the device they were fetched for, so a slide list from the
+  // other device is never shown (or downloaded) while a new fetch is in flight.
+  const [heroData, setHeroData] = useState({ device: null, slides: [] });
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    if (mql.addEventListener) mql.addEventListener('change', onChange);
+    else mql.addListener(onChange);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', onChange);
+      else mql.removeListener(onChange);
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const fetchHeroSlides = async () => {
-    try {
-      const res = await apiClient('/api/ui/hero');
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setHeroSlides(res.data);
-      }
-    } catch (err) {
-      console.warn('[Hero] Failed to fetch dynamic hero slides:', err.message);
-    }
-  };
-
   useEffect(() => {
+    let cancelled = false;
+
+    const fetchHeroSlides = async () => {
+      const forDevice = deviceRef.current;
+      try {
+        const res = await apiClient(`/api/ui/hero?device=${forDevice}`);
+        if (cancelled || forDevice !== deviceRef.current) return;
+        const slides = res && res.success && Array.isArray(res.data)
+          ? res.data.filter((s) => s.device === forDevice && s.is_active !== false && s.media_url)
+          : [];
+        setHeroData({ device: forDevice, slides });
+      } catch (err) {
+        if (cancelled || forDevice !== deviceRef.current) return;
+        console.warn('[Hero] Failed to fetch hero slides:', err.message);
+        // Show the device default instead of waiting forever
+        setHeroData((prev) => (prev.device === forDevice ? prev : { device: forDevice, slides: [] }));
+      }
+    };
+
     fetchHeroSlides();
 
     // Event listener & polling for live updates when Admin changes Hero Section
@@ -53,45 +78,25 @@ export const Hero = () => {
     const stopLivePolling = startVisiblePolling(fetchHeroSlides);
 
     return () => {
+      cancelled = true;
       window.removeEventListener('urvaah_hero_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
       stopLivePolling();
     };
-  }, []);
-
-  const activeSlide = heroSlides[activeSlideIndex] || null;
-
-  const isVideoMedia = (url) => {
-    if (!url || typeof url !== 'string') return false;
-    const clean = url.split('?')[0].toLowerCase().trim();
-    return (
-      clean.endsWith('.mp4') ||
-      clean.endsWith('.webm') ||
-      clean.endsWith('.mov') ||
-      clean.endsWith('.m4v') ||
-      clean.includes('/videos/') ||
-      clean.includes('/video/')
-    );
-  };
-
-  const desktopMediaUrl = activeSlide?.desktop_image
-    ? getSupabaseMediaUrl(activeSlide.desktop_image)
-    : fallbackVideoSrc;
-
-  const mobileMediaUrl = activeSlide?.mobile_image
-    ? getSupabaseMediaUrl(activeSlide.mobile_image)
-    : (activeSlide?.desktop_image ? getSupabaseMediaUrl(activeSlide.desktop_image) : fallbackMobileVideoSrc);
+  }, [device]);
 
   const useMobileTest = isMobile && !!MOBILE_TEST_VIDEO;
+  const isLoaded = useMobileTest || heroData.device === device;
+  const activeSlide = isLoaded && !useMobileTest ? heroData.slides[0] || null : null;
+
   const currentMediaUrl = useMobileTest
     ? MOBILE_TEST_VIDEO
-    : (isMobile ? mobileMediaUrl : desktopMediaUrl);
+    : activeSlide
+      ? getSupabaseMediaUrl(activeSlide.media_url)
+      : (isMobile ? fallbackMobileVideoSrc : fallbackVideoSrc);
 
-  const isVideo = useMobileTest ? true : isMobile
-    ? (activeSlide?.mobile_image
-        ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.mobile_image))
-        : (activeSlide?.desktop_image ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.desktop_image)) : true))
-    : (activeSlide ? (activeSlide.media_type === 'video' || isVideoMedia(activeSlide.desktop_image)) : true);
+  // Each slide renders by its own media_type; the device defaults are videos
+  const isVideo = useMobileTest || !activeSlide || activeSlide.media_type !== 'image';
 
   useEffect(() => {
     if (videoRef.current) {
@@ -100,7 +105,7 @@ export const Hero = () => {
       videoRef.current.playsInline = true;
       videoRef.current.play().catch(() => {});
     }
-  }, [currentMediaUrl, isMobile]);
+  }, [currentMediaUrl, isMobile, isLoaded]);
 
   // Hero = exactly one screen on every device (dvh tracks the real visible
   // height on phones, incl. browser bars). Media is object-cover + centred,
@@ -110,10 +115,10 @@ export const Hero = () => {
     <section className="relative w-full h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
       {/* Full-bleed Looping Cinematic Media Background */}
       <div className="absolute inset-0 z-0 bg-[#ede1e0]">
-        {isVideo ? (
+        {!isLoaded ? null : isVideo ? (
           <video
             ref={videoRef}
-            key={`${currentMediaUrl}_${isMobile ? 'mobile' : 'desktop'}`}
+            key={`${currentMediaUrl}_${device}`}
             src={currentMediaUrl}
             autoPlay
             muted
@@ -124,12 +129,14 @@ export const Hero = () => {
             className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           >
             <source src={currentMediaUrl} type="video/mp4" />
-            {!isMobile && <source src={localFallbackSrc} type="video/mp4" />}
+            {!isMobile && !activeSlide && <source src={localFallbackSrc} type="video/mp4" />}
           </video>
         ) : (
           <img
+            key={`${currentMediaUrl}_${device}`}
             src={currentMediaUrl}
-            alt={activeSlide?.heading || 'Hero Banner'}
+            alt={activeSlide?.heading || 'House of Urvaah'}
+            fetchPriority="high"
             className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           />
         )}
