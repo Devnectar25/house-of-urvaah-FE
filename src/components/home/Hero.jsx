@@ -102,10 +102,14 @@ export const Hero = () => {
     }
   }, [currentMediaUrl, isMobile]);
 
+  // Hero = exactly one screen on every device (dvh tracks the real visible
+  // height on phones, incl. browser bars). Media is object-cover + centred,
+  // so there is never blank space; only the outer edges of a 9:16 video
+  // (outside the 880x1800 safe zone) can be trimmed on some phones.
   return (
-    <section className="relative w-full aspect-[9/16] max-h-[100dvh] min-h-0 md:aspect-auto md:max-h-none md:h-screen md:h-[100dvh] md:min-h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
+    <section className="relative w-full h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
       {/* Full-bleed Looping Cinematic Media Background */}
-      <div className="absolute inset-0 z-0 bg-neutral-900">
+      <div className="absolute inset-0 z-0 bg-[#ede1e0]">
         {isVideo ? (
           <video
             ref={videoRef}
@@ -117,7 +121,7 @@ export const Hero = () => {
             playsInline
             webkit-playsinline="true"
             preload="auto"
-            className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
+            className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           >
             <source src={currentMediaUrl} type="video/mp4" />
             {!isMobile && <source src={localFallbackSrc} type="video/mp4" />}
@@ -126,12 +130,12 @@ export const Hero = () => {
           <img
             src={currentMediaUrl}
             alt={activeSlide?.heading || 'Hero Banner'}
-            className="w-full h-full object-cover filter brightness-[0.98] contrast-[1.02]"
+            className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           />
         )}
 
-        {/* Subtle Scrim Gradient at top for header icon legibility */}
-        <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/25 via-black/5 to-transparent pointer-events-none" />
+        {/* Subtle Scrim Gradient at top for header icon legibility (desktop only) */}
+        <div className="hidden md:block absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/25 via-black/5 to-transparent pointer-events-none" />
       </div>
     </section>
   );
