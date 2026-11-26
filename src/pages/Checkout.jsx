@@ -37,7 +37,8 @@ import { useCart } from '../context/CartContext';
 import apiClient, { getAuthToken } from '../lib/apiClient';
 import { getSupabaseMediaUrl } from '../lib/supabase';
 import { checkItemStockStatus } from '../utils/stockValidator';
-import { buildReorderItems } from '../utils/reorder';
+import { buildReorderItems, addReorderEntriesToCart } from '../utils/reorder';
+import { ReorderSelectModal } from '../components/common/ReorderSelectModal';
 import { SEOHead } from '../components/common/SEOHead';
 import { INDIAN_STATES, findMatchedState } from '../data/indianStates';
 import { UpiLogo, VisaLogo, MastercardLogo, RupayLogo } from '../components/common/PaymentLogos';
@@ -577,6 +578,8 @@ export const Checkout = () => {
     pincode: ''
   });
   const [isReordering, setIsReordering] = useState(false);
+  // Placed order shown in the reorder picker (multi-item orders only)
+  const [reorderPickerOrder, setReorderPickerOrder] = useState(null);
 
   // Dynamic Store Settings (GST & Card Surcharge)
   const [storeSettings, setStoreSettings] = useState({
@@ -2349,10 +2352,38 @@ export const Checkout = () => {
     const isAddressLockedStatus = isShipped || isOutForDelivery || isDelivered || isOrderCancelled || isCancellationRequested || isInReturnFlow || isInReplacementFlow;
     const canEditAddress = isWithin24Hours && !isAddressLockedStatus;
 
+    // Adds the chosen reorder lines to the bag, selects exactly those, and opens a fresh checkout
+    const addReorderEntriesAndStartCheckout = async (entries) => {
+      const keys = await addReorderEntriesToCart(entries, { addToCart, setSelectedCartItemKeys });
+      if (keys.length === 0) {
+        showToast('These items could not be added to your bag. Please try again.', 'error');
+        return;
+      }
+      setReorderPickerOrder(null);
+
+      // Clear cached order data so customer exits the success screen and enters fresh active checkout
+      sessionStorage.removeItem(ORDER_SESSION_KEY);
+      sessionStorage.removeItem('hou_last_order_num');
+      sessionStorage.removeItem('hou_last_order_data');
+
+      setOrderPlaced(false);
+      setPlacedOrderDetails(null);
+      setPlacedOrderNumber('');
+      setConfirmedGrandTotal(0);
+
+      navigate('/checkout', { replace: true, state: {} });
+    };
+
     const handleReorder = async () => {
       if (isReordering) return;
       if (!details || !details.items || !Array.isArray(details.items) || details.items.length === 0) {
         showToast('No items found in this order to reorder.', 'error');
+        return;
+      }
+
+      // More than one item: let the customer choose which pieces to reorder
+      if (details.items.length > 1) {
+        setReorderPickerOrder({ ...details, orderNumber: details.orderNumber || placedOrderNumber });
         return;
       }
 
@@ -2371,39 +2402,7 @@ export const Checkout = () => {
           return;
         }
 
-        const targetKeys = [];
-        for (const { product, size, quantity } of available) {
-          targetKeys.push(`${String(product.id).trim()}_${String(size).trim()}`);
-
-          if (addToCart) {
-            await addToCart(product, size, {
-              quantity,
-              setQuantity: true, // repeated reorders must not stack quantities
-              selectOnlyThis: false,
-              openDrawer: false
-            });
-          }
-        }
-
-        if (unavailable.length > 0) {
-          showToast(`Out of stock and skipped: ${unavailable.join(', ')}. Remaining items added to your bag.`, 'error');
-        }
-
-        if (setSelectedCartItemKeys && targetKeys.length > 0) {
-          setSelectedCartItemKeys(targetKeys);
-        }
-
-        // Clear cached order data so customer exits the success screen and enters fresh active checkout
-        sessionStorage.removeItem(ORDER_SESSION_KEY);
-        sessionStorage.removeItem('hou_last_order_num');
-        sessionStorage.removeItem('hou_last_order_data');
-
-        setOrderPlaced(false);
-        setPlacedOrderDetails(null);
-        setPlacedOrderNumber('');
-        setConfirmedGrandTotal(0);
-
-        navigate('/checkout', { replace: true, state: {} });
+        await addReorderEntriesAndStartCheckout(available);
       } catch (err) {
         console.error('Reorder error:', err);
         showToast('Failed to reorder items. Please try again.', 'error');
@@ -3258,7 +3257,12 @@ export const Checkout = () => {
       <div className="w-full bg-white text-brand-dark pt-24 sm:pt-28 pb-4 sm:pb-6 font-serif selection:bg-brand-dark selection:text-white">
         <SEOHead title="Order Confirmed | House of Urvaah" noindex={true} />
 
-
+        {/* Reorder picker: choose which items of a multi-item order to reorder */}
+        <ReorderSelectModal
+          order={reorderPickerOrder}
+          onClose={() => setReorderPickerOrder(null)}
+          onConfirm={addReorderEntriesAndStartCheckout}
+        />
 
         {/* Floating Toast Notification */}
         <AnimatePresence>
@@ -3604,7 +3608,7 @@ export const Checkout = () => {
                     ) : (
                       <RotateCcw className="w-3.5 h-3.5" />
                     )}
-                    <span>{isReordering ? 'Adding to Bag...' : 'Reorder This Entire Order'}</span>
+                    <span>{isReordering ? 'Adding to Bag...' : (details?.items?.length > 1 ? 'Reorder Items' : 'Reorder This Order')}</span>
                   </button>
                 </div>
 

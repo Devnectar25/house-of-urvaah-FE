@@ -107,12 +107,12 @@ export const Hero = () => {
     }
   }, [currentMediaUrl, isMobile, isLoaded]);
 
-  // Mobile (< 768px): the hero box is exactly 9:16 (full width, height from the
-  // aspect ratio, NOT 100vh/100svh), so a 9:16 mobile video/image fills it with
-  // object-cover and nothing is cropped on any phone width.
-  // Desktop (>= 768px): unchanged full-screen hero.
+  // Hero = exactly one screen on every device (dvh tracks the real visible
+  // height on phones, incl. browser bars). Media is object-cover + centred,
+  // so there is never blank space; only the outer edges of a 9:16 video
+  // (outside the 880x1800 safe zone) can be trimmed on some phones.
   return (
-    <section className="relative w-full aspect-[9/16] md:aspect-auto md:h-screen md:supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
+    <section className="relative w-full h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
       {/* Full-bleed Looping Cinematic Media Background */}
       <div className="absolute inset-0 z-0 bg-[#ede1e0]">
         {!isLoaded ? null : isVideo ? (
@@ -126,7 +126,7 @@ export const Hero = () => {
             playsInline
             webkit-playsinline="true"
             preload="auto"
-            className="block w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
+            className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           >
             <source src={currentMediaUrl} type="video/mp4" />
             {!isMobile && !activeSlide && <source src={localFallbackSrc} type="video/mp4" />}
@@ -137,7 +137,7 @@ export const Hero = () => {
             src={currentMediaUrl}
             alt={activeSlide?.heading || 'House of Urvaah'}
             fetchPriority="high"
-            className="block w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
+            className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.02]"
           />
         )}
 

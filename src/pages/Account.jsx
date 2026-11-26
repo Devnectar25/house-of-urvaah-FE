@@ -15,7 +15,8 @@ import { ShipmentTrackingModal } from '../components/common/ShipmentTrackingModa
 import { ProductCard } from '../components/common/ProductCard';
 import { BEST_SELLERS_PRODUCTS, MOCK_PRODUCTS } from '../data/mockProducts';
 import { productApi } from '../services/productApi';
-import { buildReorderItems } from '../utils/reorder';
+import { buildReorderItems, addReorderEntriesToCart } from '../utils/reorder';
+import { ReorderSelectModal } from '../components/common/ReorderSelectModal';
 import { subscribeToOrderUpdates, broadcastOrderUpdate } from '../lib/orderSync';
 import Swal from 'sweetalert2';
 
@@ -88,8 +89,30 @@ export const Account = () => {
   const [selectedOrderModal, setSelectedOrderModal] = useState(null);
   const [activeTrackingModal, setActiveTrackingModal] = useState(null);
 
+  // Order whose items are shown in the reorder picker (multi-item orders only)
+  const [reorderPickerOrder, setReorderPickerOrder] = useState(null);
+
+  // Adds the chosen reorder lines to the bag, selects exactly those, and opens checkout
+  const addReorderEntriesAndCheckout = async (entries) => {
+    const keys = await addReorderEntriesToCart(entries, { addToCart, setSelectedCartItemKeys });
+    if (keys.length === 0) {
+      setToastMsg({ text: 'These items could not be added to your bag. Please try again.', type: 'error' });
+      return;
+    }
+    setReorderPickerOrder(null);
+    sessionStorage.removeItem('urvaah_last_placed_order');
+    sessionStorage.removeItem('hou_last_order_num');
+    navigate('/checkout');
+  };
+
   const handleReorderOrder = async (ord) => {
     if (!ord || !ord.items || !Array.isArray(ord.items) || ord.items.length === 0) {
+      return;
+    }
+
+    // More than one item: let the customer choose which pieces to reorder
+    if (ord.items.length > 1) {
+      setReorderPickerOrder(ord);
       return;
     }
 
@@ -107,35 +130,7 @@ export const Account = () => {
         return;
       }
 
-      const targetKeys = [];
-      for (const { product, size, quantity } of available) {
-        targetKeys.push(`${String(product.id).trim()}_${String(size).trim()}`);
-
-        if (addToCart) {
-          await addToCart(product, size, {
-            quantity,
-            setQuantity: true, // repeated reorders must not stack quantities
-            selectOnlyThis: false,
-            openDrawer: false
-          });
-        }
-      }
-
-      if (unavailable.length > 0) {
-        setToastMsg({
-          text: `Out of stock and skipped: ${unavailable.join(', ')}. Remaining items added to your bag.`,
-          type: 'error'
-        });
-      }
-
-      if (setSelectedCartItemKeys && targetKeys.length > 0) {
-        setSelectedCartItemKeys(targetKeys);
-      }
-
-      sessionStorage.removeItem('urvaah_last_placed_order');
-      sessionStorage.removeItem('hou_last_order_num');
-
-      navigate('/checkout');
+      await addReorderEntriesAndCheckout(available);
     } catch (err) {
       console.error('Account reorder error:', err);
     }
@@ -3398,6 +3393,13 @@ export const Account = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Reorder picker: choose which items of a multi-item order to reorder */}
+      <ReorderSelectModal
+        order={reorderPickerOrder}
+        onClose={() => setReorderPickerOrder(null)}
+        onConfirm={addReorderEntriesAndCheckout}
+      />
 
       {/* Floating Status / Success Toaster */}
       <AnimatePresence>
