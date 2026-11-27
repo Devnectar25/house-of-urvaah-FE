@@ -1,14 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { SEOHead } from '../components/common/SEOHead';
 
 export const ReturnRefundPolicy = () => {
   return (
     <div className="w-full max-w-full min-h-screen bg-white text-[#111111] font-serif pt-20 pb-16 md:pt-28 md:pb-24 overflow-x-hidden">
       <SEOHead
-        title="Return & Refund Policy | House of Urvaah"
+        title="Cancellation, Return & Refund Policy | House of Urvaah"
         description="Understand House of Urvaah return, exchange, and refund policies for online purchases. Enjoy hassle-free returns on eligible luxury garments."
-        keywords="House of Urvaah returns, refund policy, exchange policy, garment returns"
+        keywords="House of Urvaah returns, refund policy, exchange policy, garment returns, order cancellations"
       />
       {/* 1. HERO HEADER */}
       <section className="w-full max-w-[960px] mx-auto px-4 sm:px-8 md:px-12 mb-8 md:mb-12">
@@ -25,7 +26,7 @@ export const ReturnRefundPolicy = () => {
             Cancellation, Return &amp; Refund Policy
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 font-serif italic mb-4">
-            Last updated: November 24, 2026
+            Last updated: November 27, 2026
           </p>
           <div className="w-12 h-[1px] bg-neutral-900/30" />
         </motion.div>
@@ -45,7 +46,15 @@ export const ReturnRefundPolicy = () => {
               1. Overview
             </h2>
             <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
-              At House of Urvaah, we want you to love what you order. This policy explains how order cancellations, returns, exchanges and refunds work when you shop with us on our website and mobile application (the &quot;Platform&quot;). It should be read together with our Shipping &amp; Delivery Policy and Terms &amp; Conditions.
+              At House of Urvaah, we want you to love what you order. This policy explains how order cancellations, returns, exchanges and refunds work when you shop with us on our website and mobile application (the &quot;Platform&quot;). It should be read together with our{' '}
+              <Link to="/shipping-delivery-policy" className="underline underline-offset-4 hover:text-neutral-900 transition-colors font-normal">
+                Shipping &amp; Delivery Policy
+              </Link>{' '}
+              and{' '}
+              <Link to="/terms-and-conditions" className="underline underline-offset-4 hover:text-neutral-900 transition-colors font-normal">
+                Terms &amp; Conditions
+              </Link>
+              .
             </p>
             <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               By placing an order with House of Urvaah, you agree to the terms set out in this policy.
@@ -61,21 +70,21 @@ export const ReturnRefundPolicy = () => {
             {/* 2.1 */}
             <div className="space-y-2 sm:space-y-3">
               <h3 className="text-sm sm:text-base font-serif font-semibold text-neutral-900 text-left">
-                2.1 Before Your Order is Shipped
+                2.1 Before Your Order Is Shipped
               </h3>
               <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
                 You can cancel your order free of cost as long as it hasn&apos;t been packed or dispatched yet.
               </p>
               <ul className="space-y-2 pl-5 sm:pl-6 list-disc marker:text-neutral-400 text-left sm:text-justify [text-justify:inter-word]">
                 <li>To cancel, go to &quot;My Orders&quot; on the Platform and select &quot;Cancel Order,&quot; or contact our support team with your order ID.</li>
-                <li>Once cancelled, a full refund will be initiated to your original payment method (see Section 8 for refund timelines).</li>
+                <li>Once cancelled, a full refund will be initiated to your original payment method (see Section 9 for refund timelines).</li>
               </ul>
             </div>
 
             {/* 2.2 */}
             <div className="space-y-2 sm:space-y-3 pt-2">
               <h3 className="text-sm sm:text-base font-serif font-semibold text-neutral-900 text-left">
-                2.2 After Your Order is Shipped
+                2.2 After Your Order Is Shipped
               </h3>
               <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
                 Once your order has been dispatched, it can no longer be cancelled. However, you may:
@@ -133,7 +142,7 @@ export const ReturnRefundPolicy = () => {
               <ul className="space-y-2 pl-5 sm:pl-6 list-disc marker:text-neutral-400 text-left sm:text-justify [text-justify:inter-word]">
                 <li>Unused, unworn, and unwashed;</li>
                 <li>In its original condition with all tags, labels, and packaging intact;</li>
-                <li>Free from stains, odours, alterations, or damage caused after delivery;</li>
+                <li>Free from stains, odors, alterations, or damage caused after delivery;</li>
                 <li>Accompanied by the original invoice.</li>
               </ul>
             </div>
@@ -331,7 +340,7 @@ export const ReturnRefundPolicy = () => {
                 <span className="font-semibold text-neutral-900">Email:</span>{' '}
                 <a
                   href="mailto:houseofurvaah@yahoo.com"
-                  className="font-normal underline underline-offset-4 hover:text-neutral-900 transition-colors"
+                  className="font-normal underline underline-offset-4 hover:text-neutral-900 transition-colors break-all sm:break-normal"
                 >
                   houseofurvaah@yahoo.com
                 </a>
@@ -340,7 +349,7 @@ export const ReturnRefundPolicy = () => {
                 <span className="font-semibold text-neutral-900">Phone:</span>{' '}
                 <a
                   href="tel:+919833325657"
-                  className="font-normal underline underline-offset-4 hover:text-neutral-900 transition-colors"
+                  className="font-normal underline underline-offset-4 hover:text-neutral-900 transition-colors break-all sm:break-normal"
                 >
                   +91 98333 25657
                 </a>
@@ -361,13 +370,6 @@ export const ReturnRefundPolicy = () => {
             </h2>
             <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               House of Urvaah may update this policy from time to time to reflect changes in our processes or applicable regulations. The updated version will be posted on this page with a revised effective date.
-            </p>
-          </div>
-
-          {/* CLOSING NOTICE */}
-          <div className="pt-6 sm:pt-8 border-t border-neutral-200 text-center">
-            <p className="max-w-3xl mx-auto text-xs sm:text-sm text-neutral-500 italic leading-relaxed text-left sm:text-center">
-              This Cancellation, Return, Exchange &amp; Refund Policy is provided as a starting draft and should be reviewed by a qualified legal professional before publishing, to ensure it accurately reflects House of Urvaah&apos;s actual return process, timelines, and compliance with applicable consumer protection laws (including the Consumer Protection Act, 2019 and the Consumer Protection (E-Commerce) Rules, 2020, if operating in India).
             </p>
           </div>
         </motion.article>
