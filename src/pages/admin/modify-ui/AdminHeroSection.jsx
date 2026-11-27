@@ -44,7 +44,7 @@ const DEVICE_META = {
   mobile: {
     label: 'Mobile',
     icon: Smartphone,
-    hint: 'Recommended: 9:16 vertical (1080×1920). Keep logo and models inside the centre 880×1660 area.',
+    hint: 'Recommended: 9:20 vertical (e.g. 1080×2400) or 9:16 (1080×1920). Fills full mobile screen edge-to-edge.',
     listInfo: 'Mobile view: shown to phone visitors (screens under 768px).',
     fallback: 'With no active mobile slide, phones play the default House of Urvaah mobile video.'
   }
@@ -739,7 +739,7 @@ export const AdminHeroSection = () => {
                       <span className="uppercase font-mono text-[10px]">Type: {formIsVideo ? 'video' : 'image'}</span>
                     </div>
                     <div className={`rounded-lg bg-neutral-900 overflow-hidden relative ${
-                      modalDevice === 'mobile' ? 'w-36 aspect-[9/16] mx-auto' : 'w-full aspect-video'
+                      modalDevice === 'mobile' ? 'w-36 aspect-[9/20] mx-auto' : 'w-full aspect-video'
                     }`}>
                       {formIsVideo ? (
                         <video
@@ -878,7 +878,7 @@ export const AdminHeroSection = () => {
             >
               <X className="w-5 h-5" />
             </button>
-            <div className={`w-full flex items-center justify-center bg-black ${previewMedia.device === 'mobile' ? 'aspect-[9/16]' : 'aspect-video'}`}>
+            <div className={`w-full flex items-center justify-center bg-black ${previewMedia.device === 'mobile' ? 'aspect-[9/20]' : 'aspect-video'}`}>
               {previewMedia.type !== 'image' ? (
                 <video src={previewMedia.url} controls autoPlay className="w-full h-full object-contain" />
               ) : (

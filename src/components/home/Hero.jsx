@@ -107,12 +107,11 @@ export const Hero = () => {
     }
   }, [currentMediaUrl, isMobile, isLoaded]);
 
-  // Mobile (< 768px): the hero box is exactly 9:16 (full width, height from the
-  // aspect ratio, NOT 100vh/100svh), so a 9:16 mobile video/image fills it with
-  // object-cover and nothing is cropped on any phone width.
-  // Desktop (>= 768px): unchanged full-screen hero.
+  // Mobile (< 768px) & Desktop (>= 768px): full viewport height (h-screen / 100dvh).
+  // A 9:20 vertical video fills 100% of the mobile phone screen edge-to-edge with
+  // object-cover and zero blank white space.
   return (
-    <section className="relative w-full aspect-[9/16] md:aspect-auto md:h-screen md:supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
+    <section className="relative w-full h-screen supports-[height:100dvh]:h-[100dvh] overflow-hidden bg-white text-brand-dark font-serif select-none">
       {/* Full-bleed Looping Cinematic Media Background */}
       <div className="absolute inset-0 z-0 bg-[#ede1e0]">
         {!isLoaded ? null : isVideo ? (

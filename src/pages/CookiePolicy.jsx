@@ -268,12 +268,12 @@ export const CookiePolicy = () => {
             <p className="text-neutral-700 leading-relaxed text-left sm:text-justify [text-justify:inter-word]">
               If you have any questions about our use of cookies or this Cookie Policy, please reach out to us:
             </p>
-            <div className="bg-neutral-50 p-4 sm:p-6 border border-neutral-200 space-y-2 text-xs sm:text-sm text-neutral-700 text-left">
+            <div className="space-y-2 text-neutral-700 leading-relaxed text-left">
               <p>
                 <strong className="font-semibold text-neutral-900">Direct Inquiries:</strong>{' '}
                 <a
                   href="mailto:houseofurvaah@yahoo.com"
-                  className="underline underline-offset-4 hover:text-neutral-900 transition-colors break-all sm:break-normal"
+                  className="underline underline-offset-4 font-normal hover:text-neutral-900 transition-colors break-all sm:break-normal"
                 >
                   houseofurvaah@yahoo.com
                 </a>
@@ -282,7 +282,7 @@ export const CookiePolicy = () => {
                 <strong className="font-semibold text-neutral-900">Customer Support:</strong>{' '}
                 <a
                   href="mailto:houseofurvaah@yahoo.com"
-                  className="underline underline-offset-4 hover:text-neutral-900 transition-colors break-all sm:break-normal"
+                  className="underline underline-offset-4 font-normal hover:text-neutral-900 transition-colors break-all sm:break-normal"
                 >
                   houseofurvaah@yahoo.com
                 </a>
